@@ -56,13 +56,9 @@ OnInit.final("ItemLookup", function(Require)
             ITEM_LOOKUP[itemid](p, pid, u, itm)
         end
 
-        -- kill quests
-        if KillQuest[itemid][0] ~= 0 and itemtype == ITEM_TYPE_CAMPAIGN then
-            KillQuestHandler(pid, itemid)
-
         -- Buyables / Shops
         -- church donation
-        elseif itemid == FourCC('I07Q') and not CHURCH_DONATION[pid] then
+        if itemid == FourCC('I07Q') and not CHURCH_DONATION[pid] then
             ChargeNetworth(p, 0, 0.01, 100, "")
             CHURCH_DONATION[pid] = true
             donation = donation - donationrate

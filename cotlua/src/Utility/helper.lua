@@ -1426,21 +1426,6 @@ function GetLine(line, contents)
     return ""
 end
 
----@param pid integer
-function DisplayQuestProgress(pid)
-    local i = 0 ---@type integer 
-    local flag = (CHAOS_MODE and 1) or 0
-    local index = KillQuest[flag][i]
-
-    while index ~= 0 do
-        local s = (KillQuest[index].count == KillQuest[index].goal and "|cff40ff40") or ""
-
-        DisplayTimedTextToPlayer(Player(pid - 1), 0, 0, 10, KillQuest[index].name .. ": " .. s .. (KillQuest[index].count) .. "/" .. (KillQuest[index].goal) .. "|r |cffffcc01LVL " .. (KillQuest[index].min) .. "-" .. (KillQuest[index].max))
-        i = i + 1
-        index = KillQuest[flag][i]
-    end
-end
-
 ---@return boolean
 function ConfirmDeleteCharacter()
     local pid   = GetPlayerId(GetTriggerPlayer()) + 1
