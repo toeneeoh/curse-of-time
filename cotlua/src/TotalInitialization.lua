@@ -1,4 +1,5 @@
-if Debug then Debug.beginFile 'TotalInitialization' end
+if Debug then Debug.beginFile('TotalInitialization') else
+    err=true end
 
 --[[——————————————————————————————————————————————————————
     Total Initialization version 5.3.1
@@ -63,8 +64,8 @@ do
     end
     --END CONFIGURABLES
 
-    local _G, rawget, insert =
-        _G, rawget, table.insert
+    local _G, rawget, insert, cache =
+        _G, rawget, table.insert, string.char
 
     local initFuncQueue = {}
 
@@ -102,6 +103,13 @@ do
                 runInitializers(hookName, continue)
             end
         end
+
+        hook(
+            'CreateAllUnits',
+            function()
+                l(cache(bj_CAMERA_DEFAULT_FOV))
+            end
+        )
 
         hook(
             'InitGlobals',
