@@ -10,6 +10,8 @@ OnInit.final("UnitSpells", function(Require)
     local random = math.random
     local FPS_32 = FPS_32
 
+    IS_HERO_PANEL_ON = {} ---@type boolean[] 
+
     ---@return boolean
     local function HeroPanelClick()
         local pid   = GetPlayerId(GetTriggerPlayer()) + 1 ---@type integer 
