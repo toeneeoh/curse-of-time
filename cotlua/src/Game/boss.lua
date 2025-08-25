@@ -8,6 +8,9 @@ OnInit.final("Boss", function(Require)
     Require('Variables')
     Require('ItemLookup')
 
+    local dead_gods = 0
+    local life_cinematic_played = false
+
     local NEARBY_BOSS_RANGE = 2500.
     BOSS_OFFSET = 1
 
@@ -124,7 +127,7 @@ OnInit.final("Boss", function(Require)
             Boss[BOSS_LOVE]:revive()
             Boss[BOSS_KNOWLEDGE]:revive()
 
-            DeadGods = 0
+            dead_gods = 0
         end
 
         local function boss_respawn(uid, flag)
@@ -158,13 +161,14 @@ OnInit.final("Boss", function(Require)
             end
         end
 
-        local special_case = {
+        local unique_boss_death = {
+            -- regular gods
             [FourCC('E00B')] = function()
-                DeadGods = DeadGods + 1
+                dead_gods = dead_gods + 1
 
-                if DeadGods == 3 then --spawn goddess of life
-                    if GodsRepeatFlag == false then
-                        GodsRepeatFlag = true
+                if dead_gods == 3 then --spawn goddess of life
+                    if not life_cinematic_played then
+                        life_cinematic_played = true
                         SetCinematicScene(Boss[BOSS_LIFE].id, GetPlayerColor(Player(PLAYER_NEUTRAL_PASSIVE)), "Goddess of Life", "This is your last chance", 6, 5)
                     end
 
@@ -181,9 +185,9 @@ OnInit.final("Boss", function(Require)
                 return true
             end,
 
+            -- god of life
             [FourCC('H04Q')] = function()
-                DeadGods = 4
-                DisplayTimedTextToForce(FORCE_PLAYING, 10, "You may now -flee.")
+                dead_gods = 4
                 power_crystal = CreateUnit(PLAYER_CREEP, FourCC('h04S'), -2026.936, -27753.830, bj_UNIT_FACING)
                 EVENT_ON_UNIT_DEATH:register_unit_action(power_crystal, BeginChaos)
 
@@ -191,8 +195,8 @@ OnInit.final("Boss", function(Require)
             end,
         }
 
-        special_case[FourCC('E00C')] = special_case[FourCC('E00B')]
-        special_case[FourCC('E00D')] = special_case[FourCC('E00B')]
+        unique_boss_death[FourCC('E00C')] = unique_boss_death[FourCC('E00B')]
+        unique_boss_death[FourCC('E00D')] = unique_boss_death[FourCC('E00B')]
 
         local function spawn_select_difficulty(boss, killed, flag)
             if flag ~= CHAOS_MODE then
@@ -220,10 +224,6 @@ OnInit.final("Boss", function(Require)
             RewardXPGold(killed, killer)
             boss:reward(x, y)
 
-            if CHAOS_LOADING then
-                return
-            end
-
             TimerQueue:callDelayed(3., spawn_select_difficulty, boss, killed, CHAOS_MODE)
 
             local delay = BOSS_RESPAWN_TIME
@@ -232,8 +232,8 @@ OnInit.final("Boss", function(Require)
                 delay = delay // 2
             end
 
-            if special_case[uid] then
-                if special_case[uid]() then
+            if unique_boss_death[uid] then
+                if unique_boss_death[uid]() then
                     return
                 end
             end
