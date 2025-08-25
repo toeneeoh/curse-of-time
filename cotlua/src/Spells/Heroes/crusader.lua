@@ -19,7 +19,7 @@ OnInit.final("CrusaderSpells", function(Require)
 
         function thistype.onHit(target, source, amount, damage_type)
             --soul link
-            buff = SoulLinkBuff:get(nil, target)
+            local buff = SoulLinkBuff:get(nil, target)
 
             if buff then
                 amount.value = 0.
