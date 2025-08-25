@@ -58,6 +58,31 @@ OnInit.final("Chaos", function(Require)
         return false
     end
 
+    local forgotten_spawner = nil ---@type unit 
+    local forgotten_count    = 0 ---@type integer 
+    local forgotten_types = {
+        FourCC('o030'), -- corpse basher
+        FourCC('o033'), -- destroyer
+        FourCC('o036'), -- spirit
+        FourCC('o02W'), -- warrior
+        FourCC('o02Y'), -- monster
+    }
+
+
+    ---@type fun(num: integer)
+    local function spawn_forgotten(num)
+        if UnitAlive(forgotten_spawner) and forgotten_count < 5 then
+            for _ = 1, num do
+                local id = forgotten_types[GetRandomInt(0, 4)] ---@type integer 
+
+                forgotten_count = forgotten_count + 1
+                CreateUnit(PLAYER_CREEP, id, 13699 + GetRandomInt(-250, 250), -14393 + GetRandomInt(-250, 250), GetRandomInt(0, 359))
+            end
+
+            TimerQueue:callDelayed(60., spawn_forgotten, 1)
+        end
+    end
+
     function SetupChaos()
         BANISH_FLAG = false
 
@@ -198,8 +223,8 @@ OnInit.final("Chaos", function(Require)
 
         forgotten_spawner = CreateUnit(PLAYER_BOSS, FourCC('o02E'), 15100., -12650., bj_UNIT_FACING)
         SetUnitAnimation(forgotten_spawner, "Stand Work")
-        SpawnForgotten(5)
-        TimerQueue:callDelayed(60., SpawnForgotten, 1)
+        spawn_forgotten(5)
+        TimerQueue:callDelayed(60., spawn_forgotten, 1)
 
         SetCineFilterTexture("ReplaceableTextures\\CameraMasks\\Black_mask.blp")
         SetCineFilterBlendMode(BLEND_MODE_BLEND)
@@ -250,6 +275,8 @@ OnInit.final("Chaos", function(Require)
         TimerQueue:callDelayed(3., SetupChaos)
     end
 
+    local GodsEnterFlag = false ---@type boolean 
+
     -- setup god portal actions
     local function start_god_fight(p, pid, u, itm)
         if god_portal ~= nil and TableHas(GODS_GROUP, p) == false and CHAOS_MODE == false then
@@ -261,7 +288,6 @@ OnInit.final("Chaos", function(Require)
 
             if GodsEnterFlag == false then
                 GodsEnterFlag = true
-                DisplayTextToForce(FORCE_PLAYING, "This is your last chance to -flee.")
 
                 SetCinematicScene(GetUnitTypeId(zeknen), GetPlayerColor(PLAYER_BOSS), "Zeknen", "Explain yourself or be struck down from this heaven!", 9, 8)
                 TimerQueue:callDelayed(10., ZeknenExpire)
