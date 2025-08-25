@@ -1302,10 +1302,48 @@ function NearbyRect(r, x, y)
     return false
 end
 
+---@type fun(pt: PlayerTimer)
+function DelayAnimationExpire(pt)
+    if pt.pause then
+        BlzPauseUnitEx(pt.target, false)
+    end
+
+    if pt.dur > 0. then
+        SetUnitTimeScale(pt.target, pt.dur)
+    end
+
+    if UnitAlive(pt.target) then
+        SetUnitAnimationByIndex(pt.target, pt.index)
+    end
+
+    pt:destroy()
+end
+
+---@type fun(pid: integer, u: unit, delay: number, index: integer, timescale: number, pause: boolean)
+function DelayAnimation(pid, u, delay, index, timescale, pause)
+    local pt = TimerList[pid]:add() ---@type PlayerTimer
+
+    pt.target = u
+    pt.index = index
+    pt.pause = false
+    pt.dur = timescale
+
+    if pause then
+        BlzPauseUnitEx(u, true)
+        pt.pause = true
+    end
+
+    pt.timer:callDelayed(delay, DelayAnimationExpire, pt)
+end
+
+--#region TODO: move lighting stuff somewhere?
+
+local CustomLighting = __jarray(0)
+
 ---@param i integer
 ---@param x number
 ---@param y number
-function CustomLightingPlayerCheck(i, x, y)
+local function CustomLightingPlayerCheck(i, x, y)
     local daynightmodel = DEFAULT_LIGHTING ---@type string 
 
     CustomLighting[i] = 1
@@ -1349,43 +1387,10 @@ function CustomLightingPlayerCheck(i, x, y)
     end
 end
 
----@type fun(pt: PlayerTimer)
-function DelayAnimationExpire(pt)
-    if pt.pause then
-        BlzPauseUnitEx(pt.target, false)
-    end
-
-    if pt.dur > 0. then
-        SetUnitTimeScale(pt.target, pt.dur)
-    end
-
-    if UnitAlive(pt.target) then
-        SetUnitAnimationByIndex(pt.target, pt.index)
-    end
-
-    pt:destroy()
-end
-
----@type fun(pid: integer, u: unit, delay: number, index: integer, timescale: number, pause: boolean)
-function DelayAnimation(pid, u, delay, index, timescale, pause)
-    local pt = TimerList[pid]:add() ---@type PlayerTimer
-
-    pt.target = u
-    pt.index = index
-    pt.pause = false
-    pt.dur = timescale
-
-    if pause then
-        BlzPauseUnitEx(u, true)
-        pt.pause = true
-    end
-
-    pt.timer:callDelayed(delay, DelayAnimationExpire, pt)
-end
 
 ---@param p player
 ---@param r rect
-function SetCameraBoundsRectForPlayerEx(p, r)
+local function SetCameraBoundsRectForPlayerEx(p, r)
     local minX = GetRectMinX(r) ---@type number 
     local minY = GetRectMinY(r) ---@type number 
     local maxX = GetRectMaxX(r) ---@type number 
@@ -1400,6 +1405,23 @@ function SetCameraBoundsRectForPlayerEx(p, r)
         SetCameraBounds(minX, minY, minX, maxY, maxX, maxY, maxX, minY)
     end
 end
+
+function SetCamera(pid, r)
+    local data = REGION_DATA[r]
+
+    if data.vision then
+        SetCameraBoundsRectForPlayerEx(Player(pid - 1), data.vision)
+    end
+
+    if Hero[pid] then
+        PanCameraToTimedForPlayer(Player(pid - 1), GetUnitX(Hero[pid]), GetUnitY(Hero[pid]), 0.)
+    end
+
+    if data.minimap then
+        SetMinimapTexture(pid, data.minimap)
+    end
+end
+--#endregion
 
 ---@type fun(u: unit)
 function ResetPathing(u)
@@ -1484,24 +1506,19 @@ function PlayerCleanup(pid)
 
     PLAYER_SELECTED_UNIT[pid] = nil
 
-    -- TODO: Use this more
-    EVENT_ON_CLEANUP:trigger(pid)
-
     -- cleanup bound items
     ALICE_ForAllObjectsDo(CleanupBoundItems, "item", valid_item, p)
 
+    -- TODO: Use this more
+    EVENT_ON_CLEANUP:trigger(pid)
+
     RemovePlayerUnits(pid)
     SetCameraLocked(pid, false)
-    Hero[pid] = nil
-    HeroID[pid] = 0
-    Backpack[pid] = nil
     IS_AUTO_ATTACK_OFF[pid] = false
     SetCurrency(pid, GOLD, 0)
     SetCurrency(pid, PLATINUM, 0)
     SetCurrency(pid, CRYSTAL, 0)
-    ItemGoldRate[pid] = 0
     CustomLighting[pid] = 1
-    IS_FLEEING[pid] = false
 
     if GetLocalPlayer() == p then
         BlzFrameSetVisible(DPS_FRAME, false)
@@ -1784,7 +1801,7 @@ function RewardXPGold(killed, killer)
 
     for i = 1, #xpgroup do
         local pid = xpgroup[i]
-        local XP = math.floor(expbase * XP_Rate[pid])
+        local XP = math.floor(expbase * Unit[Hero[pid]].xp_rate)
 
         AwardGold(pid, teamgold, false)
         AwardXP(pid, XP)
@@ -1875,20 +1892,6 @@ function ToggleAutoAttack(pid)
         IS_AUTO_ATTACK_OFF[pid] = true
         DisplayTimedTextToPlayer(Player(pid - 1), 0, 0, 10, "Toggled Auto Attacking off.")
         BlzSetUnitWeaponBooleanField(Hero[pid], UNIT_WEAPON_BF_ATTACKS_ENABLED, 0, false)
-    end
-end
-
----@type fun(num: integer)
-function SpawnForgotten(num)
-    if UnitAlive(forgotten_spawner) and forgottenCount < 5 then
-        for _ = 1, num do
-            local id = forgottenTypes[GetRandomInt(0, 4)] ---@type integer 
-
-            forgottenCount = forgottenCount + 1
-            CreateUnit(PLAYER_CREEP, id, 13699 + GetRandomInt(-250, 250), -14393 + GetRandomInt(-250, 250), GetRandomInt(0, 359))
-        end
-
-        TimerQueue:callDelayed(60., SpawnForgotten, 1)
     end
 end
 
@@ -2074,22 +2077,6 @@ function CastSpell(u, id, dur, anim, timescale)
     TimerQueue:callDelayed(dur, finish_cast, u)
 end
 
-function SetCamera(pid, r)
-    local data = REGION_DATA[r]
-
-    if data.vision then
-        SetCameraBoundsRectForPlayerEx(Player(pid - 1), data.vision)
-    end
-
-    if Hero[pid] then
-        PanCameraToTimedForPlayer(Player(pid - 1), GetUnitX(Hero[pid]), GetUnitY(Hero[pid]), 0.)
-    end
-
-    if data.minimap then
-        SetMinimapTexture(pid, data.minimap)
-    end
-end
-
 ---@type fun(pid: integer, x: number, y: number)
 function MoveHero(pid, x, y)
     SetUnitXBounded(Hero[pid], x)
@@ -2121,13 +2108,8 @@ end
 ---@param pid integer
 function ExperienceControl(pid)
     local level = GetHeroLevel(Hero[pid]) ---@type integer 
-    local xpRate = BASE_XP_RATE[level] ---@type number 
 
-    if IS_IN_STRUGGLE[pid] then
-        xpRate = xpRate * .3
-    end
-
-    XP_Rate[pid] = math.max(0, xpRate * (1. + 0.04 * PrestigeTable[pid][0]))
+    Unit[Hero[pid]].xp_rate = math.max(0, BASE_XP_RATE[level])
 end
 
 ---@type fun(pid: integer, texture: string)
@@ -2452,8 +2434,8 @@ end
 
 ---@param p player
 function CleanupSummons(p)
-    for i = 1, #SummonGroup do
-        local target = SummonGroup[i]
+    for i = 1, #PLAYER_SUMMONS do
+        local target = PLAYER_SUMMONS[i]
         if GetOwningPlayer(target) == p then
             SummonExpire(target)
         end
@@ -2466,8 +2448,8 @@ function RecallSummons(pid)
     local x = GetUnitX(Hero[pid]) + 200 * math.cos(bj_DEGTORAD * GetUnitFacing(Hero[pid])) ---@type number 
     local y = GetUnitY(Hero[pid]) + 200 * math.sin(bj_DEGTORAD * GetUnitFacing(Hero[pid])) ---@type number 
 
-    for i = 1, #SummonGroup do
-        local target = SummonGroup[i]
+    for i = 1, #PLAYER_SUMMONS do
+        local target = PLAYER_SUMMONS[i]
         if GetOwningPlayer(target) == p and (GetUnitTypeId(target) == SUMMON_HOUND or GetUnitTypeId(target) == SUMMON_GOLEM or GetUnitTypeId(target) == SUMMON_DESTROYER) and IsUnitHidden(target) == false then
             SetUnitPosition(target, x, y)
             SetUnitPathing(target, false)
@@ -2870,7 +2852,7 @@ end
 local applyblackmask = function(tbl, fadedur, fade)
     for _, pid in ipairs(tbl) do
         pid = (type(pid) == "userdata" and GetPlayerId(pid) + 1) or pid
-        player_fog[pid] = false
+        WeatherBuff.player_fog[pid] = false
 
         if GetLocalPlayer() == Player(pid - 1) then
             SetCineFilterTexture("ReplaceableTextures\\CameraMasks\\Black_mask.blp")
