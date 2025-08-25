@@ -162,13 +162,6 @@ OnInit.final("Units", function(Require)
     setup_unit(FourCC('n026'), 22, 7, 1) -- dimensional planewalker
     setup_unit(FourCC('n03T'), 18, 7, 1) -- dimensional planeshifter
 
-    -- forgotten units
-    forgottenTypes[0] = FourCC('o030') -- corpse basher
-    forgottenTypes[1] = FourCC('o033') -- destroyer
-    forgottenTypes[2] = FourCC('o036') -- spirit
-    forgottenTypes[3] = FourCC('o02W') -- warrior
-    forgottenTypes[4] = FourCC('o02Y') -- monster
-
     ---@param flag integer
     function SpawnCreeps(flag)
         for i = 0, UNIT_COUNT - 1 do
@@ -205,7 +198,6 @@ OnInit.final("Units", function(Require)
     PauseUnit(zeknen, true)
     UnitAddAbility(zeknen, FourCC('Avul'))
     EVENT_ON_UNIT_DEATH:register_unit_action(zeknen, function()
-        DeadGods = 0
         SetCinematicScene(Boss[BOSS_LIFE].id, GetPlayerColor(Player(PLAYER_NEUTRAL_PASSIVE)), "Goddess of Life", "You are foolish to challenge us in our realm. Prepare yourself.", 9, 7)
 
         DestroyEffect(AddSpecialEffect("Abilities\\Spells\\Items\\TomeOfRetraining\\TomeOfRetrainingCaster.mdl", GetUnitX(Boss[BOSS_HATE].unit), GetUnitY(Boss[BOSS_HATE].unit)))
