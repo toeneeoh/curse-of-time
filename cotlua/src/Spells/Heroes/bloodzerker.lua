@@ -229,7 +229,7 @@ OnInit.final("BloodzerkerSpells", function(Require)
 
         function thistype.onHit(target, source, amount, amount_after_red, damage_type)
             --undying rage delayed damage
-            buff = UndyingRageBuff:get(nil, target)
+            local buff = UndyingRageBuff:get(nil, target)
 
             if buff then
                 amount.value = 0.
