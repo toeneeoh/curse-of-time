@@ -243,7 +243,7 @@ OnInit.final("ItemSpells", function(Require)
         function thistype.onUnequip(itm, id, index)
             EVENT_ON_HIT:unregister_unit_action(itm.holder, onHit)
             EVENT_ON_STRUCK_MULTIPLIER:unregister_unit_action(itm.holder, onStruck)
-            for _, v in ipairs(SummonGroup) do
+            for _, v in ipairs(PLAYER_SUMMONS) do
                 if itm.owner == GetOwningPlayer(v) then
                     EVENT_ON_HIT:unregister_unit_action(v, onHit)
                 end
@@ -253,7 +253,7 @@ OnInit.final("ItemSpells", function(Require)
         function thistype.onEquip(itm, id, index)
             EVENT_ON_HIT:register_unit_action(itm.holder, onHit)
             EVENT_ON_STRUCK_MULTIPLIER:register_unit_action(itm.holder, onStruck)
-            for _, v in ipairs(SummonGroup) do
+            for _, v in ipairs(PLAYER_SUMMONS) do
                 if itm.owner == GetOwningPlayer(v) then
                     EVENT_ON_HIT:register_unit_action(v, onHit)
                 end
