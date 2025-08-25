@@ -642,7 +642,7 @@ OnInit.global("Buffs", function(Require)
         function thistype:onApply()
             self.armor = ROYALPLATE.armor(self.tpid) * BOOST[self.tpid]
 
-            if ShieldCount[self.tpid] > 0 then
+            if Unit[self.target].shield_count > 0 then
                 self.armor = self.armor * 1.3
             end
 
@@ -2798,16 +2798,18 @@ OnInit.global("Buffs", function(Require)
     end
 
     ---@class WeatherBuff : Buff
+    ---@field player_fog boolean[]
     WeatherBuff = setmetatable({}, mt)
     do
         local thistype = WeatherBuff
         thistype.RAWCODE         = FourCC('Weat') ---@type integer 
         thistype.DISPEL_TYPE     = BUFF_NONE ---@type integer 
         thistype.STACK_TYPE      = BUFF_STACK_PARTIAL ---@type integer 
+        thistype.player_fog      = {} ---@type boolean[]
 
         function thistype:onRemove()
-            if player_fog[self.tpid] and GetLocalPlayer() == GetOwningPlayer(self.target) and self.target == Hero[self.tpid] then
-                player_fog[self.tpid] = false
+            if thistype.player_fog[self.tpid] and GetLocalPlayer() == GetOwningPlayer(self.target) and self.target == Hero[self.tpid] then
+                thistype.player_fog[self.tpid] = false
                 SetCineFilterTexture("ReplaceableTextures\\CameraMasks\\HazeAndFogFilter_Mask.blp")
                 SetCineFilterStartColor(171, 174, WeatherTable[self.weather].blue, WeatherTable[self.weather].fog)
                 SetCineFilterEndColor(171, 174, WeatherTable[self.weather].blue, 0)
@@ -2833,7 +2835,7 @@ OnInit.global("Buffs", function(Require)
             self.dr = (1. - WeatherTable[self.weather].dr * 0.01)
 
             if GetLocalPlayer() == GetOwningPlayer(self.target) and WeatherTable[self.weather].fog > 0 and self.target == Hero[self.tpid] then
-                player_fog[self.tpid] = true
+                thistype.player_fog[self.tpid] = true
                 SetCineFilterTexture("ReplaceableTextures\\CameraMasks\\HazeAndFogFilter_Mask.blp")
                 SetCineFilterStartColor(171, 174, WeatherTable[self.weather].blue, 0)
                 SetCineFilterEndColor(171, 174, WeatherTable[self.weather].blue, WeatherTable[self.weather].fog)
