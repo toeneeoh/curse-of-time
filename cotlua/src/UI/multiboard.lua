@@ -475,7 +475,7 @@ OnInit.final("Multiboard", function(Require)
             local log = "[" .. BlzFrameGetText(CLOCK_FRAME_TEXT) .. "] " .. phex .. name .. "|r" .. type .. thex .. GetUnitName(target) .. "|r for " .. text
 
             --toggle summon flag
-            local flags = ((TableHas(SummonGroup, target) or TableHas(SummonGroup, source)) and FLAG_SUMMON) or 0
+            local flags = ((TableHas(PLAYER_SUMMONS, target) or TableHas(PLAYER_SUMMONS, source)) and FLAG_SUMMON) or 0
 
             --toggle player and damage flags
             flags = pid <= PLAYER_CAP and ((flags | (1 << (pid - 1))) + ((heal == false and FLAG_DEALT) or 0)) or flags
