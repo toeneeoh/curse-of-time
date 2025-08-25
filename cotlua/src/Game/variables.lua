@@ -1,7 +1,7 @@
 --[[
     variables.lua
 
-    A big bucket of defined globals.
+    Assorted defined globals / constants
 ]]
 
 OnInit.global("Variables", function()
@@ -599,58 +599,32 @@ OnInit.global("Variables", function()
     MAIN_MAP.centerX = (MAIN_MAP.minX + MAIN_MAP.maxX) / 2.00
     MAIN_MAP.centerY = (MAIN_MAP.minY + MAIN_MAP.maxY) / 2.00
 
-    ItemGoldRate = __jarray(0) ---@type integer[] 
-
-    SummonGroup = {} ---@type unit[]
+    PLAYER_SUMMONS = {} ---@type unit[]
     DAMAGE_TAG = {}
-    IS_FLEEING = {} ---@type boolean[]
-    PlatTag    = "|cffccccccPlatinum Coins|r: " ---@type string 
-    CrystalTag = "|cff6969FFCrystals: |r" ---@type string 
+    PLATINUM_TAG    = "|cffccccccPlatinum Coins|r: " ---@type string 
+    CRYSTAL_TAG = "|cff6969FFCrystals: |r" ---@type string 
     CHAOS_MODE = false ---@type boolean 
     CHAOS_LOADING = false ---@type boolean 
 
-    infoString=__jarray("") ---@type string[] 
-    XP_Rate=__jarray(0) ---@type number[]
-    player_fog = {} ---@type boolean[]
-
     ItemData = array2d(0) ---@type table
-    CosmeticTable = array2d(0) ---@type table
 
     ZOOM = __jarray(0) ---@type integer[]
-
-    forgottenTypes = __jarray(0) ---@type integer[] 
-    forgottenCount         = 0 ---@type integer 
-    forgotten_spawner      = nil ---@type unit 
-    charLight={} ---@type effect[] 
 
     Hero={} ---@type unit[] 
     HeroGrave={} ---@type unit[] 
     Backpack={} ---@type unit[] 
-
     HeroID=__jarray(0) ---@type integer[] 
-    prMulti=__jarray(0) ---@type integer[] 
-    ShieldCount=__jarray(0) ---@type integer[] 
-    HuntedLevel=__jarray(0) ---@type integer[] 
-    CustomLighting=__jarray(0) ---@type integer[] 
 
     BOOST=__jarray(1) ---@type number[] 
     LBOOST=__jarray(1) ---@type number[] 
 
     TOWN_CENTER = Location(-250., 160.) ---@type location 
-    StruggleCenter = Location(28030., 4361.) ---@type location 
-    IS_IN_STRUGGLE = {} ---@type boolean[] 
+    STRUGGLE_CENTER = Location(28030., 4361.) ---@type location 
 
-    DEFAULT_LIGHTING        = "Environment\\DNC\\DNCAshenvale\\DNCAshenValeTerrain\\DNCAshenValeTerrain.mdx" ---@type string 
+    DEFAULT_LIGHTING = "Environment\\DNC\\DNCAshenvale\\DNCAshenValeTerrain\\DNCAshenValeTerrain.mdx" ---@type string 
 
-    BOOST_OFF         = false ---@type boolean 
-
-    GodsEnterFlag         = false ---@type boolean 
-    GodsRepeatFlag         = false ---@type boolean 
-    DeadGods         = 4 ---@type integer 
-    BANISH_FLAG         = false ---@type boolean 
+    BANISH_FLAG = false ---@type boolean 
     GODS_GROUP = {} ---@type player[]
-
-    IS_HERO_PANEL_ON = {} ---@type boolean[] 
 
     EXPERIENCE_TABLE = {}
     GOLD_TABLE = {}
@@ -665,36 +639,20 @@ OnInit.global("Variables", function()
         BASE_XP_RATE[i] = (i <= 1 and 100) or (BASE_XP_RATE[i - 1] * 0.988)
     end
 
-    Gold_Mod = {
-        1,
-        0.55 ^ 0.5,
-        0.50 ^ 0.5,
-        0.45 ^ 0.5,
-        0.40 ^ 0.5,
-        0.35 ^ 0.5,
-    }
-
-    infoString[0] = "Use -info # for see more info about your chosen catagory\n\n -info 1, Unit Respawning\n -info 2, Boss Respawning\n -info 3, Safezone\n -info 4, Hardcore\n -info 5, Perks\n -info 6, Proficiency"
-    infoString[1] = "Units in the overworld will attempt to revive where they died 30 seconds after death. If a player hero/unit is within 800 range they will spawn frozen and invulnerable until no players are around."
-    infoString[2] = "Bosses respawn after 10 minutes and non-hero bosses respawn after 5 minutes, players may choose to fight a stronger version of the boss after defeating them once.\x25"
-    infoString[3] = "The town is protected from enemy invasion and any entering enemy will be teleported back to their original spawn."
-    infoString[4] = [[Hardcore players that die without a reincarnation item/spell will be removed from the game and cannot save/load or start a new character. 
+    INFO_STRING = {}
+    INFO_STRING[0] = "Use -info # for see more info about your chosen catagory\n\n -info 1, Unit Respawning\n -info 2, Boss Respawning\n -info 3, Safezone\n -info 4, Hardcore\n -info 5, Perks\n -info 6, Proficiency"
+    INFO_STRING[1] = "Units in the overworld will attempt to revive where they died 30 seconds after death. If a player hero/unit is within 800 range they will spawn frozen and invulnerable until no players are around."
+    INFO_STRING[2] = "Bosses respawn after 10 minutes and non-hero bosses respawn after 5 minutes, players may choose to fight a stronger version of the boss after defeating them once.\x25"
+    INFO_STRING[3] = "The town is protected from enemy invasion and any entering enemy will be teleported back to their original spawn."
+    INFO_STRING[4] = [[Hardcore players that die without a reincarnation item/spell will be removed from the game and cannot save/load or start a new character. 
     A hardcore hero can only save every 30 minutes- the timer starts upon saving OR upon loading your hardcore hero. 
-    Hardcore heroes receive double the bonus from prestiging.
-    infoString[5] = "Perk Points are earned by completing specific trials for the first time on a character and will apply to ALL of your existing characters when spent."
-    infoString[6] = [[Most items in this game have a proficiency requirement in their description.
+    Hardcore heroes receive double the bonus from prestiging.]]
+    INFO_STRING[5] = "Perk Points are earned by completing specific trials for the first time on a character and will apply to ALL of your existing characters when spent."
+    INFO_STRING[6] = [[Most items in this game have a proficiency requirement in their description.
     While any hero can equip them regardless of proficiency, those lacking proficiency receive 75% of the stats.
     Check your hero's proficiency with -pf.]]
 
-    prMulti[0] = FourCC('A0A3')
-    prMulti[1] = FourCC('A0IW')
-    prMulti[2] = FourCC('A0IX')
-    prMulti[3] = FourCC('A0IY')
-    prMulti[4] = FourCC('A0IZ')
-    prMulti[5] = FourCC('A00A')
-
     --TODO: expand channel fields?
-
     SPELL_FIELD = {} ---@type abilityreallevelfield[] 
     SPELL_FIELD[0] = ABILITY_RLF_ART_DURATION
     SPELL_FIELD[1] = ABILITY_RLF_AREA_OF_EFFECT
@@ -705,14 +663,13 @@ OnInit.global("Variables", function()
     SPELL_FIELD[6] = ABILITY_RLF_DURATION_NORMAL
     SPELL_FIELD_TOTAL = 6 ---@type integer 
 
-    TIER_NAME= {} ---@type string[] 
-    TYPE_NAME= {} ---@type string[] 
-    ITEM_MODEL= {} ---@type integer[] 
-    LEVEL_PREFIX= {} ---@type string[] 
-    SPRITE_RARITY= {} ---@type string[] 
-    ITEM_MULT= {} ---@type number[] 
-    CRYSTAL_PRICE= {} ---@type integer[] 
-    LIMIT_STRING= {} ---@type string[] 
+    TIER_NAME = {} ---@type string[] 
+    TYPE_NAME = {} ---@type string[] 
+    ITEM_MODEL = {} ---@type integer[] 
+    LEVEL_PREFIX = {} ---@type string[] 
+    SPRITE_RARITY = {} ---@type string[] 
+    ITEM_STAT_MULTIPLIER = {} ---@type number[] 
+    CRYSTAL_PRICE = {} ---@type integer[] 
 
     TIER_NAME[0] = ""
     TIER_NAME[1] = "Common"
@@ -821,26 +778,26 @@ OnInit.global("Variables", function()
     SPRITE_RARITY[19] = "war3mapImported\\ChaosBorder.dds"
     SPRITE_RARITY[20] = "war3mapImported\\ChaosBorder.dds"
     --...
-    ITEM_MULT[0] = 0
-    ITEM_MULT[1] = 0.2
-    ITEM_MULT[2] = 0.4
-    ITEM_MULT[3] = 0.6
-    ITEM_MULT[4] = 0.8
-    ITEM_MULT[5] = 1.2
-    ITEM_MULT[6] = 1.6
-    ITEM_MULT[7] = 2.
-    ITEM_MULT[8] = 2.4
-    ITEM_MULT[9] = 3.2
-    ITEM_MULT[10] = 4.
-    ITEM_MULT[11] = 4.8
-    ITEM_MULT[12] = 5.6
-    ITEM_MULT[13] = 7.
-    ITEM_MULT[14] = 8.4
-    ITEM_MULT[15] = 9.8
-    ITEM_MULT[16] = 11.2
-    ITEM_MULT[17] = 13.4
-    ITEM_MULT[18] = 15.6
-    ITEM_MULT[19] = 17.8
+    ITEM_STAT_MULTIPLIER[0] = 0
+    ITEM_STAT_MULTIPLIER[1] = 0.2
+    ITEM_STAT_MULTIPLIER[2] = 0.4
+    ITEM_STAT_MULTIPLIER[3] = 0.6
+    ITEM_STAT_MULTIPLIER[4] = 0.8
+    ITEM_STAT_MULTIPLIER[5] = 1.2
+    ITEM_STAT_MULTIPLIER[6] = 1.6
+    ITEM_STAT_MULTIPLIER[7] = 2.
+    ITEM_STAT_MULTIPLIER[8] = 2.4
+    ITEM_STAT_MULTIPLIER[9] = 3.2
+    ITEM_STAT_MULTIPLIER[10] = 4.
+    ITEM_STAT_MULTIPLIER[11] = 4.8
+    ITEM_STAT_MULTIPLIER[12] = 5.6
+    ITEM_STAT_MULTIPLIER[13] = 7.
+    ITEM_STAT_MULTIPLIER[14] = 8.4
+    ITEM_STAT_MULTIPLIER[15] = 9.8
+    ITEM_STAT_MULTIPLIER[16] = 11.2
+    ITEM_STAT_MULTIPLIER[17] = 13.4
+    ITEM_STAT_MULTIPLIER[18] = 15.6
+    ITEM_STAT_MULTIPLIER[19] = 17.8
     --...
     CRYSTAL_PRICE[0] = 1
     CRYSTAL_PRICE[1] = 1
@@ -926,34 +883,36 @@ OnInit.global("Variables", function()
         [ITEM_STACK + 4] = { tag = "|cff808000Total Time Played|r", priority = 3 }
     }
 
-    LIMIT_STRING[1] = "You can only wear one of this item."
-    LIMIT_STRING[2] = "You only have two feet"
-    LIMIT_STRING[3] = "A second set of wings won't help you fly better"
-    LIMIT_STRING[4] = "You can only wear one Bloody armor"
-    LIMIT_STRING[5] = "You can only use one Bloody weapon"
-    LIMIT_STRING[6] = "You can only wear one Absolute Horror armor"
-    LIMIT_STRING[7] = "You can only use one Absolute Horror weapon"
-    LIMIT_STRING[8] = "You can only wear one Legion armor"
-    LIMIT_STRING[9] = "You can only use one Legion weapon"
-    LIMIT_STRING[10] = "You can only wear one Azazoth armor"
-    LIMIT_STRING[11] = "You can only use one Azazoth weapon"
-    LIMIT_STRING[12] = "You can only use one Slaughterer weapon"
-    LIMIT_STRING[13] = "You can only hold one Forgotten gem"
-    LIMIT_STRING[14] = "You can only wear one Ursine Set"
-    LIMIT_STRING[15] = "You can only wear one Ogre Set"
-    LIMIT_STRING[16] = "You can only wear one Unbroken Set"
-    LIMIT_STRING[17] = "You can only wear one Magnataur Set"
-    LIMIT_STRING[18] = "You can only wear one Demon Set"
-    LIMIT_STRING[19] = "You can only wear one Horror Set"
-    LIMIT_STRING[20] = "You can only wear one Despair Set"
-    LIMIT_STRING[21] = "You can only wear one Abyssal Set"
-    LIMIT_STRING[22] = "You can only wear one Void Set"
-    LIMIT_STRING[23] = "You can only wear one Nightmare Set"
-    LIMIT_STRING[24] = "You can only wear one Hell Set"
-    LIMIT_STRING[25] = "You can only wear one Existence Set"
-    LIMIT_STRING[26] = "You can only wear one Astral Set"
-    LIMIT_STRING[27] = "You can only wear one Dimensional Set"
-    LIMIT_STRING[28] = "You can only wear one Devourer Set"
+    LIMIT_STRING = {
+        "You can only wear one of this item.",
+        "You only have two feet",
+        "A second set of wings won't help you fly better",
+        "You can only wear one Bloody armor",
+        "You can only use one Bloody weapon",
+        "You can only wear one Absolute Horror armor",
+        "You can only use one Absolute Horror weapon",
+        "You can only wear one Legion armor",
+        "You can only use one Legion weapon",
+        "You can only wear one Azazoth armor",
+        "You can only use one Azazoth weapon",
+        "You can only use one Slaughterer weapon",
+        "You can only hold one Forgotten gem",
+        "You can only wear one Ursine Set",
+        "You can only wear one Ogre Set",
+        "You can only wear one Unbroken Set",
+        "You can only wear one Magnataur Set",
+        "You can only wear one Demon Set",
+        "You can only wear one Horror Set",
+        "You can only wear one Despair Set",
+        "You can only wear one Abyssal Set",
+        "You can only wear one Void Set",
+        "You can only wear one Nightmare Set",
+        "You can only wear one Hell Set",
+        "You can only wear one Existence Set",
+        "You can only wear one Astral Set",
+        "You can only wear one Dimensional Set",
+        "You can only wear one Devourer Set",
+    }
 
     --hints
     HINT_TOOLTIP = { ---@type string[]
