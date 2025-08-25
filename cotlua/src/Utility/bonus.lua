@@ -90,8 +90,8 @@ OnInit.global("Bonus", function(Require)
 
         bonus_setters[bonus](u, bonus, amount)
 
-        IncUnitAbilityLevel(u, abil)
-        DecUnitAbilityLevel(u, abil)
+        --IncUnitAbilityLevel(u, abil)
+        --DecUnitAbilityLevel(u, abil)
     end
 
     ---@type fun(u: unit, bonus: integer, amount: number)
