@@ -260,7 +260,6 @@ OnInit.final("HeroSelect", function(Require)
             BlzFrameSetVisible(frame, false)
         end
 
-        ExperienceControl(pid)
         CharacterSetup(pid, false)
     end
 
