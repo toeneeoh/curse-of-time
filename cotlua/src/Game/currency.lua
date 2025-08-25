@@ -124,19 +124,19 @@ OnInit.final("Currency", function(Require)
     --platinum to crystal
     ITEM_LOOKUP[FourCC('I0MF')] = function(p, pid)
         AddCurrency(pid, CRYSTAL, 1)
-        DisplayTimedTextToPlayer(p, 0, 0, 20, CrystalTag .. (GetCurrency(pid, CRYSTAL)))
+        DisplayTimedTextToPlayer(p, 0, 0, 20, CRYSTAL_TAG .. (GetCurrency(pid, CRYSTAL)))
     end
 
     ITEM_LOOKUP[FourCC('I04G')] = function(p, pid)
         AddCurrency(pid, PLATINUM, 1)
         ConversionEffect(pid)
-        DisplayTimedTextToPlayer(p, 0, 0, 20, PlatTag .. (GetCurrency(pid, PLATINUM)))
+        DisplayTimedTextToPlayer(p, 0, 0, 20, PLATINUM_TAG .. (GetCurrency(pid, PLATINUM)))
     end
 
     ITEM_LOOKUP[FourCC('I052')] = function(p, pid)
         ConversionEffect(pid)
         AddCurrency(pid, GOLD, 1000000)
-        DisplayTimedTextToPlayer(p, 0, 0, 20, PlatTag .. (GetCurrency(pid, PLATINUM)))
+        DisplayTimedTextToPlayer(p, 0, 0, 20, PLATINUM_TAG .. (GetCurrency(pid, PLATINUM)))
     end
 
     local setter = {
@@ -179,8 +179,8 @@ OnInit.final("Currency", function(Require)
         local goldWon ---@type integer 
         local platWon ---@type integer 
 
-        goldWon = math.floor(goldawarded * GetRandomReal(0.9,1.1))
-        goldWon = math.floor(goldWon * (1 + (ItemGoldRate[pid] * 0.01)))
+        goldWon = math.floor(goldawarded * GetRandomReal(0.9, 1.1))
+        goldWon = math.floor(goldWon * (1 + (Unit[Hero[pid]].gold_rate * 0.01)))
 
         platWon = goldWon // 1000000
         goldWon = goldWon - platWon * 1000000
@@ -191,7 +191,7 @@ OnInit.final("Currency", function(Require)
         if displaymessage then
             if platWon > 0 then
                 DisplayTimedTextToPlayer(p, 0, 0, 10, "|c00ebeb15You have gained " .. (goldWon) .. " gold and " .. (platWon) .. " platinum coins.|r")
-                DisplayTimedTextToPlayer(p, 0, 0, 10, PlatTag .. (GetCurrency(pid, PLATINUM)))
+                DisplayTimedTextToPlayer(p, 0, 0, 10, PLATINUM_TAG .. (GetCurrency(pid, PLATINUM)))
             else
                 DisplayTimedTextToPlayer(p, 0, 0, 10, "|c00ebeb15You have gained " .. (goldWon) .. " gold.|r")
             end
