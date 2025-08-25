@@ -12,6 +12,8 @@ OnInit.final("UnitTable", function(Require)
     Require('Spells')
 
     local MOVESPEED_CAP = 600
+    local mtype, floor, rawset, rawget = math.type, math.floor, rawset, rawget
+    local EVENT_STAT_CHANGE = EVENT_STAT_CHANGE
 
     ---@class Unit
     ---@field owner player
@@ -77,6 +79,9 @@ OnInit.final("UnitTable", function(Require)
     ---@field aggro_timer integer
     ---@field boss Boss
     ---@field nomanaregen boolean
+    ---@field gold_rate number
+    ---@field shield_count number
+    ---@field xp_rate number
     Unit = {}  ---@type Unit | Unit[]
     do
         local thistype = Unit
@@ -202,16 +207,16 @@ OnInit.final("UnitTable", function(Require)
                 SetUnitYBounded(tbl.unit, val)
             end,
             cc_flat = function(tbl, val)
-                tbl.cc = val * tbl.proxy.cc_percent
+                rawset(tbl.proxy, "cc", val * tbl.proxy.cc_percent)
             end,
             cd_flat = function(tbl, val)
-                tbl.cd = val * tbl.proxy.cd_percent
+                rawset(tbl.proxy, "cd", val * tbl.proxy.cd_percent)
             end,
             cc_percent = function(tbl, val)
-                tbl.cc = tbl.proxy.cc_flat * val
+                rawset(tbl.proxy, "cc", tbl.proxy.cc_flat * val)
             end,
             cd_percent = function(tbl, val)
-                tbl.cd = tbl.proxy.cd_flat * val
+                rawset(tbl.proxy, "cd", tbl.proxy.cd_flat * val)
             end,
             ms_flat = function(tbl, val)
                 tbl.proxy.movespeed = tbl.proxy.overmovespeed or math.min(MOVESPEED_CAP, math.ceil(val * tbl.proxy.ms_percent))
@@ -279,13 +284,13 @@ OnInit.final("UnitTable", function(Require)
 
         local mt = {
                 __index = function(tbl, key)
-                    return (rawget(thistype, key) or rawget(tbl.proxy, key))
+                    return (rawget(thistype, key) or tbl.proxy[key])
                 end,
                 __newindex = function(tbl, key, val)
                     if set_operators[key] then
-                        if math.type(val) == "float" then
+                        if mtype(val) == "float" then
                             -- round to 3 decimals
-                            val = math.floor(val * 1000 + 0.5) / 1000.
+                            val = floor(val * 1000 + 0.5) / 1000.
                         end
                         rawset(tbl.proxy, key, val)
                         set_operators[key](tbl, val)
@@ -298,67 +303,79 @@ OnInit.final("UnitTable", function(Require)
                 end,
             }
 
+        -- default unit data
+        local base_proxy = {
+            damage_percent = 1.,
+            bonus_hp = 0,
+            regen_percent = 1.,
+            regen_max = 0, -- percent of max health (0-100)
+            noregen = false,
+            hidehp = false,
+            bonus_mana = 0,
+            mana_regen_percent = 1.,
+            nomanaregen = false,
+            evasion = 0,
+            bonus_str = 0,
+            bonus_agi = 0,
+            bonus_int = 0,
+            dr = 1., -- resists
+            dm = 1., -- multipliers
+            mm = 1.,
+            cc_percent = 1.,
+            cd_percent = 1.,
+            cc = 0.,
+            cd = 1.,
+            ms_percent = 1.,
+            bonus_bat = 1.,
+            spellboost = 0.,
+            armor_pen_percent = 0.,
+            gold_rate = 0.,
+            shield_count = 0,
+            xp_rate = 0,
+        }
+        base_proxy.__index = base_proxy
+
         ---@type fun(u: unit): Unit
         function thistype.create(u)
             local self = {}
 
             self.owner = GetOwningPlayer(u)
             self.pid = GetPlayerId(self.owner) + 1
+            self.id = GetUnitTypeId(u)
             self.unit = u
             self.attackCount = 0
             self.casting = false
             self.can_attack = true
             self.base_hp = BlzGetUnitMaxHP(u)
             self.base_mana = BlzGetUnitMaxMana(u)
-            self.proxy = { -- used for __newindex behavior
+
+            local default = HERO_STATS[self.id]
+            self.proxy = setmetatable({ -- used for __newindex behavior
                 damage = BlzGetUnitBaseDamage(u, 0),
                 bonus_damage = UnitGetBonus(u, BONUS_DAMAGE),
-                damage_percent = 1.,
                 hp = self.base_hp,
-                bonus_hp = 0,
                 regen_flat = BlzGetUnitRealField(u, UNIT_RF_HIT_POINTS_REGENERATION_RATE),
-                regen_percent = 1.,
-                regen_max = 0, -- percent of max health (0-100)
                 regen = BlzGetUnitRealField(u, UNIT_RF_HIT_POINTS_REGENERATION_RATE),
-                noregen = false,
-                hidehp = false,
                 mana = self.base_mana,
-                bonus_mana = 0,
                 mana_regen_flat = BlzGetUnitRealField(u, UNIT_RF_MANA_REGENERATION),
-                mana_regen_percent = 1.,
-                mana_regen_max = 0.,
+                mana_regen_max = default and default.mana_regen_max or 0.,
                 mana_regen = BlzGetUnitRealField(u, UNIT_RF_MANA_REGENERATION),
-                nomanaregen = false,
-                evasion = 0,
                 str = GetHeroStr(u, false),
                 agi = GetHeroAgi(u, false),
                 int = GetHeroInt(u, false),
-                bonus_str = 0,
-                bonus_agi = 0,
-                bonus_int = 0,
-                dr = 1., -- resists
-                mr = 1.,
-                pr = 1.,
-                dm = 1., -- multipliers
-                mm = 1.,
-                pm = 1.,
-                cc_flat = 0., -- crit
-                cc_percent = 1.,
-                cd_flat = 0.,
-                cd_percent = 1.,
-                cc = 0.,
-                cd = 1.,
+                mr = default and default.magic_resist or 1.,
+                pr = default and default.phys_resist or 1.,
+                pm = default and default.phys_damage or 1.,
+                cc_flat = default and default.crit_chance or 0.,
+                cd_flat = default and default.crit_percent or 0.,
                 ms_flat = GetUnitMoveSpeed(u),
-                ms_percent = 1.,
                 movespeed = GetUnitMoveSpeed(u),
                 bat = BlzGetUnitAttackCooldown(u, 0),
                 base_bat = BlzGetUnitAttackCooldown(u, 0),
-                bonus_bat = 1.,
                 x = GetUnitX(u),
                 y = GetUnitY(u),
-                spellboost = 0.,
-                armor_pen_percent = 0.,
-            }
+            }, base_proxy)
+
             self.original_x = self.proxy.x
             self.original_y = self.proxy.y
             self.orderX = self.proxy.x
