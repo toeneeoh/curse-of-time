@@ -12,20 +12,23 @@ OnInit.final("PhoenixRangerSpells", function(Require)
         local thistype = MULTISHOT
         thistype.enabled = setmetatable({}, {__mode = 'k'}) -- weak keys for units
 
-        local function on_order(source, target, id)
-            local p = GetOwningPlayer(source)
+        local multi_shot_ability = FourCC('A0A3')
 
+        local function on_order(source, target, id)
+            -- toggle on
             if id == ORDER_ID_IMMOLATION then
                 if not thistype.enabled[source] then
-                    SetPlayerAbilityAvailable(p, prMulti[IMinBJ(5, GetHeroLevel(source) // 50)], true)
+                    UnitRemoveAbility(source, multi_shot_ability)
+                    UnitAddAbility(source, multi_shot_ability)
+                    SetUnitAbilityLevel(source, multi_shot_ability, (GetHeroLevel(source) // 50) + 1)
+                    BlzUnitHideAbility(source, multi_shot_ability, true)
                     thistype.enabled[source] = true
                     Unit[source].pm = Unit[source].pm * 0.6
                 end
+            -- toggle off
             elseif id == ORDER_ID_UNIMMOLATION then
                 if thistype.enabled[source] then
-                    for i = 0, 5 do
-                        SetPlayerAbilityAvailable(p, prMulti[i], false)
-                    end
+                    UnitRemoveAbility(source, multi_shot_ability)
                     thistype.enabled[source] = false
                     Unit[source].pm = Unit[source].pm / 0.6
                 end
