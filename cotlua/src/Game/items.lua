@@ -386,7 +386,7 @@ OnInit.final("Items", function(Require)
             SetWidgetLife(u, math.max(1, hp))
             SetUnitState(u, UNIT_STATE_MANA, mana)
 
-            ItemGoldRate[self.pid] = ItemGoldRate[self.pid] + mult * self:getValue(ITEM_GOLD_GAIN, 0)
+            unit.gold_rate = unit.gold_rate + mult * self:getValue(ITEM_GOLD_GAIN, 0)
             unit.spellboost = unit.spellboost + mult * self:getValue(ITEM_SPELLBOOST, 0) * 0.01
             unit.ms_flat = unit.ms_flat + mult * self:getValue(ITEM_MOVESPEED, 0)
             unit.regen_flat = unit.regen_flat + mult * self:getValue(ITEM_REGENERATION, 0)
@@ -412,7 +412,7 @@ OnInit.final("Items", function(Require)
 
             -- shield
             if ItemData[self.id][ITEM_TYPE] == 5 then
-                ShieldCount[self.pid] = ShieldCount[self.pid] + mult * 1
+                unit.shield_count = unit.shield_count + mult * 1
             end
         end
 
@@ -490,8 +490,9 @@ OnInit.final("Items", function(Require)
                             end
                         end
 
-                        IncUnitAbilityLevel(itm.holder, abilid)
-                        DecUnitAbilityLevel(itm.holder, abilid)
+                        --TODO: Unnecessary?
+                        --IncUnitAbilityLevel(itm.holder, abilid)
+                        --DecUnitAbilityLevel(itm.holder, abilid)
                     end
                 end
             end
@@ -541,8 +542,8 @@ OnInit.final("Items", function(Require)
 
             --values are not fixed
             if fixed == 0 then
-                lower = lower + lower * ITEM_MULT[self.level] * pmult
-                upper = upper + upper * ITEM_MULT[self.level] * pmult
+                lower = lower + lower * ITEM_STAT_MULTIPLIER[self.level] * pmult
+                upper = upper + upper * ITEM_STAT_MULTIPLIER[self.level] * pmult
             end
 
             if flag == 1 then
@@ -631,13 +632,16 @@ OnInit.final("Items", function(Require)
             return false
         end
 
-        ---@type fun(self: Item, slot: integer): boolean
-        local function validate_slot(self, slot)
+        ---@param self Item
+        ---@param slot integer
+        ---@return boolean
+        ---@return string? err
+        function ValidateItemSlot(self, slot)
             local type = ItemData[self.id][ITEM_TYPE]
 
             -- restrict by slot type
             if not VerifySlotForType(slot, type) then
-                return false
+                return false, nil
             end
 
             local lvlreq = ItemData[self.id][ITEM_LEVEL_REQUIREMENT] ---@type integer 
@@ -647,15 +651,12 @@ OnInit.final("Items", function(Require)
                 local limited, err = is_item_limited(self)
 
                 if lvlreq > lvl then
-                    DisplayTimedTextToPlayer(Player(self.pid - 1), 0, 0, 15., "This item requires at least level |c00FF5555" .. (lvlreq) .. "|r to equip.")
-                    return false
+                    return false, "This item requires at least level |c00FF5555" .. (lvlreq) .. "|r to equip."
                 elseif limited then
-                    DisplayTextToPlayer(Player(self.pid - 1), 0, 0, err)
-                    return false
+                    return false, err
                 end
             elseif slot >= BACKPACK_INDEX and lvlreq > lvl + 20 then
-                DisplayTimedTextToPlayer(Player(self.pid - 1), 0, 0, 15., "This item requires at least level |c00FF5555" .. (lvlreq - 20) .. "|r to pick up.")
-                return false
+                return false, "This item requires at least level |c00FF5555" .. (lvlreq - 20) .. "|r to pick up."
             end
 
             return true
@@ -690,12 +691,16 @@ OnInit.final("Items", function(Require)
             slot = slot or find_empty_slot(self)
 
             local orig_holder = self.holder
-            local valid = false
+            local valid, err = false, nil
 
             -- validate it (level check, limited check)
-            if slot and validate_slot(self, slot) then
+            if slot then
+                valid, err = ValidateItemSlot(self, slot)
                 self.holder = (slot <= 6 and Hero[self.pid]) or Backpack[self.pid]
-                valid = true
+            end
+
+            if err then
+                DisplayTimedTextToPlayer(Player(self.pid - 1), 0, 0, 15., err)
             end
 
             if self.holder and valid then
