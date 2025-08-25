@@ -13,19 +13,18 @@ OnInit.final("RogueSpells", function(Require)
 
         thistype.bonus = __jarray(0)
         thistype.values = {
-            mult = function(pid) return 400. + GetHeroLevel(Hero[pid]) // 50 * 100. end,
+            mult = function(pid, u) return 400. + GetHeroLevel(u) // 50 * 100. end,
         }
 
-        function thistype.apply(u, pid)
+        function thistype.apply(u)
             Unit[u].cd_flat = Unit[u].cd_flat - thistype.bonus[u]
-            thistype.bonus[u] = thistype.mult(pid)
+            thistype.bonus[u] = thistype.values.mult(nil, u)
             Unit[u].cd_flat = Unit[u].cd_flat + thistype.bonus[u]
         end
 
         function thistype.onSetup(u)
-            local pid = GetPlayerId(GetOwningPlayer(u)) + 1
             Unit[u].cc_percent = 1.2
-            thistype.apply(u, pid)
+            thistype.apply(u)
         end
     end
 
