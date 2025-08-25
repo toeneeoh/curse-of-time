@@ -296,8 +296,8 @@ OnInit.final("BardSpells", function(Require)
                 --auras for allies
                 if BARD_SONG[self.pid] ~= SONG_FATIGUE then
                     BlzSetAbilityRealLevelField(BlzGetUnitAbility(pt.source, BARD_SONG[self.pid]), ABILITY_RLF_AREA_OF_EFFECT, 0, pt.aoe)
-                    IncUnitAbilityLevel(pt.source, BARD_SONG[self.pid])
-                    DecUnitAbilityLevel(pt.source, BARD_SONG[self.pid])
+                    --IncUnitAbilityLevel(pt.source, BARD_SONG[self.pid])
+                    --DecUnitAbilityLevel(pt.source, BARD_SONG[self.pid])
                 end
 
                 if BARD_SONG[self.pid] == SONG_WAR then
