@@ -356,8 +356,8 @@ OnInit.final("HydromancerSpells", function(Require)
 
             BlzSetAbilityIntegerLevelField(BlzGetUnitAbility(pt.source, FourCC('A02O')), ABILITY_ILF_NUMBER_OF_WAVES, 0, pt.dur // 0.6)
             BlzSetAbilityRealLevelField(BlzGetUnitAbility(pt.source, FourCC('A02O')), ABILITY_RLF_AREA_OF_EFFECT, 0, pt.aoe)
-            IncUnitAbilityLevel(pt.source, FourCC('A02O'))
-            DecUnitAbilityLevel(pt.source, FourCC('A02O'))
+            --IncUnitAbilityLevel(pt.source, FourCC('A02O'))
+            --DecUnitAbilityLevel(pt.source, FourCC('A02O'))
             SetUnitOwner(pt.source, Player(self.pid - 1), true)
 
             local b = InfusedWaterBuff:get(nil, self.caster)
