@@ -82,20 +82,17 @@ OnInit.final("Commands", function(Require)
             if GetCurrency(pid, PLATINUM) > 0 then
                 AddCurrency(pid, PLATINUM, -1)
                 AddCurrency(pid, GOLD, 1000000)
-                DisplayTimedTextToPlayer(p, 0, 0, 10, PlatTag .. (GetCurrency(pid, PLATINUM)))
+                DisplayTimedTextToPlayer(p, 0, 0, 10, PLATINUM_TAG .. (GetCurrency(pid, PLATINUM)))
             else
                 DisplayTimedTextToPlayer(p, 0, 0, 20, "You need 1 Platinum Coin to buy this")
             end
-        end,
-        ["-flee"] = function(p, pid, args)
-            FleeCommand(p)
         end,
         ["-cam"] = function(p, pid, args)
             if args[2] then
                 local _, _, zoom, lock = args[2]:find("(\x25d+)\x25s.([lL])")
 
                 if zoom then
-                    if lock == "l" then
+                    if string.lower(lock) == "l" then
                         SetCameraLocked(pid, true)
                     end
                     ZOOM[pid] = MathClamp(tonumber(zoom), 100, 3000)
@@ -103,10 +100,7 @@ OnInit.final("Commands", function(Require)
             end
         end,
         ["-zml"] = function(p, pid, args, cmd)
-            local _, _, lock = cmd:find("[lL]$")
-            if lock == "l" then
-                SetCameraLocked(pid, true)
-            end
+            SetCameraLocked(pid, true)
             ZOOM[pid] = 2500
         end,
         ["-lock"] = function(p, pid, args)
@@ -120,7 +114,7 @@ OnInit.final("Commands", function(Require)
         end,
         ["-info"] = function(p, pid, args)
             local index = (args[2] and S2I(args[2])) or 1
-            DisplayTimedTextToPlayer(p, 0, 0, 30, infoString[index])
+            DisplayTimedTextToPlayer(p, 0, 0, 30, INFO_STRING[index])
         end,
         ["-unstuck"] = function(p, pid, args)
             if GetLocalPlayer() == p then
@@ -303,23 +297,6 @@ local function VoteNo()
         BlzFrameSetEnable(BlzGetTriggerFrame(), false)
         BlzFrameSetEnable(BlzGetTriggerFrame(), true)
         BlzFrameSetVisible(VOTING_BACKDROP, false)
-    end
-end
-
----@type fun(p: player)
-function FleeCommand(p)
-    local pid = GetPlayerId(p) + 1 ---@type integer 
-
-    if IS_IN_STRUGGLE[pid] then
-        IS_FLEEING[pid] = true
-        DisplayTimedTextToPlayer(p, 0, 0, 10, "You will escape once the current wave is complete.")
-    elseif TableHas(GODS_GROUP, p) then
-        if DeadGods == 4 then
-            TableRemove(GODS_GROUP, p)
-            MoveHeroLoc(pid, TOWN_CENTER)
-        else
-            DisplayTimedTextToPlayer(p, 0, 0, 10, "You cannot escape.")
-        end
     end
 end
 
