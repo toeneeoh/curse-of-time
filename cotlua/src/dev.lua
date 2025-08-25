@@ -13,6 +13,8 @@ OnInit.final("Dev", function(Require)
     DEBUG_COUNT         = 0 ---@type integer 
     WEATHER_OVERRIDE    = 0 ---@type integer 
 
+    local BOOST_OFF = false
+
     Require('GameStatus')
     GAME_STATE          = (GAME_STATE == 0) and 2 or GAME_STATE -- keep game state as replay if replay
 
@@ -385,11 +387,9 @@ modifiers:
         ["boost"] = function(p, pid, args)
             if BOOST_OFF then
                 DisplayTextToPlayer(p, 0, 0, "Boost enabled.")
-                BOOST_OFF = false
                 setmetatable(BOOST, nil)
             else
                 DisplayTextToPlayer(p, 0, 0, "Boost disabled.")
-                BOOST_OFF = true
                 local U = User.first
                 while U do
                     BOOST[U.id] = nil
@@ -397,6 +397,8 @@ modifiers:
                 end
                 setmetatable(BOOST, boost_mt)
             end
+
+            BOOST_OFF = not BOOST_OFF
         end,
         ["hurt"] = function(p, pid, args)
             SetWidgetLife(PLAYER_SELECTED_UNIT[pid], GetWidgetLife(PLAYER_SELECTED_UNIT[pid]) - BlzGetUnitMaxHP(PLAYER_SELECTED_UNIT[pid]) * 0.01 * S2I(args[2]))
