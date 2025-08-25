@@ -350,10 +350,6 @@ OnInit.final("Dungeons", function(Require)
             if thistype.timer then
                 thistype.timer:destroy()
             end
-            --[[for _, pid in ipairs(thistype.players) do
-                local XP = R2I(EXPERIENCE_TABLE[300] * XP_Rate[pid])
-                AwardXP(pid, XP)
-            end]]
 
             thistype:endDungeon()
         end
