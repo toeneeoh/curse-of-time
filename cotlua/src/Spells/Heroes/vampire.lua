@@ -75,15 +75,11 @@ OnInit.final("VampireSpells", function(Require)
             thistype.add(pid, thistype.gain(pid))
         end
 
-        local function on_cleanup(pid)
-            thistype.set(pid, 0)
-        end
-
         function thistype.onSetup(u)
             EVENT_ON_HIT:register_unit_action(u, on_hit)
             EVENT_STAT_CHANGE:register_unit_action(u, thistype.refresh)
-            EVENT_ON_CLEANUP:register_action(Unit[u].pid, on_cleanup)
             Unit[u].nomanaregen = true
+            thistype.values.bank[Unit[u].pid] = 0
         end
     end
 
