@@ -9,6 +9,7 @@ OnInit.final("Cosmetics", function(Require)
     Require('Variables')
     Require('MapSetup')
 
+    CosmeticTable = array2d(0) ---@type table
     DONATOR_AURA_OFFSET = 1000 ---@type integer 
 
     IS_DONATOR = {} ---@type boolean[] 
