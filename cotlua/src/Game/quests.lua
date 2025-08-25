@@ -340,7 +340,7 @@ OnInit.final("Quests", function(Require)
                         PlayerAddItemById(pid, reward)
                     end
 
-                    local XP = REWARDS[id].XP * XP_Rate[pid] * 0.01
+                    local XP = REWARDS[id].XP * Unit[Hero[pid]].xp_rate * 0.01
                     AwardXP(pid, XP)
                 else
                     DisplayTextToPlayer(Player(pid - 1), 0, 0, "You do not have the head.")
@@ -437,7 +437,7 @@ OnInit.final("Quests", function(Require)
                         DisplayTimedTextToPlayer(U.player, 0, 0, 10, "|c00c0c0c0" .. KillQuest[index].name .. " quest completed!|r")
                         local GOLD = GOLD_TABLE[avg] * goal * 0.5 / (0.5 + playercount * 0.5)
                         AwardGold(U.id, GOLD, true)
-                        local XP = math.floor(EXPERIENCE_TABLE[max] * XP_Rate[U.id] * goal * 0.0008) / (0.5 + playercount * 0.5)
+                        local XP = math.floor(EXPERIENCE_TABLE[max] * Unit[Hero[U.id]].xp_rate * goal * 0.0008) / (0.5 + playercount * 0.5)
                         AwardXP(U.id, XP)
                     end
 
@@ -505,15 +505,16 @@ OnInit.final("Quests", function(Require)
             local uid      = GetUnitTypeId(killed)
             local unitType = GetType(uid)
             local kpid     = GetPlayerId(GetOwningPlayer(killer)) + 1
+            local kq       = KillQuest[unitType]
 
-            if unitType > 0 and KillQuest[unitType].status == 1 and GetHeroLevel(Hero[kpid]) <= KillQuest[unitType].max + LEECH_CONSTANT then
-                KillQuest[unitType].count = KillQuest[unitType].count + 1
-                FloatingTextUnit(KillQuest[unitType].name .. " " .. (KillQuest[unitType].count) .. "/" .. (KillQuest[unitType].goal), killed, 3.1 ,80, 90, 9, 125, 200, 200, 0, true)
+            if unitType > 0 and kq and kq.status == 1 and GetHeroLevel(Hero[kpid]) <= kq.max + LEECH_CONSTANT then
+                kq.count = kq.count + 1
+                FloatingTextUnit(kq.name .. " " .. (kq.count) .. "/" .. (kq.goal), killed, 3.1 ,80, 90, 9, 125, 200, 200, 0, true)
 
-                if KillQuest[unitType].count >= KillQuest[unitType].goal then
-                    KillQuest[unitType].status = 2
-                    KillQuest[unitType].last = uid
-                    DisplayTimedTextToForce(FORCE_PLAYING, 12, KillQuest[unitType].name .. " quest completed, talk to the Huntsman for your reward.")
+                if kq.count >= kq.goal then
+                    kq.status = 2
+                    kq.last = uid
+                    DisplayTimedTextToForce(FORCE_PLAYING, 12, kq.name .. " quest completed, talk to the Huntsman for your reward.")
                 end
             end
         end
@@ -563,7 +564,6 @@ Maiev|r]], "ReplaceableTextures\\CommandButtons\\BTNJaina.blp")
 -savetime (time until you can save again)
 -restime (time until you can recharge your ankh again)
 -st (show time until next save)
--flee (leave an instance)
 -hints (enables hint messages)
 -nohints (disables hint messages)
 -color # (changes your player color)
