@@ -63,9 +63,8 @@ OnInit.final("Timers", function(Require)
             if profile and profile.playing then
                 profile.hero.time = profile.hero.time + 1
                 profile.total_time = profile.total_time + 1
+                ExperienceControl(U.id)
             end
-
-            ExperienceControl(U.id)
             U = U.next
         end
     end
