@@ -88,7 +88,7 @@ OnInit.final("RoyalGuardianSpells", function(Require)
             BlzSetSpecialEffectYaw(sfx, bj_DEGTORAD * GetUnitFacing(self.caster))
             DestroyEffect(sfx)
 
-            if ShieldCount[self.pid] > 0 then
+            if Unit[self.caster].shield_count > 0 then
                 local ug = CreateGroup()
                 MakeGroupInRange(self.pid, ug, GetUnitX(self.target), GetUnitY(self.target), 300 * LBOOST[self.pid], Condition(FilterEnemy))
                 GroupRemoveUnit(ug, self.target)
