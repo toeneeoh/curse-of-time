@@ -8,12 +8,46 @@ OnInit.final("PVP", function(Require)
     local Arena = {
         {}, {}, {}
     }
+    local on_death
 
     -- frame setup
-    local exit = SimpleButton.create(BlzGetOriginFrame(ORIGIN_FRAME_WORLD_FRAME, 0), "war3mapImported\\ExitButton.blp", 0.03, 0.015, FRAMEPOINT_TOP, FRAMEPOINT_TOP, 0., 0.015)
-    BlzFrameClearAllPoints(exit.frame)
-    BlzFrameSetPoint(exit.frame, FRAMEPOINT_CENTER, BlzGetOriginFrame(ORIGIN_FRAME_WORLD_FRAME, 0), FRAMEPOINT_CENTER, 0, -0.154)
-    BlzFrameSetVisible(exit.frame, false)
+    local exit_button = SimpleButton.create(BlzGetOriginFrame(ORIGIN_FRAME_WORLD_FRAME, 0), "war3mapImported\\ExitButton.blp", 0.03, 0.015, FRAMEPOINT_TOP, FRAMEPOINT_TOP, 0., 0.015)
+    BlzFrameClearAllPoints(exit_button.frame)
+    BlzFrameSetPoint(exit_button.frame, FRAMEPOINT_CENTER, BlzGetOriginFrame(ORIGIN_FRAME_WORLD_FRAME, 0), FRAMEPOINT_CENTER, 0, -0.154)
+    BlzFrameSetVisible(exit_button.frame, false)
+
+    local function on_exit()
+        local p = GetTriggerPlayer()
+        local pid = GetPlayerId(p) + 1
+
+        DisableBackpackTeleports(pid, false)
+
+        if GetLocalPlayer() == p then
+            BlzFrameSetVisible(exit_button.frame, false)
+        end
+
+        MoveHeroLoc(pid, TOWN_CENTER)
+        ArenaQueue[pid] = 0
+        TableRemove(Arena[ARENA_FFA], pid)
+
+        local U = User.first
+        while U do
+                SetPlayerAllianceStateBJ(U.player, Player(pid - 1), bj_ALLIANCE_ALLIED_VISION)
+                SetPlayerAllianceStateBJ(Player(pid - 1), U.player, bj_ALLIANCE_ALLIED_VISION)
+
+                if IS_HERO_PANEL_ON[pid * PLAYER_CAP + U.id] then
+                    ShowHeroPanel(Player(pid - 1), U.player, true)
+                end
+
+                if IS_HERO_PANEL_ON[U.id * PLAYER_CAP + pid] then
+                    ShowHeroPanel(U.player, Player(pid - 1), true)
+                end
+            U = U.next
+        end
+        EVENT_ON_FATAL_DAMAGE:unregister_unit_action(Hero[pid], on_death)
+    end
+
+    exit_button:onClick(on_exit)
     --
 
     ---@type fun(pid: integer): integer?
@@ -62,7 +96,7 @@ OnInit.final("PVP", function(Require)
         end
     end
 
-    local function on_death(killed, killer, amount)
+    on_death = function(killed, killer, amount)
         local pid = GetPlayerId(GetOwningPlayer(killed)) + 1
         local kpid = GetPlayerId(GetOwningPlayer(killer)) + 1
         amount.value = 0
@@ -282,38 +316,6 @@ OnInit.final("PVP", function(Require)
         end
     end
 
-    local function exit_button()
-        local p = GetTriggerPlayer()
-        local pid = GetPlayerId(p) + 1
-
-        DisableBackpackTeleports(pid, false)
-
-        if GetLocalPlayer() == p then
-            BlzFrameSetVisible(exit.frame, false)
-        end
-
-        MoveHeroLoc(pid, TOWN_CENTER)
-        ArenaQueue[pid] = 0
-        TableRemove(Arena[ARENA_FFA], pid)
-
-        local U = User.first
-        while U do
-                SetPlayerAllianceStateBJ(U.player, Player(pid - 1), bj_ALLIANCE_ALLIED_VISION)
-                SetPlayerAllianceStateBJ(Player(pid - 1), U.player, bj_ALLIANCE_ALLIED_VISION)
-
-                if IS_HERO_PANEL_ON[pid * PLAYER_CAP + U.id] then
-                    ShowHeroPanel(Player(pid - 1), U.player, true)
-                end
-
-                if IS_HERO_PANEL_ON[U.id * PLAYER_CAP + pid] then
-                    ShowHeroPanel(U.player, Player(pid - 1), true)
-                end
-            U = U.next
-        end
-        EVENT_ON_FATAL_DAMAGE:unregister_unit_action(Hero[pid], on_death)
-    end
-    exit:onClick(exit_button)
-
     local function enter_pvp()
         local p     = GetTriggerPlayer()
         local pid   = GetPlayerId(p) + 1 ---@type integer 
@@ -355,7 +357,7 @@ OnInit.final("PVP", function(Require)
 
                     EVENT_ON_FATAL_DAMAGE:register_unit_action(Hero[pid], on_death)
                     if GetLocalPlayer() == p then
-                        BlzFrameSetVisible(exit.frame, true)
+                        BlzFrameSetVisible(exit_button.frame, true)
                     end
                     DisableBackpackTeleports(pid, true)
                     DisplayTextToPlayer(p, 0, 0, "You may leave at any time by pressing the EXIT button below.")
