@@ -115,6 +115,10 @@ OnInit.global("Profile", function(Require)
                 profile.save_timer = nil
             end
             profile.autosave = false
+
+            Hero[pid] = nil
+            HeroID[pid] = 0
+            Backpack[pid] = nil
         end
 
         ---@type fun(pid: integer): Profile
@@ -699,13 +703,6 @@ OnInit.global("Profile", function(Require)
                 HeroID[pid] = id
                 PLAYER_SELECTED_UNIT[pid] = hero
 
-                Unit[hero].mr = HERO_STATS[id].magic_resist
-                Unit[hero].pr = HERO_STATS[id].phys_resist
-                Unit[hero].pm = HERO_STATS[id].phys_damage
-                Unit[hero].cc_flat = HERO_STATS[id].crit_chance
-                Unit[hero].cd_flat = HERO_STATS[id].crit_damage
-                Unit[hero].mana_regen_max = HERO_STATS[id].mana_regen_max or 0
-
                 -- backpack
                 local backpack = CreateUnit(Player(pid - 1), BACKPACK, GetRectCenterX(gg_rct_ChurchSpawn), GetRectCenterY(gg_rct_ChurchSpawn), 0)
                 Backpack[pid] = backpack
@@ -942,6 +939,8 @@ OnInit.global("Profile", function(Require)
         EVENT_ON_UNIT_DEATH:register_unit_action(Hero[pid], on_hero_death)
         EVENT_STAT_CHANGE:register_unit_action(Hero[pid], UpdateSpellTooltips)
         EVENT_ON_SETUP:trigger(pid)
+
+        ExperienceControl(pid)
     end
 
 end, Debug and Debug.getLine())
