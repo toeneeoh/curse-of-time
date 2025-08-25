@@ -100,7 +100,7 @@ OnInit.final("DarkSummonerSpells", function(Require)
 
         local function on_cleanup(pid)
             for i = 1, 6 do
-                TableRemove(SummonGroup, hounds[pid * PLAYER_CAP + i])
+                TableRemove(PLAYER_SUMMONS, hounds[pid * PLAYER_CAP + i])
                 hounds[pid * PLAYER_CAP + i] = nil
             end
         end
@@ -173,7 +173,7 @@ OnInit.final("DarkSummonerSpells", function(Require)
                 if GetUnitAbilityLevel(summon, FourCC('A06Q')) > 9 then
                     Unit[summon].regen_max = (0.02 + 0.0005 * GetUnitAbilityLevel(summon, FourCC('A06Q')))
                 end
-                SummonGroup[#SummonGroup + 1] = summon
+                PLAYER_SUMMONS[#PLAYER_SUMMONS + 1] = summon
                 EVENT_ON_FATAL_DAMAGE:register_unit_action(summon, SummonExpire)
                 EVENT_ON_CLEANUP:register_action(self.pid, on_cleanup)
                 SetHeroLevel(summon, GetHeroLevel(self.caster), false)
@@ -205,7 +205,7 @@ OnInit.final("DarkSummonerSpells", function(Require)
         }
 
         local function on_cleanup(pid)
-            TableRemove(SummonGroup, meatgolem[pid])
+            TableRemove(PLAYER_SUMMONS, meatgolem[pid])
             meatgolem[pid] = nil
         end
 
@@ -245,7 +245,7 @@ OnInit.final("DarkSummonerSpells", function(Require)
 
             BlzSetHeroProperName(summon, "Meat Golem")
             TimerQueue:callDelayed(2., DestroyEffect, AddSpecialEffectTarget("Abilities\\Spells\\Undead\\Darksummoning\\DarkSummonTarget.mdl", summon, "origin"))
-            SummonGroup[#SummonGroup + 1] = summon
+            PLAYER_SUMMONS[#PLAYER_SUMMONS + 1] = summon
             EVENT_ON_FATAL_DAMAGE:register_unit_action(summon, SummonExpire)
             EVENT_ON_CLEANUP:register_action(self.pid, on_cleanup)
             SetHeroLevel(summon, GetHeroLevel(self.caster), false)
@@ -295,7 +295,7 @@ OnInit.final("DarkSummonerSpells", function(Require)
         end
 
         local function on_cleanup(pid)
-            TableRemove(SummonGroup, destroyer[pid])
+            TableRemove(PLAYER_SUMMONS, destroyer[pid])
             destroyer[pid] = nil
         end
 
@@ -373,8 +373,8 @@ OnInit.final("DarkSummonerSpells", function(Require)
             Unit[summon].regen_max = (0.02 + 0.0005 * GetUnitAbilityLevel(summon, FourCC('A06Q')))
 
             -- revert hounds to normal
-            for i = 1, #SummonGroup do
-                local target = SummonGroup[i]
+            for i = 1, #PLAYER_SUMMONS do
+                local target = PLAYER_SUMMONS[i]
                 if GetOwningPlayer(target) == Player(self.pid - 1) and GetUnitTypeId(target) == SUMMON_HOUND then
                     SetUnitVertexColor(target, 120, 60, 60, 255)
                     SetUnitScale(target, 0.85, 0.85, 0.85)
@@ -382,7 +382,7 @@ OnInit.final("DarkSummonerSpells", function(Require)
                 end
             end
 
-            SummonGroup[#SummonGroup + 1] = summon
+            PLAYER_SUMMONS[#PLAYER_SUMMONS + 1] = summon
             EVENT_ON_FATAL_DAMAGE:register_unit_action(summon, SummonExpire)
             EVENT_ON_HIT:register_unit_action(summon, on_hit)
             EVENT_ON_ATTACK:register_unit_action(summon, on_attack)
@@ -442,8 +442,8 @@ OnInit.final("DarkSummonerSpells", function(Require)
             if GetUnitTypeId(self.target) == SUMMON_HOUND then
                 SummonExpire(self.target)
 
-                for i = 1, #SummonGroup do
-                    local target = SummonGroup[i]
+                for i = 1, #PLAYER_SUMMONS do
+                    local target = PLAYER_SUMMONS[i]
                     if GetOwningPlayer(target) == Player(self.pid - 1) then
                         local heal = BlzGetUnitMaxHP(target) * self.pheal * 0.01 * BOOST[self.pid]
                         HP(self.caster, target, heal, thistype.tag)
@@ -463,8 +463,8 @@ OnInit.final("DarkSummonerSpells", function(Require)
                 SummonExpire(self.target)
                 is_destroyer_sacrificed[self.pid] = true
 
-                for i = 1, #SummonGroup do
-                    local target = SummonGroup[i]
+                for i = 1, #PLAYER_SUMMONS do
+                    local target = PLAYER_SUMMONS[i]
                     if GetOwningPlayer(target) == Player(self.pid - 1) and GetUnitTypeId(target) == SUMMON_HOUND then
                         SetUnitVertexColor(target, 90, 90, 230, 255)
                         SetUnitScale(target, 1.15, 1.15, 1.15)
