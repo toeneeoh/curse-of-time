@@ -346,14 +346,6 @@ OnInit.final("Spells", function(Require)
         local p = Player(k)
 
         if GetPlayerController(p) ~= MAP_CONTROL_NONE then
-            -- pr setup
-            SetPlayerAbilityAvailable(p, prMulti[0], false)
-            SetPlayerAbilityAvailable(p, prMulti[1], false)
-            SetPlayerAbilityAvailable(p, prMulti[2], false)
-            SetPlayerAbilityAvailable(p, prMulti[3], false)
-            SetPlayerAbilityAvailable(p, prMulti[4], false)
-            SetPlayerAbilityAvailable(p, prMulti[5], false)
-            SetPlayerAbilityAvailable(p, FourCC('A0AP'), false)
             -- bard setup
             SetPlayerAbilityAvailable(p, SONG_HARMONY, false)
             SetPlayerAbilityAvailable(p, SONG_PEACE, false)
