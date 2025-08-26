@@ -82,7 +82,6 @@ OnInit.final("Inventory", function(Require)
         local context, target, slots = __jarray(0), __jarray(0), {} ---@type Button[]
         local viewing, move_item_cooldown = __jarray(-1), {}
         local on_m1_down, on_m2_down, on_m1_up, on_m2_up, open_context_menu, on_m1_context_menu
-        local context_menu_size = __jarray(0)
         local threads = {} -- Tracks coroutine per player
         local context_pushed = __jarray(false)
 
@@ -534,7 +533,6 @@ OnInit.final("Inventory", function(Require)
             visible_buttons[#visible_buttons + 1] = 5
 
             -- reattach and reposition visible buttons dynamically
-            context_menu_size[pid] = #visible_buttons
             local previous_button = nil
             for i = 1, #visible_buttons do
                 local button_index = visible_buttons[i]
