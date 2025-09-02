@@ -182,7 +182,7 @@ OnInit.global("Variables", function()
         stars        = {3, 2, 2, 0, 3}
         },
         [HERO_SAVIOR] = {
-        model        = "war3mapImported\\TheCaptain.mdx",
+        model        = "SaviorSprite.mdx",
         prof         = PROF_SWORD + PROF_PLATE + PROF_HEAVY + PROF_FULLPLATE,
         phys_resist  = 1.2,
         magic_resist = 1.3,
@@ -204,7 +204,7 @@ OnInit.global("Variables", function()
         stars        = {2, 3, 2, 1, 3}
         },
         [HERO_DARK_SAVIOR] = {
-        model        = "war3mapImported\\BloodElfLieutenant.mdx",
+        model        = "DarkSaviorSprite.mdx",
         prof         = PROF_SWORD + PROF_PLATE + PROF_STAFF + PROF_CLOTH,
         phys_resist  = 1.6,
         magic_resist = 1.0,
@@ -226,7 +226,7 @@ OnInit.global("Variables", function()
         stars        = {1, 3, 3, 1, 1}
         },
         [HERO_CRUSADER] = {
-        model        = "war3mapImported\\HeroBloodKnight.mdx",
+        model        = "CrusaderSprite.mdx",
         prof         = PROF_HEAVY + PROF_FULLPLATE + PROF_STAFF + PROF_CLOTH,
         phys_resist  = 1.1,
         magic_resist = 1.1,
@@ -248,7 +248,7 @@ OnInit.global("Variables", function()
         stars        = {1, 0, 1, 3, 0}
         },
         [HERO_ARCANIST] = {
-        model        = "units\\human\\Kael\\Kael.mdx",
+        model        = "ArcanistSprite.mdx",
         prof         = PROF_STAFF + PROF_CLOTH,
         phys_resist  = 1.8,
         magic_resist = 1.6,
@@ -270,7 +270,7 @@ OnInit.global("Variables", function()
         stars        = {0, 2, 2, 1, 0}
         },
         [HERO_DARK_SUMMONER] = {
-        model        = "war3mapImported\\HeroDeposedWarlock.mdx",
+        model        = "DarkSummonerSprite.mdx",
         prof         = PROF_STAFF + PROF_CLOTH,
         phys_resist  = 1.8,
         magic_resist = 1.6,
@@ -292,7 +292,7 @@ OnInit.global("Variables", function()
         stars        = {2.5, 2.5, 1, 0, 2}
         },
         [HERO_BARD] = {
-        model        = "war3mapImported\\Medivh.mdx",
+        model        = "BardSprite.mdx",
         prof         = PROF_STAFF + PROF_CLOTH,
         phys_resist  = 1.8,
         magic_resist = 1.6,
@@ -336,7 +336,7 @@ OnInit.global("Variables", function()
         stars        = {0, 1, 3, 3, 1}
         },
         [HERO_HIGH_PRIEST] = {
-        model        = "war3mapImported\\HighElfPriestess.mdx",
+        model        = "HighPriestessSprite.mdx",
         prof         = PROF_STAFF + PROF_CLOTH,
         phys_resist  = 1.8,
         magic_resist = 1.6,
@@ -358,7 +358,7 @@ OnInit.global("Variables", function()
         stars        = {0, 0.5, 0, 3, 0}
         },
         [HERO_ELEMENTALIST] = {
-        model        = "war3mapImported\\Geomancer_E_002.mdx",
+        model        = "ElementalistSprite.mdx",
         prof         = PROF_STAFF + PROF_CLOTH,
         phys_resist  = 1.8,
         magic_resist = 1.6,
@@ -380,7 +380,7 @@ OnInit.global("Variables", function()
         stars        = {0, 2, 3, 1, 2}
         },
         [HERO_ASSASSIN] = {
-        model          = "war3mapImported\\ShadowWarrior.mdx",
+        model          = "AssassinSprite.mdx",
         prof           = PROF_DAGGER + PROF_LEATHER,
         phys_resist    = 1.6,
         magic_resist   = 1.8,
@@ -403,7 +403,7 @@ OnInit.global("Variables", function()
         stars          = {0, 2, 1, 1, 0}
         },
         [HERO_THUNDERBLADE] = {
-        model        = "war3mapImported\\WanderingSwordman3.mdx",
+        model        = "ThunderBladeSprite.mdx",
         prof         = PROF_DAGGER + PROF_LEATHER,
         phys_resist  = 1.6,
         magic_resist = 1.8,
@@ -425,7 +425,7 @@ OnInit.global("Variables", function()
         stars        = {0, 2, 2, 0, 0}
         },
         [HERO_MASTER_ROGUE] = {
-        model        = "war3mapImported\\BloodelfPhoenixGuard.mdx",
+        model        = "MasterRogueSprite.mdx",
         prof         = PROF_DAGGER + PROF_LEATHER,
         phys_resist  = 1.6,
         magic_resist = 1.8,
@@ -447,7 +447,7 @@ OnInit.global("Variables", function()
         stars        = {0, 3, 0, 1, 0}
         },
         [HERO_MARKSMAN] = {
-        model        = "war3mapImported\\HeroGoblinGunner.mdx",
+        model        = "EliteMarksmanSprite.mdx",
         prof         = PROF_BOW + PROF_LEATHER,
         phys_resist  = 2.0,
         magic_resist = 1.8,
@@ -469,7 +469,7 @@ OnInit.global("Variables", function()
         stars        = {0, 3, 2, 0, 0}
         },
         [HERO_PHOENIX_RANGER] = {
-        model        = "war3mapImported\\Bloodelf_ArcherMaiden.mdx",
+        model        = "PhoenixRangerSprite.mdx",
         prof         = PROF_BOW + PROF_LEATHER,
         phys_resist  = 2.0,
         magic_resist = 1.8,
