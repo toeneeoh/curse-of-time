@@ -9,6 +9,7 @@ OnInit.final("Inventory", function(Require)
     Require('Currency')
 
     local INVENTORY_WIDTH   = 0.1981
+    local INVENTORY_HEIGHT  = 0.232
     local INVENTORY_GAPY    = 0.0312
     local INVENTORY_GAPX    = 0.0333
     local INVENTORY_TEXTURE = "inventory_row.tga"
@@ -16,49 +17,60 @@ OnInit.final("Inventory", function(Require)
     local INVENTORY_MIN_X   = 0.612
     local INVENTORY_MIN_Y   = 0.214
     local INVENTORY_SLOT_SIZE = 0.0266
+    local DROP_ITEM_COMMAND = "robogoblin"
 
     local FPS_64 = FPS_32 * 0.5
-    local sqrt = math.sqrt
+    local frame_set_visible, frame_clear_all_points = BlzFrameSetVisible, BlzFrameClearAllPoints
     local get_x_stable, get_y_stable = GetMouseFrameXStable, GetMouseFrameYStable
     local setabspoint = BlzFrameSetAbsPoint
 
     local CONTEXT_BUTTON_WIDTH = 0.055
     local CONTEXT_BUTTON_HEIGHT = 0.016
 
+    -- slot atlas
+    -- fields: {x, y, kind}
     local inventory_slots = {
-        {0.0000, 0.1248},
-        {0.0333, 0.1248},
-        {0.0666, 0.1248},
-        {0.0999, 0.1248},
-        {0.1332, 0.1248},
-        {0.1665, 0.1248},
-        {0.2048, 0.1248}, -- POTION 1
-        {0.2048, 0.0936}, -- POTION 2
-        {0.0000, 0.0624},
-        {0.0333, 0.0624},
-        {0.0666, 0.0624},
-        {0.0999, 0.0624},
-        {0.1332, 0.0624},
-        {0.1665, 0.0624},
-        {0.0000, 0.0312},
-        {0.0333, 0.0312},
-        {0.0666, 0.0312},
-        {0.0999, 0.0312},
-        {0.1332, 0.0312},
-        {0.1665, 0.0312},
-        {0.0000, 0.0},
-        {0.0333, 0.0},
-        {0.0666, 0.0},
-        {0.0999, 0.0},
-        {0.1332, 0.0},
-        {0.1665, 0.0},
+        {0.0000, 0.1248, "main"},
+        {0.0333, 0.1248, "main"},
+        {0.0666, 0.1248, "main"},
+        {0.0999, 0.1248, "main", FRAMEPOINT_TOPRIGHT},
+        {0.1332, 0.1248, "main", FRAMEPOINT_TOPRIGHT},
+        {0.1665, 0.1248, "main", FRAMEPOINT_TOPRIGHT},
+
+        {0.2048, 0.1248, "potion1", FRAMEPOINT_TOPRIGHT},
+        {0.2048, 0.0936, "potion2", FRAMEPOINT_TOPRIGHT},
+
+        {0.0000, 0.0624, "unequip1"},
+        {0.0333, 0.0624, "unequip1"},
+        {0.0666, 0.0624, "unequip1"},
+        {0.0999, 0.0624, "unequip1", FRAMEPOINT_TOPRIGHT},
+        {0.1332, 0.0624, "unequip1", FRAMEPOINT_TOPRIGHT},
+        {0.1665, 0.0624, "unequip1", FRAMEPOINT_TOPRIGHT},
+
+        {0.0000, 0.0312, "unequip2"},
+        {0.0333, 0.0312, "unequip2"},
+        {0.0666, 0.0312, "unequip2"},
+        {0.0999, 0.0312, "unequip2", FRAMEPOINT_TOPRIGHT},
+        {0.1332, 0.0312, "unequip2", FRAMEPOINT_TOPRIGHT},
+        {0.1665, 0.0312, "unequip2", FRAMEPOINT_TOPRIGHT},
+
+        {0.0000, 0.0,    "unequip3"},
+        {0.0333, 0.0,    "unequip3"},
+        {0.0666, 0.0,    "unequip3"},
+        {0.0999, 0.0,    "unequip3", FRAMEPOINT_TOPRIGHT},
+        {0.1332, 0.0,    "unequip3", FRAMEPOINT_TOPRIGHT},
+        {0.1665, 0.0,    "unequip3", FRAMEPOINT_TOPRIGHT},
     }
 
+    -- tracker is offset for some reason
+    local MAGIC_X_OFFSET = 0.21
+    local MAGIC_Y_OFFSET = -0.085
+
     ---@param slot integer
-    ---@return integer x, integer y
+    ---@return number x, number y
     local slot_to_xy = function(slot)
         if inventory_slots[slot] then
-            return inventory_slots[slot][1] + 0.21, inventory_slots[slot][2] - 0.085
+            return inventory_slots[slot][1] + MAGIC_X_OFFSET, inventory_slots[slot][2] + MAGIC_Y_OFFSET
         end
 
         return 0, 0
@@ -81,24 +93,36 @@ OnInit.final("Inventory", function(Require)
         local thistype = INVENTORY
         local context, target, slots = __jarray(0), __jarray(0), {} ---@type Button[]
         local viewing, move_item_cooldown = __jarray(-1), {}
-        local on_m1_down, on_m2_down, on_m1_up, on_m2_up, open_context_menu, on_m1_context_menu
-        local threads = {} -- Tracks coroutine per player
-        local context_pushed = __jarray(false)
+        local on_m1_down, on_m2_down, on_m1_up, on_m2_up, open_context_menu
+        local target_thread = {} -- used to sync context and target acquisition
+        local synced_context, synced_target = {}, {}
+        local pending_click  = {} -- stores index of context menu click
+        local ui_mode = __jarray(0) -- 0 = normal, 1 = context menu open
 
         -- determines what item slot a user has their cursor over
-        ---@return number, number, integer
+        ---@return integer
         local get_hovered_slot = function()
-            local mouse_x = get_x_stable() - INVENTORY_MIN_X
-            local mouse_y = get_y_stable() - INVENTORY_MIN_Y
+            local x, y = get_x_stable(), get_y_stable()
+
+            -- bail if mouse is outside inventory UI
+            if x < INVENTORY_MIN_X - 0.03 or x > INVENTORY_MIN_X + INVENTORY_WIDTH + 0.03 or
+            y < INVENTORY_MIN_Y - 0.03 or y > INVENTORY_MIN_Y + INVENTORY_HEIGHT - 0.03
+            then
+                return -1
+            end
+
             local closest_slot = 0
             local closest_distance = 1000
+            local mouse_x = x - INVENTORY_MIN_X
+            local mouse_y = y - INVENTORY_MIN_Y
+            local threshold_distance = 0.025 * 0.025
 
             -- loop through each slot's position and calculate the distance to the mouse
             for i = 1, #inventory_slots do
                 local pos = inventory_slots[i]
                 local dx = mouse_x - pos[1]
                 local dy = mouse_y - pos[2]
-                local distance = sqrt(dx * dx + dy * dy)
+                local distance = dx * dx + dy * dy
 
                 -- check if this slot is the closest
                 if distance < closest_distance then
@@ -107,18 +131,11 @@ OnInit.final("Inventory", function(Require)
                 end
             end
 
-            -- define a threshold distance to ensure the mouse is reasonably close to a slot
-            local threshold_distance = 0.025
-
             if closest_distance > threshold_distance then
-                closest_slot = 0
-
-                return get_x_stable(), get_y_stable(), 0
+                return 0
             end
 
-            local x, y = slot_to_xy(closest_slot)
-
-            return x, y, closest_slot
+            return closest_slot
         end
 
         -- determines what item slot a user is highlighting
@@ -139,7 +156,7 @@ OnInit.final("Inventory", function(Require)
         --#region frame setup
         local frame = BlzCreateFrame("ListBoxWar3", BlzGetFrameByName("ConsoleUIBackdrop", 0), 0, 0)
         BlzFrameSetAbsPoint(frame, FRAMEPOINT_TOPLEFT, 0.575, 0.41)
-        BlzFrameSetSize(frame, INVENTORY_WIDTH + 0.072, 0.232)
+        BlzFrameSetSize(frame, INVENTORY_WIDTH + 0.072, INVENTORY_HEIGHT)
         BlzFrameSetEnable(frame, false)
 
         local title = BlzCreateFrame("TitleText", frame, 0, 0)
@@ -172,25 +189,25 @@ OnInit.final("Inventory", function(Require)
             BlzFrameSetEnable(pot[i], true)
         end
 
-        BlzFrameSetVisible(frame, false)
+        frame_set_visible(frame, false)
 
         -- context menu setup
         local context_menu_backdrop = BlzCreateFrameByType("FRAME", "", frame, "", 0)
         BlzFrameSetTexture(context_menu_backdrop, "trans32.blp", 0, true)
         BlzFrameSetSize(context_menu_backdrop, 0.001, 0.001)
         BlzFrameSetEnable(context_menu_backdrop, false)
-        BlzFrameSetVisible(context_menu_backdrop, false)
+        frame_set_visible(context_menu_backdrop, false)
         local context_buttons = {}
-        context_buttons[1] = SimpleButton.create(context_menu_backdrop, "inventorymenubuttons.dds", CONTEXT_BUTTON_WIDTH, CONTEXT_BUTTON_HEIGHT, FRAMEPOINT_TOPLEFT, FRAMEPOINT_TOPLEFT, 0, 0)
-        context_buttons[2] = SimpleButton.create(context_menu_backdrop, "inventorymenubuttons.dds", CONTEXT_BUTTON_WIDTH, CONTEXT_BUTTON_HEIGHT, FRAMEPOINT_TOPLEFT, FRAMEPOINT_TOPLEFT, 0, 0)
-        context_buttons[3] = SimpleButton.create(context_menu_backdrop, "inventorymenubuttons.dds", CONTEXT_BUTTON_WIDTH, CONTEXT_BUTTON_HEIGHT, FRAMEPOINT_TOPLEFT, FRAMEPOINT_TOPLEFT, 0, 0)
-        context_buttons[4] = SimpleButton.create(context_menu_backdrop, "inventorymenubuttons.dds", CONTEXT_BUTTON_WIDTH, CONTEXT_BUTTON_HEIGHT, FRAMEPOINT_TOPLEFT, FRAMEPOINT_TOPLEFT, 0, 0)
-        context_buttons[5] = SimpleButton.create(context_menu_backdrop, "inventorymenubuttons.dds", CONTEXT_BUTTON_WIDTH, CONTEXT_BUTTON_HEIGHT, FRAMEPOINT_TOPLEFT, FRAMEPOINT_TOPLEFT, 0, 0)
-        context_buttons[1]:text("Equip")
-        context_buttons[2]:text("Unequip")
-        context_buttons[3]:text("Drop")
-        context_buttons[4]:text("Sell")
-        context_buttons[5]:text("Details")
+        local CONTEXT_IDS = { "Equip", "Unequip", "Drop", "Sell", "Details" }
+        for i, name in ipairs(CONTEXT_IDS) do
+            context_buttons[i] = SimpleButton.create(context_menu_backdrop, "inventorymenubuttons.dds", CONTEXT_BUTTON_WIDTH, CONTEXT_BUTTON_HEIGHT, FRAMEPOINT_TOPLEFT, FRAMEPOINT_TOPLEFT, 0, 0)
+            context_buttons[i]:text(name)
+        end
+        -- map frames to index
+        local frame_to_btn = {}
+        for i = 1, #context_buttons do
+            frame_to_btn[context_buttons[i].frame] = i
+        end
         local cost_frame = BlzCreateFrameByType("FRAME", "", context_buttons[4].frame, "", 0)
         BlzFrameSetSize(cost_frame, 0.001, 0.001)
         BlzFrameSetEnable(cost_frame, false)
@@ -198,7 +215,7 @@ OnInit.final("Inventory", function(Require)
         BlzFrameSetTexture(transparent_placeholder, "trans32.blp", 0, true)
         BlzFrameSetSize(transparent_placeholder, 0.001, 0.001)
         BlzFrameSetEnable(transparent_placeholder, false)
-        BlzFrameSetVisible(transparent_placeholder, false)
+        frame_set_visible(transparent_placeholder, false)
         local cost_icon = BlzCreateFrameByType("BACKDROP", "", cost_frame, "", 0)
         local cost_icon2 = BlzCreateFrameByType("BACKDROP", "", cost_frame, "", 0)
         local cost_text = BlzCreateFrameByType("TEXT", "", cost_icon, "", 0)
@@ -214,7 +231,7 @@ OnInit.final("Inventory", function(Require)
         BlzFrameSetTexture(cost_icon2, CURRENCY_ICON[PLATINUM + 1], 0, true)
         BlzFrameSetPoint(cost_text2, FRAMEPOINT_TOPLEFT, cost_icon2, FRAMEPOINT_TOPRIGHT, 0.002, -0.002)
         BlzFrameSetTextAlignment(cost_text2, TEXT_JUSTIFY_CENTER, TEXT_JUSTIFY_LEFT)
-        BlzFrameSetVisible(cost_frame, false)
+        frame_set_visible(cost_frame, false)
         BlzFrameSetTooltip(context_buttons[1].frame, transparent_placeholder)
         BlzFrameSetTooltip(context_buttons[2].frame, transparent_placeholder)
         BlzFrameSetTooltip(context_buttons[3].frame, transparent_placeholder)
@@ -222,92 +239,87 @@ OnInit.final("Inventory", function(Require)
         BlzFrameSetTooltip(context_buttons[5].frame, transparent_placeholder)
 
         local context_functions = {
-            function(pid) -- EQUIP
-                if context[pid] > 0 then
-                    local itm = Profile[pid].hero.items[context[pid]]
+            function(pid, slot) -- EQUIP
+                local itm = Profile[pid].hero.items[slot]
 
+                if itm then
+                    itm:equip()
+                end
+            end,
+            function(pid, slot) -- UNEQUIP
+                local index = -1
+                local items = Profile[pid].hero.items
+                for i = BACKPACK_INDEX, MAX_INVENTORY_SLOTS do
+                    local itm = items[i]
+                    if itm == nil then
+                        index = i
+                        break
+                    end
+                end
+                if index ~= -1 then
+                    local itm = items[slot]
                     if itm then
-                        itm:equip()
+                        itm:equip(index)
                     end
-                    open_context_menu(pid, false)
                 end
             end,
-            function(pid) -- UNEQUIP
-                if context[pid] > 0 then
-                    local index = -1
-                    local items = Profile[pid].hero.items
-                    for i = BACKPACK_INDEX, MAX_INVENTORY_SLOTS do
-                        local itm = items[i]
-                        if itm == nil then
-                            index = i
-                            break
-                        end
-                    end
-                    if index ~= -1 then
-                        local itm = items[context[pid]]
-                        if itm then
-                            itm:equip(index)
-                        end
-                    end
-                    open_context_menu(pid, false)
-                end
-            end,
-            function(pid) -- DROP
-                if context[pid] > 0 then
-                    local hero = Profile[pid].hero
-                    local itm = hero.items[context[pid]]
+            function(pid, slot) -- DROP
+                local hero = Profile[pid].hero
+                local itm = hero.items[slot]
 
-                    if itm then
-                        hero.item_to_drop = itm
-                        IssuePointOrder(itm.holder, "robogoblin", GetUnitX(Hero[pid]), GetUnitY(Hero[pid]))
-                    end
-                    open_context_menu(pid, false)
+                if itm then
+                    itm:drop(GetUnitX(Hero[pid]), GetUnitY(Hero[pid]))
                 end
             end,
-            function(pid) -- SELL
-                if context[pid] > 0 then
-                    local itm = Profile[pid].hero.items[context[pid]]
-                    if itm then
-                        SoundHandler("Abilities\\Spells\\Items\\ResourceItems\\ReceiveGold.flac", true, Player(pid - 1), itm.holder)
-                        local _, gold, plat = GetItemSellPrice(itm)
-                        AddCurrency(pid, GOLD, gold)
-                        AddCurrency(pid, PLATINUM, plat)
+            function(pid, slot) -- SELL
+                local itm = Profile[pid].hero.items[slot]
+                if itm then
+                    SoundHandler("Abilities\\Spells\\Items\\ResourceItems\\ReceiveGold.flac", true, Player(pid - 1), itm.holder)
+                    local _, gold, plat = GetItemSellPrice(itm)
+                    AddCurrency(pid, GOLD, gold)
+                    AddCurrency(pid, PLATINUM, plat)
 
-                        itm:destroy(nil, nil, true)
-                    end
-                    open_context_menu(pid, false)
+                    itm:destroy(nil, nil, true)
                 end
             end,
-            function(pid) -- DETAILS
-                if context[pid] > 0 then
-                    local itm = Profile[viewing[pid]].hero.items[context[pid]]
-                    if itm then
-                        itm:info(pid)
-                    end
-                    open_context_menu(pid, false)
+            function(pid, slot) -- DETAILS
+                local itm = Profile[viewing[pid]].hero.items[slot]
+                if itm then
+                    itm:info(pid)
                 end
             end,
         }
 
+        local function clear_context(pid)
+            context[pid] = 0
+            target[pid] = 0
+            synced_context[pid] = false
+            synced_target[pid] = false
+            pending_click[pid] = nil
+        end
+
         local on_context_push = function()
-            local p = GetTriggerPlayer()
-            local pid = GetPlayerId(p) + 1
+            local pid = GetPlayerId(GetTriggerPlayer()) + 1
             local f = BlzGetTriggerFrame()
 
             BlzFrameSetEnable(f, false)
             BlzFrameSetEnable(f, true)
 
-            if not context_pushed[pid] then
-                context_pushed[pid] = true
+            local btn_index = frame_to_btn[f]
+            if not btn_index then return false end
 
-                for i = 1, #context_buttons do
-                    local button = context_buttons[i]
+            open_context_menu(pid, false)
 
-                    if button.frame == f then
-                        context_functions[i](pid)
-                        break
-                    end
+            -- if not synced, queue pending click to execute at on_context_sync
+            if not synced_context[pid] then
+                --print("not synced yet!")
+                if not pending_click[pid] then
+                    pending_click[pid] = btn_index
                 end
+                return false
+            elseif not pending_click[pid] and context[pid] > 0 then
+                context_functions[btn_index](pid, context[pid])
+                clear_context(pid)
             end
 
             return false
@@ -324,7 +336,7 @@ OnInit.final("Inventory", function(Require)
         BlzFrameSetEnable(tracker, false)
         BlzFrameSetSize(tracker, INVENTORY_SLOT_SIZE, INVENTORY_SLOT_SIZE)
         BlzFrameSetTexture(tracker, "trans32.blp", 0, true)
-        -- BlzFrameSetVisible(tracker, true)
+        -- frame_set_visible(tracker, true)
         -- BlzFrameSetLevel(tracker, 5)
 
         local function update_tracker()
@@ -344,7 +356,7 @@ OnInit.final("Inventory", function(Require)
 
         INVENTORY.open = function(pid, tpid)
             if GetLocalPlayer() == Player(pid - 1) then
-                BlzFrameSetVisible(frame, true)
+                frame_set_visible(frame, true)
             end
 
             -- open may be called again without a close
@@ -374,7 +386,7 @@ OnInit.final("Inventory", function(Require)
         INVENTORY.close = function(pid)
             if viewing[pid] ~= -1 then
                 if GetLocalPlayer() == Player(pid - 1) then
-                    BlzFrameSetVisible(frame, false)
+                    frame_set_visible(frame, false)
                 end
                 viewing[pid] = -1
                 EVENT_ON_M1_DOWN:unregister_action(pid, on_m1_down)
@@ -383,8 +395,8 @@ OnInit.final("Inventory", function(Require)
                 EVENT_ON_M2_UP:unregister_action(pid, on_m2_up)
 
                 count = math.max(0, count - 1)
-                context[pid] = 0
-                target[pid] = 0
+
+                clear_context(pid)
                 hide_tracker(pid)
                 PauseMouseTracker(pid)
             end
@@ -404,32 +416,25 @@ OnInit.final("Inventory", function(Require)
         INVENTORY.refresh = function(pid)
             POTION.refresh(pid)
 
-            local U = User.first
+            local me = GetPlayerId(GetLocalPlayer()) + 1
+
+            if viewing[me] ~= pid then return end
+
+            -- local block for players viewing this inventory
             local items = Profile[pid].hero.items
-            local players = {}
-            while U do
-                -- refresh for every player viewing the inventory
-                if viewing[U.id] == pid then
-                    players[#players + 1] = U.player
-                end
-                U = U.next
-            end
+            for i = 1, MAX_INVENTORY_SLOTS do
+                local itm = items[i]
 
-            if TableHas(players, GetLocalPlayer()) then
-                for i = 1, MAX_INVENTORY_SLOTS do
-                    local itm = items[i]
-
-                    if itm then
-                        slots[i]:icon(BlzGetItemIconPath(itm.obj))
-                        slots[i].tooltip:icon(BlzGetItemIconPath(itm.obj))
-                        slots[i].tooltip:name(GetItemName(itm.obj))
-                        slots[i].tooltip:text(BlzGetItemExtendedTooltip(itm.obj))
-                        slots[i].tooltip:text(BlzGetItemExtendedTooltip(itm.obj))
-                        slots[i]:visible(true)
-                        slots[i]:charge(itm.charges)
-                    else
-                        slots[i]:visible(false)
-                    end
+                if itm then
+                    local icon = BlzGetItemIconPath(itm.obj)
+                    slots[i]:icon(icon)
+                    slots[i].tooltip:icon(icon)
+                    slots[i].tooltip:name(GetItemName(itm.obj))
+                    slots[i].tooltip:text(BlzGetItemExtendedTooltip(itm.obj))
+                    slots[i]:visible(true)
+                    slots[i]:charge(itm.charges)
+                else
+                    slots[i]:visible(false)
                 end
             end
         end
@@ -452,21 +457,39 @@ OnInit.final("Inventory", function(Require)
         local esc_button = SimpleButton.create(frame, "ReplaceableTextures\\CommandButtons\\BTNCancel.blp", 0.015, 0.015, FRAMEPOINT_TOPRIGHT, FRAMEPOINT_TOPRIGHT, -0.02, -0.02, onCloseButton, "Close 'I'", FRAMEPOINT_BOTTOM, FRAMEPOINT_TOP, 0., 0.01)
         RegisterHotkeyTooltip(esc_button, 4)
 
+        local function send_context(pid, slot)
+            -- set context asynchronously
+            context[pid] = slot
+            synced_context[pid] = false
+
+            -- send payload
+            if GetLocalPlayer() == Player(pid - 1) then
+                BlzSendSyncData("context", string.format("\x25d", slot))
+            end
+        end
+
+        local function send_target(pid, slot)
+            -- set target asynchronously
+            target[pid] = slot
+            synced_target[pid] = false
+
+            -- send payload
+            if GetLocalPlayer() == Player(pid - 1) then
+                BlzSendSyncData("target", tostring(slot))
+            end
+        end
+
         local pick_item = function(pid)
             local highlighted = get_highlighted_slot(pid)
 
             if highlighted > 0 then
                 local new_slot = slots[highlighted]
 
-                -- set asynchronously
-                context[pid] = highlighted
+                send_context(pid, highlighted)
 
                 if GetLocalPlayer() == Player(pid - 1) then
                     BlzFrameSetTexture(tracker, new_slot.texture, 0, true)
                     new_slot:visible(false)
-
-                    -- eventually sync context
-                    BlzSendSyncData("context", tostring(highlighted))
                 end
 
                 local x, y = slot_to_xy(highlighted)
@@ -479,7 +502,9 @@ OnInit.final("Inventory", function(Require)
         end
 
         local function update_context_buttons(pid, slot)
-            local items = Profile[pid].hero.items
+            local owner = viewing[pid]
+            local items = Profile[owner].hero.items -- safe for read only
+            local it = items[slot.index]
 
             for i = 1, #context_buttons do
                 if GetLocalPlayer() == Player(pid - 1) then
@@ -502,11 +527,13 @@ OnInit.final("Inventory", function(Require)
                     end
                 else
                 -- equip logic
-                    local type = ItemData[items[slot.index].id][ITEM_TYPE]
-                    for i = 1, BACKPACK_INDEX - 1 do
-                        if items[i] == nil and VerifySlotForType(i, type) then
-                            visible_buttons[#visible_buttons + 1] = 1 -- EQUIP
-                            break
+                    if it then
+                        local type = ItemData[it.id][ITEM_TYPE]
+                        for i = 1, BACKPACK_INDEX - 1 do
+                            if items[i] == nil and VerifySlotForType(i, type) then
+                                visible_buttons[#visible_buttons + 1] = 1 -- EQUIP
+                                break
+                            end
                         end
                     end
                 end
@@ -515,15 +542,17 @@ OnInit.final("Inventory", function(Require)
                 visible_buttons[#visible_buttons + 1] = 3
 
                 -- selling logic
-                local total, gold, plat = GetItemSellPrice(items[slot.index])
-                if RectContainsUnit(gg_rct_Town_Main, Hero[pid]) and total > 0 then
-                    visible_buttons[#visible_buttons + 1] = 4
-                    if GetLocalPlayer() == Player(pid - 1) then
-                        BlzFrameSetText(cost_text, string.format("\x2501d", gold))
-                        BlzFrameSetVisible(cost_icon2, false)
-                        if plat > 0 then
-                            BlzFrameSetVisible(cost_icon2, true)
-                            BlzFrameSetText(cost_text2, string.format("\x2501d", plat))
+                if it then
+                    local total, gold, plat = GetItemSellPrice(it)
+                    if RectContainsUnit(gg_rct_Town_Main, Hero[pid]) and total > 0 then
+                        visible_buttons[#visible_buttons + 1] = 4
+                        if GetLocalPlayer() == Player(pid - 1) then
+                            BlzFrameSetText(cost_text, string.format("\x2501d", gold))
+                            local show_plat = plat > 0
+                            frame_set_visible(cost_icon2, show_plat)
+                            if show_plat then
+                                BlzFrameSetText(cost_text2, string.format("\x2501d", plat))
+                            end
                         end
                     end
                 end
@@ -539,7 +568,7 @@ OnInit.final("Inventory", function(Require)
                 local button = context_buttons[button_index]
 
                 if GetLocalPlayer() == Player(pid - 1) then
-                    BlzFrameClearAllPoints(button.frame) -- Clear previous attachment
+                    frame_clear_all_points(button.frame) -- Clear previous attachment
                     button:visible(true)
                     if previous_button then
                         -- attach below the last visible button
@@ -555,14 +584,10 @@ OnInit.final("Inventory", function(Require)
         end
 
         open_context_menu = function(pid, open)
-            -- disable default m1 behavior
-            EVENT_ON_M1_DOWN:unregister_action(pid, on_m1_down)
-            EVENT_ON_M1_UP:unregister_action(pid, on_m1_up)
+            -- toggle context menu mode
+            ui_mode[pid] = 1
 
-            -- enable m1 down close behavior
-            EVENT_ON_M1_DOWN:register_action(pid, on_m1_context_menu)
-
-            -- get context
+            -- get context asynchronously
             local highlighted = get_highlighted_slot(pid)
 
             -- open context menu
@@ -570,33 +595,26 @@ OnInit.final("Inventory", function(Require)
                 local new_slot = slots[highlighted]
                 update_context_buttons(pid, new_slot)
 
-                -- set asynchronously
-                context[pid] = highlighted
+                -- start context sync
+                send_context(pid, highlighted)
 
+                -- reposition and display context menu frame
                 if GetLocalPlayer() == Player(pid - 1) then
-                    BlzFrameSetVisible(context_menu_backdrop, true)
-                    BlzFrameClearAllPoints(context_menu_backdrop)
+                    frame_set_visible(context_menu_backdrop, true)
+                    frame_clear_all_points(context_menu_backdrop)
                     BlzFrameSetPoint(context_menu_backdrop, FRAMEPOINT_TOPLEFT, new_slot.frame, FRAMEPOINT_TOPRIGHT, 0.005, 0.)
                     for _, v in ipairs(slots) do
                         v.tooltip:visible(false)
                     end
-                    -- eventually sync context
-                    BlzSendSyncData("context", tostring(highlighted))
                 end
-
-                context_pushed[pid] = false
             else
             -- close context menu
-                -- reenable default m1 behavior
-                if pid == viewing[pid] then
-                    EVENT_ON_M1_DOWN:register_action(pid, on_m1_down)
-                    EVENT_ON_M1_UP:register_action(pid, on_m1_up)
-                end
+                -- toggle normal mode
+                ui_mode[pid] = 0
 
-                -- disable m1 down close behavior
-                EVENT_ON_M1_DOWN:unregister_action(pid, on_m1_context_menu)
+                -- hide context menu frame
                 if GetLocalPlayer() == Player(pid - 1) then
-                    BlzFrameSetVisible(context_menu_backdrop, false)
+                    frame_set_visible(context_menu_backdrop, false)
                     for _, v in ipairs(slots) do
                         v.tooltip:visible(true)
                     end
@@ -604,103 +622,138 @@ OnInit.final("Inventory", function(Require)
             end
         end
 
-        local function sync_context()
+        local function on_context_sync()
             local pid = GetPlayerId(GetTriggerPlayer()) + 1
             local data = BlzGetTriggerSyncData()
-            context[pid] = tonumber(data)
+            local slot_s = string.match(data, "(\x25d+)")
+            local slot = tonumber(slot_s)
+            --print("context:",slot_s)
 
-            return false
-        end
+            -- update context and flag as synced
+            context[pid] = slot
+            synced_context[pid] = true
 
-        local function sync_target()
-            local pid = GetPlayerId(GetTriggerPlayer()) + 1
-            local data = BlzGetTriggerSyncData()
-            local index, x, y = string.match(data, "(\x25d+) (\x25-?[\x25d\x25.]+) (\x25-?[\x25d\x25.]+)")
-            target[pid], x, y = tonumber(index), tonumber(x), tonumber(y)
-
-            if threads[pid] then
-                coroutine.resume(threads[pid], x, y)
+            local pc = pending_click[pid]
+            if pc then
+                context_functions[pc](pid, slot)
+                clear_context(pid)
             end
 
             return false
         end
 
+        local function on_target_sync()
+            local pid = GetPlayerId(GetTriggerPlayer()) + 1
+            local data = BlzGetTriggerSyncData()
+            local slot_s = string.match(data, "(\x25-?\x25d+)")
+            local slot = tonumber(slot_s)
+            --print("target:", slot_s)
+
+            -- update target and flag as synced
+            target[pid] = slot
+            synced_target[pid] = true
+
+            -- resume any threads yielding for target
+            if target_thread[pid] then
+                coroutine.resume(target_thread[pid], slot)
+            end
+
+            return false
+        end
+
+        -- paint a slot from an item (or hide if nil)
+        local function apply_item_visual(slot_btn, itm)
+            if not itm then
+                slot_btn:visible(false)
+                return
+            end
+            local icon = BlzGetItemIconPath(itm.obj)
+            slot_btn:icon(icon)
+            slot_btn.tooltip:icon(icon)
+            slot_btn.tooltip:name(GetItemName(itm.obj))
+            slot_btn.tooltip:text(BlzGetItemExtendedTooltip(itm.obj))
+            slot_btn:charge(itm.charges)
+            slot_btn:visible(true)
+        end
+
+        ---@param pid integer
         ---@param a integer
         ---@param b integer
-        local function swap_slot_visuals(a, b)
-            local slot1 = slots[a]
-            local slot2 = slots[b]
-            local texture1, texture2 = slot1.texture, slot2.texture
-            local visible1, visible2 = slot1.isVisible, slot2.isVisible
+        local function swap_slot_visuals(pid, a, b)
+            if a == b then return end
+            local items = Profile[pid].hero.items
+            local itmA, itmB = items[a], items[b]
 
-            slot1:icon(texture2)
-            slot2:icon(texture1)
-
-            if not visible2 then
-                slot1:visible(visible2)
-            end
-            if not visible1 then
-                slot2:visible(visible1)
+            if GetLocalPlayer() == Player(pid - 1) then
+                apply_item_visual(slots[a], itmB)
+                apply_item_visual(slots[b], itmA)
             end
         end
 
         local confirm_item = function(pid)
-            threads[pid] = coroutine.create(function()
+            target_thread[pid] = coroutine.create(function()
                 local hero = Profile[pid].hero
                 local itm = hero.items[context[pid]]
-                local mouse_x, mouse_y, slot = get_hovered_slot() -- not sync safe
+                local itm2 = hero.items[target[pid]]
+                local slot = get_hovered_slot() -- not sync safe
+                local valid = false
 
                 -- async visual swap
                 if itm and slot > 0 then
-                    local valid = ValidateItemSlot(itm, slot)
-                    if valid and GetLocalPlayer() == Player(pid - 1) then
-                        swap_slot_visuals(context[pid], slot)
+                    valid = ValidateItemSlot(itm, slot)
+                    if itm2 and valid then
+                        valid = ValidateItemSlot(itm2, context[pid])
+                    end
+                    if valid then
+                        swap_slot_visuals(pid, context[pid], slot)
                     end
                 end
 
-                -- start sync
-                if GetLocalPlayer() == Player(pid - 1) then
-                    BlzSendSyncData("target", tostring(slot) .. " " .. mouse_x .. " " .. mouse_y)
-                end
+                hide_tracker(pid)
+                PauseMouseTracker(pid)
 
-                -- yield for coords and target
-                local x, y = coroutine.yield()
+                -- start target sync
+                send_target(pid, slot)
 
-                if context[pid] > 0 then
-                    if x and x < 0.575 and slot == 0 then -- drop
-                        itm = hero.items[context[pid]]
+                -- yield for target sync
+                slot = coroutine.yield()
+
+                -- check for syncs (extra safe)
+                if synced_context[pid] and synced_target[pid] then
+                    itm = hero.items[context[pid]]
+                    itm2 = hero.items[slot]
+
+                    if slot == -1 then -- negative indicates bailed out of menu
                         if itm then
                             hero.item_to_drop = itm
-                            IssuePointOrder(itm.holder, "robogoblin", GetMouseX(pid), GetMouseY(pid))
+                            IssuePointOrder(itm.holder, DROP_ITEM_COMMAND, GetMouseX(pid), GetMouseY(pid))
                         end
-                    elseif target[pid] > 0 then
-                        local itm1 = hero.items[context[pid]]
-                        local itm2 = hero.items[target[pid]]
-
-                        if itm1 and itm1:equip(target[pid]) then
-                            if itm2 and itm1 ~= itm2 then -- if another item is there
+                    elseif slot > 0 then
+                        -- validate slots again (synced)
+                        valid = ValidateItemSlot(itm, slot)
+                        if itm2 and valid then
+                            valid = ValidateItemSlot(itm2, context[pid])
+                        end
+                        if valid and itm and itm:equip(slot) then
+                            if itm2 and itm ~= itm2 then -- if another item is there
                                 itm2:equip(context[pid])
                             end
                         end
-                        open_context_menu(pid, false)
                     end
                 end
 
                 -- final cleanup
-                context[pid] = 0
-                target[pid] = 0
-                hide_tracker(pid)
-                PauseMouseTracker(pid)
+                clear_context(pid)
                 INVENTORY.refresh(pid)
 
                 -- short cooldown to prevent spam
                 move_item_cooldown[pid] = true
                 TimerQueue:callDelayed(0.05, reset_cooldown, pid)
 
-                threads[pid] = nil -- Clear coroutine reference
+                target_thread[pid] = nil -- Clear coroutine reference
             end)
 
-            coroutine.resume(threads[pid])
+            coroutine.resume(target_thread[pid])
         end
 
         -- mouse events
@@ -713,33 +766,33 @@ OnInit.final("Inventory", function(Require)
         end
 
         on_m2_down = function()
-            --local pid = GetPlayerId(GetTriggerPlayer()) + 1
         end
 
         on_m1_down = function()
             local pid = GetPlayerId(GetTriggerPlayer()) + 1
 
-            if not disabled_for_player[pid] and not move_item_cooldown[pid] then
-                pick_item(pid)
+            if ui_mode[pid] == 0 then
+                if not disabled_for_player[pid] and not move_item_cooldown[pid] then
+                    pick_item(pid)
+                end
+            end
+
+            if ui_mode[pid] == 1 then
+                -- close context menu if either of these frames are not visible, because mouse is outside
+                if not BlzFrameIsVisible(cost_frame) and not BlzFrameIsVisible(transparent_placeholder) then
+                    open_context_menu(pid, false)
+                    clear_context(pid)
+                end
             end
         end
 
         on_m1_up = function()
             local pid = GetPlayerId(GetTriggerPlayer()) + 1
 
-            if not disabled_for_player[pid] and context[pid] > 0 then
-                confirm_item(pid)
-            end
-        end
-
-        on_m1_context_menu = function()
-            local pid = GetPlayerId(GetTriggerPlayer()) + 1
-
-            -- close context menu if either of these frames are not visible, because mouse is outside
-            if not BlzFrameIsVisible(cost_frame) and not BlzFrameIsVisible(transparent_placeholder) then
-                open_context_menu(pid, false)
-                context[pid] = 0
-                target[pid] = 0
+            if ui_mode[pid] == 0 then
+                if not disabled_for_player[pid] then
+                    confirm_item(pid)
+                end
             end
         end
 
@@ -747,8 +800,9 @@ OnInit.final("Inventory", function(Require)
             thistype.close(pid)
         end
 
-        SyncCallback("context", sync_context)
-        SyncCallback("target", sync_target)
+        -- assign a prefix and function for BlzSendSyncData calls
+        SyncCallback("context", on_context_sync)
+        SyncCallback("target", on_target_sync)
 
         local U = User.first
         while U do
@@ -756,40 +810,55 @@ OnInit.final("Inventory", function(Require)
             U = U.next
         end
 
-        -- main equip slots
-        for i = 1, 6 do
-            slots[i] = Button.create(inv[0], INVENTORY_SLOT_SIZE, INVENTORY_SLOT_SIZE, 0.0032 + INVENTORY_GAPX * (i - 1), -0.0033, false)
-            slots[i]:visible(false)
-            slots[i].index = i
-            if i > 3 then
-                slots[i].tooltip:point(FRAMEPOINT_TOPRIGHT)
-            end
-        end
+        -- slot initialization
+        do
+            local parent_table = {
+                ["main"] = inv[0],
+                ["potion1"] = pot[1],
+                ["potion2"] = pot[2],
+                -- unequip rows map to inv[1], inv[2], inv[3]
+                ["unequip1"] = inv[1],
+                ["unequip2"] = inv[2],
+                ["unequip3"] = inv[3],
+            }
 
-        -- unequip slots
-        local index = BACKPACK_INDEX
-        for j = 1, 3 do
-            for i = 1, 6 do
-                slots[index] = Button.create(inv[j], INVENTORY_SLOT_SIZE, INVENTORY_SLOT_SIZE, 0.0032 + INVENTORY_GAPX * (i - 1), -0.0033, false)
-                slots[index]:visible(false)
-                slots[index].index = index
-                if i > 3 then
-                    slots[index].tooltip:point(FRAMEPOINT_TOPRIGHT)
+            local function y_offset(kind)
+                -- potions sit a hair higher in original code
+                if kind == "potion1" or kind == "potion2" then
+                    return -0.0032
                 end
-                index = index + 1
+                return -0.0033
+            end
+
+            local function column_for(id, kind)
+                if kind == "main" then
+                    return id
+                elseif kind == "potion1" or kind == "potion2" then
+                    return 1
+                else
+                    -- flatten id to its position within the 18 unequip cells
+                    -- unequip cells start at global index 9
+                    local unequip_pos = id - 8 -- 1..18
+                    return ((unequip_pos - 1) % 6) + 1
+                end
+            end
+
+            for id, slot_meta in ipairs(inventory_slots) do
+                local _, _, kind, point = slot_meta[1], slot_meta[2], slot_meta[3], slot_meta[4]
+
+                local parent = parent_table[kind]
+                local col    = column_for(id, kind)
+                local offx   = 0.0032 + INVENTORY_GAPX * (col - 1)
+                local offy   = y_offset(kind)
+
+                slots[id] = Button.create(parent, INVENTORY_SLOT_SIZE, INVENTORY_SLOT_SIZE, offx, offy, false)
+                slots[id]:visible(false)
+                slots[id].index = id
+
+                if point then
+                    slots[id].tooltip:point(point)
+                end
             end
         end
-
-        -- potions
-        index = POTION_INDEX
-        slots[index] = Button.create(pot[1], INVENTORY_SLOT_SIZE, INVENTORY_SLOT_SIZE, 0.0032, -0.0032, false)
-        slots[index].tooltip:point(FRAMEPOINT_TOPRIGHT)
-        slots[index]:visible(false)
-        slots[index].index = index
-        index = index + 1
-        slots[index] = Button.create(pot[2], INVENTORY_SLOT_SIZE, INVENTORY_SLOT_SIZE, 0.0032, -0.0032, false)
-        slots[index].tooltip:point(FRAMEPOINT_TOPRIGHT)
-        slots[index]:visible(false)
-        slots[index].index = index
     end
 end, Debug and Debug.getLine())
