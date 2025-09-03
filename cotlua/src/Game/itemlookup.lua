@@ -33,10 +33,8 @@ OnInit.final("ItemLookup", function(Require)
         local orig_itm = GetManipulatedItem()
         local itm = Item[orig_itm] ---@type Item
         local itemid = GetItemTypeId(orig_itm)
-        local itemtype = GetItemType(orig_itm)
         local p = GetOwningPlayer(u)
         local pid = GetPlayerId(p) + 1 ---@type integer 
-        local U = User.first ---@type User 
 
         -- ignore non-player inventories / dummy cast items
         if pid > PLAYER_CAP or IsDummyCastItem(itemid) then
