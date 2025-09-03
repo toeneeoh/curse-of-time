@@ -383,45 +383,46 @@ OnInit.final("Quests", function(Require)
         function DisplayQuestProgress(pid)
             local i = 0 ---@type integer 
             local flag = (CHAOS_MODE and 1) or 0
-            local index = KillQuest[flag][i]
+            local id = KillQuest[flag][i]
+            local kq = KillQuest[id]
 
-            while index ~= 0 do
-                local s = (KillQuest[index].count == KillQuest[index].goal and "|cff40ff40") or ""
+            while kq do
+                local s = (kq.count == kq.goal and "|cff40ff40") or ""
 
-                DisplayTimedTextToPlayer(Player(pid - 1), 0, 0, 10, KillQuest[index].name .. ": " .. s .. (KillQuest[index].count) .. "/" .. (KillQuest[index].goal) .. "|r |cffffcc01LVL " .. (KillQuest[index].min) .. "-" .. (KillQuest[index].max))
+                DisplayTimedTextToPlayer(Player(pid - 1), 0, 0, 10, kq.name .. ": " .. s .. (kq.count) .. "/" .. (kq.goal) .. "|r |cffffcc01LVL " .. (kq.min) .. "-" .. (kq.max))
                 i = i + 1
-                index = KillQuest[flag][i]
+                id = KillQuest[flag][i]
+                kq = KillQuest[id]
             end
         end
 
-        local function kill_quest_handler(p, pid, u, itm)
-            local itemid        = itm.id
-            local index         = KillQuest[itemid][0] ---@type integer 
-            local min           = KillQuest[index].min ---@type integer 
-            local max           = KillQuest[index].max ---@type integer 
-            local avg           = (min + max) // 2
-            local goal          = KillQuest[index].goal ---@type integer 
-            local playercount   = 0 ---@type integer 
-            local U             = User.first ---@type User 
-            local x             = 0.
-            local y             = 0.
-            local myregion      = nil ---@type rect 
+        local function kill_quest_handler(p, pid, _, itm)
+            local kq          = KillQuest[itm.id] ---@type table 
+            local min         = kq.min ---@type integer 
+            local max         = kq.max ---@type integer 
+            local avg         = (min + max) // 2
+            local goal        = kq.goal ---@type integer 
+            local playercount = 0 ---@type integer 
+            local U           = User.first ---@type User 
+            local x           = 0.
+            local y           = 0.
+            local myregion    = nil ---@type rect 
 
             if GetUnitLevel(Hero[pid]) < min then
                 DisplayTimedTextToPlayer(p, 0,0, 10, "You must be level |cffffcc00" .. (min) .. "|r to begin this quest.")
             elseif GetUnitLevel(Hero[pid]) > max then
                 DisplayTimedTextToPlayer(p, 0,0, 10, "You are too high level to do this quest.")
             -- progress
-            elseif KillQuest[index].status == 1 then
-                DisplayTimedTextToPlayer(p, 0,0, 10, "Killed " .. (KillQuest[index].count) .. "/" .. (goal) .. " " .. KillQuest[index].name)
-                PingMinimap(GetRectCenterX(KillQuest[index].region), GetRectCenterY(KillQuest[index].region), 3)
+            elseif kq.status == "IN_PROGRESS" then
+                DisplayTimedTextToPlayer(p, 0,0, 10, "Killed " .. (kq.count) .. "/" .. (goal) .. " " .. kq.name)
+                PingMinimap(GetRectCenterX(kq.region), GetRectCenterY(kq.region), 3)
             -- start quest
-            elseif KillQuest[index].status == 0 then
-                KillQuest[index].status = 1
-                DisplayTimedTextToPlayer(p, 0, 0, 10, "|cffffcc00QUEST:|r Kill " .. (goal) .. " " .. KillQuest[index].name .. " for a reward.")
-                PingMinimap(GetRectCenterX(KillQuest[index].region), GetRectCenterY(KillQuest[index].region), 5)
+            elseif kq.status == "NOT_STARTED" then
+                kq.status = "IN_PROGRESS"
+                DisplayTimedTextToPlayer(p, 0, 0, 10, "|cffffcc00QUEST:|r Kill " .. (goal) .. " " .. kq.name .. " for a reward.")
+                PingMinimap(GetRectCenterX(kq.region), GetRectCenterY(kq.region), 5)
             -- completion
-            elseif KillQuest[index].status == 2 then
+            elseif kq.status == "COMPLETE" then
                 while U do
                     if Profile[U.id].playing and GetUnitLevel(Hero[U.id]) >= min and GetUnitLevel(Hero[U.id]) <= max then
                         playercount = playercount + 1
@@ -434,7 +435,7 @@ OnInit.final("Quests", function(Require)
 
                 while U do
                     if GetHeroLevel(Hero[U.id]) >= min and GetHeroLevel(Hero[U.id]) <= max then
-                        DisplayTimedTextToPlayer(U.player, 0, 0, 10, "|c00c0c0c0" .. KillQuest[index].name .. " quest completed!|r")
+                        DisplayTimedTextToPlayer(U.player, 0, 0, 10, "|c00c0c0c0" .. kq.name .. " quest completed!|r")
                         local GOLD = GOLD_TABLE[avg] * goal * 0.5 / (0.5 + playercount * 0.5)
                         AwardGold(U.id, GOLD, true)
                         local XP = math.floor(EXPERIENCE_TABLE[max] * Unit[Hero[U.id]].xp_rate * goal * 0.0008) / (0.5 + playercount * 0.5)
@@ -445,19 +446,19 @@ OnInit.final("Quests", function(Require)
                 end
 
                 -- reset
-                KillQuest[index].status = 1
-                KillQuest[index].count = 0
-                KillQuest[index].goal = IMinBJ(goal + 3, 100)
+                kq.status = "IN_PROGRESS"
+                kq.count = 0
+                kq.goal = math.min(goal + 3, 100)
 
                 -- increase max spawns based on last unit killed (until max goal of 100 is reached)
-                if (KillQuest[index].goal) < 100 and ModuloInteger(KillQuest[index].goal, 2) == 0 then
-                    myregion = SelectGroupedRegion(UnitData[KillQuest[index].last].spawn)
+                if (kq.goal) < 100 and ModuloInteger(kq.goal, 2) == 0 then
+                    myregion = SelectGroupedRegion(UnitData[kq.last].spawn)
                     repeat
                         x = GetRandomReal(GetRectMinX(myregion), GetRectMaxX(myregion))
                         y = GetRandomReal(GetRectMinY(myregion), GetRectMaxY(myregion))
                     until IsTerrainWalkable(x, y)
-                    CreateUnit(PLAYER_CREEP, KillQuest[index].last, x, y, GetRandomInt(0, 359))
-                    DisplayTimedTextToForce(FORCE_PLAYING, 20., "An additional " .. GetObjectName(KillQuest[index].last) .. " has spawned in the area.")
+                    CreateUnit(PLAYER_CREEP, kq.last, x, y, GetRandomInt(0, 359))
+                    DisplayTimedTextToForce(FORCE_PLAYING, 20., "An additional " .. GetObjectName(kq.last) .. " has spawned in the area.")
                 end
             end
         end
@@ -470,10 +471,13 @@ OnInit.final("Quests", function(Require)
                 max = max,
                 name = name,
                 region = region,
+                count = 0,
+                status = "NOT_STARTED",
             }
 
             count = count + 1
             KillQuest[id] = kq
+            KillQuest[itemid] = kq
             ITEM_LOOKUP[itemid] = kill_quest_handler
         end
 
@@ -507,12 +511,12 @@ OnInit.final("Quests", function(Require)
             local kpid     = GetPlayerId(GetOwningPlayer(killer)) + 1
             local kq       = KillQuest[unitType]
 
-            if unitType > 0 and kq and kq.status == 1 and GetHeroLevel(Hero[kpid]) <= kq.max + LEECH_CONSTANT then
+            if unitType > 0 and kq and kq.status == "IN_PROGRESS" and GetHeroLevel(Hero[kpid]) <= kq.max + LEECH_CONSTANT then
                 kq.count = kq.count + 1
                 FloatingTextUnit(kq.name .. " " .. (kq.count) .. "/" .. (kq.goal), killed, 3.1 ,80, 90, 9, 125, 200, 200, 0, true)
 
                 if kq.count >= kq.goal then
-                    kq.status = 2
+                    kq.status = "COMPLETE"
                     kq.last = uid
                     DisplayTimedTextToForce(FORCE_PLAYING, 12, kq.name .. " quest completed, talk to the Huntsman for your reward.")
                 end
