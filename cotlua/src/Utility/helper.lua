@@ -8,8 +8,10 @@ OnInit.global("Helper", function(Require)
     Require('Variables')
     Require('TimerQueue')
 
+    local TQ = TimerQueue
+
     local pack = string.pack
-    local FPS_32 = FPS_32
+    local FPS_32, FPS_64 = FPS_32, FPS_32 * 0.5
 
     ---@class CircularArrayList
     ---@field iterator function
@@ -81,7 +83,7 @@ OnInit.global("Helper", function(Require)
         function thistype:add_timed(value, time)
             self:add(value)
 
-            TimerQueue:callDelayed(time, remove, self)
+            TQ:callDelayed(time, remove, self)
         end
 
         function thistype:wipe()
@@ -289,7 +291,7 @@ do
             instances[#instances + 1] = self
 
             if #instances == 1 then
-                TimerQueue:callPeriodically(FPS_32, condition, update)
+                TQ:callPeriodically(FPS_32, condition, update)
             end
 
             return self
@@ -311,25 +313,27 @@ do
         local mt = { __index = thistype }
 
         function thistype:destroy()
-            self.queue:destroy()
-            self = nil
+            TQ:disableCallback(self.queue)
+            TableRemove(self.shield.timers, self)
+            setmetatable(self, nil)
         end
 
-        ---@type fun(timer: shieldtimer)
-        local function expire(timer)
-            timer.shield.max = timer.shield.max - timer.amount
-            timer.shield.hp = timer.shield.hp - timer.amount
+        ---@type fun(self: shieldtimer)
+        local function expire(self)
+            self.shield.max = self.shield.max - self.amount
+            self.shield.hp = self.shield.hp - self.amount
 
-            if timer.shield.hp <= 0 then
-                timer.shield:destroy()
+            -- remove self before removing shield object
+            self:destroy()
+
+            if self.shield.hp <= 0 then
+                self.shield:destroy()
             else
-                timer.shield:refresh()
+                self.shield:refresh()
             end
-
-            TableRemove(timer.shield.timers, timer)
-            timer:destroy()
         end
 
+        -- timer op associated with one shield instance
         function thistype.create(shield, amount, dur)
             local self = {}
 
@@ -337,9 +341,7 @@ do
 
             self.shield = shield
             self.amount = amount
-            self.queue = TimerQueue.create()
-
-            self.queue:callDelayed(dur, expire, self)
+            self.queue = TQ:callDelayed(dur, expire, self)
 
             return self
         end
@@ -350,7 +352,7 @@ do
     ---@field refresh function
     ---@field sfx effect
     ---@field max number
-    ---@field queue TimerQueue
+    ---@field queue integer
     ---@field target unit
     ---@field add function
     ---@field create function
@@ -452,9 +454,7 @@ do
                 end
             end
 
-            if thistype.queue then
-                thistype.queue:callDelayed(FPS_32, update)
-            end
+            thistype.queue = TQ:callDelayed(FPS_64, update)
         end
 
         local function onStruck(target, source, amount, amount_after_red)
@@ -462,17 +462,17 @@ do
             amount.value = thistype[target]:damage(amount_after_red, source)
         end
 
-        --shield fully expires
+        -- shield fully expires
         function thistype:onDestroy()
             local pid = GetPlayerId(GetOwningPlayer(self.target)) + 1 ---@type integer 
 
-            TimerList[pid]:stopAllTimers(GAIAARMOR.id) --gaia armor attachment
-            ProtectionBuff:dispel(nil, self.target) --high priestess protection attack speed
+            TimerList[pid]:stopAllTimers(GAIAARMOR.id) -- gaia armor attachment
+            ProtectionBuff:dispel(nil, self.target) -- high priestess protection attack speed
 
             BlzSetSpecialEffectAlpha(self.sfx, 0)
             DestroyEffect(self.sfx)
 
-            --destroy all active shieldtimers
+            -- destroy all active shieldtimers
             for _, v in ipairs(self.timers) do
                 v:destroy()
             end
@@ -481,7 +481,7 @@ do
 
             if #thistype.list == 0 then
                 BlzFrameSetVisible(SHIELD_BACKDROP, false)
-                thistype.queue:destroy()
+                TQ:disableCallback(thistype.queue)
             end
 
             EVENT_ON_STRUCK_AFTER_REDUCTIONS:unregister_unit_action(self.target, onStruck)
@@ -490,7 +490,7 @@ do
         function thistype:destroy()
             self:onDestroy()
             thistype[self.target] = nil
-            self = nil
+            setmetatable(self, nil)
         end
 
         ---@type fun(self: shield, amount: number, dur: number)
@@ -504,14 +504,14 @@ do
         function thistype.add(u, amount, dur)
             local self = shield[u] ---@type shield
 
-            --shield already exists
+            -- shield already exists
             if self then
                 self.max = self.max + amount
                 self.hp = self.hp + amount
 
                 self:refresh()
             else
-            --make a new one
+            -- make a new one
                 self = thistype.create(u, amount, dur)
                 EVENT_ON_STRUCK_AFTER_REDUCTIONS:register_unit_action(u, onStruck)
             end
@@ -524,11 +524,9 @@ do
         ---@type fun(u: unit, amount: number, dur: number):shield
         function thistype.create(u, amount, dur)
             ---@diagnostic disable-next-line: missing-fields
-            local self = {} ---@type shield
+            local self = setmetatable({}, mt) ---@type shield
 
-            setmetatable(self, mt)
-
-            --setup
+            -- setup
             self.max = amount
             self.hp = amount
             self.target = u
@@ -543,8 +541,7 @@ do
             thistype.list[#thistype.list + 1] = self
 
             if #thistype.list == 1 then
-                thistype.queue = TimerQueue.create()
-                thistype.queue:callDelayed(FPS_32, update)
+                update()
             end
 
             return self
@@ -750,12 +747,12 @@ do
             self:stop()
         else
             self:update()
-            self.timer = TimerQueue:callDelayed(1, thistype.run, self)
+            self.timer = TQ:callDelayed(1, thistype.run, self)
         end
     end
 
     function thistype:destroy()
-        TimerQueue:disableCallback(self.timer)
+        TQ:disableCallback(self.timer)
         DestroyTrigger(self.trig)
         local pid = GetPlayerId(GetLocalPlayer()) + 1
         if TableHas(self.playerGroup, GetLocalPlayer()) or TableHas(self.playerGroup, pid) then
@@ -819,7 +816,7 @@ do
         end
 
         self:update()
-        self.timer = TimerQueue:callDelayed(1, thistype.run, self)
+        self.timer = TQ:callDelayed(1, thistype.run, self)
 
         return self
     end
@@ -1242,7 +1239,7 @@ end
 ---@param target unit
 function InstantAttack(source, target)
     UnitAddAbility(source, FourCC('IATK'))
-    TimerQueue:callDelayed(FPS_32, AttackDelay, source, target)
+    TQ:callDelayed(FPS_32, AttackDelay, source, target)
 end
 
 ---@param pid integer
@@ -2074,7 +2071,7 @@ function CastSpell(u, id, dur, anim, timescale)
 
     Unit[u].cast_time = dur
     PauseUnit(u, true)
-    TimerQueue:callDelayed(dur, finish_cast, u)
+    TQ:callDelayed(dur, finish_cast, u)
 end
 
 ---@type fun(pid: integer, x: number, y: number)
@@ -2126,7 +2123,7 @@ local conversion_reset_cd = function(pid) conversion_cd[pid] = nil end
 function ConversionEffect(pid)
     if not conversion_cd[pid] then
         conversion_cd[pid] = true
-        TimerQueue:callDelayed(1., conversion_reset_cd, pid)
+        TQ:callDelayed(1., conversion_reset_cd, pid)
         local x = GetUnitX(Hero[pid])
         local y = GetUnitY(Hero[pid])
 
@@ -2305,13 +2302,13 @@ local function apply_fade(u, dur, fade, amount)
     end
 
     if amount < 255 and UnitAlive(u) then
-        TimerQueue:callDelayed(FPS_32, apply_fade, u, dur, fade, amount)
+        TQ:callDelayed(FPS_32, apply_fade, u, dur, fade, amount)
     end
 end
 
 ---@type fun(u: unit, dur: number, fade: boolean)
 function Fade(u, dur, fade)
-    TimerQueue:callDelayed(0, apply_fade, u, dur, fade, 0)
+    TQ:callDelayed(0, apply_fade, u, dur, fade, 0)
 end
 
 local function apply_sfx_fade(sfx, fade, count)
@@ -2324,7 +2321,7 @@ local function apply_sfx_fade(sfx, fade, count)
             BlzSetSpecialEffectAlpha(sfx, 255 - count * 7)
         end
 
-        TimerQueue:callDelayed(FPS_32, apply_sfx_fade, sfx, fade, count)
+        TQ:callDelayed(FPS_32, apply_sfx_fade, sfx, fade, count)
     end
 end
 
@@ -2336,7 +2333,7 @@ function FadeSFX(sfx, fade)
         BlzSetSpecialEffectAlpha(sfx, 0)
     end
 
-    TimerQueue:callDelayed(FPS_32, apply_sfx_fade, sfx, fade, count)
+    TQ:callDelayed(FPS_32, apply_sfx_fade, sfx, fade, count)
 end
 
 function ShopkeeperMove()
@@ -2373,7 +2370,7 @@ function ShopkeeperMove()
         ShopSetStock(FourCC('n01F'), 'I0FC:0', 1)
         ShopSetStock(FourCC('n01F'), 'I00A:0', 1)
 
-        TimerQueue:callDelayed(300., ShopkeeperMove)
+        TQ:callDelayed(300., ShopkeeperMove)
     end
 end
 
@@ -2408,7 +2405,7 @@ function SummonExpire(u)
             local pt = TimerList[pid]:add()
             pt.target = u
             pt.tag = u
-            TimerQueue:callDelayed(2., DestroyEffect, AddSpecialEffectTarget("Abilities\\Spells\\Undead\\Darksummoning\\DarkSummonTarget.mdl", u, "origin"))
+            TQ:callDelayed(2., DestroyEffect, AddSpecialEffectTarget("Abilities\\Spells\\Undead\\Darksummoning\\DarkSummonTarget.mdl", u, "origin"))
 
             pt.timer:callDelayed(2., HideSummon, pt)
         end
@@ -2872,7 +2869,7 @@ end
 ---@type fun(tbl: table, fadein: number, fadeout: number)
 function BlackMask(tbl, fadein, fadeout)
     applyblackmask(tbl, fadein, true)
-    TimerQueue:callDelayed(fadein, applyblackmask, tbl, fadeout, false)
+    TQ:callDelayed(fadein, applyblackmask, tbl, fadeout, false)
 end
 
 ---@type fun(tbl: table, x: number, y: number)
