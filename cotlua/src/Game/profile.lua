@@ -718,8 +718,16 @@ OnInit.global("Profile", function(Require)
                     BlzSetUnitBooleanField(backpack, UNIT_BF_HERO_HIDE_HERO_INTERFACE_ICON, false)
                 end
 
+                -- force refresh
                 SetUnitOwner(backpack, Player(PLAYER_NEUTRAL_PASSIVE), false)
                 SetUnitOwner(backpack, Player(pid - 1), false)
+
+                -- locust trick (disable directly clicking)
+                UnitAddAbility(backpack, FourCC('Aloc'))
+                ShowUnit(backpack, false)
+                ShowUnit(backpack, true)
+                UnitRemoveAbility(backpack, FourCC('Aloc'))
+
                 SetUnitAnimation(backpack, "stand")
                 SuspendHeroXP(backpack, true)
                 UnitAddAbility(backpack, TELEPORT.id)
