@@ -622,12 +622,14 @@ modifiers:
         ["go"] = function(p, pid, args)
             local hero = (args[2]) or "oblivion"
 
-            for _, v in ipairs(HERO_STATS) do
-                local name = v.name:lower()
+            for _, v in pairs(HERO_STATS) do
+                if v.name then
+                    local name = v.name:lower()
 
-                if name:find(hero, nil, true) then
-                    SelectHero(pid, v.id)
-                    break
+                    if name:find(hero, nil, true) then
+                        SelectHero(pid, v.id)
+                        break
+                    end
                 end
             end
         end,
@@ -810,6 +812,8 @@ modifiers:
     end
     RegisterHotkeyToFunc('P', "Dev Teleport", teleport)
 
+    Require("HeroSelect")
+
     local setup = function(x, y)
         local pid = 1
         local p = Player(0)
@@ -821,6 +825,6 @@ modifiers:
     end
 
     --- start somewhere
-    -- TimerQueue:callDelayed(1.5, setup, 0, 0)
+    TimerQueue:callDelayed(0.5, setup, 0, 0)
 
 end, Debug and Debug.getLine())
