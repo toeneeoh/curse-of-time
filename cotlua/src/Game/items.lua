@@ -469,23 +469,27 @@ OnInit.final("Items", function(Require)
                         else
                             dummy = MakeDummyCastItem(Hero[itm.pid])
                         end
-                        if Spells[abilid].ACTIVE then
-                            BlzItemAddAbility(dummy, abilid)
-                        end
-                        BlzSetItemIconPath(dummy, BlzGetAbilityIcon(abilid))
-                        --BlzSetItemDescription(dummy, desc)
-                        BlzSetItemExtendedTooltip(dummy, desc)
-                        BlzSetItemName(dummy, GetObjectName(abilid))
-                        itm.abilities[index] = {obj = dummy, id = abilid}
 
-                        -- if onequip returns true, dont allocate real fields
-                        if not Spells[abilid].onEquip(itm, abilid, index) then
-                            local ab = BlzGetItemAbility(dummy, abilid)
-                            BlzSetAbilityRealLevelField(ab, SPELL_FIELD[0], 0, itm:getValue(index, 0))
-                            for i = 1, SPELL_FIELD_TOTAL do
-                                local v = ItemData[itm.id][index .. "data" .. i]
-                                if v ~= 0 then
-                                    BlzSetAbilityRealLevelField(ab, SPELL_FIELD[i], 0, v)
+                        -- spell inventory is full if dummy is nil
+                        if dummy then
+                            if Spells[abilid].ACTIVE then
+                                BlzItemAddAbility(dummy, abilid)
+                            end
+                            BlzSetItemIconPath(dummy, BlzGetAbilityIcon(abilid))
+                            --BlzSetItemDescription(dummy, desc)
+                            BlzSetItemExtendedTooltip(dummy, desc)
+                            BlzSetItemName(dummy, GetObjectName(abilid))
+                            itm.abilities[index] = {obj = dummy, id = abilid}
+
+                            -- if onequip returns true, dont allocate real fields
+                            if not Spells[abilid].onEquip(itm, abilid, index) then
+                                local ab = BlzGetItemAbility(dummy, abilid)
+                                BlzSetAbilityRealLevelField(ab, SPELL_FIELD[0], 0, itm:getValue(index, 0))
+                                for i = 1, SPELL_FIELD_TOTAL do
+                                    local v = ItemData[itm.id][index .. "data" .. i]
+                                    if v ~= 0 then
+                                        BlzSetAbilityRealLevelField(ab, SPELL_FIELD[i], 0, v)
+                                    end
                                 end
                             end
                         end
