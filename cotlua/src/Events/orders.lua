@@ -25,7 +25,7 @@ OnInit.final("Orders", function(Require)
     ORDER_ID_IMMOLATION    = 852177
     ORDER_ID_UNIMMOLATION  = 852178
 
-    function OnOrder()
+    local function OnOrder()
         local source = GetTriggerUnit() ---@type unit 
         local p      = GetTriggerPlayer()
         local pid    = GetPlayerId(p) + 1 ---@type integer 
