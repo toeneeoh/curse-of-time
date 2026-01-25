@@ -624,7 +624,6 @@ OnInit.global("Variables", function()
     DEFAULT_LIGHTING = "Environment\\DNC\\DNCAshenvale\\DNCAshenValeTerrain\\DNCAshenValeTerrain.mdx" ---@type string 
 
     BANISH_FLAG = false ---@type boolean 
-    GODS_GROUP = {} ---@type player[]
 
     EXPERIENCE_TABLE = {}
     GOLD_TABLE = {}
