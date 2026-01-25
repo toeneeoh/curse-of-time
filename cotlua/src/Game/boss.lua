@@ -107,7 +107,6 @@ OnInit.final("Boss", function(Require)
                 local pid = GetPlayerId(GetOwningPlayer(target)) + 1
 
                 if target == Hero[pid] then
-                    TableRemove(GODS_GROUP, GetOwningPlayer(target))
                     MoveHeroLoc(pid, TOWN_CENTER)
                 else
                     SetUnitPositionLoc(target, TOWN_CENTER)
