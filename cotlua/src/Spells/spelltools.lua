@@ -8,7 +8,12 @@ OnInit.final("SpellTools", function()
     end
 
     function VALID_DAMAGE_TARGET(object, self)
-        return UnitAlive(object) and IsUnitEnemy(object, self.owner)
+        if type(self) == "table" then
+            self = self.owner
+        else
+            self = GetOwningPlayer(self)
+        end
+        return UnitAlive(object) and IsUnitEnemy(object, self)
     end
 
     function VALID_PULL_TARGET(object, self)
