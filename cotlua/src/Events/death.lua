@@ -70,13 +70,14 @@ OnInit.final("Death", function(Require)
         CleanupSummons(pid)
         EVENT_GRAVE_DEATH:trigger(Hero[pid])
 
-        -- gods area
-        if TableHas(GODS_GROUP, pid) then
-            TableRemove(GODS_GROUP, pid)
-        -- death exception
-        elseif InColosseum(pid) then
+        -- flag to avoid normal death sequence
+        if Unit[Hero[pid]].death_exception then
+            Unit[Hero[pid]].death_exception = false
+            return
+        end
+
         -- hardcore death
-        elseif Profile[pid].hero.hardcore > 0 then
+        if Profile[pid].hero.hardcore > 0 then
             DisplayTextToPlayer(Player(pid - 1), 0, 0, "You have died on Hardcore mode, you cannot revive. However, you may -repick to begin a new character in a new character save slot.")
 
             PlayerCleanup(pid)
@@ -126,6 +127,7 @@ OnInit.final("Death", function(Require)
         end
     end
 
+    -- handles visuals and abilities, grave position is already set on death
     ---@type fun(pid: integer)
     function SpawnGrave(pid)
         local itm = GetResurrectionItem(pid, false)
