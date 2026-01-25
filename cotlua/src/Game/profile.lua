@@ -892,6 +892,7 @@ OnInit.global("Profile", function(Require)
 
     local function on_hero_death(killed, killer)
         local pid = GetPlayerId(GetOwningPlayer(killed)) + 1
+        local x, y = GetUnitX(killed), GetUnitY(killed)
 
         -- disable backpack teleports
         DisableBackpackTeleports(pid, true)
