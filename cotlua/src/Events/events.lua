@@ -66,7 +66,7 @@ OnInit.final("Events", function()
             in_flight[self] = nil
             recurseCount[u] = recurseCount[u] - 1
 
-            -- less burden on gc?
+            -- TODO: less burden on gc?
             if recurseCount[u] == 0 then
                 recurse[u] = nil
                 recurseCount[u] = nil
