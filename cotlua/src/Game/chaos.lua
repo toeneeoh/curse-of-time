@@ -155,7 +155,6 @@ OnInit.final("Chaos", function(Require)
             x = GetUnitX(Hero[u.id])
             y = GetUnitY(Hero[u.id])
             if not SELECTING_HERO[u.id] and RectContainsCoords(gg_rct_Colosseum, x, y) == false and RectContainsCoords(gg_rct_Infinite_Struggle, x, y) == false and RectContainsCoords(gg_rct_Church, x, y) == false then
-                TableRemove(GODS_GROUP, u.player)
                 MoveHeroLoc(u.id, TOWN_CENTER)
             end
 
@@ -279,9 +278,7 @@ OnInit.final("Chaos", function(Require)
 
     -- setup god portal actions
     local function start_god_fight(p, pid, u, itm)
-        if god_portal ~= nil and TableHas(GODS_GROUP, p) == false and CHAOS_MODE == false then
-            GODS_GROUP[#GODS_GROUP + 1] = p
-
+        if god_portal ~= nil and CHAOS_MODE == false then
             BlzSetUnitFacingEx(Hero[pid], 45)
             MoveHero(pid, GetRectCenterX(gg_rct_GodsEntrance), GetRectCenterY(gg_rct_GodsEntrance))
             reselect(Hero[pid])
