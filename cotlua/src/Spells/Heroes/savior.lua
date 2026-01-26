@@ -124,15 +124,15 @@ OnInit.final("SaviorSpells", function(Require)
                 GroupAddUnit(pt.ug, self.caster)
 
                 for target in each(pt.ug) do
-                    shield.add(target, self.shield * BOOST[self.pid], self.dur)
+                    Shield.add(target, self.shield * BOOST[self.pid], self.dur)
                 end
             --normal cast
             else
                 if self.caster ~= self.target and self.target ~= nil then
-                    shield.add(self.target, self.shield * BOOST[self.pid], self.dur)
+                    Shield.add(self.target, self.shield * BOOST[self.pid], self.dur)
                 end
 
-                shield.add(self.caster, self.shield * BOOST[self.pid], self.dur)
+                Shield.add(self.caster, self.shield * BOOST[self.pid], self.dur)
             end
 
 
