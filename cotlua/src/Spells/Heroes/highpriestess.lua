@@ -238,7 +238,7 @@ OnInit.final("HighPriestessSpells", function(Require)
 
             for target in each(ug) do
                 ProtectionBuff:add(self.caster, target)
-                shield.add(target, self.shield * BOOST[self.pid], 20 + 10 * self.ablev):color(4)
+                Shield.add(target, self.shield * BOOST[self.pid], 20 + 10 * self.ablev):color(4)
             end
         end
 
