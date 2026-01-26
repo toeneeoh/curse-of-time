@@ -382,9 +382,9 @@ OnInit.final("ElementalistSpells", function(Require)
             BlzSetSpecialEffectColor(pt.sfx, 160, 255, 160)
 
             if masterElement[self.pid] == ELEMENTEARTH.value then --earth element bonus
-                shield.add(self.caster, self.shield * 2.5 * BOOST[self.pid], 31.)
+                Shield.add(self.caster, self.shield * 2.5 * BOOST[self.pid], 31.)
             else
-                shield.add(self.caster, self.shield * BOOST[self.pid], 31.)
+                Shield.add(self.caster, self.shield * BOOST[self.pid], 31.)
             end
 
             pt.timer:callDelayed(30., PlayerTimer.destroy, pt)
@@ -571,7 +571,7 @@ OnInit.final("ElementalistSpells", function(Require)
                         elseif rand == ELEMENTEARTH.value then --earth
                             local b = EarthDebuff:get(nil, enemy)
                             if b then
-                                IncUnitAbilityLevel(enemy, b.RAWCODE)
+                                b.level = b.level + 1
                                 b:refresh()
                             end
                             EarthDebuff:add(Hero[pt.pid], enemy):duration(10.)
