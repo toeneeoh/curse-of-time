@@ -8,7 +8,7 @@
 ]]
 
 OnInit.global("CodeGen", function()
-    local ALPHABET  = "!#$\x25&'()*+,-.0123456789:;=<>?[]^_{}|`@ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz" ---@type string 
+    local ALPHABET  = "!#$%&'()*+,-.0123456789:;=<>?[]^_{}|`@ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz" ---@type string 
     local MAX_SPACE = 6
     local BASE      = ALPHABET:len() - MAX_SPACE - 1
     local CHAR      = ALPHABET:sub(2, MAX_SPACE + 1)
@@ -92,7 +92,7 @@ OnInit.global("CodeGen", function()
 
     ---@param str string
     local function decompress(str)
-        str = str:gsub(" (\x25S)(\x25S)", function(symbol, sequence)
+        str = str:gsub(" (%S)(%S)", function(symbol, sequence)
             local count = string.find(ALPHABET, symbol, nil, true) + 2
 
             return string.rep(sequence, count)

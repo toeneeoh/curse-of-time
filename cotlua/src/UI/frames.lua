@@ -98,7 +98,7 @@ OnInit.final("Frames", function(Require)
         local time = 0
         TimerQueue:callPeriodically(1., nil, function()
             time = time + 1
-            BlzFrameSetText(CLOCK_FRAME_TEXT, date("!\x25H:\x25M:\x25S", time))
+            BlzFrameSetText(CLOCK_FRAME_TEXT, date("!%H:%M:%S", time))
         end)
 
         -- Gold (Default Gold)

@@ -211,7 +211,7 @@ OnInit.final("Damage", function(Require)
                 ArcingTextTag.create(amount_after_red, target, 1, 1, colors[1], colors[2], colors[3], 0)
             end
 
-            local damageHex = format("|cff\x2502X\x2502X\x2502X", colors[1], colors[2], colors[3])
+            local damageHex = format("|cff%02X%02X%02X", colors[1], colors[2], colors[3])
             LogDamage(source, target, damageHex .. RealToString(amount_after_red) .. "|r", false, tag)
         end
 

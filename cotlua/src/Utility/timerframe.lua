@@ -87,7 +87,7 @@ OnInit.global("TimerFrame", function(Require)
         end
 
         function thistype:update()
-            BlzFrameSetText(text, self.title .. "|n" .. date("!\x25H:\x25M:\x25S", self.time))
+            BlzFrameSetText(text, self.title .. "|n" .. date("!%H:%M:%S", self.time))
         end
 
         function TimerFrame.create(title, time, onExpire, playerGroup)

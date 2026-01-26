@@ -613,7 +613,7 @@ function HealthGradient(position, returnHex)
 
     if returnHex then
         -- Convert RGB values to hexadecimal string
-        local hexString = string.format("|cff\x2502X\x2502X\x2502X", interpolatedColor[1], interpolatedColor[2], interpolatedColor[3])
+        local hexString = string.format("|cff%02X%02X%02X", interpolatedColor[1], interpolatedColor[2], interpolatedColor[3])
         return hexString
     else
         return interpolatedColor[1], interpolatedColor[2], interpolatedColor[3]
@@ -933,11 +933,11 @@ function HighestStat(hero, include_bonus)
     end
 end
 
-function HighestBaseStat(hero, literal)
+function HighestStatName(hero, literal, include_bonus)
     if literal then
-        return literal_stat_map[HighestStat(hero, false)]
+        return literal_stat_map[HighestStat(hero, include_bonus)]
     else
-        return stat_map[HighestStat(hero, false)]
+        return stat_map[HighestStat(hero, include_bonus)]
     end
 end
 
@@ -1335,9 +1335,9 @@ function RealToString(value)
     end
 
     local s = tostring(math.floor(value + 0.5))
-    local _, _, minus, int = s:find("([-]?)(\x25d+)")
+    local _, _, minus, int = s:find("([-]?)(%d+)")
 
-    int = int:reverse():gsub("(\x25d\x25d\x25d)", "\x251,")
+    int = int:reverse():gsub("(%d%d%d)", "%1,")
 
     return minus .. int:reverse():gsub("^,", "")
 end
@@ -1635,10 +1635,10 @@ function ParseItemTooltip(itm, s)
     ItemData[itemid].name = GetItemName(itm)
 
     -- match balanced brackets
-    orig = orig:gsub("(\x25b[])", function(contents)
+    orig = orig:gsub("(%b[])", function(contents)
         contents = contents:sub(2, -2) ---@type string
 
-        local tag, suffix, value = contents:match("(\x25a+)([ \x25*])(\x25-?\x25d+\x25.?\x25d*)")
+        local tag, suffix, value = contents:match("(%a+)([ %*])(%-?%d+%.?%d*)")
         local index
         for i = 1, #STAT_TAG do
             local v = STAT_TAG[i]
@@ -1664,7 +1664,7 @@ function ParseItemTooltip(itm, s)
                 ItemData[itemid][index .. "data"] = data
 
                 -- read sfx data
-                for entry in gmatch(data, "(\x25S+)") do
+                for entry in gmatch(data, "(%S+)") do
                     local args = {}
 
                     -- parse [sfx,level,attach,path] entries
@@ -1695,7 +1695,7 @@ function ParseItemTooltip(itm, s)
             end)
 
             -- process affixes
-            local affix = "([|=>\x25@])(\x25-?\x25d+\x25.?\x25d*)"
+            local affix = "([|=>%@])(%-?%d+%.?%d*)"
             local start = contents:find(affix)
 
             if start then
@@ -1712,7 +1712,7 @@ function ParseItemTooltip(itm, s)
                     elseif prefix == ">" then
                         ItemData[itemid][index .. "fpr"] = tonumber(capture)
                     -- percent effectiveness
-                    elseif prefix == "\x25" then
+                    elseif prefix == "%" then
                         ItemData[itemid][index .. "percent"] = tonumber(capture)
                     -- unlock at
                     elseif prefix == "@" then

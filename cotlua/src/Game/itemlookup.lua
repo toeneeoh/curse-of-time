@@ -61,7 +61,7 @@ OnInit.final("ItemLookup", function(Require)
             CHURCH_DONATION[pid] = true
             donation = donation - donationrate
             DisplayTextToPlayer(p, 0, 0, "|c00408080The Goddesses bestow their blessings.")
-            DisplayTextToForce(FORCE_PLAYING, "Reduced bad weather chance: " .. (R2I((1 - donation) * 100)) .. "\x25")
+            DisplayTextToForce(FORCE_PLAYING, "Reduced bad weather chance: " .. (R2I((1 - donation) * 100)) .. "%")
         -- upgrade teleports & reveal
         elseif itemid == FourCC('I101') or itemid == FourCC('I102') then
             local lvl = (itemid == FourCC('I101') and GetUnitAbilityLevel(Backpack[pid], TELEPORT.id)) or GetUnitAbilityLevel(Backpack[pid], FourCC('A0FK'))

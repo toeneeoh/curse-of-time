@@ -282,7 +282,7 @@ OnInit.final("MarksmanSpells", function(Require)
 
             pt.boost = BOOST[self.pid]
             pt.dmg = self.dmg
-            SetTextTagText(tag, RealToString(pt.boost * 100) .. "\x25", 0.024)
+            SetTextTagText(tag, RealToString(pt.boost * 100) .. "%", 0.024)
             SetTextTagColor(tag, 255, R2I(270 - pt.boost * 150), R2I(270 - pt.boost * 150), 255)
             pt.cd = self.cd * LBOOST[self.pid]
             pt.ug = CreateGroup()

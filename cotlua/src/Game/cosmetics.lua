@@ -43,7 +43,7 @@ OnInit.final("Cosmetics", function(Require)
     }
 
     for i = 1, #donator do
-        local name, skinFlags, auraFlags = donator[i]:match("(\x25S+) (\x25S+) (\x25S+)")
+        local name, skinFlags, auraFlags = donator[i]:match("(%S+) (%S+) (%S+)")
 
         --flag as donator
         CosmeticTable[name][0] = 1

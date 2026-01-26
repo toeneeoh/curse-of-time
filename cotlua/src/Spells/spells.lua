@@ -191,7 +191,7 @@ OnInit.final("Spells", function(Require)
                 \: no boost
                 =: tag identifier
             ]]
-            local pattern = "(~?)(>?)([\\{\x25[])(\x25w-)=(.-)]"
+            local pattern = "(~?)(>?)([\\{%[])(%w-)=(.-)]"
             orig = string.gsub(orig, pattern, function(defaultflag, colorflag, prefix, tag, content)
                 local color = (colorflag ~= ">")
                 local alt   = alt_down[self.pid] or defaultflag == "~"
@@ -210,7 +210,7 @@ OnInit.final("Spells", function(Require)
                 elseif prefix == "{" then
                     local out
                     if calc < 1000 then
-                        out = string.format("\x25.2f", calc * LBOOST[self.pid])
+                        out = string.format("%.2f", calc * LBOOST[self.pid])
                     else
                         out = RealToString(calc * LBOOST[self.pid])
                     end

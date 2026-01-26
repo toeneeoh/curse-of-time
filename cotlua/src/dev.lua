@@ -201,7 +201,7 @@ modifiers:
             for i = 2, #args do
                 search = search .. args[i] .. " "
             end
-            search = search:gsub("\x25s+$", "")
+            search = search:gsub("%s+$", "")
 
             find_item(search, pid)
         end,
@@ -267,7 +267,7 @@ modifiers:
                 rate = FourCC(rate)
 
                 for i = 1, ItemDrops[rate][100] do
-                    print(ItemDrops[rate][i .. "\x25"])
+                    print(ItemDrops[rate][i .. "%"])
                 end
             end
         end,
@@ -786,7 +786,7 @@ modifiers:
         local args = {}
 
         --propogate args table
-        for arg in GetEventPlayerChatString():gmatch("\x25S+") do
+        for arg in GetEventPlayerChatString():gmatch("%S+") do
             args[#args + 1] = arg
         end
 

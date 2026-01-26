@@ -89,7 +89,7 @@ OnInit.final("Commands", function(Require)
         end,
         ["-cam"] = function(p, pid, args)
             if args[2] then
-                local _, _, zoom, lock = args[2]:find("(\x25d+)\x25s.([lL])")
+                local _, _, zoom, lock = args[2]:find("(%d+)%s.([lL])")
 
                 if zoom then
                     if string.lower(lock) == "l" then
@@ -342,7 +342,7 @@ local function CustomCommands()
     local args = {}
 
     --propogate args table
-    for arg in cmd:gmatch("\x25S+") do
+    for arg in cmd:gmatch("%S+") do
         args[#args + 1] = arg
     end
 

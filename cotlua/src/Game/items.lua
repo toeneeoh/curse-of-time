@@ -402,7 +402,7 @@ OnInit.final("Items", function(Require)
 
                 -- profiency warning
                 if GetHeroLevel(u) < 15 and mod < 1 then
-                    DisplayTimedTextToPlayer(self.owner, 0, 0, 10, "You lack the proficiency (-pf) to use this item, therefore it only gives 75\x25 of most stats.\n|cffFF0000You will stop getting this warning at level 15.|r")
+                    DisplayTimedTextToPlayer(self.owner, 0, 0, 10, "You lack the proficiency (-pf) to use this item, therefore it only gives 75% of most stats.\n|cffFF0000You will stop getting this warning at level 15.|r")
                 end
             else
                 unit.mr = unit.mr / (1 - self:getValue(ITEM_MAGIC_RESIST, 0) * 0.01)
@@ -427,14 +427,14 @@ OnInit.final("Items", function(Require)
             values[0] = value
 
             -- parse ability data into array
-            for v in data:gmatch("(\x25-?\x25d+)") do
+            for v in data:gmatch("(%-?%d+)") do
                 values[count] = v
                 ItemData[itm.id][index .. "data" .. count] = v
                 count = count + 1
             end
 
             -- parse ability tooltip and fill capture groups
-            orig = orig:gsub("\x25$(\x25d+)", function(tag)
+            orig = orig:gsub("%$(%d+)", function(tag)
                 return values[tonumber(tag) - 1] .. ""
             end)
 
@@ -837,7 +837,7 @@ OnInit.final("Items", function(Require)
 
             --flavor text
             --remove bracket pairs, extra spaces, and extra newlines
-            orig = "|n" .. orig:gsub("(\x25b[]\x25s*)", "")
+            orig = "|n" .. orig:gsub("(%b[]%s*)", "")
             orig = (orig:len() > 5 and ("|n" .. orig)) or ""
 
             self.tooltip = norm_new .. orig

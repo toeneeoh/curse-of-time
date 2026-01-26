@@ -464,7 +464,7 @@ OnInit.final("Inventory", function(Require)
 
             -- send payload
             if GetLocalPlayer() == Player(pid - 1) then
-                BlzSendSyncData("context", string.format("\x25d", slot))
+                BlzSendSyncData("context", string.format("%d", slot))
             end
         end
 
@@ -547,11 +547,11 @@ OnInit.final("Inventory", function(Require)
                     if RectContainsUnit(gg_rct_Town_Main, Hero[pid]) and total > 0 then
                         visible_buttons[#visible_buttons + 1] = 4
                         if GetLocalPlayer() == Player(pid - 1) then
-                            BlzFrameSetText(cost_text, string.format("\x2501d", gold))
+                            BlzFrameSetText(cost_text, string.format("%01d", gold))
                             local show_plat = plat > 0
                             frame_set_visible(cost_icon2, show_plat)
                             if show_plat then
-                                BlzFrameSetText(cost_text2, string.format("\x2501d", plat))
+                                BlzFrameSetText(cost_text2, string.format("%01d", plat))
                             end
                         end
                     end
@@ -625,7 +625,7 @@ OnInit.final("Inventory", function(Require)
         local function on_context_sync()
             local pid = GetPlayerId(GetTriggerPlayer()) + 1
             local data = BlzGetTriggerSyncData()
-            local slot_s = string.match(data, "(\x25d+)")
+            local slot_s = string.match(data, "(%d+)")
             local slot = tonumber(slot_s)
             --print("context:",slot_s)
 
@@ -645,7 +645,7 @@ OnInit.final("Inventory", function(Require)
         local function on_target_sync()
             local pid = GetPlayerId(GetTriggerPlayer()) + 1
             local data = BlzGetTriggerSyncData()
-            local slot_s = string.match(data, "(\x25-?\x25d+)")
+            local slot_s = string.match(data, "(%-?%d+)")
             local slot = tonumber(slot_s)
             --print("target:", slot_s)
 

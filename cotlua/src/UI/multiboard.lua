@@ -404,7 +404,7 @@ OnInit.final("Multiboard", function(Require)
                     local hp = (playing and GetWidgetLife(Hero[pid]) / BlzGetUnitMaxHP(Hero[pid]) * 100.) or 0
                     local heroText = (playing and GetObjectName(HeroID[pid])) or ""
                     local levelText = (playing and "|cff999999[" .. GetHeroLevel(Hero[pid]) .. "]|r") or ""
-                    local hpText = (playing and HealthGradient(hp, true) .. math.ceil(hp) .. "\x25" .. "|r") or ""
+                    local hpText = (playing and HealthGradient(hp, true) .. math.ceil(hp) .. "%" .. "|r") or ""
                     if u.isPlaying == false then
                         name = "|cff999999" .. u.name .. "|r"
                     end
@@ -597,7 +597,7 @@ OnInit.final("Multiboard", function(Require)
 
                     BlzFrameSetText(MB.name, self.title)
                     BlzFrameSetText(self:get(2, 2).text, "|cffffcc00Target:|r " .. ((b.target and User[b.target.owner].hex .. GetUnitName(b.target.unit) .. "|r") or ""))
-                    BlzFrameSetText(self:get(3, 1).text, "|cffffcc00Battle Time:|r " .. os.date("!\x25H:\x25M:\x25S", math.floor(b.time)))
+                    BlzFrameSetText(self:get(3, 1).text, "|cffffcc00Battle Time:|r " .. os.date("!%H:%M:%S", math.floor(b.time)))
 
                     for i = 4, #self.rows do
                         local pid = i - 3
@@ -654,7 +654,7 @@ OnInit.final("Multiboard", function(Require)
             boss.close()
             boss:get(2, 2).text =   {0.15, -0.005, ROW_WIDTH * 0.5, ROW_HEIGHT * 0.7}
             boss:get(3, 1).text = {0.02, 0.006, 0.075, 0.025}
-            BlzFrameSetText(boss:get(3, 1).text, "|cffffcc00Battle Time:|r " .. os.date("!\x25H:\x25M:\x25S", 0))
+            BlzFrameSetText(boss:get(3, 1).text, "|cffffcc00Battle Time:|r " .. os.date("!%H:%M:%S", 0))
             boss:get(3, 3).icon = {0.13, 0., 0.015, 0.015}
             boss:get(3, 4).text = {0.15, -0.002, 0.1, 0.015}
             BlzFrameSetText(boss:get(3, 4).text, "|cffffcc00Damage|r")

@@ -398,7 +398,7 @@ OnInit.final("Gluebutton", function(Require)
                 self.cooldown_callback[pid] = nil
             else
                 if p == Player(pid - 1) then
-                    BlzFrameSetText(self.cooldownText, format("\x25.1f", self.cooldown_time[pid]))
+                    BlzFrameSetText(self.cooldownText, format("%.1f", self.cooldown_time[pid]))
                     BlzFrameSetValue(self.cooldownFrame, 100 - (self.cooldown_time[pid] / total_time) * 100)
                 end
                 self.cooldown_time[pid] = self.cooldown_time[pid] - FPS_32
@@ -429,7 +429,7 @@ OnInit.final("Gluebutton", function(Require)
                 return
             end
             if GetLocalPlayer() == Player(pid - 1) then
-                BlzFrameSetText(self.cooldownText, format("\x25.1f", tostring(time)))
+                BlzFrameSetText(self.cooldownText, format("%.1f", tostring(time)))
                 BlzFrameSetValue(self.cooldownFrame, 0)
                 BlzFrameSetVisible(self.cooldownFrame, true)
             end
