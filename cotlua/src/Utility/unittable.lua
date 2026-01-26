@@ -287,6 +287,7 @@ OnInit.final("UnitTable", function(Require)
                     return (rawget(thistype, key) or tbl.proxy[key])
                 end,
                 __newindex = function(tbl, key, val)
+                    local prev = tbl.proxy[key]
                     if set_operators[key] then
                         if mtype(val) == "float" then
                             -- round to 3 decimals
@@ -294,11 +295,13 @@ OnInit.final("UnitTable", function(Require)
                         end
                         rawset(tbl.proxy, key, val)
                         set_operators[key](tbl, val)
-
-                        -- trigger stat change event
-                        EVENT_STAT_CHANGE:trigger(tbl.unit)
                     else
-                        rawset(tbl, key, val)
+                        rawset(tbl.proxy, key, val)
+                    end
+
+                    -- trigger stat change event
+                    if prev ~= val then
+                        EVENT_STAT_CHANGE:trigger(tbl.unit)
                     end
                 end,
             }
@@ -350,6 +353,7 @@ OnInit.final("UnitTable", function(Require)
             self.base_mana = BlzGetUnitMaxMana(u)
 
             local default = HERO_STATS[self.id]
+            -- stats that trigger EVENT_STAT_CHANGE
             self.proxy = setmetatable({ -- used for __newindex behavior
                 damage = BlzGetUnitBaseDamage(u, 0),
                 bonus_damage = UnitGetBonus(u, BONUS_DAMAGE),
@@ -429,7 +433,7 @@ OnInit.final("UnitTable", function(Require)
     end
 
     ---@type fun(u: unit)
-    function UnitIndex(u)
+    local function index_unit(u)
         if u and not IsDummy(u) and GetUnitAbilityLevel(u, DETECT_LEAVE_ABILITY) == 0 then
             -- first time setup for abilities
             local index = 0
@@ -457,7 +461,7 @@ OnInit.final("UnitTable", function(Require)
 
     ---@return boolean
     local function onIndex()
-        UnitIndex(GetFilterUnit())
+        index_unit(GetFilterUnit())
 
         return false
     end
