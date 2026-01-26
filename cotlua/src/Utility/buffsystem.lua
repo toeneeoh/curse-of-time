@@ -1,6 +1,7 @@
 OnInit.global("BuffSystem", function(Require)
     Require('TimerQueue')
     Require('UnitEvent')
+    Require('BuffBar')
 
     -------------------------------//
     ----------- BUFF TYPES --------//
@@ -23,11 +24,9 @@ OnInit.global("BuffSystem", function(Require)
     --Each buff applied fully stacks.
     BUFF_STACK_FULL   = 2 ---@type integer 
 
-    --Determines the automatic Buff rawcode based on the Ability rawcode
-    --If BUFF_OFFSET = 0x01000000, then Ability rawcode of FourCC('AXXX') will have Buff rawcode of FourCC('BXXX')
-    local BUFF_OFFSET = 0x01000000 ---@type integer 
     local buffs = {}
     local count = array2d(0)
+    local TQ = TimerQueue
 
     ---@class Buff
     ---@field pid integer
@@ -53,12 +52,9 @@ OnInit.global("BuffSystem", function(Require)
     ---@field create function
     ---@field duration function
     ---@field refresh function
-    ---@field timer TimerQueue
     Buff = {} ---@type Buff
     do
         local thistype = Buff
-        thistype.timer = TimerQueue.create()
-
         --Buff defaults
         thistype.pid = 0 ---@type integer
         thistype.tpid = 0 ---@type integer
@@ -67,6 +63,9 @@ OnInit.global("BuffSystem", function(Require)
         thistype.RAWCODE = 0 ---@type integer 
         thistype.STACK_TYPE = 0 ---@type integer 
         thistype.DISPEL_TYPE = 0 ---@type integer 
+        thistype.ICON = "ReplaceableTextures\\CommandButtons\\BTNShoveler.blp"
+        thistype.NAME = "Placeholder"
+        thistype.DESC = "Placeholder"
         thistype.onApply = nil ---@type function
         thistype.onRemove = nil ---@type function
 
@@ -119,16 +118,11 @@ OnInit.global("BuffSystem", function(Require)
                 remove = true
             end
 
-            if remove then
-                UnitRemoveAbility(self.target, self.RAWCODE)
-                UnitRemoveAbility(self.target, self.RAWCODE + BUFF_OFFSET)
-            end
-
             if self.callback then
-                thistype.timer:disableCallback(self.callback)
+                TQ:disableCallback(self.callback)
             end
 
-            -- remove from buffs
+            -- remove from buffs table
             for i = 1, #buffs do
                 if buffs[i] == self then
                     buffs[i] = buffs[#buffs]
@@ -137,25 +131,36 @@ OnInit.global("BuffSystem", function(Require)
                 end
             end
 
+            if remove then
+                -- remove from buff bar
+                UnitRemoveBuff(self.target, self)
+            end
+
             if self.onRemove then
                 self:onRemove()
             end
-
-            self = nil
         end
 
         ---@type fun(self: Buff, dur: number)
         function thistype:duration(dur)
             if self.callback then
-                thistype.timer:disableCallback(self.callback)
+                TQ:disableCallback(self.callback)
             end
 
             if dur then
-                self.callback = thistype.timer:callDelayed(dur, self.remove, self)
+                self.callback = TQ:callDelayed(dur, self.remove, self)
             end
+
+            -- refresh buff bar
+            UnitRefreshBuff(self.target)
         end
 
-        ---@type fun(self: Buff, source: unit, target: unit): Buff
+        ---@type fun(self: Buff): number?
+        function thistype:remaining()
+            return TQ:getRemaining(self.callback)
+        end
+
+        ---@type fun(self: Buff, source: unit, target: unit): Buff, boolean
         function thistype:check(source, target)
             local apply = false ---@type boolean 
             local similar = self:get(nil, target) ---@type Buff
@@ -186,20 +191,15 @@ OnInit.global("BuffSystem", function(Require)
             self.target = target
 
             if apply then
-                --Append to buffs
+                -- Append to global buffs table
                 buffs[#buffs + 1] = self
-
-                if GetUnitAbilityLevel(target, self.RAWCODE) == 0 then
-                    UnitAddAbility(target, self.RAWCODE)
-                    UnitMakeAbilityPermanent(target, true, self.RAWCODE)
-                end
 
                 if self.onApply then
                     self:onApply()
                 end
             end
 
-            return self
+            return self, apply
         end
 
         --===============================================================
@@ -253,6 +253,7 @@ OnInit.global("BuffSystem", function(Require)
             end
         end
 
+        -- remove all instances of a specific buff (ie. weather)
         function thistype:removeAll()
             local i = 1
             while i <= #buffs do
@@ -281,9 +282,14 @@ OnInit.global("BuffSystem", function(Require)
 
         ---@type fun(self: Buff, source: unit, target: unit): Buff
         function thistype:add(source, target)
-            local b = self:create(source, target)
+            local b = self:create(source, target) ---@type Buff
 
-            b = b:check(source, target)
+            b, apply = b:check(source, target)
+
+            -- add to buff bar
+            if not b.HIDDEN and apply then
+                UnitAddBuff(target, b)
+            end
 
             return b
         end
