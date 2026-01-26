@@ -25,6 +25,7 @@ OnInit.final("Gluebutton", function(Require)
     ---@field pointType framepointtype
     ---@field create function
     ---@field destroy function
+    ---@field visible function
     Tooltip = {}
     do
         local thistype = Tooltip
@@ -216,6 +217,7 @@ OnInit.final("Gluebutton", function(Require)
     ---@field charge function
     ---@field cooldown function
     ---@field use_cooldowns function
+    ---@field use_click_placeholder function
     Button = {}
     do
         local thistype = Button
@@ -393,6 +395,7 @@ OnInit.final("Gluebutton", function(Require)
                 if p == Player(pid - 1) then
                     BlzFrameSetVisible(self.cooldownFrame, false)
                 end
+                self.cooldown_callback[pid] = nil
             else
                 if p == Player(pid - 1) then
                     BlzFrameSetText(self.cooldownText, format("\x25.1f", self.cooldown_time[pid]))
@@ -400,23 +403,39 @@ OnInit.final("Gluebutton", function(Require)
                 end
                 self.cooldown_time[pid] = self.cooldown_time[pid] - FPS_32
 
-                TimerQueue:callDelayed(FPS_32, cooldown_periodic, self, total_time, pid)
+                self.cooldown_callback[pid] = TimerQueue:callDelayed(FPS_32, cooldown_periodic, self, total_time, pid)
             end
+        end
+
+        local on_click_placeholder = function()
+            local f = BlzGetTriggerFrame()
+
+            BlzFrameSetEnable(f, false)
+            BlzFrameSetEnable(f, true)
+        end
+
+        function thistype:use_click_placeholder()
+            self:onClick(on_click_placeholder)
         end
 
         function thistype:use_cooldowns()
             self.cooldown_time = __jarray(0)
+            self.cooldown_callback = {}
         end
 
         function thistype:cooldown(time, pid)
-            self.cooldown_time[pid] = time
+            if self.cooldown_callback[pid] then
+                self.cooldown_time[pid] = time
+                return
+            end
             if GetLocalPlayer() == Player(pid - 1) then
                 BlzFrameSetText(self.cooldownText, format("\x25.1f", tostring(time)))
                 BlzFrameSetValue(self.cooldownFrame, 0)
                 BlzFrameSetVisible(self.cooldownFrame, true)
             end
 
-            TimerQueue:callDelayed(FPS_32, cooldown_periodic, self, time, pid)
+            self.cooldown_time[pid] = time
+            self.cooldown_callback[pid] = TimerQueue:callDelayed(FPS_32, cooldown_periodic, self, time, pid)
         end
 
         ---@param model string
@@ -498,6 +517,8 @@ OnInit.final("Gluebutton", function(Require)
             BlzFrameSetVisible(self.cooldownFrame, false)
             BlzFrameSetPoint(self.cooldownText, FRAMEPOINT_CENTER, self.iconFrame, FRAMEPOINT_CENTER, 0., 0.)
             BlzFrameSetScale(self.cooldownText, 1.5)
+            BlzFrameSetEnable(self.cooldownFrame, false)
+            BlzFrameSetEnable(self.cooldownText, false)
 
             BlzFrameSetPoint(self.chargeFrame, FRAMEPOINT_BOTTOMRIGHT, self.iconFrame, FRAMEPOINT_BOTTOMRIGHT, -0.003, 0.003)
             BlzFrameSetSize(self.chargeFrame, width * 0.35, height * 0.35)
