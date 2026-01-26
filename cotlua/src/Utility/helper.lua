@@ -11,7 +11,7 @@ OnInit.global("Helper", function(Require)
     local TQ = TimerQueue
 
     local pack = string.pack
-    local FPS_32, FPS_64 = FPS_32, FPS_32 * 0.5
+    local FPS_32 = FPS_32
 
     ---@class CircularArrayList
     ---@field iterator function
@@ -299,256 +299,6 @@ do
     end
 end
 
---[[Shield system and UI]]
-do
-    ---@class shieldtimer
-    ---@field shield shield
-    ---@field amount number
-    ---@field create function
-    ---@field destroy function
-    ---@field queue TimerQueue
-    shieldtimer = {}
-    do
-        local thistype = shieldtimer
-        local mt = { __index = thistype }
-
-        function thistype:destroy()
-            TQ:disableCallback(self.queue)
-            TableRemove(self.shield.timers, self)
-            setmetatable(self, nil)
-        end
-
-        ---@type fun(self: shieldtimer)
-        local function expire(self)
-            self.shield.max = self.shield.max - self.amount
-            self.shield.hp = self.shield.hp - self.amount
-
-            -- remove self before removing shield object
-            self:destroy()
-
-            if self.shield.hp <= 0 then
-                self.shield:destroy()
-            else
-                self.shield:refresh()
-            end
-        end
-
-        -- timer op associated with one shield instance
-        function thistype.create(shield, amount, dur)
-            local self = {}
-
-            setmetatable(self, mt)
-
-            self.shield = shield
-            self.amount = amount
-            self.queue = TQ:callDelayed(dur, expire, self)
-
-            return self
-        end
-
-    end
-
-    ---@class shield
-    ---@field refresh function
-    ---@field sfx effect
-    ---@field max number
-    ---@field queue integer
-    ---@field target unit
-    ---@field add function
-    ---@field create function
-    ---@field destroy function
-    ---@field color function
-    ---@field c integer
-    ---@field r integer
-    ---@field g integer
-    ---@field b integer
-    ---@field addTimer function
-    ---@field timers shieldtimer[]
-    ---@field shieldheight number[]
-    ---@field list shield[]
-    shield = {}
-    do
-        local thistype = shield
-        local mt = { __index = thistype }
-
-        thistype.list = {}
-        thistype.shieldheight = {
-            HERO_ELEMENTALIST = 200,
-            HERO_MARKSMAN = 220,
-            HERO_MARKSMAN_SNIPER = 220,
-            HERO_ROYAL_GUARDIAN = 230,
-            HERO_MASTER_ROGUE = 230,
-            HERO_ASSASSIN = 230,
-            HERO_DARK_SUMMONER = 230,
-            HERO_THUNDERBLADE = 240,
-            HERO_HIGH_PRIEST = 240,
-            HERO_VAMPIRE = 240,
-            HERO_OBLIVION_GUARD = 275
-        }
-
-        --shieldheight default value
-        __jarray(250, thistype.shieldheight)
-
-        function thistype:color(c)
-            self.c = c
-            self.r = OriginalRGB[c].r
-            self.g = OriginalRGB[c].g
-            self.b = OriginalRGB[c].b
-            BlzSetSpecialEffectColorByPlayer(self.sfx, Player(c))
-        end
-
-        function thistype:refresh()
-            BlzSetSpecialEffectTime(self.sfx, self.hp / self.max)
-        end
-
-        ---@type fun(self: shield, dmg: number, source: unit): number
-        function thistype:damage(dmg, source)
-            local angle = math.atan(GetUnitY(source) - GetUnitY(self.target), GetUnitX(source) - GetUnitX(self.target)) ---@type number 
-            local x     = GetUnitX(self.target) + 80. * math.cos(angle) ---@type number 
-            local y     = GetUnitY(self.target) + 80. * math.sin(angle) ---@type number 
-            local e     = AddSpecialEffect("war3mapImported\\BoneArmorCasterTC.mdx", x, y) ---@type effect 
-
-            BlzSetSpecialEffectZ(e, BlzGetUnitZ(self.target) + 90.)
-            BlzSetSpecialEffectColorByPlayer(e, Player(self.c))
-            BlzSetSpecialEffectYaw(e, angle)
-            BlzSetSpecialEffectScale(e, 0.85)
-            BlzSetSpecialEffectTimeScale(e, 3.5)
-
-            DestroyEffect(e)
-
-            self.hp = self.hp - dmg
-
-            if self.hp <= 0. then
-                self:destroy()
-                return -self.hp
-            else
-                self:refresh()
-                return 0.00
-            end
-        end
-
-        local function update()
-            local u = GetMainSelectedUnit() ---@type unit 
-
-            if thistype[u] then
-                BlzFrameSetVisible(SHIELD_BACKDROP, true)
-
-                if thistype[u].max >= 100000 then
-                    BlzFrameSetText(SHIELD_TEXT, "|cff22ddff" .. R2I(thistype[u].hp))
-                else
-                    BlzFrameSetText(SHIELD_TEXT, "|cff22ddff" .. R2I(thistype[u].hp) .. " / " .. R2I(thistype[u].max))
-                end
-            else
-                BlzFrameSetVisible(SHIELD_BACKDROP, false)
-            end
-
-            --move shield visual positions
-            for i = 1, #thistype.list do
-                local s = thistype.list[i]
-                if UnitAlive(s.target) then
-                    BlzSetSpecialEffectX(s.sfx, GetUnitX(s.target))
-                    BlzSetSpecialEffectY(s.sfx, GetUnitY(s.target))
-                    BlzSetSpecialEffectZ(s.sfx, BlzGetUnitZ(s.target) + thistype.shieldheight[GetUnitTypeId(s.target)])
-                else
-                    s:destroy()
-                end
-            end
-
-            thistype.queue = TQ:callDelayed(FPS_64, update)
-        end
-
-        local function onStruck(target, source, amount, amount_after_red)
-            amount.color = {thistype[target].r, thistype[target].g, thistype[target].b}
-            amount.value = thistype[target]:damage(amount_after_red, source)
-        end
-
-        -- shield fully expires
-        function thistype:onDestroy()
-            local pid = GetPlayerId(GetOwningPlayer(self.target)) + 1 ---@type integer 
-
-            TimerList[pid]:stopAllTimers(GAIAARMOR.id) -- gaia armor attachment
-            ProtectionBuff:dispel(nil, self.target) -- high priestess protection attack speed
-
-            BlzSetSpecialEffectAlpha(self.sfx, 0)
-            DestroyEffect(self.sfx)
-
-            -- destroy all active shieldtimers
-            for _, v in ipairs(self.timers) do
-                v:destroy()
-            end
-
-            TableRemove(thistype.list, self)
-
-            if #thistype.list == 0 then
-                BlzFrameSetVisible(SHIELD_BACKDROP, false)
-                TQ:disableCallback(thistype.queue)
-            end
-
-            EVENT_ON_STRUCK_AFTER_REDUCTIONS:unregister_unit_action(self.target, onStruck)
-        end
-
-        function thistype:destroy()
-            self:onDestroy()
-            thistype[self.target] = nil
-            setmetatable(self, nil)
-        end
-
-        ---@type fun(self: shield, amount: number, dur: number)
-        function thistype:addTimer(amount, dur)
-            local timer = shieldtimer.create(self, amount, dur)
-
-            self.timers[#self.timers + 1] = timer
-        end
-
-        ---@type fun(u: unit, amount: number, dur: number):shield
-        function thistype.add(u, amount, dur)
-            local self = shield[u] ---@type shield
-
-            -- shield already exists
-            if self then
-                self.max = self.max + amount
-                self.hp = self.hp + amount
-
-                self:refresh()
-            else
-            -- make a new one
-                self = thistype.create(u, amount, dur)
-                EVENT_ON_STRUCK_AFTER_REDUCTIONS:register_unit_action(u, onStruck)
-            end
-
-            self:addTimer(amount, dur)
-
-            return self
-        end
-
-        ---@type fun(u: unit, amount: number, dur: number):shield
-        function thistype.create(u, amount, dur)
-            ---@diagnostic disable-next-line: missing-fields
-            local self = setmetatable({}, mt) ---@type shield
-
-            -- setup
-            self.max = amount
-            self.hp = amount
-            self.target = u
-            self.sfx = AddSpecialEffect("war3mapImported\\HPbar.mdx", GetUnitX(u), GetUnitY(u))
-            self.timers = {}
-            self:color(2)
-            BlzSetSpecialEffectTime(self.sfx, 1.)
-            BlzSetSpecialEffectTimeScale(self.sfx, 0.)
-            BlzSetSpecialEffectScale(self.sfx, 1.6)
-
-            thistype[u] = self
-            thistype.list[#thistype.list + 1] = self
-
-            if #thistype.list == 1 then
-                update()
-            end
-
-            return self
-        end
-    end
-end
-
 ---@class DialogWindow
 ---@field getClickedIndex function
 ---@field pid integer
@@ -714,113 +464,6 @@ do
     end
 end
 
----@class TimerFrame
----@field running boolean
----@field stop function
----@field create function
----@field update function
----@field destroy function
----@field expire function
----@field frame framehandle
----@field text framehandle
----@field timer integer
----@field time integer
----@field title string
----@field trig trigger
----@field minimize framehandle
----@field minimize_frame framehandle
----@field playerGroup table
-TimerFrame = {}
-do
-    local thistype = TimerFrame
-    local mt = { __index = thistype }
-    local date = os.date
-    local minimize = BlzCreateFrameByType("GLUEBUTTON", "", BlzGetOriginFrame(ORIGIN_FRAME_WORLD_FRAME, 0), "ScoreScreenTabButtonTemplate", 0)
-    local minimize_frame = BlzCreateFrameByType("BACKDROP", "", minimize, "", 0)
-    local frame = BlzCreateFrame("ListBoxWar3", minimize_frame, 0, 0)
-    local text = BlzCreateFrameByType("TEXT", "", frame, "", 0)
-
-    function thistype:run()
-        self.time = self.time - 1
-
-        if self.time < 0 then
-            self:stop()
-        else
-            self:update()
-            self.timer = TQ:callDelayed(1, thistype.run, self)
-        end
-    end
-
-    function thistype:destroy()
-        TQ:disableCallback(self.timer)
-        DestroyTrigger(self.trig)
-        local pid = GetPlayerId(GetLocalPlayer()) + 1
-        if TableHas(self.playerGroup, GetLocalPlayer()) or TableHas(self.playerGroup, pid) then
-            BlzFrameSetVisible(minimize, false)
-        end
-        setmetatable(self, nil)
-        self = nil
-    end
-
-    function thistype:stop()
-        self.expire()
-        self:destroy()
-    end
-
-    function thistype:update()
-        BlzFrameSetText(text, self.title .. "|n" .. date("!\x25H:\x25M:\x25S", self.time))
-    end
-
-    function TimerFrame.create(title, time, onExpire, playerGroup)
-        local self = {
-            running = true,
-            expire = onExpire,
-            time = time,
-            title = title,
-            playerGroup = playerGroup,
-        }
-
-        BlzFrameSetSize(minimize, 0.015, 0.015)
-        BlzFrameSetTexture(minimize_frame, "war3mapImported\\expand.blp", 0, true)
-
-        self.trig = CreateTrigger()
-        BlzTriggerRegisterFrameEvent(self.trig, minimize, FRAMEEVENT_CONTROL_CLICK)
-        TriggerAddAction(self.trig, function()
-            if GetTriggerPlayer() == GetLocalPlayer() then
-                BlzFrameSetEnable(BlzGetTriggerFrame(), false)
-                BlzFrameSetEnable(BlzGetTriggerFrame(), true)
-
-                if BlzFrameIsVisible(frame) then
-                    BlzFrameSetVisible(frame, false)
-                    BlzFrameSetTexture(minimize_frame, "war3mapImported\\minimize.blp", 0, true)
-                else
-                    BlzFrameSetVisible(frame, true)
-                    BlzFrameSetTexture(minimize_frame, "war3mapImported\\expand.blp", 0, true)
-                end
-            end
-        end)
-
-        setmetatable(self, mt)
-
-        BlzFrameSetTextAlignment(text, TEXT_JUSTIFY_CENTER, TEXT_JUSTIFY_CENTER)
-        BlzFrameSetPoint(minimize, FRAMEPOINT_CENTER, BlzGetOriginFrame(ORIGIN_FRAME_WORLD_FRAME, 0), FRAMEPOINT_CENTER, 0, -0.154)
-        BlzFrameSetAllPoints(minimize_frame, minimize)
-        BlzFrameSetPoint(text, FRAMEPOINT_BOTTOM, minimize_frame, FRAMEPOINT_TOP, 0, 0.018)
-        BlzFrameSetPoint(frame, FRAMEPOINT_TOPLEFT, text, FRAMEPOINT_TOPLEFT, -0.04, 0.02)
-        BlzFrameSetPoint(frame, FRAMEPOINT_BOTTOMRIGHT, text, FRAMEPOINT_BOTTOMRIGHT, 0.04, -0.02)
-        BlzFrameSetVisible(minimize, false)
-
-        local pid = GetPlayerId(GetLocalPlayer()) + 1
-        if TableHas(playerGroup, GetLocalPlayer()) or TableHas(playerGroup, pid) then
-            BlzFrameSetVisible(minimize, true)
-        end
-
-        self:update()
-        self.timer = TQ:callDelayed(1, thistype.run, self)
-
-        return self
-    end
-end
 
 -- simple priority queue
 
@@ -1259,27 +902,48 @@ function RemovePlayerUnits(pid)
     DestroyGroup(ug)
 end
 
+local stat_map = {
+    "str",
+    "int",
+    "agi",
+}
+
+local literal_stat_map = {
+    "Strength",
+    "Intelligence",
+    "Agility",
+}
+
 ---@param hero unit
+---@param include_bonus boolean
 ---@return integer
-function HighestStat(hero)
-    local str = GetHeroStr(hero, true) ---@type integer 
-    local agi = GetHeroAgi(hero, true) ---@type integer 
-    local int = GetHeroInt(hero, true) ---@type integer 
+function HighestStat(hero, include_bonus)
+    local str = GetHeroStr(hero, include_bonus) ---@type integer 
+    local agi = GetHeroAgi(hero, include_bonus) ---@type integer 
+    local int = GetHeroInt(hero, include_bonus) ---@type integer 
 
     if str > agi and str > int then
         return 1
-    elseif agi > str and agi > int then
-        return 2
     elseif int > str and int > agi then
+        return 2
+    elseif agi > str and agi > int then
         return 3
     else
         return MainStat(hero)
     end
 end
 
+function HighestBaseStat(hero, literal)
+    if literal then
+        return literal_stat_map[HighestStat(hero, false)]
+    else
+        return stat_map[HighestStat(hero, false)]
+    end
+end
+
 ---@param hero unit
 ---@return integer
-function MainStat(hero) --returns integer signifying primary attribute
+function MainStat(hero) -- returns integer signifying primary attribute
     return BlzGetUnitIntegerField(hero, UNIT_IF_PRIMARY_ATTRIBUTE)
 end
 
@@ -1601,10 +1265,14 @@ function MakeDummyCastItem(u)
         end
     end
 
-    local itm = OldCreateItem(dummies[index], 30000, 30000)
-    UnitAddItem(u, itm)
+    if dummies[index] then
+        local itm = OldCreateItem(dummies[index], 30000, 30000)
+        UnitAddItem(u, itm)
 
-    return itm
+        return itm
+    end
+
+    return nil
 end
 
 ---@param pid integer
@@ -1816,8 +1484,8 @@ end
 
 local StatTable = {
     GetHeroStr,
-    GetHeroInt,
     GetHeroAgi,
+    GetHeroInt,
     function() return 0 end,
 }
 
@@ -2670,6 +2338,7 @@ do
     end
 
     function thistype:point(p1, p2, x, y)
+        BlzFrameClearAllPoints(self.tooltip)
         BlzFrameSetPoint(self.tooltip, p1, self.frame, p2, x, y)
     end
 
@@ -2688,8 +2357,6 @@ do
             BlzFrameSetPoint(self.tooltip, point, self.frame, FRAMEPOINT_TOPLEFT, -0.005, -0.05)
         elseif point == FRAMEPOINT_BOTTOMLEFT then
             BlzFrameSetPoint(self.tooltip, point, self.frame, FRAMEPOINT_BOTTOMRIGHT, 0.005, 0.0)
-        else
-            BlzFrameSetPoint(self.tooltip, point, self.frame, FRAMEPOINT_BOTTOMLEFT, -0.005, 0.0)
         end
 
         BlzFrameSetPoint(self.box, FRAMEPOINT_TOPLEFT, self.iconFrame, FRAMEPOINT_TOPLEFT, -0.005, 0.005)
@@ -2849,7 +2516,6 @@ end
 local applyblackmask = function(tbl, fadedur, fade)
     for _, pid in ipairs(tbl) do
         pid = (type(pid) == "userdata" and GetPlayerId(pid) + 1) or pid
-        WeatherBuff.player_fog[pid] = false
 
         if GetLocalPlayer() == Player(pid - 1) then
             SetCineFilterTexture("ReplaceableTextures\\CameraMasks\\Black_mask.blp")
