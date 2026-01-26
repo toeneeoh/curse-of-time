@@ -324,10 +324,10 @@ OnInit.final("UnitTable", function(Require)
             dr = 1., -- resists
             dm = 1., -- multipliers
             mm = 1.,
+            cc = 0.,
+            cd = 100.,
             cc_percent = 1.,
             cd_percent = 1.,
-            cc = 0.,
-            cd = 1.,
             ms_percent = 1.,
             bonus_bat = 1.,
             spellboost = 0.,
@@ -352,7 +352,6 @@ OnInit.final("UnitTable", function(Require)
             self.base_hp = BlzGetUnitMaxHP(u)
             self.base_mana = BlzGetUnitMaxMana(u)
 
-            local default = HERO_STATS[self.id]
             -- stats that trigger EVENT_STAT_CHANGE
             self.proxy = setmetatable({ -- used for __newindex behavior
                 damage = BlzGetUnitBaseDamage(u, 0),
@@ -362,16 +361,16 @@ OnInit.final("UnitTable", function(Require)
                 regen = BlzGetUnitRealField(u, UNIT_RF_HIT_POINTS_REGENERATION_RATE),
                 mana = self.base_mana,
                 mana_regen_flat = BlzGetUnitRealField(u, UNIT_RF_MANA_REGENERATION),
-                mana_regen_max = default and default.mana_regen_max or 0.,
+                mana_regen_max = 0.,
                 mana_regen = BlzGetUnitRealField(u, UNIT_RF_MANA_REGENERATION),
                 str = GetHeroStr(u, false),
                 agi = GetHeroAgi(u, false),
                 int = GetHeroInt(u, false),
-                mr = default and default.magic_resist or 1.,
-                pr = default and default.phys_resist or 1.,
-                pm = default and default.phys_damage or 1.,
-                cc_flat = default and default.crit_chance or 0.,
-                cd_flat = default and default.crit_percent or 0.,
+                mr = 1.,
+                pr = 1.,
+                pm = 1.,
+                cc_flat = 0.,
+                cd_flat = 0.,
                 ms_flat = GetUnitMoveSpeed(u),
                 movespeed = GetUnitMoveSpeed(u),
                 bat = BlzGetUnitAttackCooldown(u, 0),
@@ -386,6 +385,15 @@ OnInit.final("UnitTable", function(Require)
             self.orderY = self.proxy.y
 
             setmetatable(self, mt)
+
+            -- trigger set operators
+            local default = HERO_STATS[self.id]
+            self.cc_flat = default.crit_chance
+            self.cd_flat = default.crit_damage
+            self.mr = default.magic_resist
+            self.pr = default.phys_resist
+            self.pm = default.phys_damage
+            self.mana_regen_max = default.mana_regen_max
 
             return self
         end
