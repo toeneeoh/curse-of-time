@@ -322,6 +322,10 @@ OnInit.final("BardSpells", function(Require)
     do
         local thistype = INSPIRE
 
+        thistype.values = {
+            spellboost = function(pid, u) local ablev = GetUnitAbilityLevel(u, thistype.id) return (8 + 2 * ablev) end
+        }
+
         function thistype:onCast()
             InspireBuff:add(self.caster, self.caster)
         end
