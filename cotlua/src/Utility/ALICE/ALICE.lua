@@ -1,17 +1,18 @@
 if Debug then Debug.beginFile "ALICE" end
+---@require HandleType, PrecomputedHeightMap?
 ---@diagnostic disable: need-check-nil
+---@nodebug
 do
     --[[
     =============================================================================================================================================================
                                                             A Limitless Interaction Caller Engine
                                                                          by Antares
-                                                                            v2.9
+                                                                          v2.12.2
 
-                                A Lua system to easily create highly performant checks and interactions, between any type of objects.
+                                A Lua system to easily create highly performant callbacks and interactions, between any type of objects.
                         
                                 Requires:
                                 TotalInitialization             https://www.hiveworkshop.com/threads/total-initialization.317099/
-                                Hook                            https://www.hiveworkshop.com/threads/hook.339153/
                                 HandleType                      https://www.hiveworkshop.com/threads/get-handle-type.354436/
                                 PrecomputedHeightMap (optional) https://www.hiveworkshop.com/threads/precomputed-synchronized-terrain-height-map.353477/
 
@@ -34,13 +35,22 @@ do
 
         --Print out warnings, errors, and enable the "downtherabbithole" cheat code for the players with these names. #XXXX not required.
         ,MAP_CREATORS                       = {         ---@constant string[]
-            "lcm#1458",
-            "WorldEdit"
         }
 
         --Calls all interaction functions in protected mode, so that the main cycle is not interrupted on an error. Each unique error will be printed only once to the
         --map creator. This is recommended for playtest versions which are not fully stable yet.
         ,PROCTECTED_MODE                    = false     ---@constant boolean
+
+        --An option that is available if PROTECTED_MODE is also activated. If enabled, ALICE will write the next executed callback or interaction function into the file
+        --ALICE\ALICECrashDump.txt, giving you information about which function causes a crash. Functions need to be global or named with ALICE_FuncSetName to get any
+        --meaningful information from the dump.
+        --"once"        Will test every function once, then ignore it on subsequent calls.
+        --"full"        Will test every function on each call. Will MASSIVELY slow down the game.
+        ,CRASH_DUMP                         = false     ---@constant false | "once" | "full"
+
+        --Stores the traceback for each callback created with ALICE_CallDelayed, ALICE_PairCallDelayed, ALICE_CallRepetaed, or ALICE_CallPeriodic. The traceback is then
+        --stored to the global ALICE_Traceback each time the callback function is invoked.
+        ,STORE_TRACEBACK_ON_CALLBACKS       = true      ---@constant boolean
 
         --These constants control which hotkeys are used for the various commands in debug mode. The key combo is Ctrl + the specified hotkey.
         ,CYCLE_SELECTION_HOTKEY             = "Q"
@@ -48,31 +58,6 @@ do
         ,NEXT_STEP_HOTKEY                   = "R"
         ,HALT_CYCLE_HOTKEY                  = "T"
         ,PRINT_FUNCTION_NAMES_HOTKEY        = "G"
-
-        -------------------------------------------------------------------------------------------------------------------------------------------------------------
-        --Optimization
-
-        --Maximum interval between interactions in seconds.
-        ,MAX_INTERVAL                       = 10.0      ---@constant number
-
-        --This interval is used by a second, faster timer that can be used to update visual effects at a faster rate than the MIN_INTERVAL with ALICE_PairInterpolate.
-        --Set to nil to disable.
-        ,INTERPOLATION_INTERVAL             = nil      ---@constant number
-
-        --The playable map area is divided into cells of this size. Objects only interact with other objects that share a cell with them. Smaller cells increase the
-        --efficiency of interactions at the cost of increased memory usage and overhead.
-        ,CELL_SIZE                          = 256       ---@constant number
-
-        --How often the system checks if objects left their current cell. Should be overwritten with the cellCheckInterval flag for fast-moving objects.
-        ,DEFAULT_CELL_CHECK_INTERVAL        = 0.1       ---@constant number
-
-        --How large an actor is when it comes to determining in which cells it is in and its maximum interaction range. Should be overwritten with the radius flag for
-        --objects with a larger interaction range.
-        ,DEFAULT_OBJECT_RADIUS              = 75        ---@constant number
-
-        --You can integrate ALICE's internal table recycling system into your own by setting the GetTable and ReturnTable functions here.
-        ,TABLE_RECYCLER_GET                 = nil       ---@constant function
-        ,TABLE_RECYCLER_RETURN              = nil       ---@constant function
 
         -------------------------------------------------------------------------------------------------------------------------------------------------------------
         --Automatic actor creation for widgets
@@ -108,12 +93,42 @@ do
         --The radius of the destructable actors. Set to nil to use DEFAULT_OBJECT_RADIUS.
         ,DEFAULT_DESTRUCTABLE_RADIUS        = nil       ---@constant number
 
+        --Disable if destructables cannot be destroyed.
+        ,CREATE_DESTRUCTABLE_DEATH_TRIGGERS = true      ---@constant boolean
+
         --Disable if items are relevant and you're moving them around.
         ,ITEMS_ARE_STATIONARY               = true      ---@constant boolean
 
         --The radius of the item actors. Set to nil to use DEFAULT_OBJECT_RADIUS.
         ,DEFAULT_ITEM_RADIUS                = nil       ---@constant number
 
+        --Disable if items cannot be destroyed.
+        ,CREATE_ITEM_DEATH_TRIGGERS         = true      ---@constant boolean
+
+        -------------------------------------------------------------------------------------------------------------------------------------------------------------
+        --Optimization
+
+        --Maximum interval between interactions in seconds.
+        ,MAX_INTERVAL                       = 10.0      ---@constant number
+
+        --This interval is used by a second, faster timer that can be used to update visual effects at a faster rate than the MIN_INTERVAL with ALICE_PairInterpolate.
+        --Set to nil to disable.
+        ,INTERPOLATION_INTERVAL             = nil       ---@constant number
+
+        --The playable map area is divided into cells of this size. Objects only interact with other objects that share a cell with them. Smaller cells increase the
+        --efficiency of interactions at the cost of increased memory usage and overhead.
+        ,CELL_SIZE                          = 256       ---@constant number
+
+        --How often the system checks if objects left their current cell. Should be overwritten with the cellCheckInterval flag for fast-moving objects.
+        ,DEFAULT_CELL_CHECK_INTERVAL        = 0.1       ---@constant number
+
+        --How large an actor is when it comes to determining in which cells it is in and its maximum interaction range. Should be overwritten with the radius flag for
+        --objects with a larger interaction range.
+        ,DEFAULT_OBJECT_RADIUS              = 75        ---@constant number
+
+        --You can integrate ALICE's internal table recycling system into your own by setting the GetTable and ReturnTable functions here.
+        ,TABLE_RECYCLER_GET                 = nil       ---@constant function
+        ,TABLE_RECYCLER_RETURN              = nil       ---@constant function
     }
 
     -------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -221,6 +236,11 @@ do
     local isInterpolated                        ---@type boolean
     local interpolationCounter = 10             ---@type integer
     local regions = {}                          ---@type table[]
+    local includeSuspended                      ---@type boolean
+    local initEnum = {
+        objects = {},                           ---@type Object[]?
+        callbacks = {},                         ---@type table<string, function>
+    }
 
     local functionIsEveryStep = {}              ---@type table<function,boolean>
     local functionIsUnbreakable = {}            ---@type table<function,boolean>
@@ -243,6 +263,8 @@ do
     local userCallbacks = {}                    ---@type table[]
     local pairingFunctions = {}                 ---@type table[]
     local objectIsStationary                    ---@type table<any,boolean>
+        = setmetatable({}, {__mode = "k"})
+    local objectIsSuspended                     ---@type table<any,boolean>
         = setmetatable({}, {__mode = "k"})
 
     local widgets = {
@@ -332,7 +354,9 @@ do
         [UNIT_TYPE_TOWNHALL] = "townhall",
     }
 
-    local GetTable                              ---@type function
+    local GetTable = function()                 ---@type function
+        error("Attempted to call ALICE function before ALICE has initialized.")
+    end
     local ReturnTable                           ---@type function
 
     local Create                                ---@type function
@@ -395,6 +419,7 @@ do
     debug.functionName = {}                     ---@type table<function,string>
     debug.controlIsPressed = false              ---@type boolean
     debug.errors = {}                           ---@type table<string, boolean>
+    debug.crashDumps = {}                       ---@type table<string, boolean>
 
     local eventHooks = {                        ---@type table[]
         onUnitEnter = {},
@@ -420,7 +445,7 @@ do
     local function Identifier2String(whichIdentifier)
         local toString = "("
         local i = 1
-        for key, __ in pairs(whichIdentifier) do
+        for key, __ in next, whichIdentifier do
             if i > 1 then
                 toString = toString .. ", "
             end
@@ -493,6 +518,10 @@ do
     end
 
     local function ExecuteUserCallback(self)
+        if self.traceback then
+            ALICE_Traceback = self.traceback
+        end
+
         if self.pair then
             if self.pair[0x3] == self.hostA and self.pair[0x4] == self.hostB then
                 currentPair = self.pair
@@ -507,11 +536,11 @@ do
                     functionOnDestroy[self.callback](self.hostA, self.hostB, false)
                 end
             end
-        elseif self.args then
+        elseif self.args ~= nil then
             if self.unpack then
-                self.callback(unpack(self.args))
+                self.callback(unpack(self.args, 1, self.args.n))
                 if functionOnDestroy[self.callback] then
-                    functionOnDestroy[self.callback](unpack(self.args))
+                    functionOnDestroy[self.callback](unpack(self.args, 1, self.args.n))
                 end
                 ReturnTable(self.args)
             else
@@ -528,9 +557,11 @@ do
         end
 
         RemoveUserCallbackFromList(self)
-        for key, __ in pairs(self) do
+        for key, __ in next, self do
             self[key] = nil
         end
+
+        ALICE_Traceback = nil
     end
 
     local function AddUserCallback(self)
@@ -569,10 +600,17 @@ do
             caller.excess = caller.excess - config.MAX_INTERVAL
             return returnValue
         end
-        local returnValue = caller.callback(unpack(caller))
+        caller.wasExecuted = true
+
+        if caller.traceback then
+            ALICE_Traceback = caller.traceback
+        end
+
+        local returnValue = caller.callback(unpack(caller, 1, caller.n))
         if returnValue and returnValue > config.MAX_INTERVAL then
             caller.excess = returnValue - config.MAX_INTERVAL
         end
+        ALICE_Traceback = nil
         return returnValue
     end
 
@@ -582,14 +620,20 @@ do
             caller.excess = caller.excess - config.MAX_INTERVAL
             return returnValue
         end
+
+        if caller.traceback then
+            ALICE_Traceback = caller.traceback
+        end
+
         caller.currentExecution = caller.currentExecution + 1
-        local returnValue = caller.callback(caller.currentExecution, unpack(caller))
+        local returnValue = caller.callback(caller.currentExecution, unpack(caller, 1, caller.n))
         if caller.currentExecution == caller.howOften then
             ALICE_DisableCallback()
         end
         if returnValue and returnValue > config.MAX_INTERVAL then
             caller.excess = returnValue - config.MAX_INTERVAL
         end
+        ALICE_Traceback = nil
         return returnValue
     end
 
@@ -731,8 +775,8 @@ do
         destructionQueued = nil,       ---@type boolean
         userData = nil,                ---@type table
         hadContact = nil,              ---@type boolean
-        cooldown = nil,                 ---@type number
-        paused = nil,                   ---@type boolean
+        cooldown = nil,                ---@type number
+        paused = nil,                  ---@type boolean
     }
 
     local function GetInteractionFunc(male, female)
@@ -744,7 +788,7 @@ do
         local identifier = female.identifier
         local level = 0
         local conflict = false
-        for key, value in pairs(male.interactions) do
+        for key, value in next, male.interactions do
             if type(key) == "string" then
                 if identifier[key] then
                     if level < 1 then
@@ -828,7 +872,6 @@ do
 
         local self ---@type Pair
         if #unusedPairs == 0 then
----@diagnostic disable-next-line: missing-fields
             self = {}
         else
             self = unusedPairs[#unusedPairs]
@@ -907,6 +950,9 @@ do
         if self[0x7] then
             RemovePairFromEveryStepList(self)
         else
+            if not self[0x5] then
+                return
+            end
             whichPairs[self[0x5]][self[0x6]] = DUMMY_PAIR
         end
         self[0x5] = nil
@@ -1033,7 +1079,6 @@ do
         local self
         if #unusedActors == 0 then
             --Actors have their own table recycling system. These fields do not get nilled on destroy.
----@diagnostic disable-next-line: missing-fields
             self = {} ---@type Actor
             self.isActor = true
             self.identifier = {}
@@ -1047,7 +1092,6 @@ do
             self.interactions = {}
             self.selfInteractions = {}
             self.references = {}
----@diagnostic disable-next-line: missing-fields
             pairList[self] = {}
             pairingExcluded[self] = {}
         else
@@ -1083,22 +1127,20 @@ do
                         return currentPair[0x2]
                     end
                 end
-                for __, actor in ipairs(actorOf) do
-                    if actor.host == object then
-                        return actor
+                for i = 1, #actorOf do
+                    if actorOf[i].host == object then
+                        return actorOf[i]
                     end
                 end
                 return actorOf[1]
             else
-                for __, actor in ipairs(actorOf) do
-                    if actor.identifier[keyword] then
-                        return actor
+                for i = 1, #actorOf do
+                    if actorOf[i].identifier[keyword] then
+                        return actorOf[i]
                     end
                 end
                 return nil
             end
-        elseif type(object) == "table" and object.isActor then
-            return object
         end
         return nil
     end
@@ -1242,7 +1284,7 @@ do
             for __, keyword in ipairs(tempIdentifier) do
                 if onCreation.flags[keyword] then
                     local onCreationFlags = onCreation.flags[keyword]
-                    for key, __ in pairs(OVERWRITEABLE_FLAGS) do
+                    for key, __ in next, OVERWRITEABLE_FLAGS do
                         if onCreationFlags[key] then
                             if type(onCreationFlags[key]) == "function" then
                                 additionalFlags[key] = onCreationFlags[key](host)
@@ -1278,7 +1320,7 @@ do
 
             --Copy interactions.
             if interactions then
-                for keyword, func in pairs(interactions) do
+                for keyword, func in next, interactions do
                     if keyword ~= "self" then
                         self.interactions[keyword] = func
                     end
@@ -1286,9 +1328,9 @@ do
             end
 
             --Add additional interactions from onCreation hooks.
-            for keyword, __ in pairs(self.identifier) do
+            for keyword, __ in next, self.identifier do
                 if onCreation.interactions[keyword] then
-                    for target, func in pairs(onCreation.interactions[keyword]) do
+                    for target, func in next, onCreation.interactions[keyword] do
                         self.interactions[target] = func
                     end
                 end
@@ -1317,6 +1359,11 @@ do
                 self.isStationary = true
             else
                 self.isStationary = nil
+            end
+
+            --Inherit suspended.
+            if objectIsSuspended[self.anchor] then
+                self.isSuspended = true
             end
 
             --Set coordinate getter functions.
@@ -1443,7 +1490,7 @@ do
 
             --Create onDeath trigger.
             self.persistOnDeath = flags.persistOnDeath
-            if (HandleType[self.anchor] == "destructable" or HandleType[self.anchor] == "item") and widgets.deathTriggers[self.anchor] == nil then
+            if (HandleType[self.anchor] == "destructable" and ALICE_Config.CREATE_DESTRUCTABLE_DEATH_TRIGGERS) or (HandleType[self.anchor] == "item" and ALICE_Config.CREATE_ITEM_DEATH_TRIGGERS) and widgets.deathTriggers[self.anchor] == nil then
                 widgets.deathTriggers[self.anchor] = CreateTrigger()
                 TriggerRegisterDeathEvent(widgets.deathTriggers[self.anchor], self.anchor)
                 if HandleType[self.anchor] == "destructable" then
@@ -1477,7 +1524,7 @@ do
 
             self.isUnselectable = additionalFlags.isUnselectable or flags.isUnselectable
 
-            for key, __ in pairs(additionalFlags) do
+            for key, __ in next, additionalFlags do
                 additionalFlags[key] = nil
             end
             ReturnTable(tempIdentifier)
@@ -1574,7 +1621,7 @@ do
             end
 
             --Create onDeath trigger.
-            if (HandleType[self.anchor] == "destructable" or HandleType[self.anchor] == "item") and widgets.deathTriggers[self.anchor] == nil then
+            if (HandleType[self.anchor] == "destructable" and ALICE_Config.CREATE_DESTRUCTABLE_DEATH_TRIGGERS) or (HandleType[self.anchor] == "item" and ALICE_Config.CREATE_ITEM_DEATH_TRIGGERS) and widgets.deathTriggers[self.anchor] == nil then
                 widgets.deathTriggers[self.anchor] = CreateTrigger()
                 TriggerRegisterDeathEvent(widgets.deathTriggers[self.anchor], self.anchor)
                 if HandleType[self.anchor] == "destructable" then
@@ -1624,11 +1671,11 @@ do
             end
         end
 
-        local next = self.nextPair
-        local pair = next[self.firstPair]
+        local nextPair = self.nextPair
+        local pair = nextPair[self.firstPair]
         while pair do
             pair.destructionQueued = true
-            pair = next[pair]
+            pair = nextPair[pair]
         end
 
         if self.index then
@@ -1665,7 +1712,7 @@ do
             DestroyEffect(self.visualizer)
         end
 
-        for object, __ in pairs(self.references) do
+        for object, __ in next, self.references do
             RemoveReference(self, object)
         end
 
@@ -1676,7 +1723,7 @@ do
     end
 
     Release = function(self)
-        for key, __ in pairs(pairingExcluded[self]) do
+        for key, __ in next, pairingExcluded[self] do
             pairingExcluded[self][key] = nil
             pairingExcluded[key][self] = nil
         end
@@ -1703,13 +1750,13 @@ do
             local actorsOfClass = actorsOfActorClass[self.actorClass]
             actorsOfClass[#actorsOfClass + 1] = self
         else
-            for key, __ in pairs(self.interactions) do
+            for key, __ in next, self.interactions do
                 self.interactions[key] = nil
             end
-            for key, __ in pairs(self.identifier) do
+            for key, __ in next, self.identifier do
                 self.identifier[key] = nil
             end
-            for key, __ in pairs(self.selfInteractions) do
+            for key, __ in next, self.selfInteractions do
                 self.selfInteractions[key] = nil
             end
 
@@ -1730,7 +1777,6 @@ do
         if actorOf[object] == nil then
             actorOf[object] = self
         elseif actorOf[object].isActor then
----@diagnostic disable-next-line: missing-fields
             actorOf[object] = {actorOf[object], self}
         else
             actorOf[object][#actorOf[object] + 1] = self
@@ -1824,7 +1870,7 @@ do
         self.maxX = min(NUM_CELLS_X, max(1, (NUM_CELLS_X*(x + self.halfWidth - MAP_MIN_X)/MAP_SIZE_X) // 1 + 1))
         self.maxY = min(NUM_CELLS_Y, max(1, (NUM_CELLS_Y*(y + self.halfHeight - MAP_MIN_Y)/MAP_SIZE_Y) // 1 + 1))
 
-        for key, __ in pairs(actorAlreadyChecked) do
+        for key, __ in next, actorAlreadyChecked do
             actorAlreadyChecked[key] = nil
         end
         actorAlreadyChecked[self] = true
@@ -1852,7 +1898,7 @@ do
         if doIdentifier then
             local i = 1
             local identifierClass = GetTable()
-            for id, __ in pairs(self.identifier) do
+            for id, __ in next, self.identifier do
                 identifierClass[i] = id
                 i = i + 1
             end
@@ -1866,7 +1912,7 @@ do
             local j = 1
             local first, entry
             local interactionsClass = GetTable()
-            for target, func in pairs(self.interactions) do
+            for target, func in next, self.interactions do
                 if type(target) == "string" then
                     if not functionKey[func] then
                         highestFunctionKey = highestFunctionKey + 1
@@ -1907,7 +1953,7 @@ do
         end
 
         if not self.isGlobal then
-            for key, __ in pairs(actorAlreadyChecked) do
+            for key, __ in next, actorAlreadyChecked do
                 actorAlreadyChecked[key] = nil
             end
             actorAlreadyChecked[self] = true
@@ -1946,14 +1992,14 @@ do
 
     SharesCellWith = function(self, actor)
         if self.halfWidth < actor.halfWidth then
-            for cellA in pairs(self.isInCell) do
+            for cellA in next, self.isInCell do
                 if actor.isInCell[cellA] then
                     return true
                 end
             end
             return false
         else
-            for cellB in pairs(actor.isInCell) do
+            for cellB in next, actor.isInCell do
                 if self.isInCell[cellB] then
                     return true
                 end
@@ -2117,8 +2163,11 @@ do
         MoveLightning(self.cellVisualizers[4], false, minx, miny, maxx, miny)
     end
 
-    ---Called when an object is loaded into a transport actor crashes a thread.
+    ---Called when an object is loaded into a transport or an actor crashes a thread.
     Suspend = function(self, enable)
+        if self.alreadyDestroyed then
+            return
+        end
         if enable then
             local pair
             for __, actor in ipairs(actorList) do
@@ -2127,10 +2176,18 @@ do
                     DestroyPair(pair)
                 end
             end
-            self.isSuspended = true
+            for __, pair in next, self.selfInteractions do
+                if not functionIsUnsuspendable[pair[0x8]] then
+                    PausePair(pair)
+                end
+            end
         else
-            self.isSuspended = false
-            AddDelayedCallback(Flicker, self)
+            Flicker(self)
+            for __, pair in next, self.selfInteractions do
+                if not functionIsUnsuspendable[pair[0x8]] then
+                    UnpausePair(pair)
+                end
+            end
         end
     end
 
@@ -2150,7 +2207,7 @@ do
             local first = true
             if functionRequiredFields[func] then
                 if isMaleInFunc and functionRequiredFields[func].male then
-                    for field, value in pairs(functionRequiredFields[func].male) do
+                    for field, value in next, functionRequiredFields[func].male do
                         if not self.host[field] and (value == true or self.host[value]) then
                             if first then
                                 first = false
@@ -2162,7 +2219,7 @@ do
                     end
                 end
                 if isFemaleInFunc and functionRequiredFields[func].female then
-                    for field, value in pairs(functionRequiredFields[func].female) do
+                    for field, value in next, functionRequiredFields[func].female do
                         if not self.host[field] and (value == true or self.host[value]) then
                             if first then
                                 first = false
@@ -2185,7 +2242,7 @@ do
 
         description = description + "|cffffcc00Identifiers:|r "
         local first = true
-        for key, __ in pairs(self.identifier) do
+        for key, __ in next, self.identifier do
             if not first then
                 description = description + ", "
             else
@@ -2203,7 +2260,7 @@ do
 
         description = description + "\n|cffffcc00Interactions:|r "
         first = true
-        for key, func in pairs(self.interactions) do
+        for key, func in next, self.interactions do
             if not first then
                 description = description + ", "
             end
@@ -2226,7 +2283,7 @@ do
         if next(self.selfInteractions) then
             description = description + "\n|cffffcc00Self-Interactions:|r "
             first = true
-            for key, __ in pairs(self.selfInteractions) do
+            for key, __ in next, self.selfInteractions do
                 if not first then
                     description = description + ", "
                 end
@@ -2317,7 +2374,7 @@ do
         if numOutgoing > 0 then
             first = true
             description = description + "|cffaaaaaa ("
-            for key, number in pairs(outgoingFuncs) do
+            for key, number in next, outgoingFuncs do
                 if not first then
                     description = description + ", |r"
                 end
@@ -2330,7 +2387,7 @@ do
         if numIncoming > 0 then
             first = true
             description = description + "|cffaaaaaa ("
-            for key, number in pairs(incomingFuncs) do
+            for key, number in next, incomingFuncs do
                 if not first then
                     description = description + ", |r"
                 end
@@ -2358,7 +2415,7 @@ do
         if type(self.host) == "table" then
             first = true
             local requiredFieldString
-            for func, __ in pairs(funcs) do
+            for func, __ in next, funcs do
                 requiredFieldString = GetMissingRequiredFieldsString(self, func, isMaleInFunc[func], isFemaleInFunc[func])
                 if requiredFieldString ~= "" then
                     if first then
@@ -2455,7 +2512,7 @@ do
             if anchor == self.originalAnchor then
                 return
             end
-            for object, __ in pairs(self.references) do
+            for object, __ in next, self.references do
                 if object ~= self.host then
                     RemoveReference(self, object)
                 end
@@ -2753,33 +2810,33 @@ do
     --#region Main Functions
     local function ResetCoordinateLookupTables()
         local classX, classY = coord.classX, coord.classY
-        for key, __ in pairs(classX) do
+        for key, __ in next, classX do
             classX[key], classY[key] = nil, nil
         end
         local classZ = coord.classZ
-        for key, __ in pairs(classZ) do
+        for key, __ in next, classZ do
             classZ[key] = nil
         end
         local unitX, unitY = coord.unitX, coord.unitY
-        for key, __ in pairs(unitX) do
+        for key, __ in next, unitX do
             unitX[key], unitY[key] = nil, nil
         end
         local unitZ = coord.unitZ
-        for key, __ in pairs(unitZ) do
+        for key, __ in next, unitZ do
             unitZ[key] = nil
         end
         if not config.ITEMS_ARE_STATIONARY then
             local itemX, itemY = coord.itemX, coord.itemY
-            for key, __ in pairs(itemX) do
+            for key, __ in next, itemX do
                 itemX[key], itemY[key] = nil, nil
             end
             local itemZ = coord.itemZ
-            for key, __ in pairs(itemZ) do
+            for key, __ in next, itemZ do
                 itemZ[key] = nil
             end
         end
         local terrainZ = coord.terrainZ
-        for key, __ in pairs(terrainZ) do
+        for key, __ in next, terrainZ do
             terrainZ[key] = nil
         end
     end
@@ -2903,7 +2960,7 @@ do
                 actor.maxX = newMaxX
                 actor.maxY = newMaxY
 
-                for key, __ in pairs(actorAlreadyChecked) do
+                for key, __ in next, actorAlreadyChecked do
                     actorAlreadyChecked[key] = nil
                 end
                 actorAlreadyChecked[actor] = true
@@ -2913,21 +2970,6 @@ do
                     for X = oldMinX, newMinX - 1 < oldMaxX and newMinX - 1 or oldMaxX do
                         for Y = oldMinY, oldMaxY do
                             LeaveCell(CELL_LIST[X][Y], actor)
-                        end
-                    end
-                elseif newMinX < oldMinX then
-                    actor.minX = newMinX
-                    for X = newMinX, newMaxX < oldMinX - 1 and newMaxX or oldMinX  - 1 do
-                        for Y = newMinY, newMaxY do
-                            EnterCell(CELL_LIST[X][Y], actor)
-                        end
-                    end
-                end
-
-                if newMaxX > oldMaxX then
-                    for X = oldMaxX + 1 > newMinX and oldMaxX + 1 or newMinX, newMaxX do
-                        for Y = newMinY, newMaxY do
-                            EnterCell(CELL_LIST[X][Y], actor)
                         end
                     end
                 elseif newMaxX < oldMaxX then
@@ -2944,24 +2986,39 @@ do
                             LeaveCell(CELL_LIST[X][Y], actor)
                         end
                     end
-                elseif newMinY < oldMinY then
-                    for Y = newMinY, newMaxY < oldMinY - 1 and newMaxY or oldMinY  - 1 do
+                elseif newMaxY < oldMaxY then
+                    for Y = newMaxY + 1 > oldMinY and newMaxY + 1 or oldMinY , oldMaxY do
                         for X = oldMinX > newMinX and oldMinX or newMinX, oldMaxX < newMaxX and oldMaxX or newMaxX do
+                            LeaveCell(CELL_LIST[X][Y], actor)
+                        end
+                    end
+                end
+
+                if newMinX < oldMinX then
+                    actor.minX = newMinX
+                    for X = newMinX, newMaxX < oldMinX - 1 and newMaxX or oldMinX  - 1 do
+                        for Y = newMinY, newMaxY do
+                            EnterCell(CELL_LIST[X][Y], actor)
+                        end
+                    end
+                elseif newMaxX > oldMaxX then
+                    for X = oldMaxX + 1 > newMinX and oldMaxX + 1 or newMinX, newMaxX do
+                        for Y = newMinY, newMaxY do
                             EnterCell(CELL_LIST[X][Y], actor)
                         end
                     end
                 end
 
-                if newMaxY > oldMaxY then
-                    for Y = oldMaxY + 1 > newMinY and oldMaxY + 1 or newMinY, newMaxY do
+                if newMinY < oldMinY then
+                    for Y = newMinY, newMaxY < oldMinY - 1 and newMaxY or oldMinY  - 1 do
                         for X = oldMinX > newMinX and oldMinX or newMinX, oldMaxX < newMaxX and oldMaxX or newMaxX do
                             EnterCell(CELL_LIST[X][Y], actor)
                         end
                     end
-                elseif newMaxY < oldMaxY then
-                    for Y = newMaxY + 1 > oldMinY and newMaxY + 1 or oldMinY , oldMaxY do
+                elseif newMaxY > oldMaxY then
+                    for Y = oldMaxY + 1 > newMinY and oldMaxY + 1 or newMinY, newMaxY do
                         for X = oldMinX > newMinX and oldMinX or newMinX, oldMaxX < newMaxX and oldMaxX or newMaxX do
-                            LeaveCell(CELL_LIST[X][Y], actor)
+                            EnterCell(CELL_LIST[X][Y], actor)
                         end
                     end
                 end
@@ -2994,6 +3051,52 @@ do
         end
 
         numCellChecks[currentCounter] = 0
+    end
+
+    local function CrashDump()
+        if ALICE_Where == "callbacks" then
+            local newCrashDump = Function2String(userCallbacks.first.callback)
+            if ALICE_Config.CRASH_DUMP == "full" and newCrashDump ~= debug.lastCrashDump or not debug.crashDumps[newCrashDump] then
+                PreloadGenClear()
+                PreloadGenStart()
+                Preload("Delayed callback: " .. newCrashDump)
+                PreloadGenEnd("ALICE\\ALICECrashDump.txt")
+                debug.lastCrashDump = newCrashDump
+                debug.crashDumps[newCrashDump] = true
+            end
+        elseif currentPair[0x2] == SELF_INTERACTION_ACTOR then
+            if currentPair[0x8] == PeriodicWrapper then
+                local newCrashDump = Function2String(currentPair[0x1].callback)
+            if ALICE_Config.CRASH_DUMP == "full" and newCrashDump ~= debug.lastCrashDump or not debug.crashDumps[newCrashDump] then
+                    PreloadGenClear()
+                    PreloadGenStart()
+                    Preload("Periodic callback: " .. newCrashDump)
+                    PreloadGenEnd("ALICE\\ALICECrashDump.txt")
+                    debug.lastCrashDump = newCrashDump
+                    debug.crashDumps[newCrashDump] = true
+                end
+            else
+                local newCrashDump = Function2String(currentPair[0x1].callback)
+                if ALICE_Config.CRASH_DUMP == "full" and newCrashDump ~= debug.lastCrashDump or not debug.crashDumps[newCrashDump] then
+                    PreloadGenClear()
+                    PreloadGenStart()
+                    Preload("Self-Interaction Function: " .. newCrashDump)
+                    PreloadGenEnd("ALICE\\ALICECrashDump.txt")
+                    debug.lastCrashDump = newCrashDump
+                    debug.crashDumps[newCrashDump] = true
+                end
+            end
+        else
+            local newCrashDump = Function2String(currentPair[0x8])
+            if ALICE_Config.CRASH_DUMP == "full" and newCrashDump ~= debug.lastCrashDump or not debug.crashDumps[newCrashDump] then
+                PreloadGenClear()
+                PreloadGenStart()
+                Preload("Interaction Function: " .. newCrashDump)
+                PreloadGenEnd("ALICE\\ALICECrashDump.txt")
+                debug.lastCrashDump = newCrashDump
+                debug.crashDumps[newCrashDump] = true
+            end
+        end
     end
 
     local function Interpolate()
@@ -3112,7 +3215,12 @@ do
 
         if ALICE_Config.PROCTECTED_MODE then
             while userCallbacks.first and userCallbacks.first.callCounter == cycle.unboundCounter do
+                if ALICE_Config.CRASH_DUMP then
+                    CrashDump()
+                end
+
                 success, err = pcall(ExecuteUserCallback, userCallbacks.first)
+
                 if not success then
                     if Debug then
                         Debug.throwError(err)
@@ -3173,7 +3281,12 @@ do
             for __ = 1, numEveryStepPairs do
                 currentPair = currentPair[0x5]
                 if not currentPair.destructionQueued then
+                    if ALICE_Config.CRASH_DUMP then
+                        CrashDump()
+                    end
+
                     success, err = pcall(currentPair[0x8], currentPair[0x3], currentPair[0x4])
+
                     if not success then
                         if not crashingPairOrCallback then
                             crashingPairOrCallback = currentPair
@@ -3229,7 +3342,12 @@ do
                         currentPair[0x6] = numPairs[nextStep]
                     end
                 else
+                    if ALICE_Config.CRASH_DUMP then
+                        CrashDump()
+                    end
+
                     success, returnValue = pcall(currentPair[0x8], currentPair[0x3], currentPair[0x4])
+
                     if not success then
                         err = returnValue
                         if not crashingPairOrCallback then
@@ -3337,6 +3455,18 @@ do
                 debug.errors[err] = true
             end
         end
+
+        if ALICE_Config.CRASH_DUMP then
+            local newCrashDump = "No Crash"
+            if ALICE_Config.CRASH_DUMP == "full" and newCrashDump ~= debug.lastCrashDump or not debug.crashDumps[newCrashDump] then
+                PreloadGenClear()
+                PreloadGenStart()
+                Preload(newCrashDump)
+                PreloadGenEnd("ALICE\\ALICECrashDump.txt")
+                debug.lastCrashDump = newCrashDump
+                debug.crashDumps[newCrashDump] = true
+            end
+        end
     end
     --#endregion
 
@@ -3400,7 +3530,7 @@ do
             if debug.printFunctionNames then
                 local first = true
                 local message
-                for func, amount in pairs(funcs) do
+                for func, amount in next, funcs do
                     if first then
                         message = "\n|cffffcc00Step " .. cycle.unboundCounter .. ":|r"
                         first = false
@@ -3465,7 +3595,7 @@ do
             local actor = GetActor(object)
             --Find the actor that is closest to the mouse-cursor.
             if not actor.isUnselectable and (previousSelectedActor == nil or ALICE_GetAnchor(object) ~= previousSelectedActor.anchor) then
-                x, y = World2Screen(eyeX, eyeY, eyeZ, angleOfAttack, ALICE_GetCoordinates3D(actor))
+                x, y = World2Screen(eyeX, eyeY, eyeZ, angleOfAttack, ALICE_GetCoordinates3D(object))
                 dx, dy = x - mouseScreenX, y - mouseScreenY
                 local dist = sqrt(dx*dx + dy*dy)
                 if dist < closestDist then
@@ -3580,7 +3710,7 @@ do
             debug.tooltipText = BlzGetFrameByName("CustomTooltipValue", 0)
 
             debug.nextStepTrigger = CreateTrigger()
-            BlzTriggerRegisterPlayerKeyEvent(debug.nextStepTrigger, GetTriggerPlayer() or Player(0), _G["OSKEY_" .. ALICE_Config.NEXT_STEP_HOTKEY], 2, true)
+            BlzTriggerRegisterPlayerKeyEvent(debug.nextStepTrigger, GetTriggerPlayer() or Player(0), _ENV["OSKEY_" .. ALICE_Config.NEXT_STEP_HOTKEY], 2, true)
             TriggerAddAction(debug.nextStepTrigger, OnCtrlR)
 
             debug.mouseClickTrigger = CreateTrigger()
@@ -3588,20 +3718,20 @@ do
             TriggerAddAction(debug.mouseClickTrigger, OnMouseClick)
 
             debug.lockSelectionTrigger = CreateTrigger()
-            BlzTriggerRegisterPlayerKeyEvent(debug.lockSelectionTrigger, GetTriggerPlayer() or Player(0), _G["OSKEY_" .. ALICE_Config.LOCK_SELECTION_HOTKEY], 2, true)
+            BlzTriggerRegisterPlayerKeyEvent(debug.lockSelectionTrigger, GetTriggerPlayer() or Player(0), _ENV["OSKEY_" .. ALICE_Config.LOCK_SELECTION_HOTKEY], 2, true)
             TriggerAddAction(debug.lockSelectionTrigger, OnCtrlW)
 
             debug.cycleSelectTrigger = CreateTrigger()
-            BlzTriggerRegisterPlayerKeyEvent(debug.cycleSelectTrigger, GetTriggerPlayer() or Player(0), _G["OSKEY_" .. ALICE_Config.CYCLE_SELECTION_HOTKEY], 2, true)
+            BlzTriggerRegisterPlayerKeyEvent(debug.cycleSelectTrigger, GetTriggerPlayer() or Player(0), _ENV["OSKEY_" .. ALICE_Config.CYCLE_SELECTION_HOTKEY], 2, true)
             TriggerAddAction(debug.cycleSelectTrigger, OnCtrlQ)
 
             debug.haltTrigger = CreateTrigger()
-            BlzTriggerRegisterPlayerKeyEvent(debug.haltTrigger, GetTriggerPlayer() or Player(0), _G["OSKEY_" .. ALICE_Config.HALT_CYCLE_HOTKEY], 2, true)
-            BlzTriggerRegisterPlayerKeyEvent(debug.haltTrigger, GetTriggerPlayer() or Player(0), _G["OSKEY_" .. ALICE_Config.HALT_CYCLE_HOTKEY], 3, true)
+            BlzTriggerRegisterPlayerKeyEvent(debug.haltTrigger, GetTriggerPlayer() or Player(0), _ENV["OSKEY_" .. ALICE_Config.HALT_CYCLE_HOTKEY], 2, true)
+            BlzTriggerRegisterPlayerKeyEvent(debug.haltTrigger, GetTriggerPlayer() or Player(0), _ENV["OSKEY_" .. ALICE_Config.HALT_CYCLE_HOTKEY], 3, true)
             TriggerAddAction(debug.haltTrigger, OnCtrlT)
 
             debug.printFunctionsTrigger = CreateTrigger()
-            BlzTriggerRegisterPlayerKeyEvent(debug.printFunctionsTrigger, GetTriggerPlayer() or Player(0), _G["OSKEY_" .. ALICE_Config.PRINT_FUNCTION_NAMES_HOTKEY], 2, true)
+            BlzTriggerRegisterPlayerKeyEvent(debug.printFunctionsTrigger, GetTriggerPlayer() or Player(0), _ENV["OSKEY_" .. ALICE_Config.PRINT_FUNCTION_NAMES_HOTKEY], 2, true)
             TriggerAddAction(debug.printFunctionsTrigger, OnCtrlG)
 
             debug.pressControlTrigger = CreateTrigger()
@@ -3687,6 +3817,7 @@ do
     end
 
     local function OnLoad(widget, transport)
+        objectIsSuspended[widget] = true
         if actorOf[widget] == nil then
             return
         end
@@ -3704,6 +3835,7 @@ do
     end
 
     local function OnUnload(widget)
+        objectIsSuspended[widget] = false
         if actorOf[widget].isActor then
             local actor = actorOf[widget]
             actor.anchor = actor.originalAnchor
@@ -3757,7 +3889,7 @@ do
             return false
         end
 
-        for key, __ in pairs(identifiers) do
+        for key, __ in next, identifiers do
             identifiers[key] = nil
         end
 
@@ -3872,14 +4004,14 @@ do
         local id = GetDestructableTypeId(d)
 
         if not widgets.idInclusions[id] and (config.NO_DESTRUCTABLE_ACTOR or widgets.idExclusions[id]) then
-            return
+            return false
         end
 
         if id == 0 then
-            return
+            return false
         end
 
-        for key, __ in pairs(identifiers) do
+        for key, __ in next, identifiers do
             identifiers[key] = nil
         end
         identifiers[#identifiers + 1] = "destructable"
@@ -3894,6 +4026,7 @@ do
         actorFlags.persistOnDeath = nil
 
         Create(d, identifiers, nil, actorFlags)
+        return true
     end
 
     OnDestructableDeath = function()
@@ -3915,14 +4048,14 @@ do
         local id = GetItemTypeId(i)
 
         if not widgets.idInclusions[id] and (config.NO_ITEM_ACTOR or widgets.idExclusions[id]) then
-            return
+            return false
         end
 
         if id == 0 then
-            return
+            return false
         end
 
-        for key, __ in pairs(identifiers) do
+        for key, __ in next, identifiers do
             identifiers[key] = nil
         end
         identifiers[#identifiers + 1] = "item"
@@ -3936,10 +4069,14 @@ do
         actorFlags.persistOnDeath = nil
 
         Create(i, identifiers, nil, actorFlags)
+        return true
     end
 
     local function OnItemPickup()
         local item = GetManipulatedItem()
+        if not item then
+            return
+        end
         OnLoad(item, GetTriggerUnit())
         if config.ITEMS_ARE_STATIONARY then
             ALICE_SetStationary(item, false)
@@ -3948,6 +4085,9 @@ do
 
     local function OnItemDrop()
         local item = GetManipulatedItem()
+        if not item then
+            return
+        end
         if actorOf[item] then
             OnUnload(item)
             if config.ITEMS_ARE_STATIONARY then
@@ -3988,8 +4128,9 @@ do
 
     --#region Init
     local function Init()
-        Require "HandleType"
-        Require "Hook"
+        if Require then
+            Require "HandleType"
+        end
 
         timers.MASTER = CreateTimer()
         timers.INTERPOLATION = CreateTimer()
@@ -4004,7 +4145,6 @@ do
 
         for i = 1, CYCLE_LENGTH do
             numCellChecks[i] = 0
----@diagnostic disable-next-line: missing-fields
             cellCheckedActors[i] = {}
         end
 
@@ -4022,7 +4162,6 @@ do
         for X = 1, NUM_CELLS_X do
             CELL_LIST[X] = {}
             for Y = 1, NUM_CELLS_Y do
----@diagnostic disable-next-line: missing-fields
                 CELL_LIST[X][Y] = {numActors = 0}
             end
         end
@@ -4048,7 +4187,7 @@ do
         end
 
         ReturnTable = config.TABLE_RECYCLER_RETURN or function(whichTable)
-            for key, __ in pairs(whichTable) do
+            for key, __ in next, whichTable do
                 whichTable[key] = nil
             end
             unusedTables[#unusedTables + 1] = whichTable
@@ -4075,9 +4214,7 @@ do
             TimerStart(timers.INTERPOLATION, config.INTERPOLATION_INTERVAL, true, Interpolate)
         end
 
-        local precomputedHeightMap = Require.optionally "PrecomputedHeightMap"
-
-        if precomputedHeightMap then
+        if _G.GetTerrainZ then
             GetTerrainZ = _G.GetTerrainZ
         else
             moveableLoc = Location(0, 0)
@@ -4135,31 +4272,96 @@ do
         TriggerRegisterAnyUnitEventBJ(trig, EVENT_PLAYER_UNIT_LOADED)
         TriggerAddAction(trig, OnUnitLoaded)
 
-        local function CreateUnitHookFunc(self, ...)
-            local newUnit = self.old(...)
+        local function CreateUnitHookFunc(newUnit)
             if CreateUnitActor(newUnit) then
                 for __, func in ipairs(eventHooks.onUnitEnter) do
                     func(newUnit)
                 end
             end
+        end
+
+        local oldCreateUnit = CreateUnit
+        ---@param id player
+        ---@param unitid integer
+        ---@param x number
+        ---@param y number
+        ---@param face number
+        ---@return unit
+        CreateUnit = function(id, unitid, x, y, face)
+            local newUnit = oldCreateUnit(id, unitid, x, y, face)
+            CreateUnitHookFunc(newUnit)
             return newUnit
         end
 
-        ---@diagnostic disable-next-line: duplicate-set-field
-        Hook.CreateUnit = CreateUnitHookFunc
-        ---@diagnostic disable-next-line: duplicate-set-field
-        Hook.CreateUnitByName = CreateUnitHookFunc
-        ---@diagnostic disable-next-line: duplicate-set-field
-        Hook.CreateUnitAtLoc = CreateUnitHookFunc
-        ---@diagnostic disable-next-line: duplicate-set-field
-        Hook.CreateUnitAtLocByName = CreateUnitHookFunc
-        if config.UNITS_LEAVE_BEHIND_CORPSES then
-            ---@diagnostic disable-next-line: duplicate-set-field
-            Hook.CreateCorpse = CreateUnitHookFunc
+        local oldCreateUnitByName = CreateUnitByName
+        ---@param whichPlayer player
+        ---@param unitname string
+        ---@param x number
+        ---@param y number
+        ---@param face number
+        ---@return unit
+        CreateUnitByName = function(whichPlayer, unitname, x, y, face)
+            local newUnit = oldCreateUnitByName(whichPlayer, unitname, x, y, face)
+            CreateUnitHookFunc(newUnit)
+            return newUnit
         end
 
-        ---@diagnostic disable-next-line: duplicate-set-field
-        function Hook:RemoveUnit(whichUnit)
+        local oldCreateUnitAtLoc = CreateUnitAtLoc
+        ---@param id player
+        ---@param unitid integer
+        ---@param whichLocation location
+        ---@param face number
+        ---@return unit
+        CreateUnitAtLoc = function(id, unitid, whichLocation, face)
+            local newUnit = oldCreateUnitAtLoc(id, unitid, whichLocation, face)
+            CreateUnitHookFunc(newUnit)
+            return newUnit
+        end
+
+        local oldCreateUnitAtLocByName = CreateUnitAtLocByName
+        ---@param id player
+        ---@param unitname string
+        ---@param whichLocation location
+        ---@param face number
+        ---@return unit
+        CreateUnitAtLocByName = function(id, unitname, whichLocation, face)
+            local newUnit = oldCreateUnitAtLocByName(id, unitname, whichLocation, face)
+            CreateUnitHookFunc(newUnit)
+            return newUnit
+        end
+
+        local oldBlzCreateUnitWithSkin = BlzCreateUnitWithSkin
+        ---@param id player
+        ---@param unitid integer
+        ---@param x number
+        ---@param y number
+        ---@param face number
+        ---@param skinId integer
+        ---@return unit
+        BlzCreateUnitWithSkin = function(id, unitid, x, y, face, skinId)
+            local newUnit = oldBlzCreateUnitWithSkin(id, unitid, x, y, face, skinId)
+            CreateUnitHookFunc(newUnit)
+            return newUnit
+        end
+
+        if config.UNITS_LEAVE_BEHIND_CORPSES then
+            local oldCreateCorpse = CreateCorpse
+            ---@param whichPlayer player
+            ---@param unitid integer
+            ---@param x number
+            ---@param y number
+            ---@param face number
+            ---@return unit
+            CreateCorpse = function(whichPlayer, unitid, x, y, face)
+                local newUnit = oldCreateCorpse(whichPlayer, unitid, x, y, face)
+                CreateUnitHookFunc(newUnit)
+                return newUnit
+            end
+        end
+
+        local oldRemoveUnit = RemoveUnit
+        ---@param whichUnit unit
+        RemoveUnit = function(whichUnit)
             local item
             for i = 0, UnitInventorySize(whichUnit) - 1 do
                 item = UnitItemInSlot(whichUnit, i)
@@ -4172,44 +4374,88 @@ do
                 func(whichUnit)
             end
             Clear(whichUnit)
-            self.old(whichUnit)
+            oldRemoveUnit(whichUnit)
         end
 
-        ---@diagnostic disable-next-line: duplicate-set-field
-        function Hook:ShowUnit(whichUnit, enable)
-            self.old(whichUnit, enable)
-            if actorOf[whichUnit] == nil then
-                return
-            end
-            if actorOf[whichUnit].isActor then
-                Suspend(actorOf[whichUnit], not enable)
-            else
-                for __, actor in ipairs(actorOf[whichUnit]) do
-                    Suspend(actor, not enable)
+        local oldShowUnit = ShowUnit
+        ---@param whichUnit unit
+        ---@param enable boolean
+        ShowUnit = function(whichUnit, enable)
+            oldShowUnit(whichUnit, enable)
+            ALICE_Suspend(whichUnit, not enable)
+        end
+
+        local function CreateDestructableHookFunc(newDestructable)
+            if CreateDestructableActor(newDestructable) then
+                for __, func in ipairs(eventHooks.onDestructableEnter) do
+                    func(newDestructable)
                 end
             end
         end
 
-        local function CreateDestructableHookFunc(self, ...)
-            local newDestructable = self.old(...)
-            CreateDestructableActor(newDestructable)
-            for __, func in ipairs(eventHooks.onDestructableEnter) do
-                func(newDestructable)
-            end
+        local oldCreateDestructable = CreateDestructable
+        ---@param objectid integer
+        ---@param x number
+        ---@param y number
+        ---@param face number
+        ---@param scale number
+        ---@param variation integer
+        ---@return destructable
+        CreateDestructable = function(objectid, x, y, face, scale, variation)
+            local newDestructable = oldCreateDestructable(objectid, x, y, face, scale, variation)
+            CreateDestructableHookFunc(newDestructable)
             return newDestructable
         end
 
-        ---@diagnostic disable-next-line: duplicate-set-field
-        Hook.CreateDestructable = CreateDestructableHookFunc
-        ---@diagnostic disable-next-line: duplicate-set-field
-        Hook.CreateDestructableZ = CreateDestructableHookFunc
-        ---@diagnostic disable-next-line: duplicate-set-field
-        Hook.BlzCreateDestructableWithSkin = CreateDestructableHookFunc
-        ---@diagnostic disable-next-line: duplicate-set-field
-        Hook.BlzCreateDestructableZWithSkin = CreateDestructableHookFunc
+        local oldCreateDestructableZ = CreateDestructableZ
+        ---@param objectid integer
+        ---@param x number
+        ---@param y number
+        ---@param z number
+        ---@param face number
+        ---@param scale number
+        ---@param variation integer
+        ---@return destructable
+        CreateDestructableZ = function(objectid, x, y, z, face, scale, variation)
+            local newDestructable = oldCreateDestructableZ(objectid, x, y, z, face, scale, variation)
+            CreateDestructableHookFunc(newDestructable)
+            return newDestructable
+        end
 
-        ---@diagnostic disable-next-line: duplicate-set-field
-        function Hook:RemoveDestructable(whichDestructable)
+        local oldBlzCreateDestructableWithSkin = BlzCreateDestructableWithSkin
+        ---@param objectid integer
+        ---@param x number
+        ---@param y number
+        ---@param face number
+        ---@param scale number
+        ---@param variation integer
+        ---@param skinId integer
+        ---@return destructable
+        BlzCreateDestructableWithSkin = function(objectid, x, y, face, scale, variation, skinId)
+            local newDestructable = oldBlzCreateDestructableWithSkin(objectid, x, y, face, scale, variation, skinId)
+            CreateDestructableHookFunc(newDestructable)
+            return newDestructable
+        end
+
+        local oldBlzCreateDestructableZWithSkin = BlzCreateDestructableZWithSkin
+        ---@param objectid integer
+        ---@param x number
+        ---@param y number
+        ---@param z number
+        ---@param face number
+        ---@param scale number
+        ---@param variation integer
+        ---@param skinId integer
+        ---@return destructable
+        BlzCreateDestructableZWithSkin = function(objectid, x, y, z, face, scale, variation, skinId)
+            local newDestructable = oldBlzCreateDestructableZWithSkin(objectid, x, y, z, face, scale, variation, skinId)
+            CreateDestructableHookFunc(newDestructable)
+            return newDestructable
+        end
+
+        local oldRemoveDestructable = RemoveDestructable
+        ---@param whichDestructable destructable
+        RemoveDestructable = function(whichDestructable)
             for __, func in ipairs(eventHooks.onDestructableDestroy) do
                 func(whichDestructable)
             end
@@ -4218,12 +4464,15 @@ do
                 DestroyTrigger(widgets.deathTriggers[whichDestructable])
                 widgets.deathTriggers[whichDestructable] = nil
             end
-            self.old(whichDestructable)
+            oldRemoveDestructable(whichDestructable)
         end
 
-        ---@diagnostic disable-next-line: duplicate-set-field
-        function Hook:DestructableRestoreLife(whichDestructable, life, birth)
-            self.old(whichDestructable, life, birth)
+        local oldDestructableRestoreLife = DestructableRestoreLife
+        ---@param whichDestructable destructable
+        ---@param life number
+        ---@param birth boolean
+        DestructableRestoreLife = function(whichDestructable, life, birth)
+            oldDestructableRestoreLife(whichDestructable, life, birth)
             if GetDestructableLife(whichDestructable) > 0 and GetActor(whichDestructable, "destructable") == nil then
                 CreateDestructableActor(whichDestructable)
                 for __, func in ipairs(eventHooks.onDestructableEnter) do
@@ -4232,19 +4481,20 @@ do
             end
         end
 
-        ---@diagnostic disable-next-line: duplicate-set-field
-        function Hook:CreateItem(...)
-            local newItem
-            newItem = self.old(...)
-            CreateItemActor(newItem)
-            for __, func in ipairs(eventHooks.onItemEnter) do
-                func(newItem)
+        local oldCreateItem = CreateItem
+        CreateItem = function(itemid, x, y)
+            local newItem = oldCreateItem(itemid, x, y)
+            if CreateItemActor(newItem) then
+                for __, func in ipairs(eventHooks.onItemEnter) do
+                    func(newItem)
+                end
             end
             return newItem
         end
 
-        ---@diagnostic disable-next-line: duplicate-set-field
-        function Hook:RemoveItem(whichItem)
+        local oldRemoveItem = RemoveItem
+        ---@param whichItem item
+        RemoveItem = function(whichItem)
             for __, func in ipairs(eventHooks.onItemDestroy) do
                 func(whichItem)
             end
@@ -4253,26 +4503,50 @@ do
                 DestroyTrigger(widgets.deathTriggers[whichItem])
                 widgets.deathTriggers[whichItem] = nil
             end
-            self.old(whichItem)
+            oldRemoveItem(whichItem)
         end
 
-        ---@diagnostic disable-next-line: duplicate-set-field
-        function Hook:SetItemVisible(whichItem, enable)
-            self.old(whichItem, enable)
-            if actorOf[whichItem] == nil then
-                return
+        local oldSetItemVisible = SetItemVisible
+        ---@param whichItem item
+        ---@param enable boolean
+        SetItemVisible = function(whichItem, enable)
+            oldSetItemVisible(whichItem, enable)
+            ALICE_Suspend(whichItem, not enable)
+        end
+
+        if next(initEnum.objects) then
+            local initEnums = initEnum.objects
+
+            for __, actor in ipairs(actorList) do
+                for id, __ in next, actor.identifier do
+                    if initEnums[id] then
+                        initEnums[id][#initEnums[id] + 1] = actor.host
+                    end
+                end
             end
-            if actorOf[whichItem].isActor then
-                Suspend(actorOf[whichItem], not enable)
-            else
-                for __, actor in ipairs(actorOf[whichItem]) do
-                    Suspend(actor, not enable)
+
+            local identifierList = {}
+            for id, __ in next, initEnums do
+                identifierList[#identifierList + 1] = id
+            end
+
+            table.sort(identifierList)
+
+            for __, id in ipairs(identifierList) do
+                if initEnum.callbacks[id] then
+                    initEnum.callbacks[id](initEnums[id], id)
                 end
             end
         end
+
+        initEnum = nil
     end
 
-    OnInit.final("ALICE", Init)
+    if OnInit then
+        OnInit.final("ALICE", Init)
+    else
+        --WSCode.InitFinal(Init)
+    end
     --#endregion
 
     --===========================================================================================================================================================
@@ -4479,8 +4753,17 @@ do
     ---@vararg any
     ---@return table
     function ALICE_CallDelayed(callback, delay, ...)
+        if callback == nil then
+            error("No callback function specified.")
+        end
+
+        delay = delay or 0
+        if delay < 0 then
+            error("Specified delay is negative.")
+        end
+
         local new = GetTable()
-        new.callCounter = cycle.unboundCounter + ((delay or 0)*INV_MIN_INTERVAL + 1) // 1
+        new.callCounter = cycle.unboundCounter + (delay*INV_MIN_INTERVAL + 1) // 1
         new.callback = callback
         local numArgs = select("#", ...)
         if numArgs == 1 then
@@ -4488,6 +4771,10 @@ do
         elseif numArgs > 1 then
             new.args = pack(...)
             new.unpack = true
+        end
+
+        if Debug and ALICE_Config.STORE_TRACEBACK_ON_CALLBACKS then
+            new.traceback = Debug.traceback()
         end
 
         AddUserCallback(new)
@@ -4500,12 +4787,25 @@ do
     ---@param delay? number
     ---@return table
     function ALICE_PairCallDelayed(callback, delay)
+        if callback == nil then
+            error("No callback function specified.")
+        end
+
+        delay = delay or 0
+        if delay < 0 then
+            error("Specified delay is negative.")
+        end
+
         local new = GetTable()
-        new.callCounter = cycle.unboundCounter + ((delay or 0)*INV_MIN_INTERVAL + 1) // 1
+        new.callCounter = cycle.unboundCounter + (delay*INV_MIN_INTERVAL + 1) // 1
         new.callback = callback
         new.hostA = currentPair[0x3]
         new.hostB = currentPair[0x4]
         new.pair = currentPair
+
+        if Debug and ALICE_Config.STORE_TRACEBACK_ON_CALLBACKS then
+            new.traceback = Debug.traceback()
+        end
 
         AddUserCallback(new)
 
@@ -4518,10 +4818,19 @@ do
     ---@vararg any
     ---@return table
     function ALICE_CallPeriodic(callback, delay, ...)
+        if callback == nil then
+            error("No callback function specified.")
+        end
+
         local host = pack(...)
         host.callback = callback
         host.excess = delay or 0
         host.isPeriodic = true
+
+        if Debug and ALICE_Config.STORE_TRACEBACK_ON_CALLBACKS then
+            host.traceback = Debug.traceback()
+        end
+
         local actor = CreateStub(host)
         actor.periodicPair = CreatePair(actor, SELF_INTERACTION_ACTOR, PeriodicWrapper)
 
@@ -4533,23 +4842,65 @@ do
     ---@param howOften integer
     ---@param delay? number
     ---@vararg any
-    ---@return table
+    ---@return table | nil
     function ALICE_CallRepeated(callback, howOften, delay, ...)
+        if callback == nil then
+            error("No callback function specified.")
+        end
+        if howOften <= 0 then
+            return nil
+        end
+
         local host = pack(...)
         host.callback = callback
         host.howOften = howOften
         host.currentExecution = 0
         host.excess = delay or 0
         host.isPeriodic = true
-        local actor = CreateStub(host)
-        if howOften > 0 then
-            actor.periodicPair = CreatePair(actor, SELF_INTERACTION_ACTOR, RepeatedWrapper)
+
+        if Debug and ALICE_Config.STORE_TRACEBACK_ON_CALLBACKS then
+            host.traceback = Debug.traceback()
         end
+
+        local actor = CreateStub(host)
+        actor.periodicPair = CreatePair(actor, SELF_INTERACTION_ACTOR, RepeatedWrapper)
 
         return host
     end
 
-    ---Disables a callback returned by ALICE_CallDelayed, ALICE_CallPeriodic, or ALICE_CallRepeated. If called from within a periodic callback function itself, the parameter can be omitted. Returns whether the callback was interrupted.
+    ---Returns the remaining time until the first execution of a callback returned by ALICE_CallDelayed, ALICE_PairCallDelayed, ALICE_CallPeriodic, or ALICE_CallRepeated. Returns 0 if the callback has already been executed or is invalid.
+    ---@param callback table
+    ---@return number
+    function ALICE_GetDelayRemaining(callback)
+        if not callback then
+            return 0
+        end
+        if callback.isPeriodic then
+            if callback.wasExecuted or callback.currentExecution and callback.currentExecution > 0 then
+                return 0
+            end
+            local actor = GetActor(callback)
+            if not actor then
+                return 0
+            end
+            local nextStep = actor.periodicPair[0x5]
+            if nextStep == DO_NOT_EVALUATE then
+                return 0
+            end
+            if nextStep < cycle.counter then
+                nextStep = nextStep + CYCLE_LENGTH
+            end
+            return (nextStep - cycle.counter - 1)*ALICE_Config.MIN_INTERVAL + max(callback.excess, 0)
+        elseif callback.isPaused then
+            return callback.stepsRemaining*ALICE_Config.MIN_INTERVAL
+        elseif callback.callCounter then
+            return (callback.callCounter - cycle.unboundCounter)*ALICE_Config.MIN_INTERVAL
+        else
+            return 0
+        end
+    end
+
+    ---Disables a callback returned by ALICE_CallDelayed, ALICE_PairCallDelayed, ALICE_CallPeriodic, or ALICE_CallRepeated. If called from within a periodic callback function itself, the parameter can be omitted. Returns whether the callback was interrupted.
     ---@param callback? table
     ---@return boolean
     function ALICE_DisableCallback(callback)
@@ -4561,13 +4912,15 @@ do
                     return false
                 end
 
-                actor.periodicPair.destructionQueued = true
-                AddDelayedCallback(DestroyPair, actor.periodicPair)
-                if functionOnDestroy[callback.callback] then
-                    functionOnDestroy[callback.callback](unpack(callback))
+                if not actor.periodicPair.destructionQueued then
+                    actor.periodicPair.destructionQueued = true
+                    AddDelayedCallback(DestroyPair, actor.periodicPair)
                 end
                 DestroyStub(actor)
-                for key, __ in pairs(callback) do
+                if functionOnDestroy[callback.callback] then
+                    functionOnDestroy[callback.callback](unpack(callback, 1, callback.n))
+                end
+                for key, __ in next, callback do
                     callback[key] = nil
                 end
                 return true
@@ -4587,7 +4940,7 @@ do
                         end
                     elseif callback.args then
                         if callback.unpack then
-                            functionOnDestroy[callback.callback](unpack(callback.args))
+                            functionOnDestroy[callback.callback](unpack(callback.args, 1, callback.args.n))
                         else
                             functionOnDestroy[callback.callback](callback.args)
                         end
@@ -4599,7 +4952,7 @@ do
                 if not callback.isPaused then
                     RemoveUserCallbackFromList(callback)
                 end
-                for key, __ in pairs(callback) do
+                for key, __ in next, callback do
                     callback[key] = nil
                 end
                 return true
@@ -4611,15 +4964,17 @@ do
                 return false
             end
 
-            actor.periodicPair.destructionQueued = true
-            AddDelayedCallback(DestroyPair, actor.periodicPair)
+            if not actor.periodicPair.destructionQueued then
+                actor.periodicPair.destructionQueued = true
+                AddDelayedCallback(DestroyPair, actor.periodicPair)
+            end
             callback = actor.host
 
-            if functionOnDestroy[callback.callback] then
-                functionOnDestroy[callback.callback](unpack(callback))
-            end
             DestroyStub(actor)
-            for key, __ in pairs(callback) do
+            if functionOnDestroy[callback.callback] then
+                functionOnDestroy[callback.callback](unpack(callback, 1, callback.n))
+            end
+            for key, __ in next, callback do
                 callback[key] = nil
             end
             return true
@@ -4652,7 +5007,7 @@ do
                     return
                 end
 
-                if callback.isPaused == enable then
+                if (callback.isPaused == true) == (enable == true) then
                     return
                 end
                 callback.isPaused = enable
@@ -4700,7 +5055,7 @@ do
         if type(identifier) == "string" then
             for __, actor in ipairs(actorList) do
                 if actor.identifier[identifier] and (condition == nil or condition(actor.host, ...)) then
-                    if not actor.isSuspended then
+                    if not actor.isSuspended or includeSuspended then
                         returnTable[#returnTable + 1] = actor.host
                     end
                 end
@@ -4708,7 +5063,7 @@ do
         else
             for __, actor in ipairs(actorList) do
                 if HasIdentifierFromTable(actor, identifier) and (condition == nil or condition(actor.host, ...)) then
-                    if not actor.isSuspended then
+                    if not actor.isSuspended or includeSuspended then
                         returnTable[#returnTable + 1] = actor.host
                     end
                 end
@@ -4754,10 +5109,11 @@ do
         local rangeSquared = range*range
         local identifierIsString = type(identifier) == "string"
 
-        local actor, cell
+        local actor, cell, cellListX
         for X = minX, maxX do
+            cellListX = CELL_LIST[X]
             for Y = minY, maxY do
-                cell = CELL_LIST[X][Y]
+                cell = cellListX[Y]
                 actor = cell.first
                 if actor then
                     if identifierIsString then
@@ -4766,7 +5122,7 @@ do
                                 alreadyEnumerated[actor] = true
                                 dx = actor.x[actor.anchor] - x
                                 dy = actor.y[actor.anchor] - y
-                                if dx*dx + dy*dy < rangeSquared then
+                                if dx*dx + dy*dy < rangeSquared and (not actor.isSuspended or includeSuspended) then
                                     returnTable[#returnTable + 1] = actor.host
                                 end
                             end
@@ -4778,7 +5134,7 @@ do
                                 alreadyEnumerated[actor] = true
                                 dx = actor.x[actor.anchor] - x
                                 dy = actor.y[actor.anchor] - y
-                                if dx*dx + dy*dy < rangeSquared then
+                                if dx*dx + dy*dy < rangeSquared and (not actor.isSuspended or includeSuspended) then
                                     returnTable[#returnTable + 1] = actor.host
                                 end
                             end
@@ -4789,7 +5145,7 @@ do
             end
         end
 
-        for key, __ in pairs(alreadyEnumerated) do
+        for key, __ in next, alreadyEnumerated do
             alreadyEnumerated[key] = nil
         end
 
@@ -4847,7 +5203,7 @@ do
                                 alreadyEnumerated[actor] = true
                                 x = actor.x[actor.anchor]
                                 y = actor.y[actor.anchor]
-                                if x > minx and x < maxx and y > miny and y < maxy then
+                                if x > minx and x < maxx and y > miny and y < maxy and (not actor.isSuspended or includeSuspended) then
                                     returnTable[#returnTable + 1] = actor.host
                                 end
                             end
@@ -4859,7 +5215,7 @@ do
                                 alreadyEnumerated[actor] = true
                                 x = actor.x[actor.anchor]
                                 y = actor.y[actor.anchor]
-                                if x > minx and x < maxx and y > miny and y < maxy then
+                                if x > minx and x < maxx and y > miny and y < maxy and (not actor.isSuspended or includeSuspended) then
                                     returnTable[#returnTable + 1] = actor.host
                                 end
                             end
@@ -4870,7 +5226,7 @@ do
             end
         end
 
-        for key, __ in pairs(alreadyEnumerated) do
+        for key, __ in next, alreadyEnumerated do
             alreadyEnumerated[key] = nil
         end
 
@@ -5002,7 +5358,7 @@ do
                             dy = actor.y[actor.anchor] - y1
                             xPrime = cosAngle*dx + sinAngle*dy
                             yPrime = -sinAngle*dx + cosAngle*dy
-                            if yPrime < halfWidth and yPrime > -halfWidth and xPrime > 0 and xPrime < maxDist then
+                            if yPrime < halfWidth and yPrime > -halfWidth and xPrime > 0 and xPrime < maxDist and (not actor.isSuspended or includeSuspended) then
                                 returnTable[#returnTable + 1] = actor.host
                             end
                         end
@@ -5016,7 +5372,7 @@ do
                             dy = actor.y[actor.anchor] - y1
                             xPrime = cosAngle*dx + sinAngle*dy
                             yPrime = -sinAngle*dx + cosAngle*dy
-                            if yPrime < halfWidth and yPrime > -halfWidth and xPrime > 0 and xPrime < maxDist then
+                            if yPrime < halfWidth and yPrime > -halfWidth and xPrime > 0 and xPrime < maxDist and (not actor.isSuspended or includeSuspended) then
                                 returnTable[#returnTable + 1] = actor.host
                             end
                         end
@@ -5028,7 +5384,7 @@ do
 
         ReturnTable(cells)
 
-        for key, __ in pairs(alreadyEnumerated) do
+        for key, __ in next, alreadyEnumerated do
             alreadyEnumerated[key] = nil
         end
 
@@ -5053,8 +5409,8 @@ do
         ReturnTable(list)
     end
 
-    ---Function for performant enumeration of objects within a region. The region does not use the native region type, but is represented by a rect array or a table array, where each table must hold the minX, minY, maxX, and maxY fields. Region data is cached on the first call and the region object must not change afterwards. Identifier can be a string or a table. If it is a table, the last entry must be MATCHING_TYPE_ANY or MATCHING_TYPE_ALL. Optional condition to specify an additional filter function, which takes the enumerated objects as an argument and returns a boolean. Additional arguments are passed into the filter function.
-    ---@param whichRegion rect[] | table[]
+    ---Function for performant enumeration of objects within a region. The region does not use the native region type, but is represented by a rect, a rect array or a table or table array, where each table must hold the minX, minY, maxX, and maxY fields. Region data is cached on the first call and the region object must not change afterwards. Identifier can be a string or a table. If it is a table, the last entry must be MATCHING_TYPE_ANY or MATCHING_TYPE_ALL. Optional condition to specify an additional filter function, which takes the enumerated objects as an argument and returns a boolean. Additional arguments are passed into the filter function.
+    ---@param whichRegion rect | rect[] | WonderRect | WonderRegion
     ---@param identifier string | table
     ---@param condition? function
     ---@vararg any
@@ -5071,8 +5427,17 @@ do
                 cells = {}
             }
 
-            if type(whichRegion[1]) == "table" then
+            if HandleType[whichRegion] == "rect" then
+                regions[whichRegion].rects = {{
+                    minX = GetRectMinX(whichRegion),
+                    minY = GetRectMinY(whichRegion),
+                    maxX = GetRectMaxX(whichRegion),
+                    maxY = GetRectMaxY(whichRegion)
+                }}
+            elseif type(whichRegion[1]) == "table" then
                 regions[whichRegion].rects = whichRegion
+            elseif whichRegion.minX then
+                regions[whichRegion].rects = {whichRegion}
             else
                 regions[whichRegion].rects = {}
                 for __, rect in ipairs(whichRegion) do
@@ -5130,21 +5495,21 @@ do
                                         local xr = (x - rect.minX)/(rect.maxX - rect.minX)
                                         local yr = (y - rect.minY)/(rect.maxY - rect.minY)
                                         if rect.missingVertex == "topright" then
-                                            if xr + yr < 1 then
+                                            if xr + yr < 1 and not actor.isSuspended then
                                                 returnTable[#returnTable + 1] = actor.host
                                             end
                                         elseif rect.missingVertex == "topleft" then
-                                            if  xr - yr > 0 then
+                                            if  xr - yr > 0 and not actor.isSuspended then
                                                 returnTable[#returnTable + 1] = actor.host
                                             end
                                         elseif rect.missingVertex == "bottomleft" then
-                                            if xr + yr > 1 then
+                                            if xr + yr > 1 and not actor.isSuspended then
                                                 returnTable[#returnTable + 1] = actor.host
                                             end
-                                        elseif xr - yr < 0 then
+                                        elseif xr - yr < 0 and not actor.isSuspended then
                                             returnTable[#returnTable + 1] = actor.host
                                         end
-                                    else
+                                    elseif not actor.isSuspended then
                                         returnTable[#returnTable + 1] = actor.host
                                     end
                                     break
@@ -5165,21 +5530,21 @@ do
                                         local xr = (x - rect.minX)/(rect.maxX - rect.minX)
                                         local yr = (y - rect.minY)/(rect.maxY - rect.minY)
                                         if rect.missingVertex == "topright" then
-                                            if xr + yr < 1 then
+                                            if xr + yr < 1 and (not actor.isSuspended or includeSuspended) then
                                                 returnTable[#returnTable + 1] = actor.host
                                             end
                                         elseif rect.missingVertex == "topleft" then
-                                            if  xr - yr > 0 then
+                                            if  xr - yr > 0 and (not actor.isSuspended or includeSuspended) then
                                                 returnTable[#returnTable + 1] = actor.host
                                             end
                                         elseif rect.missingVertex == "bottomleft" then
-                                            if xr + yr > 1 then
+                                            if xr + yr > 1 and (not actor.isSuspended or includeSuspended) then
                                                 returnTable[#returnTable + 1] = actor.host
                                             end
-                                        elseif xr - yr < 0 then
+                                        elseif xr - yr < 0 and (not actor.isSuspended or includeSuspended) then
                                             returnTable[#returnTable + 1] = actor.host
                                         end
-                                    else
+                                    elseif not actor.isSuspended or includeSuspended then
                                         returnTable[#returnTable + 1] = actor.host
                                     end
                                 end
@@ -5191,7 +5556,7 @@ do
             end
         end
 
-        for key, __ in pairs(alreadyEnumerated) do
+        for key, __ in next, alreadyEnumerated do
             alreadyEnumerated[key] = nil
         end
 
@@ -5212,6 +5577,19 @@ do
         ReturnTable(list)
     end
 
+    ---Enumerates all preplaced objects with the specified identifier when ALICE initializes, then invokes the specified callback function, passing the list of all objects as the first argument. Extremely performant when attempting to fetch many different types of preplaced objects. Passes the identifier as the second argument. This function returns an empty table that is later filled with preplaced objects. Must be called before ALICE initializes.
+    ---@param identifier string
+    ---@param callback? function
+    ---@return table
+    function ALICE_EnumOnInit(identifier, callback)
+        if not initEnum then
+            return {}
+        end
+        initEnum.objects[identifier] = {}
+        initEnum.callbacks[identifier] = callback
+        return initEnum.objects[identifier]
+    end
+
     ---Returns the closest object to a point from among objects with the specified identifier. Identifier can be a string or a table. If it is a table, the last entry must be MATCHING_TYPE_ANY or MATCHING_TYPE_ALL. Optional condition to specify an additional filter function, which takes the enumerated objects as an argument and returns a boolean. Additional arguments are passed into the filter function.
     ---@param x number
     ---@param y number
@@ -5224,6 +5602,236 @@ do
         ResetCoordinateLookupTables()
 
         cutOffDistance = cutOffDistance or 99999
+        local thisX = min(NUM_CELLS_X, max(1, (NUM_CELLS_X*(x - MAP_MIN_X)/MAP_SIZE_X) // 1 + 1))
+        local thisY = min(NUM_CELLS_Y, max(1, (NUM_CELLS_Y*(y - MAP_MIN_Y)/MAP_SIZE_Y) // 1 + 1))
+        local minX = min(NUM_CELLS_X, max(1, (NUM_CELLS_X*(x - cutOffDistance - MAP_MIN_X)/MAP_SIZE_X) // 1 + 1))
+        local minY = min(NUM_CELLS_Y, max(1, (NUM_CELLS_Y*(y - cutOffDistance - MAP_MIN_Y)/MAP_SIZE_Y) // 1 + 1))
+        local maxX = min(NUM_CELLS_X, max(1, (NUM_CELLS_X*(x + cutOffDistance - MAP_MIN_X)/MAP_SIZE_X) // 1 + 1))
+        local maxY = min(NUM_CELLS_Y, max(1, (NUM_CELLS_Y*(y + cutOffDistance - MAP_MIN_Y)/MAP_SIZE_Y) // 1 + 1))
+
+        local maxIteration = max(maxX - thisX, max(maxY - thisY, max(thisX - minY, max(thisY - minY))))
+
+        local dx, dy
+        local closestDistSquared = cutOffDistance*cutOffDistance
+        local closestObject, thisDistSquared
+        local identifierIsString = type(identifier) == "string"
+
+        local actor, cell, skipFirst, skipLast, lowerBound, upperBound
+        for iter = 0, maxIteration do
+            if sqrt(closestDistSquared) < config.CELL_SIZE*(iter - 1) then
+                break
+            end
+
+            if minX <= thisX - iter then
+                local X = thisX - iter
+                lowerBound = thisY - iter
+                lowerBound = minY > lowerBound and minY or lowerBound
+                upperBound = thisY + iter
+                upperBound = maxY < upperBound and maxY or upperBound
+                for Y = lowerBound, upperBound do
+                    cell = CELL_LIST[X][Y]
+                    actor = cell.first
+                    if actor then
+                        if identifierIsString then
+                            for __ = 1, cell.numActors do
+                                if actor.identifier[identifier] and not alreadyEnumerated[actor] and (condition == nil or condition(actor.host, ...)) then
+                                    alreadyEnumerated[actor] = true
+                                    dx = actor.x[actor.anchor] - x
+                                    dy = actor.y[actor.anchor] - y
+                                    thisDistSquared = dx*dx + dy*dy
+                                    if thisDistSquared < closestDistSquared and (not actor.isSuspended or includeSuspended) then
+                                        closestDistSquared = thisDistSquared
+                                        closestObject = actor.host
+                                    end
+                                end
+                                actor = actor.nextInCell[cell]
+                            end
+                        else
+                            for __ = 1, cell.numActors do
+                                if not alreadyEnumerated[actor] and HasIdentifierFromTable(actor, identifier) and (condition == nil or condition(actor.host, ...)) then
+                                    alreadyEnumerated[actor] = true
+                                    dx = actor.x[actor.anchor] - x
+                                    dy = actor.y[actor.anchor] - y
+                                    thisDistSquared = dx*dx + dy*dy
+                                    if thisDistSquared < closestDistSquared and (not actor.isSuspended or includeSuspended) then
+                                        closestDistSquared = thisDistSquared
+                                        closestObject = actor.host
+                                    end
+                                end
+                                actor = actor.nextInCell[cell]
+                            end
+                        end
+                    end
+                end
+                skipFirst = true
+                skipLast = true
+            else
+                skipFirst = false
+            end
+
+            if maxY >= thisY + iter then
+                local Y = thisY + iter
+                lowerBound = skipFirst and (thisX - iter + 1) or (thisX - iter)
+                lowerBound = minX > lowerBound and minX or lowerBound
+                upperBound = thisX + iter
+                upperBound = maxX < upperBound and maxX or upperBound
+                for X = lowerBound, upperBound do
+                    cell = CELL_LIST[X][Y]
+                    actor = cell.first
+                    if actor then
+                        if identifierIsString then
+                            for __ = 1, cell.numActors do
+                                if actor.identifier[identifier] and not alreadyEnumerated[actor] and (condition == nil or condition(actor.host, ...)) then
+                                    alreadyEnumerated[actor] = true
+                                    dx = actor.x[actor.anchor] - x
+                                    dy = actor.y[actor.anchor] - y
+                                    thisDistSquared = dx*dx + dy*dy
+                                    if thisDistSquared < closestDistSquared and (not actor.isSuspended or includeSuspended) then
+                                        closestDistSquared = thisDistSquared
+                                        closestObject = actor.host
+                                    end
+                                end
+                                actor = actor.nextInCell[cell]
+                            end
+                        else
+                            for __ = 1, cell.numActors do
+                                if not alreadyEnumerated[actor] and HasIdentifierFromTable(actor, identifier) and (condition == nil or condition(actor.host, ...)) then
+                                    alreadyEnumerated[actor] = true
+                                    dx = actor.x[actor.anchor] - x
+                                    dy = actor.y[actor.anchor] - y
+                                    thisDistSquared = dx*dx + dy*dy
+                                    if thisDistSquared < closestDistSquared and (not actor.isSuspended or includeSuspended) then
+                                        closestDistSquared = thisDistSquared
+                                        closestObject = actor.host
+                                    end
+                                end
+                                actor = actor.nextInCell[cell]
+                            end
+                        end
+                    end
+                end
+                skipFirst = true
+            else
+                skipFirst = false
+            end
+
+            if maxX >= thisX + iter then
+                local X = thisX + iter
+                lowerBound = thisY - iter
+                lowerBound = minY > lowerBound and minY or lowerBound
+                upperBound = skipFirst and (thisY + iter - 1) or (thisY + iter)
+                upperBound = maxY < upperBound and maxY or upperBound
+                for Y = lowerBound, upperBound do
+                    cell = CELL_LIST[X][Y]
+                    actor = cell.first
+                    if actor then
+                        if identifierIsString then
+                            for __ = 1, cell.numActors do
+                                if actor.identifier[identifier] and not alreadyEnumerated[actor] and (condition == nil or condition(actor.host, ...)) then
+                                    alreadyEnumerated[actor] = true
+                                    dx = actor.x[actor.anchor] - x
+                                    dy = actor.y[actor.anchor] - y
+                                    thisDistSquared = dx*dx + dy*dy
+                                    if thisDistSquared < closestDistSquared and (not actor.isSuspended or includeSuspended) then
+                                        closestDistSquared = thisDistSquared
+                                        closestObject = actor.host
+                                    end
+                                end
+                                actor = actor.nextInCell[cell]
+                            end
+                        else
+                            for __ = 1, cell.numActors do
+                                if not alreadyEnumerated[actor] and HasIdentifierFromTable(actor, identifier) and (condition == nil or condition(actor.host, ...)) then
+                                    alreadyEnumerated[actor] = true
+                                    dx = actor.x[actor.anchor] - x
+                                    dy = actor.y[actor.anchor] - y
+                                    thisDistSquared = dx*dx + dy*dy
+                                    if thisDistSquared < closestDistSquared and (not actor.isSuspended or includeSuspended) then
+                                        closestDistSquared = thisDistSquared
+                                        closestObject = actor.host
+                                    end
+                                end
+                                actor = actor.nextInCell[cell]
+                            end
+                        end
+                    end
+                end
+                skipFirst = true
+            else
+                skipFirst = false
+            end
+
+            if minY <= thisY - iter then
+                local Y = thisY - iter
+                lowerBound = skipLast and (thisX - iter + 1) or (thisX - iter)
+                lowerBound = minX > lowerBound and minX or lowerBound
+                upperBound = skipFirst and (thisX + iter - 1) or (thisX + iter)
+                upperBound = maxX < upperBound and maxX or upperBound
+                for X = lowerBound, upperBound do
+                    cell = CELL_LIST[X][Y]
+                    actor = cell.first
+                    if actor then
+                        if identifierIsString then
+                            for __ = 1, cell.numActors do
+                                if actor.identifier[identifier] and not alreadyEnumerated[actor] and (condition == nil or condition(actor.host, ...)) then
+                                    alreadyEnumerated[actor] = true
+                                    dx = actor.x[actor.anchor] - x
+                                    dy = actor.y[actor.anchor] - y
+                                    thisDistSquared = dx*dx + dy*dy
+                                    if thisDistSquared < closestDistSquared and (not actor.isSuspended or includeSuspended) then
+                                        closestDistSquared = thisDistSquared
+                                        closestObject = actor.host
+                                    end
+                                end
+                                actor = actor.nextInCell[cell]
+                            end
+                        else
+                            for __ = 1, cell.numActors do
+                                if not alreadyEnumerated[actor] and HasIdentifierFromTable(actor, identifier) and (condition == nil or condition(actor.host, ...)) then
+                                    alreadyEnumerated[actor] = true
+                                    dx = actor.x[actor.anchor] - x
+                                    dy = actor.y[actor.anchor] - y
+                                    thisDistSquared = dx*dx + dy*dy
+                                    if thisDistSquared < closestDistSquared and (not actor.isSuspended or includeSuspended) then
+                                        closestDistSquared = thisDistSquared
+                                        closestObject = actor.host
+                                    end
+                                end
+                                actor = actor.nextInCell[cell]
+                            end
+                        end
+                    end
+                end
+                skipFirst = true
+            else
+                skipFirst = false
+            end
+        end
+
+        for key, __ in next, alreadyEnumerated do
+            alreadyEnumerated[key] = nil
+        end
+
+        return closestObject
+    end
+
+    ---Returns the closest objects to a point from among objects with the specified identifier, limiting the returned amount to maxAmount. Identifier can be a string or a table. If it is a table, the last entry must be MATCHING_TYPE_ANY or MATCHING_TYPE_ALL. Optional condition to specify an additional filter function, which takes the enumerated objects as an argument and returns a boolean. Additional arguments are passed into the filter function.
+    ---@param x number
+    ---@param y number
+    ---@param identifier string | table
+    ---@param maxAmount integer
+    ---@param cutOffDistance? number
+    ---@param condition? function
+    ---@vararg any
+    ---@return Object[]
+    function ALICE_GetNClosestObjects(x, y, identifier, maxAmount, cutOffDistance, condition, ...)
+        ResetCoordinateLookupTables()
+
+        local objects = GetTable()
+        local dists = GetTable()
+
+        cutOffDistance = cutOffDistance or 99999
+        local distanceThreshold = cutOffDistance*cutOffDistance
 
         local minX = min(NUM_CELLS_X, max(1, (NUM_CELLS_X*(x - cutOffDistance - MAP_MIN_X)/MAP_SIZE_X) // 1 + 1))
         local minY = min(NUM_CELLS_Y, max(1, (NUM_CELLS_Y*(y - cutOffDistance - MAP_MIN_Y)/MAP_SIZE_Y) // 1 + 1))
@@ -5231,9 +5839,12 @@ do
         local maxY = min(NUM_CELLS_Y, max(1, (NUM_CELLS_Y*(y + cutOffDistance - MAP_MIN_Y)/MAP_SIZE_Y) // 1 + 1))
 
         local dx, dy
-        local closestDistSquared = cutOffDistance*cutOffDistance
-        local closestObject, thisDistSquared
+        local thisDist
         local identifierIsString = type(identifier) == "string"
+        local numObjects = 0
+        local furthestDistance
+        local secondFurthestDistance
+        local furthestObjectIndex
 
         local actor, cell
         for X = minX, maxX do
@@ -5243,23 +5854,81 @@ do
                 if actor then
                     if identifierIsString then
                         for __ = 1, cell.numActors do
-                            dx = actor.x[actor.anchor] - x
-                            dy = actor.y[actor.anchor] - y
-                            thisDistSquared = dx*dx + dy*dy
-                            if thisDistSquared < closestDistSquared and actor.identifier[identifier] and (condition == nil or condition(actor.host, ...)) and not actor.isSuspended then
-                                closestDistSquared = thisDistSquared
-                                closestObject = actor.host
+                            if actor.identifier[identifier] and not alreadyEnumerated[actor] and (condition == nil or condition(actor.host, ...)) then
+                                alreadyEnumerated[actor] = true
+                                dx = actor.x[actor.anchor] - x
+                                dy = actor.y[actor.anchor] - y
+                                thisDist = dx*dx + dy*dy
+                                if thisDist < distanceThreshold and (not actor.isSuspended or includeSuspended) then
+                                    if numObjects < maxAmount then
+                                        objects[#objects + 1] = actor.host
+                                        dists[#dists + 1] = thisDist
+                                        numObjects = numObjects + 1
+
+                                        if numObjects == maxAmount then
+                                            distanceThreshold = 0
+                                            for i = 1, numObjects do
+                                                if dists[i] > distanceThreshold then
+                                                    distanceThreshold = dists[i]
+                                                    furthestObjectIndex = i
+                                                end
+                                            end
+                                        end
+                                    else
+                                        furthestDistance = 0
+                                        secondFurthestDistance = 0
+                                        for i = 1, numObjects do
+                                            if dists[i] > furthestDistance then
+                                                furthestObjectIndex = i
+                                                secondFurthestDistance = furthestDistance
+                                                furthestDistance = dists[i]
+                                            end
+                                        end
+                                        objects[furthestObjectIndex] = actor.host
+                                        dists[furthestObjectIndex] = thisDist
+                                        distanceThreshold = thisDist > secondFurthestDistance and thisDist or secondFurthestDistance
+                                    end
+                                end
                             end
                             actor = actor.nextInCell[cell]
                         end
                     else
                         for __ = 1, cell.numActors do
-                            dx = actor.x[actor.anchor] - x
-                            dy = actor.y[actor.anchor] - y
-                            thisDistSquared = dx*dx + dy*dy
-                            if thisDistSquared < closestDistSquared and HasIdentifierFromTable(actor, identifier) and (condition == nil or condition(actor.host, ...)) and not actor.isSuspended then
-                                closestDistSquared = thisDistSquared
-                                closestObject = actor.host
+                            if not alreadyEnumerated[actor] and HasIdentifierFromTable(actor, identifier) and (condition == nil or condition(actor.host, ...)) then
+                                alreadyEnumerated[actor] = true
+                                dx = actor.x[actor.anchor] - x
+                                dy = actor.y[actor.anchor] - y
+                                thisDist = dx*dx + dy*dy
+                                if thisDist < distanceThreshold and (not actor.isSuspended or includeSuspended) then
+                                    if numObjects < maxAmount then
+                                        objects[#objects + 1] = actor.host
+                                        dists[#dists + 1] = thisDist
+                                        numObjects = numObjects + 1
+
+                                        if numObjects == maxAmount then
+                                            distanceThreshold = 0
+                                            for i = 1, numObjects do
+                                                if dists[i] > distanceThreshold then
+                                                    distanceThreshold = dists[i]
+                                                    furthestObjectIndex = i
+                                                end
+                                            end
+                                        end
+                                    else
+                                        furthestDistance = 0
+                                        secondFurthestDistance = 0
+                                        for i = 1, numObjects do
+                                            if dists[i] > furthestDistance then
+                                                furthestObjectIndex = i
+                                                secondFurthestDistance = furthestDistance
+                                                furthestDistance = dists[i]
+                                            end
+                                        end
+                                        objects[furthestObjectIndex] = actor.host
+                                        dists[furthestObjectIndex] = thisDist
+                                        distanceThreshold = thisDist > secondFurthestDistance and thisDist or secondFurthestDistance
+                                    end
+                                end
                             end
                             actor = actor.nextInCell[cell]
                         end
@@ -5268,7 +5937,19 @@ do
             end
         end
 
-        return closestObject
+        for key, __ in next, alreadyEnumerated do
+            alreadyEnumerated[key] = nil
+        end
+
+        ReturnTable(dists)
+
+        return objects
+    end
+
+    ---Toggles whether objects that were suspended with ALICE_Suspend, widgets that were hidden with ShowUnit, ShowItem, or ShowDestructable, and units loaded into transports are enumerated by ALICE_Enum functions.
+    ---@param enable boolean
+    function ALICE_IncludeSuspended(enable)
+        includeSuspended = enable
     end
 
     --Debug API
@@ -5288,15 +5969,15 @@ do
             female = requiredOnFemale or nil
         }
 
-        for actorType, __ in pairs(actors) do
-            for __, func in pairs(whichFunc) do
+        for actorType, __ in next, actors do
+            for __, func in next, whichFunc do
                 functionRequiredFields[func] = functionRequiredFields[func] or {}
                 if requiredOnMale then
                     functionRequiredFields[func][actorType] = functionRequiredFields[func][actorType] or {}
                     for i = 1, select("#", ...) do
                         entry = select(i, ...)
                         entry = type(entry) == "string" and {entry} or entry
-                        for key, value in pairs(entry) do
+                        for key, value in next, entry do
                             if type(key) == "string" then
                                 if type(value) == "table" then
                                     for __, subvalue in ipairs(value) do
@@ -5379,7 +6060,7 @@ do
 
     ---Returns the host of the actor currently selected in debug mode.
     ---@return Object | nil
-    function ALICE_GetSelectedObject()
+    function ALICE_GetSelected()
         if debug.selectedActor then
             return debug.selectedActor.host
         end
@@ -5473,7 +6154,7 @@ do
 
         local sortedKeys = {}
         local count = 0
-        for key, __ in pairs(functionCount) do
+        for key, __ in next, functionCount do
             count = count + 1
             sortedKeys[count] = key
         end
@@ -5549,6 +6230,15 @@ do
         else
             return "uninitialized"
         end
+    end
+
+    ---If the current stack trace begins at an ALICE callback or interaction function, returns the hosts of the current pair.
+    ---@return Object | nil, Object | nil
+    function ALICE_GetCurrent()
+        if currentPair ~= OUTSIDE_OF_CYCLE then
+            return currentPair[0x3], currentPair[0x4]
+        end
+        return nil, nil
     end
 
     ---Create lightning effects around all cells.
@@ -5648,8 +6338,10 @@ do
             currentPair[0x1].selfInteractions[currentPair[0x8]] = nil
         end
 
-        currentPair.destructionQueued = true
-        AddDelayedCallback(DestroyPair, currentPair)
+        if not currentPair.destructionQueued then
+            currentPair.destructionQueued = true
+            AddDelayedCallback(DestroyPair, currentPair)
+        end
     end
 
     ---Modifies the return value of an interactionFunc so that, on average, the interval is the specified value, even if it isn't an integer multiple of the minimum interval.
@@ -5818,7 +6510,7 @@ do
         insert(eventHooks.onItemEnter, hookTable.onItemEnter)
         insert(eventHooks.onItemDestroy, hookTable.onItemDestroy)
 
-        for key, __ in pairs(hookTable) do
+        for key, __ in next, hookTable do
             if not eventHooks[key] then
                 Warning("|cffff0000Warning:|r Unrecognized key " .. key .. " in hookTable passed to ALICE_OnWidgetEvent.")
             end
@@ -5855,19 +6547,20 @@ do
         AddDelayedCallback(Flicker, actor)
     end
 
-    ---Remove identifier(s) from an object and remove all pairings with objects it is no longer eligible to be paired with. Optional keyword parameter to specify actor with the keyword in its identifier for an object with multiple actors.
+    ---Remove identifier(s) from an object and remove all pairings with objects it is no longer eligible to be paired with. Optional keyword parameter to specify actor with the keyword in its identifier for an object with multiple actors. Returns whether the identifier was removed.
     ---@param object Object
     ---@param toRemove string | string[]
     ---@param keyword? string
+    ---@return boolean
     function ALICE_RemoveIdentifier(object, toRemove, keyword)
         local actor = GetActor(object, keyword)
         if actor == nil or toRemove == nil then
-            return
+            return false
         end
 
         if type(toRemove) == "string" then
             if actor.identifier[toRemove] == nil then
-                return
+                return false
             end
             actor.identifier[toRemove] = nil
         else
@@ -5879,28 +6572,30 @@ do
                 end
             end
             if not removedSomething then
-                return
+                return false
             end
         end
 
         AssignActorClass(actor, true, false)
         DestroyObsoletePairs(actor)
         AddDelayedCallback(Flicker, actor)
+        return true
     end
 
-    ---Exchanges one of the object's identifier with another. If the old identifier is not found, the new one won't be added. Optional keyword parameter to specify actor with the keyword in its identifier for an object with multiple actors.
+    ---Exchanges one of the object's identifier with another. If the old identifier is not found, the new one won't be added. Optional keyword parameter to specify actor with the keyword in its identifier for an object with multiple actors. Returns whether the identifier was swapped.
     ---@param object Object
     ---@param oldIdentifier string
     ---@param newIdentifier string
     ---@param keyword? string
+    ---@return boolean
     function ALICE_SwapIdentifier(object, oldIdentifier, newIdentifier, keyword)
         local actor = GetActor(object, keyword)
         if actor == nil or oldIdentifier == nil or newIdentifier == nil then
-            return
+            return false
         end
 
         if actor.identifier[oldIdentifier] == nil then
-            return
+            return false
         end
 
         actor.identifier[oldIdentifier] = nil
@@ -5909,6 +6604,7 @@ do
         AssignActorClass(actor, true, false)
         DestroyObsoletePairs(actor)
         AddDelayedCallback(Flicker, actor)
+        return true
     end
 
     ---Sets the object's identifier to a string or string sequence.
@@ -5921,7 +6617,7 @@ do
             return
         end
 
-        for word, __ in pairs(actor.identifier) do
+        for word, __ in next, actor.identifier do
             actor.identifier[word] = nil
         end
         if type(newIdentifier) == "string" then
@@ -5965,7 +6661,7 @@ do
             return
         end
         local returnTable = table or {}
-        for key, __ in pairs(actor.identifier) do
+        for key, __ in next, actor.identifier do
             insert(returnTable, key)
         end
         sort(returnTable)
@@ -6023,7 +6719,7 @@ do
         local level = 0
         local conflict = false
 
-        for key, value in pairs(table) do
+        for key, value in next, table do
             if type(key) == "string" then
                 if identifier[key] then
                     if level < 1 then
@@ -6106,6 +6802,7 @@ do
     ---@param data? table
     function ALICE_AddSelfInteraction(object, whichFunc, keyword, data)
         local actor = GetActor(object, keyword)
+
         if actor == nil then
             return
         end
@@ -6118,7 +6815,7 @@ do
 
         if data then
             local pairData = GetTable()
-            for key, value in pairs(data) do
+            for key, value in next, data do
                 pairData[key] = value
             end
             actor.selfInteractions[whichFunc].userData = pairData
@@ -6142,8 +6839,10 @@ do
         local pair = actor.selfInteractions[whichFunc]
         actor.selfInteractions[whichFunc] = nil
 
-        pair.destructionQueued = true
-        AddDelayedCallback(DestroyPair, pair)
+        if not pair.destructionQueued then
+            pair.destructionQueued = true
+            AddDelayedCallback(DestroyPair, pair)
+        end
     end
 
     ---Checks if the object has a self-interaction with the specified function. Optional keyword parameter to specify actor with the keyword in its identifier for an object with multiple actors.
@@ -6162,6 +6861,38 @@ do
 
     --Misc API
     --===========================================================================================================================================================
+
+    ---Pauses all actors attached to the specified object and renders it invisible to enumerator functions.
+    ---@param whichObject Object
+    ---@param enable boolean
+    function ALICE_Suspend(whichObject, enable)
+        if not whichObject then
+            return
+        end
+        if objectIsSuspended[whichObject] == enable then
+            return
+        end
+        objectIsSuspended[whichObject] = enable
+        if actorOf[whichObject] == nil then
+            return
+        end
+        if actorOf[whichObject].isActor then
+            actorOf[whichObject].isSuspended = enable
+            AddDelayedCallback(Suspend, actorOf[whichObject], enable)
+        else
+            for __, actor in ipairs(actorOf[whichObject]) do
+                actor.isSuspended = enable
+                AddDelayedCallback(Suspend, actor, enable)
+            end
+        end
+    end
+
+    ---Returns whether the specified object is suspended. Hidden widgets, units loaded into transports, or objects suspended with ALICE_Suspend are suspended.
+    ---@param whichObject Object
+    ---@return boolean
+    function ALICE_IsSuspended(whichObject)
+        return objectIsSuspended[whichObject] == true
+    end
 
     ---The first interaction of all pairs using this function will be delayed by the specified number.
     ---@param whichFunc function
@@ -6206,7 +6937,7 @@ do
 
     ---Returns the object the specified object is anchored to or itself if there is no anchor.
     ---@param object Object
-    ---@return Object | nil
+    ---@return Object
     function ALICE_GetAnchor(object)
         local actor = GetActor(object)
         if actor == nil then
@@ -6223,7 +6954,14 @@ do
     function ALICE_GetAnchoredObject(object, identifier)
         local actor = GetActor(object, identifier)
         if actor == nil then
-            return nil
+            local objectActor = GetActor(object)
+            if not objectActor then
+                return nil
+            end
+            actor = GetActor(objectActor.originalAnchor, identifier)
+            if not actor then
+                return nil
+            end
         end
 
         return actor.host
@@ -6296,7 +7034,8 @@ do
     ---@param x number
     ---@param y number
     ---@param z? number
-    function ALICE_Teleport(object, x, y, z)
+    ---@param useSetXY? boolean
+    function ALICE_Teleport(object, x, y, z, useSetXY)
         if type(object) == "table" then
             if object.anchor and object.anchor ~= object then
                 error("Attempted to teleport object that is anchored to another object.")
@@ -6319,8 +7058,12 @@ do
                 end
             end
         elseif HandleType[object] == "unit" then
-            SetUnitX(object, x)
-            SetUnitY(object, y)
+            if useSetXY then
+                SetUnitX(object, x)
+                SetUnitY(object, y)
+            else
+                SetUnitPosition(object, x, y)
+            end
         elseif HandleType[object] == "item" then
             SetItemPosition(object, x, y)
         else
@@ -6431,6 +7174,9 @@ do
     ---@param keywordB? string
     function ALICE_UnpausePair(objectA, objectB, keywordA, keywordB)
         local actorA = GetActor(objectA, keywordA)
+        if actorA == nil then
+            return
+        end
         local actorB
         local whichPair
 
@@ -6438,7 +7184,7 @@ do
             whichPair = actorA.selfInteractions[objectB]
         else
             actorB = GetActor(objectB, keywordB)
-            if actorA == nil or actorB == nil then
+            if actorB == nil then
                 return nil
             end
             whichPair = pairList[actorA][actorB] or pairList[actorB][actorA]
