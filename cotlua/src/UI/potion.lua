@@ -45,14 +45,16 @@ OnInit.final("Potion", function(Require)
 
             local f = function(pid, is_down)
                 local pot = Profile[pid].hero.items[POTION_INDEX + capture_index - 1]
+                local button = potion_button[capture_index]
 
-                if is_down and pot and potion_button[capture_index].charges > 0 then
-                    if potion_button[capture_index].cooldown_time[pid] <= 0 then
+                if is_down and pot and button.charges > 0 then
+                    if button.cooldown_time[pid] <= 0 then
                         pot.charges = pot.charges - 1
                         if GetLocalPlayer() == Player(pid - 1) then
-                            potion_button[capture_index]:charge(pot.charges)
+                            button:charge(pot.charges)
                         end
-                        potion_button[capture_index]:cooldown(1., pid)
+
+                        button:cooldown(1., pid)
                         potion_effect(pot)
                         INVENTORY.refresh(pid)
                     end
@@ -108,19 +110,21 @@ OnInit.final("Potion", function(Require)
         for i = POTION_INDEX, POTION_INDEX + 1 do
             local pot = Profile[pid].hero.items[i]
             local index = i - POTION_INDEX + 1
+            local button = potion_button[index]
 
             if pot then
                 if GetLocalPlayer() == Player(pid - 1) then
-                    potion_button[index]:visible(true)
-                    potion_button[index]:charge(pot.charges)
-                    potion_button[index].tooltip:name(GetObjectName(pot.id) .. " '" .. GetHotkeyForFunc(pid, pot_func[index]) .. "'")
-                    potion_button[index]:icon(BlzGetAbilityIcon(pot.id))
-                    potion_button[index].tooltip:icon(BlzGetAbilityIcon(pot.id))
-                    potion_button[index].tooltip:text(BlzGetItemExtendedTooltip(pot.obj))
+                    button:visible(true)
+                    button:charge(pot.charges)
+                    button.tooltip:name(GetObjectName(pot.id) .. " '" .. GetHotkeyForFunc(pid, pot_func[index]) .. "'")
+                    button:icon(BlzGetAbilityIcon(pot.id))
+                    button.tooltip:icon(BlzGetAbilityIcon(pot.id))
+                    button.tooltip:text(BlzGetItemExtendedTooltip(pot.obj))
+                    button:enabled(pot.charges >= 1 and true or false)
                 end
             else
                 if GetLocalPlayer() == Player(pid - 1) then
-                    potion_button[index]:visible(false)
+                    button:visible(false)
                 end
             end
         end
