@@ -101,7 +101,7 @@ OnInit.final("CrusaderSpells", function(Require)
             DestroyEffect(AddSpecialEffect("war3mapImported\\BlessedField.mdx", self.x, self.y))
 
             for target in each(ug) do
-                shield.add(target, BlzGetUnitMaxHP(target) * self.pshield * 0.01 * LBOOST[self.pid], self.dur * LBOOST[self.pid])
+                Shield.add(target, BlzGetUnitMaxHP(target) * self.pshield * 0.01 * LBOOST[self.pid], self.dur * LBOOST[self.pid])
             end
 
             DestroyGroup(ug)
