@@ -174,74 +174,60 @@ OnInit.final("MarksmanSpells", function(Require)
         }
         missile_template.__index = missile_template
 
-        local function cluster_rocket(pt)
-            local to_remove = {}
-
-            for target in each(pt.ug) do
-                if UnitAlive(target) == false or UnitDistance(target, pt.source) > 1500. or IsUnitAlly(target, Player(pt.pid - 1)) then
-                    to_remove[#to_remove + 1] = target
-                end
-            end
-
-            --clean helitargets
-            for i = 1, #to_remove do
-                GroupRemoveUnit(pt.ug, to_remove[i])
-            end
-
-            local x, y, z = GetUnitX(pt.source), GetUnitY(pt.source), GetUnitZ(pt.source)
-
-            --single shot
-            if SNIPERSTANCE.enabled[pt.pid] then
-                local target = FirstOfGroup(pt.ug)
-
-                if UnitAlive(Unit[Hero[pt.pid]].target) then
-                    target = Unit[Hero[pt.pid]].target
-                end
-
-                local missile = setmetatable({}, missile_template)
-                missile.x = x
-                missile.y = y
-                missile.z = z
-                missile.visual = AddSpecialEffect("war3mapImported\\HighSpeedProjectile_ByEpsilon.mdx", x, y)
-                BlzSetSpecialEffectScale(missile.visual, 1.1)
-                missile.speed = 1800
-                missile.source = Hero[pt.pid]
-                missile.target = target
-                missile.owner = Player(pt.pid - 1)
-                missile.damage = pt.dmg * 2.5 * pt.boost
-
-                ALICE_Create(missile)
-            --multi shot
-            else
-                for enemy in each(pt.ug) do
-                    local missile = setmetatable({}, missile_template)
-                    missile.x = x
-                    missile.y = y
-                    missile.z = z
-                    missile.visual = AddSpecialEffect("Abilities\\Spells\\Other\\TinkerRocket\\TinkerRocketMissile.mdl", x, y)
-                    BlzSetSpecialEffectScale(missile.visual, 1.1)
-                    missile.speed = 1400
-                    missile.source = Hero[pt.pid]
-                    missile.target = enemy
-                    missile.owner = Player(pt.pid - 1)
-                    missile.damage = pt.dmg * pt.boost
-
-                    ALICE_Create(missile)
-                end
-            end
-        end
-
         local function cooldown(pt)
             pt.rocket_cd = false
         end
 
+        local function sniper_rocket(pt, target)
+            local x, y, z = GetUnitX(pt.source), GetUnitY(pt.source), GetUnitZ(pt.source)
+
+            local missile = setmetatable({}, missile_template)
+            missile.x = x
+            missile.y = y
+            missile.z = z
+            missile.visual = AddSpecialEffect("war3mapImported\\HighSpeedProjectile_ByEpsilon.mdx", x, y)
+            BlzSetSpecialEffectScale(missile.visual, 1.1)
+            missile.speed = 1800
+            missile.source = Hero[pt.pid]
+            missile.target = target
+            missile.owner = Player(pt.pid - 1)
+            missile.damage = pt.dmg * 2.5 * pt.boost
+
+            ALICE_Create(missile)
+
+            return true
+        end
+
+        local function cluster_rocket(pt, target)
+            local x, y, z = GetUnitX(pt.source), GetUnitY(pt.source), GetUnitZ(pt.source)
+
+            local missile = setmetatable({}, missile_template)
+            missile.x = x
+            missile.y = y
+            missile.z = z
+            missile.visual = AddSpecialEffect("Abilities\\Spells\\Other\\TinkerRocket\\TinkerRocketMissile.mdl", x, y)
+            BlzSetSpecialEffectScale(missile.visual, 1.1)
+            missile.speed = 1400
+            missile.source = Hero[pt.pid]
+            missile.target = target
+            missile.owner = Player(pt.pid - 1)
+            missile.damage = pt.dmg * pt.boost
+
+            ALICE_Create(missile)
+
+            return true
+        end
+
         local function attack(pt)
-            local x = GetUnitX(Hero[pt.pid]) + 60. * math.cos(bj_DEGTORAD * (pt.angle + GetUnitFacing(Hero[pt.pid])))
-            local y = GetUnitY(Hero[pt.pid]) + 60. * math.sin(bj_DEGTORAD * (pt.angle + GetUnitFacing(Hero[pt.pid])))
+            local pid = pt.pid
+            local hero_x = GetUnitX(Hero[pid])
+            local hero_y = GetUnitY(Hero[pid])
+            local x = hero_x + 60. * math.cos(bj_DEGTORAD * (pt.angle + GetUnitFacing(Hero[pid])))
+            local y = hero_y + 60. * math.sin(bj_DEGTORAD * (pt.angle + GetUnitFacing(Hero[pid])))
 
             -- leash
-            if UnitDistance(Hero[pt.pid], pt.source) > 700. then
-                SetUnitPosition(pt.source, GetUnitX(Hero[pt.pid]), GetUnitY(Hero[pt.pid]))
+            if UnitDistance(Hero[pid], pt.source) > 700. then
+                SetUnitPosition(pt.source, hero_x, hero_y)
             end
 
             -- follow
@@ -250,18 +236,30 @@ OnInit.final("MarksmanSpells", function(Require)
             end
 
             -- prioritize facing target hero is attacking
-            local target = Unit[Hero[pt.pid]].target
+            local target = Unit[Hero[pid]].target
             if target and UnitAlive(target) then
                 SetUnitFacing(pt.source, bj_RADTODEG * atan(GetUnitY(target) - GetUnitY(pt.source), GetUnitX(target) - GetUnitX(pt.source)))
             end
 
-            -- acquire helicopter targets near hero
-            GroupEnumUnitsInRangeEx(pt.pid, pt.ug, GetUnitX(Hero[pt.pid]), GetUnitY(Hero[pt.pid]), 1200., Condition(FilterEnemyAwake))
+            if not pt.rocket_cd then
+                local launched = false
+                MakeGroupInRange(pid, pt.ug, hero_x, hero_y, 1200., Condition(FilterEnemyAwake))
 
-            if BlzGroupGetSize(pt.ug) > 0 and not pt.rocket_cd then
-                pt.rocket_cd = true
-                TimerQueue:callDelayed(pt.cd, cooldown, pt)
-                cluster_rocket(pt)
+                if SNIPERSTANCE.enabled[pid] then
+                    target = target or FirstOfGroup(pt.ug)
+                    if target then
+                        launched = sniper_rocket(pt, target)
+                    end
+                else
+                    for enemy in each(pt.ug) do
+                        launched = cluster_rocket(pt, enemy)
+                    end
+                end
+
+                if launched then
+                    pt.rocket_cd = true
+                    TimerQueue:callDelayed(pt.cd, cooldown, pt)
+                end
             end
         end
 
