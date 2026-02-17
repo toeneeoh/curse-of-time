@@ -375,7 +375,7 @@ OnInit.final("Items", function(Require)
             local mana = GetUnitState(u, UNIT_STATE_MANA) ---@type number 
             local mod  = ItemProfMod(self.id, self.pid) ---@type number 
 
-            UnitAddBonus(u, BONUS_ARMOR, mult * floor(mod * self:getValue(ITEM_ARMOR, 0)))
+            unit.bonus_armor = unit.bonus_armor + mult * floor(mod * self:getValue(ITEM_ARMOR, 0))
             unit.bonus_damage = unit.bonus_damage + mult * floor(mod * self:getValue(ITEM_DAMAGE, 0))
             unit.bonus_hp = unit.bonus_hp + mult * floor(mod * self:getValue(ITEM_HEALTH, 0))
             unit.bonus_mana = unit.bonus_mana + mult * floor(mod * self:getValue(ITEM_MANA, 0))
