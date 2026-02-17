@@ -919,17 +919,15 @@ local literal_stat_map = {
 ---@return integer
 function HighestStat(hero, include_bonus)
     local str = GetHeroStr(hero, include_bonus) ---@type integer 
-    local agi = GetHeroAgi(hero, include_bonus) ---@type integer 
     local int = GetHeroInt(hero, include_bonus) ---@type integer 
+    local agi = GetHeroAgi(hero, include_bonus) ---@type integer 
 
-    if str > agi and str > int then
+    if str >= agi and str >= int then
         return 1
-    elseif int > str and int > agi then
+    elseif int >= str and int >= agi then
         return 2
-    elseif agi > str and agi > int then
-        return 3
     else
-        return MainStat(hero)
+        return 3
     end
 end
 
@@ -976,8 +974,6 @@ function DelayAnimationExpire(pt)
     if UnitAlive(pt.target) then
         SetUnitAnimationByIndex(pt.target, pt.index)
     end
-
-    pt:destroy()
 end
 
 ---@type fun(pid: integer, u: unit, delay: number, index: integer, timescale: number, pause: boolean)
@@ -994,7 +990,7 @@ function DelayAnimation(pid, u, delay, index, timescale, pause)
         pt.pause = true
     end
 
-    pt.timer:callDelayed(delay, DelayAnimationExpire, pt)
+    pt:after(delay, DelayAnimationExpire)
 end
 
 --#region TODO: move lighting stuff somewhere?
@@ -1484,8 +1480,8 @@ end
 
 local StatTable = {
     GetHeroStr,
-    GetHeroAgi,
     GetHeroInt,
+    GetHeroAgi,
     function() return 0 end,
 }
 
@@ -2054,7 +2050,7 @@ function HideSummon(pt)
     SetUnitXBounded(pt.target, 30000)
     SetUnitYBounded(pt.target, 30000)
 
-    pt.timer:callDelayed(1., HideSummonDelay, pt)
+    pt:after(1., HideSummonDelay)
 end
 
 ---@param u unit
@@ -2070,12 +2066,12 @@ function SummonExpire(u)
         if uid == SUMMON_DESTROYER or uid == SUMMON_HOUND or uid == SUMMON_GOLEM then
             UnitRemoveAbility(u, FourCC('BNpa'))
             UnitRemoveAbility(u, FourCC('BNpm'))
-            local pt = TimerList[pid]:add()
+            local pt = TimerList[pid]:add(u)
             pt.target = u
-            pt.tag = u
+            pt.autoDestroy = false
             TQ:callDelayed(2., DestroyEffect, AddSpecialEffectTarget("Abilities\\Spells\\Undead\\Darksummoning\\DarkSummonTarget.mdl", u, "origin"))
 
-            pt.timer:callDelayed(2., HideSummon, pt)
+            pt:after(2., HideSummon)
         end
 
         if UnitAlive(u) then
