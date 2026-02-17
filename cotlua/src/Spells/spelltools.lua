@@ -17,7 +17,12 @@ OnInit.final("SpellTools", function()
     end
 
     function VALID_PULL_TARGET(object, self)
-        return UnitAlive(object) and IsUnitEnemy(object, self.owner) and GetUnitMoveSpeed(object) > 0
+        if type(self) == "table" then
+            self = self.owner
+        else
+            self = GetOwningPlayer(self)
+        end
+        return UnitAlive(object) and IsUnitEnemy(object, self) and GetUnitMoveSpeed(object) > 0
     end
 
     function DASH_PRECAST(pid, tpid, caster, target, x, y, targetX, targetY)
