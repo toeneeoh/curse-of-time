@@ -5,18 +5,18 @@
 ]]
 
 OnInit.final("Dev", function(Require)
-    DEV_ENABLED         = true
-    SAVE_LOAD_VERSION   = 0x40000000
-    MAP_NAME            = "CoT Nevermore BETA"
-    EXTRA_DEBUG         = false ---@type boolean 
-    BUDDHA_MODE         = {} ---@type boolean[] 
-    DEBUG_COUNT         = 0 ---@type integer 
-    WEATHER_OVERRIDE    = 0 ---@type integer 
+    DEV_ENABLED        = true
+    SAVE_LOAD_VERSION  = 0x40000000
+    MAP_NAME           = "CoT Nevermore BETA"
+    EXTRA_DEBUG        = false
+    BUDDHA_MODE        = {} ---@type boolean[] 
+    DEBUG_COUNT        = 0
+    WEATHER_OVERRIDE   = 0
 
     local BOOST_OFF = false
 
     Require('GameStatus')
-    GAME_STATE          = (GAME_STATE == 0) and 2 or GAME_STATE -- keep game state as replay if replay
+    GAME_STATE = (GAME_STATE == 0) and 2 or GAME_STATE -- keep game state as replay if replay
 
     Require('TimerQueue')
     local pack, find, lower = string.pack, string.find, string.lower
@@ -257,7 +257,7 @@ modifiers:
             local w = (args[2] and S2I(args[2])) or 0
 
             WEATHER_OVERRIDE = w
-            WeatherPeriodic()
+            WEATHER_PERIODIC()
         end,
 
         ["getrate"] = function(p, pid, args)
@@ -817,7 +817,7 @@ modifiers:
     local setup = function(x, y)
         local pid = 1
         local p = Player(0)
-        dev_cmds["go"](p, pid, {"go", "arcani"})
+        dev_cmds["go"](p, pid, {"go", "warrior"})
 
         SetUnitXBounded(Hero[pid], x)
         SetUnitYBounded(Hero[pid], y)
