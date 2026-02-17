@@ -188,11 +188,11 @@ OnInit.final("Faction", function(Require)
         end
 
         function thistype:refresh(pid)
-            local buffid = player_faction[pid].buff.RAWCODE
+            local buff = player_faction[pid].buff
 
             if GetLocalPlayer() == Player(pid - 1) then
-                buff_icon:icon(BlzGetAbilityIcon(buffid))
-                BlzFrameSetText(buff_blurb, "|cffffcc00" .. GetAbilityName(buffid) .. "|r\n\n" .. BlzGetAbilityExtendedTooltip(buffid, 0))
+                buff_icon:icon(buff.ICON)
+                BlzFrameSetText(buff_blurb, "|cffffcc00" .. buff.NAME .. "|r\n\n" .. buff.DESC_FACTION)
                 BlzFrameSetTextAlignment(buff_blurb, TEXT_JUSTIFY_LEFT, TEXT_JUSTIFY_CENTER)
                 BlzFrameSetText(blurb, "|cffffcc00Reputation:|r 0")
                 BlzFrameSetText(title, "|cffffffff" .. player_faction[pid].name .. "|r")
