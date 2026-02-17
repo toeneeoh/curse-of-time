@@ -169,9 +169,8 @@ OnInit.final("Death", function(Require)
         BlzPlaySpecialEffectWithTimeScale(REVIVE_BAR[pid], ANIM_TYPE_BIRTH, 0.099)
         BlzSetSpecialEffectScale(REVIVE_BAR[pid], 1.25)
 
-        local pt = TimerList[pid]:add()
-        pt.tag = 'dead'
-        pt.timer:callDelayed(12.5, grave_expire, pt)
+        local pt = TimerList[pid]:add('dead')
+        pt:after(12.5, grave_expire)
     end
 
     -- main death event
