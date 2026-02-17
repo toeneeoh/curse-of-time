@@ -172,11 +172,6 @@ OnInit.global("Shield", function(Require)
 
         -- shield fully expires
         function thistype:onDestroy()
-            local pid = GetPlayerId(GetOwningPlayer(self.target)) + 1 ---@type integer 
-
-            TimerList[pid]:stopAllTimers(GAIAARMOR.id) -- gaia armor attachment
-            ProtectionBuff:dispel(nil, self.target) -- high priestess protection attack speed
-
             BlzSetSpecialEffectAlpha(self.sfx, 0)
             DestroyEffect(self.sfx)
 
@@ -192,8 +187,7 @@ OnInit.global("Shield", function(Require)
                 TQ:disableCallback(thistype.queue)
             end
 
-            -- TODO: Create shield expire event?
-
+            EVENT_ON_SHIELD_EXPIRE:trigger(self.target)
             EVENT_ON_STRUCK_AFTER_REDUCTIONS:unregister_unit_action(self.target, onStruck)
         end
 
@@ -220,11 +214,13 @@ OnInit.global("Shield", function(Require)
                 self.hp = self.hp + amount
 
                 self:refresh()
-            else
             -- make a new one
+            else
                 self = thistype.create(u, amount, dur)
                 EVENT_ON_STRUCK_AFTER_REDUCTIONS:register_unit_action(u, onStruck)
             end
+
+            EVENT_ON_SHIELD_APPLY:trigger(u, amount, dur)
 
             self:addTimer(amount, dur)
 

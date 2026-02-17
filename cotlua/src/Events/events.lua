@@ -200,6 +200,10 @@ OnInit.final("Events", function()
     EVENT_ON_REVIVE     = EVENT.create()
     EVENT_ON_DEATH      = PLAYER_EVENT.create()
 
+    -- shields
+    EVENT_ON_SHIELD_APPLY = EVENT.create()
+    EVENT_ON_SHIELD_EXPIRE = EVENT.create()
+
     -- unit order events
     EVENT_ON_AGGRO = EVENT.create()
     EVENT_ON_CAST = EVENT.create()
