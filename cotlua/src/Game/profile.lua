@@ -517,7 +517,7 @@ OnInit.global("Profile", function(Require)
 
         -- save all codes in backup folder with time stamp
         function thistype:generate_backup()
-            local backup_folder = MAP_NAME .. "\\BACKUP\\" .. User[self.pid - 1].name .. "\\" .. os.date("\x25B_\x25d_\x25Y_\x25H_\x25M")
+            local backup_folder = MAP_NAME .. "\\BACKUP\\" .. User[self.pid - 1].name .. "\\" .. os.date("%B_%d_%Y_%H_%M")
 
             if GetLocalPlayer() == Player(self.pid - 1) then
                 FileIO.Save(backup_folder .. "\\profile.pld", "\n" .. self.profile_code)
@@ -569,7 +569,7 @@ OnInit.global("Profile", function(Require)
                 DisplayTimedTextToPlayer(p, 0, 0, 120, "(Warcraft III\\CustomMapData\\" .. MAP_NAME .. "\\" .. GetPlayerName(p) .. ")")
                 DisplayTimedTextToPlayer(p, 0, 0, 120, "|cffffcc00Make sure to type|r -load |cffffcc00the next time you play.|r")
                 DisplayTimedTextToPlayer(p, 0, 0, 120, "|cffffcc00A backup of your data has also been created at:|r")
-                DisplayTimedTextToPlayer(p, 0, 0, 120, "(" .. MAP_NAME .. "\\BACKUP\\" .. GetPlayerName(p) .. "\\" .. os.date("\x25B_\x25d_\x25Y_\x25H_\x25M") .. ")")
+                DisplayTimedTextToPlayer(p, 0, 0, 120, "(" .. MAP_NAME .. "\\BACKUP\\" .. GetPlayerName(p) .. "\\" .. os.date("%B_%d_%Y_%H_%M") .. ")")
                 DisplayTimedTextToPlayer(p, 0, 0, 120, "-------------------------------------------------------------------")
             end
         end
@@ -912,10 +912,10 @@ OnInit.global("Profile", function(Require)
 
     ---@type fun(pid: integer, load: boolean)
     function CharacterSetup(pid, load)
-        local hero = Profile[pid].hero
+        local hero_data = Profile[pid].hero
         local x, y, angle, camera = SETUP_X, SETUP_Y, 0, MAIN_MAP.rect -- outside tavern
 
-        hero:load_data(pid)
+        hero_data:load_data(pid)
 
         if load then
             x, y, angle, camera = GetRectCenterX(gg_rct_ChurchSpawn), GetRectCenterY(gg_rct_ChurchSpawn), 270., gg_rct_Church
@@ -924,30 +924,42 @@ OnInit.global("Profile", function(Require)
             -- new characters can save immediately
             Profile[pid].cannot_load = true
 
-            -- default potions
+            -- give default potions
             PlayerAddItemById(pid, 'I02F')
             PlayerAddItemById(pid, 'I00E')
         end
 
+        -- move passive ability icon position
         if GetLocalPlayer() == Player(pid - 1) then
             BlzSetAbilityPosY(HERO_STATS[HeroID[pid]].passive, 0)
         end
 
-        SetUnitPosition(Hero[pid], x, y)
+        local hero = Hero[pid]
+
+        -- set position and camera
+        SetUnitPosition(hero, x, y)
         SetUnitPosition(Backpack[pid], x, y)
-        BlzSetUnitFacingEx(Hero[pid], angle)
+        BlzSetUnitFacingEx(hero, angle)
         SetCamera(pid, camera)
 
+        -- set to playing and no longer selecting
         SELECTING_HERO[pid] = false
         Profile[pid].playing = true
 
         -- heal to max
-        SetWidgetLife(Hero[pid], BlzGetUnitMaxHP(Hero[pid]))
-        SetUnitState(Hero[pid], UNIT_STATE_MANA, (HeroID[pid] ~= HERO_VAMPIRE and BlzGetUnitMaxMana(Hero[pid])) or 0)
+        SetWidgetLife(hero, BlzGetUnitMaxHP(hero))
+        SetUnitState(hero, UNIT_STATE_MANA, (HeroID[pid] ~= HERO_VAMPIRE and BlzGetUnitMaxMana(hero)) or 0)
 
-        EVENT_ON_UNIT_DEATH:register_unit_action(Hero[pid], on_hero_death)
-        EVENT_STAT_CHANGE:register_unit_action(Hero[pid], UpdateSpellTooltips)
+        -- register on death / stat change events
+        EVENT_ON_UNIT_DEATH:register_unit_action(hero, on_hero_death)
+        EVENT_STAT_CHANGE:register_unit_action(hero, UpdateSpellTooltips)
+
+        -- trigger setup event (for any innates)
         EVENT_ON_SETUP:trigger(pid)
+
+        -- force click event on hero
+        EVENT_ON_UNIT_SELECT:trigger(hero, pid)
+        EVENT_ON_SELECT:trigger(pid, hero)
 
         ExperienceControl(pid)
     end
