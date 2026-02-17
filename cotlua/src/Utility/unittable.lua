@@ -11,6 +11,7 @@ OnInit.final("UnitTable", function(Require)
     Require('Events')
     Require('Spells')
 
+    local TQ = TimerQueue
     local MOVESPEED_CAP = 600
     local mtype, floor, rawset, rawget = math.type, math.floor, rawset, rawget
     local EVENT_STAT_CHANGE = EVENT_STAT_CHANGE
@@ -25,6 +26,9 @@ OnInit.final("UnitTable", function(Require)
     ---@field damage integer
     ---@field bonus_damage integer
     ---@field damage_percent number
+    ---@field armor number
+    ---@field bonus_armor number
+    ---@field armor_percent number
     ---@field evasion integer
     ---@field regen number
     ---@field regen_percent number
@@ -104,13 +108,29 @@ OnInit.final("UnitTable", function(Require)
             self.casting = false
         end
 
+        local function recalc_armor(tbl)
+            local u = tbl.unit
+            local proxy = tbl.proxy
+
+            -- engine armor: includes base, agi, bonus agi, items, etc. but NOT our BONUS_ARMOR
+            local base_armor = BlzGetUnitArmor(u) - UnitGetBonus(u, BONUS_ARMOR)
+
+            local bonus_armor = proxy.bonus_armor or 0.
+            local armor_percent = proxy.armor_percent or 1.
+
+            local new_armor = (base_armor + bonus_armor) * armor_percent
+
+            UnitSetBonus(u, BONUS_ARMOR, new_armor - base_armor)
+            rawset(proxy, "armor", new_armor)
+        end
+
         -- dot method set operators
         local set_operators = {
             str = function(tbl, val)
                 UnitSetBonus(tbl.unit, BONUS_HERO_BASE_STR, val)
 
                 -- recalc HP
-                local hp = tbl.base_hp + tbl.proxy.bonus_hp + 25 * (val + tbl.proxy.bonus_str)
+                local hp = R2I(tbl.base_hp + tbl.proxy.bonus_hp + 25 * (val + tbl.proxy.bonus_str))
                 BlzSetUnitMaxHP(tbl.unit, hp)
                 rawset(tbl.proxy, "hp", hp)
 
@@ -123,7 +143,7 @@ OnInit.final("UnitTable", function(Require)
                 UnitSetBonus(tbl.unit, BONUS_HERO_STR, val)
 
                 -- same HP & DAMAGE logic as above
-                local hp = tbl.base_hp + tbl.proxy.bonus_hp + 25 * (tbl.proxy.str + val)
+                local hp = R2I(tbl.base_hp + tbl.proxy.bonus_hp + 25 * (tbl.proxy.str + val))
                 BlzSetUnitMaxHP(tbl.unit, hp)
                 rawset(tbl.proxy, "hp", hp)
 
@@ -137,6 +157,9 @@ OnInit.final("UnitTable", function(Require)
                 local damage = (BlzGetUnitBaseDamage(tbl.unit, 0) + tbl.proxy.bonus_damage) * tbl.proxy.damage_percent
                 UnitSetBonus(tbl.unit, BONUS_DAMAGE, damage - BlzGetUnitBaseDamage(tbl.unit, 0))
                 rawset(tbl.proxy, "damage", damage)
+
+                -- recalc armor
+                recalc_armor(tbl)
             end,
             bonus_agi = function(tbl, val)
                 UnitSetBonus(tbl.unit, BONUS_HERO_AGI, val)
@@ -144,6 +167,9 @@ OnInit.final("UnitTable", function(Require)
                 local damage = (BlzGetUnitBaseDamage(tbl.unit, 0) + tbl.proxy.bonus_damage) * tbl.proxy.damage_percent
                 UnitSetBonus(tbl.unit, BONUS_DAMAGE, damage - BlzGetUnitBaseDamage(tbl.unit, 0))
                 rawset(tbl.proxy, "damage", damage)
+
+                -- recalc armor
+                recalc_armor(tbl)
             end,
             int = function(tbl, val)
                 UnitSetBonus(tbl.unit, BONUS_HERO_BASE_INT, val)
@@ -195,8 +221,14 @@ OnInit.final("UnitTable", function(Require)
                 UnitSetBonus(tbl.unit, BONUS_DAMAGE, new_dmg - BlzGetUnitBaseDamage(tbl.unit, 0))
                 rawset(tbl.proxy, "damage", new_dmg)
             end,
+            bonus_armor = function(tbl, val)
+                recalc_armor(tbl)
+            end,
+            armor_percent = function(tbl, val)
+                recalc_armor(tbl)
+            end,
             bonus_hp = function(tbl, val)
-                local hp = tbl.base_hp + val + 25 * (tbl.proxy.str + tbl.proxy.bonus_str)
+                local hp = R2I(tbl.base_hp + val + 25 * (tbl.proxy.str + tbl.proxy.bonus_str))
                 BlzSetUnitMaxHP(tbl.unit, hp)
                 rawset(tbl.proxy, "hp", hp)
             end,
@@ -273,7 +305,7 @@ OnInit.final("UnitTable", function(Require)
             cast_time = function(tbl, val)
                 tbl.casting = true
 
-                TimerQueue:callDelayed(val, finish_cast, tbl)
+                TQ:callDelayed(val, finish_cast, tbl)
             end,
             hidehp = function(tbl, val)
                 if GetMainSelectedUnit() == tbl.unit then
@@ -332,6 +364,8 @@ OnInit.final("UnitTable", function(Require)
             bonus_bat = 1.,
             spellboost = 0.,
             armor_pen_percent = 0.,
+            bonus_armor = 0.,
+            armor_percent = 1.,
             gold_rate = 0.,
             shield_count = 0,
             xp_rate = 0,
@@ -369,6 +403,9 @@ OnInit.final("UnitTable", function(Require)
                 mr = 1.,
                 pr = 1.,
                 pm = 1.,
+                armor = BlzGetUnitArmor(u),
+                bonus_armor = 0.,
+                armor_percent = 1.,
                 cc_flat = 0.,
                 cd_flat = 0.,
                 ms_flat = GetUnitMoveSpeed(u),
@@ -412,11 +449,11 @@ OnInit.final("UnitTable", function(Require)
 
             if self.aggro_timer then
                 -- the act of taunting retains aggro
-                TimerQueue:disableCallback(self.aggro_timer)
+                TQ:disableCallback(self.aggro_timer)
             end
 
             if UnitAlive(self.unit) then
-                self.aggro_timer = TimerQueue:callDelayed(3., DropAggro, self)
+                self.aggro_timer = TQ:callDelayed(3., DropAggro, self)
             else
                 self.aggro_timer = nil
             end
@@ -428,7 +465,7 @@ OnInit.final("UnitTable", function(Require)
             end
 
             if self.aggro_timer then
-                TimerQueue:disableCallback(self.aggro_timer)
+                TQ:disableCallback(self.aggro_timer)
             end
         end
     end
