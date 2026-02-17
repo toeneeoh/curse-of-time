@@ -8,6 +8,7 @@ OnInit.final("Boss", function(Require)
     Require('Variables')
     Require('ItemLookup')
 
+    local TQ = TimerQueue
     local dead_gods = 0
     local life_cinematic_played = false
 
@@ -75,7 +76,7 @@ OnInit.final("Boss", function(Require)
 
             if found_player then
                 mb:update()
-                TimerQueue:callDelayed(1., check_multiboard, boss)
+                TQ:callDelayed(1., check_multiboard, boss)
             end
         end
 
@@ -178,7 +179,7 @@ OnInit.final("Boss", function(Require)
                     PauseUnit(Boss[BOSS_LIFE].unit, true)
                     UnitAddAbility(Boss[BOSS_LIFE].unit, FourCC('Avul'))
                     UnitAddAbility(Boss[BOSS_LIFE].unit, FourCC('A08L')) --life aura
-                    TimerQueue:callDelayed(6., GoddessOfLife)
+                    TQ:callDelayed(6., GoddessOfLife)
                 end
 
                 return true
@@ -208,8 +209,8 @@ OnInit.final("Boss", function(Require)
 
             SetUnitAnimation(u, "birth")
 
-            TimerQueue:callDelayed(50., SetUnitAnimation, u, "stand work")
-            TimerQueue:callDelayed(60., RemoveUnit, u)
+            TQ:callDelayed(50., SetUnitAnimation, u, "stand work")
+            TQ:callDelayed(60., RemoveUnit, u)
 
             RemoveUnit(killed)
         end
@@ -219,11 +220,13 @@ OnInit.final("Boss", function(Require)
             local uid = GetType(killed)
             local x, y = GetUnitX(killed), GetUnitY(killed)
 
+            TimerList[BOSS_ID]:stopAllTimers(killed)
+
             -- rewards
             RewardXPGold(killed, killer)
             boss:reward(x, y)
 
-            TimerQueue:callDelayed(3., spawn_select_difficulty, boss, killed, CHAOS_MODE)
+            TQ:callDelayed(3., spawn_select_difficulty, boss, killed, CHAOS_MODE)
 
             local delay = BOSS_RESPAWN_TIME
 
@@ -239,7 +242,7 @@ OnInit.final("Boss", function(Require)
 
             delay = delay * boss.respawn_modifier
 
-            TimerQueue:callDelayed(delay, boss_respawn, uid, CHAOS_MODE)
+            TQ:callDelayed(delay, boss_respawn, uid, CHAOS_MODE)
         end
 
         ON_BUY_LOOKUP[FourCC('I05V')] = function(u, b, pid, itm)
@@ -371,7 +374,7 @@ OnInit.final("Boss", function(Require)
 
             if self.target then
                 MULTIBOARD.BOSS:update()
-                TimerQueue:callDelayed(delay or 0., IssueTargetOrderById, self.unit, ORDER_ID_SMART, self.target.unit)
+                TQ:callDelayed(delay or 0., IssueTargetOrderById, self.unit, ORDER_ID_SMART, self.target.unit)
             end
         end
 
@@ -450,7 +453,7 @@ OnInit.final("Boss", function(Require)
                         IssuePointOrder(boss.unit, "move", GetLocationX(boss.loc), GetLocationY(boss.loc))
                     end
                     Buff.dispelAll(boss.unit)
-                    TimerQueue:callDelayed(0.25, return_boss, boss)
+                    TQ:callDelayed(0.25, return_boss, boss)
                 end
             end
         end
@@ -470,7 +473,7 @@ OnInit.final("Boss", function(Require)
                             bossUnit.overmovespeed = 750
                             UnitAddAbility(boss.unit, FourCC('Amrf'))
                             SetUnitPathing(boss.unit, false)
-                            TimerQueue:callDelayed(0.25, return_boss, boss)
+                            TQ:callDelayed(0.25, return_boss, boss)
                         end
                     end
 
@@ -487,7 +490,7 @@ OnInit.final("Boss", function(Require)
                     boss.nearby_count = math.max(boss.nearby_count, numplayers)
 
                     if numplayers < boss.nearby_count then
-                        TimerQueue:callDelayed(5., bonus_linger, boss, boss.nearby_count - numplayers)
+                        TQ:callDelayed(5., bonus_linger, boss, boss.nearby_count - numplayers)
                     end
 
                     local hp = 1
@@ -521,7 +524,7 @@ OnInit.final("Boss", function(Require)
         end
 
         -- refresh boss regen, threat, etc.
-        TimerQueue:callPeriodically(1., nil, periodic)
+        TQ:callPeriodically(1., nil, periodic)
 
         local function kill_zeppelin_factory(boss)
             local function f()
@@ -576,27 +579,23 @@ OnInit.final("Boss", function(Require)
         end
     end
 
-    ---@type fun(pt: PlayerTimer)
+    ---@type fun(pt: PlayerTimer): boolean
     function StompPeriodic(pt)
         pt.dur = pt.dur - 1
 
-        if pt.dur <= 0 or UnitAlive(pt.source) == false then
-            pt:destroy()
-        else
-            local ug = CreateGroup()
-
-            MakeGroupInRange(BOSS_ID, ug, GetUnitX(pt.source), GetUnitY(pt.source), 300., Condition(FilterEnemy))
+        if pt.dur > 0 then
+            MakeGroupInRange(BOSS_ID, pt.ug, GetUnitX(pt.source), GetUnitY(pt.source), 300., Condition(FilterEnemy))
 
             DestroyEffect(AddSpecialEffect("Abilities\\Spells\\Human\\Thunderclap\\ThunderClapCaster.mdl", GetUnitX(pt.source), GetUnitY(pt.source)))
 
-            for target in each(ug) do
-                DamageTarget(pt.source, target, pt.dmg, ATTACK_TYPE_NORMAL, MAGIC, pt.tag)
+            for target in each(pt.ug) do
+                DamageTarget(pt.source, target, pt.dmg, ATTACK_TYPE_NORMAL, MAGIC, pt.name)
             end
 
-            DestroyGroup(ug)
-
-            pt.timer:callDelayed(1., StompPeriodic, pt)
+            return true
         end
+
+        return false
     end
 
     local function boss_tp(target, x, y)
@@ -623,7 +622,7 @@ OnInit.final("Boss", function(Require)
             FloatingTextUnit(msg, guy, 1.75, 100, 0, 12, 154, 38, 158, 0, true)
             PauseUnit(guy, true)
             local x, y = GetUnitX(target), GetUnitY(target)
-            TimerQueue:callDelayed(dur, boss_tp, guy, x, y)
+            TQ:callDelayed(dur, boss_tp, guy, x, y)
             Fade(guy, dur - 0.6, true)
             local dummy = Dummy.create(x, y, 0, 0, dur)
             BlzSetUnitSkin(dummy.unit, GetUnitTypeId(guy))
@@ -669,7 +668,7 @@ OnInit.final("Boss", function(Require)
                 local sfx = AddSpecialEffect("war3mapImported\\BlackSmoke.mdx", GetUnitX(guy), GetUnitY(guy))
                 BlzSetSpecialEffectTimeScale(sfx, 0.75)
                 BlzSetSpecialEffectScale(sfx, 1.)
-                TimerQueue:callDelayed(3., DestroyEffect, sfx)
+                TQ:callDelayed(3., DestroyEffect, sfx)
 
                 BossTeleport(guy, 4.)
             end
@@ -679,7 +678,7 @@ OnInit.final("Boss", function(Require)
         DestroyGroup(g)
 
         if not called then
-            HUNT_TIMER = TimerQueue:callDelayed(2040. - (User.AmountPlaying * 240), ShadowStepExpire)
+            HUNT_TIMER = TQ:callDelayed(2040. - (User.AmountPlaying * 240), ShadowStepExpire)
         end
 
         return false
@@ -789,6 +788,6 @@ OnInit.final("Boss", function(Require)
     TriggerRegisterPlayerUnitEvent(t, PLAYER_BOSS, EVENT_PLAYER_UNIT_SUMMON, nil)
     TriggerAddCondition(t, Filter(PositionLegionIllusions))
 
-    TimerQueue:callPeriodically(15., nil, BossWander)
+    TQ:callPeriodically(15., nil, BossWander)
 
 end, Debug and Debug.getLine())
