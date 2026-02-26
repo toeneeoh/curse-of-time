@@ -67,10 +67,15 @@ do
         end
     end
 
+    ---@return integer
     function enum(...)
+        local count = 0
         for i, name in ipairs{...} do
             rawset(_G, name, i)
+            count = count + 1
         end
+
+        return count
     end
 
     --credits: Bribe
