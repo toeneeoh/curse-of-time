@@ -332,8 +332,8 @@ OnInit.final("UnitTable", function(Require)
                     end
 
                     -- trigger stat change event
-                    if prev ~= val then
-                        EVENT_STAT_CHANGE:trigger(tbl.unit)
+                    if prev ~= val and not tbl.suppress_stat_events then
+                        EVENT_STAT_CHANGE:trigger(tbl.unit, key)
                     end
                 end,
             }
