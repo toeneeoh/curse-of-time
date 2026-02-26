@@ -401,7 +401,25 @@ modifiers:
             BOOST_OFF = not BOOST_OFF
         end,
         ["hurt"] = function(p, pid, args)
-            SetWidgetLife(PLAYER_SELECTED_UNIT[pid], GetWidgetLife(PLAYER_SELECTED_UNIT[pid]) - BlzGetUnitMaxHP(PLAYER_SELECTED_UNIT[pid]) * 0.01 * S2I(args[2]))
+            local u = PLAYER_SELECTED_UNIT[pid]
+            if not u then return end
+
+            local maxHP = BlzGetUnitMaxHP(u)
+            local percent = S2I(args[2])
+            local damage = math.floor(maxHP * percent * 0.01 + 0.5)
+
+            local currentHP = GetWidgetLife(u)
+            local newHP = currentHP - damage
+
+            if newHP < 1.0 then
+                newHP = 1.0
+            elseif newHP > maxHP then
+                newHP = maxHP
+            else
+                newHP = math.floor(newHP + 0.5)
+            end
+
+            SetWidgetLife(u, newHP)
         end,
         ["buddha"] = function(p, pid, args)
             if BUDDHA_MODE[pid] then
