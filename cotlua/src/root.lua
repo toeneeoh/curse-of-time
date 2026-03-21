@@ -154,7 +154,6 @@ dofile('Utility/worldbounds.lua')
 dofile('Utility/shield.lua')
 
 dofile('Utility/PrecomputedHeightMap.lua')
-dofile('Utility/Hook.lua')
 dofile('Utility/HandleType.lua')
 dofile('Utility/ALICE/ALICE.lua')
 dofile('Utility/ALICE/CAT_data.lua')
