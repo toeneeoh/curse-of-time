@@ -295,7 +295,7 @@ modifiers:
         end,
         ["horde"] = function(p, pid, args)
             for _ = 0, 39 do
-                CreateUnitAtLoc(PLAYER_CREEP, FourCC('n07R'), GetUnitLoc(Hero[pid]), GetRandomReal(0, 359))
+                CreateUnit(PLAYER_CREEP, FourCC('n07R'), GetUnitX(Hero[pid]), GetUnitY(Hero[pid]), GetRandomReal(0, 359))
             end
         end,
         ["kill"] = function(p, pid, args)
