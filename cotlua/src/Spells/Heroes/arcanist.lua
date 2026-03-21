@@ -316,25 +316,21 @@ OnInit.final("ArcanistSpells", function(Require)
         }
         thistype.cooldown = 20.
 
-        ---@type fun(pt: PlayerTimer)
+        ---@type fun(pt: PlayerTimer): boolean
         local function periodic(pt)
             pt.dur = pt.dur - 0.25
 
             if pt.dur > 0. then
-                local ug = CreateGroup()
+                MakeGroupInRange(pt.pid, pt.ug, pt.x, pt.y, pt.aoe, Condition(FilterEnemy))
 
-                MakeGroupInRange(pt.pid, ug, pt.x, pt.y, pt.aoe, Condition(FilterEnemy))
-
-                for target in each(ug) do
+                for target in each(pt.ug) do
                     StasisFieldDebuff:add(pt.source, target):duration(0.5)
                 end
 
-                DestroyGroup(ug)
-
-                pt.timer:callDelayed(0.25, periodic, pt)
-            else
-                pt:destroy()
+                return true
             end
+
+            return false
         end
 
         function thistype:onCast()
@@ -345,6 +341,7 @@ OnInit.final("ArcanistSpells", function(Require)
             pt.y = self.targetY
             pt.dur = self.dur * LBOOST[self.pid]
             pt.source = self.caster
+            pt.ug = CreateGroup()
 
             pt.target = Dummy.create(pt.x, pt.y, 0, 0, 6.).unit
             BlzSetUnitSkin(pt.target, FourCC('h02B'))
@@ -353,7 +350,7 @@ OnInit.final("ArcanistSpells", function(Require)
             SetUnitFlyHeight(pt.target, 0., 0.)
             SetUnitAnimation(pt.target, "birth")
 
-            pt.timer:callDelayed(0.25, periodic, pt)
+            pt:startLoop(0.25, periodic)
         end
     end
 
@@ -386,7 +383,7 @@ OnInit.final("ArcanistSpells", function(Require)
             end
         end
 
-        ---@type fun(pt: PlayerTimer)
+        ---@type fun(pt: PlayerTimer): boolean
         local function periodic(pt)
             pt.time = pt.time + FPS_32
 
@@ -405,10 +402,10 @@ OnInit.final("ArcanistSpells", function(Require)
 
                 BlzStartUnitAbilityCooldown(pt.source, thistype.id, pt.cooldown - pt.time)
 
-                pt:destroy()
-            else
-                pt.timer:callDelayed(FPS_32, periodic, pt)
+                return true
             end
+
+            return false
         end
 
         function thistype:onCast()
@@ -446,7 +443,7 @@ OnInit.final("ArcanistSpells", function(Require)
                     end
 
                     TQ:callDelayed(FPS_32, BlzEndUnitAbilityCooldown, pt.source, thistype.id)
-                    pt.timer:callDelayed(FPS_32, periodic, pt)
+                    pt:startLoop(FPS_32, periodic)
                 end
 
                 DestroyGroup(ug)
