@@ -18,19 +18,18 @@ OnInit.final("HighPriestessSpells", function(Require)
             mana = function(pid) return 0.02 * BlzGetUnitMaxMana(Hero[pid]) end,
         }
 
-        ---@type fun(pt: PlayerTimer)
+        ---@type fun(pt: PlayerTimer): boolean
         local function periodic(pt)
             local heal = thistype.heal(pt.pid) ---@type number 
             local mana = thistype.mana(pt.pid) ---@type number 
-            local ug = CreateGroup()
             local ftarget = nil ---@type unit 
             local percent = 100. ---@type number 
 
             pt.dur = pt.dur + 1
 
-            MakeGroupInRange(pt.pid, ug, pt.x, pt.y, pt.aoe, Condition(FilterAllyHero))
+            MakeGroupInRange(pt.pid, pt.ug, pt.x, pt.y, pt.aoe, Condition(FilterAllyHero))
 
-            for target in each(ug) do
+            for target in each(pt.ug) do
                 if percent > GetUnitLifePercent(target) then
                     percent = GetUnitLifePercent(target)
                     ftarget = target
@@ -51,12 +50,10 @@ OnInit.final("HighPriestessSpells", function(Require)
                     DestroyEffect(AddSpecialEffectTarget("Abilities\\Spells\\Undead\\VampiricAura\\VampiricAuraTarget.mdl", ftarget, "origin"))
                 end
 
-                pt.timer:callDelayed(0.5, periodic, pt)
-            else
-                pt:destroy()
+                return true
             end
 
-            DestroyGroup(ug)
+            return false
         end
 
         function thistype:onCast()
@@ -65,8 +62,9 @@ OnInit.final("HighPriestessSpells", function(Require)
             pt.x = self.x
             pt.y = self.y
             pt.aoe = self.aoe * LBOOST[self.pid]
+            pt.ug = CreateGroup()
 
-            pt.timer:callDelayed(0.5, periodic, pt)
+            pt:startLoop(0.5, periodic)
         end
     end
 
@@ -85,15 +83,17 @@ OnInit.final("HighPriestessSpells", function(Require)
 
             --because backpack is a valid target
             if GetUnitTypeId(self.target) == BACKPACK then
-                self.target = Hero[self.pid]
+                self.target = Hero[self.tpid]
             end
 
             HP(self.caster, self.target, (self.heal + BlzGetUnitMaxHP(self.target) * 0.05) * BOOST[self.pid], thistype.tag)
             DivineLightBuff:add(self.caster, self.target):duration(3.)
         end
 
-        local manacost = function(u)
-            BlzSetUnitAbilityManaCost(u, thistype.id, GetUnitAbilityLevel(u, thistype.id) - 1, R2I(BlzGetUnitMaxMana(u) * 0.05))
+        local manacost = function(u, key)
+            if key == "int" or key == "bonus_mana" or key == "bonus_int" then
+                BlzSetUnitAbilityManaCost(u, thistype.id, GetUnitAbilityLevel(u, thistype.id) - 1, R2I(BlzGetUnitMaxMana(u) * 0.05))
+            end
         end
 
         function thistype.onLearn(source, ablev, pid)
@@ -117,16 +117,14 @@ OnInit.final("HighPriestessSpells", function(Require)
             dur = function(pid) local ablev = GetUnitAbilityLevel(Hero[pid], thistype.id) return 11. + ablev end,
         }
 
-        ---@type fun(pt: PlayerTimer)
+        ---@type fun(pt: PlayerTimer): boolean
         local function periodic(pt)
             pt.dur = pt.dur - 1
 
             if pt.dur > 0. then
-                local ug = CreateGroup()
+                MakeGroupInRange(pt.pid, pt.ug, pt.x, pt.y, pt.aoe, Condition(FilterEnemy))
 
-                MakeGroupInRange(pt.pid, ug, pt.x, pt.y, pt.aoe, Condition(FilterEnemy))
-
-                for target in each(ug) do
+                for target in each(pt.ug) do
                     SanctifiedGroundDebuff:add(Hero[pt.pid], target):duration(1.)
                 end
 
@@ -134,12 +132,10 @@ OnInit.final("HighPriestessSpells", function(Require)
                     FadeSFX(pt.sfx, true)
                 end
 
-                DestroyGroup(ug)
-
-                pt.timer:callDelayed(0.5, periodic, pt)
-            else
-                pt:destroy()
+                return true
             end
+
+            return false
         end
 
         function thistype:onCast()
@@ -150,19 +146,20 @@ OnInit.final("HighPriestessSpells", function(Require)
             pt.y = self.targetY
             pt.aoe = self.aoe * LBOOST[self.pid]
             pt.dur = self.dur * 2. * LBOOST[self.pid]
+            pt.ug = CreateGroup()
 
             pt.sfx = AddSpecialEffect("war3mapImported\\Heaven's Gate Channel.mdl", pt.x, pt.y)
             BlzSetSpecialEffectScale(pt.sfx, LBOOST[self.pid])
             BlzPlaySpecialEffect(pt.sfx, ANIM_TYPE_BIRTH)
-            local loc = Location(pt.x, pt.y)
-            BlzSetSpecialEffectZ(pt.sfx, GetLocationZ(loc))
-            RemoveLocation(loc)
+            BlzSetSpecialEffectZ(pt.sfx, GetLocZ(pt.x, pt.y))
 
-            pt.timer:callDelayed(0.5, periodic, pt)
+            pt:startLoop(0.5, periodic)
         end
 
-        local manacost = function(u)
-            BlzSetUnitAbilityManaCost(u, thistype.id, GetUnitAbilityLevel(u, thistype.id) - 1, R2I(BlzGetUnitMaxMana(u) * 0.1))
+        local manacost = function(u, key)
+            if key == "int" or key == "bonus_mana" or key == "bonus_int" then
+                BlzSetUnitAbilityManaCost(u, thistype.id, GetUnitAbilityLevel(u, thistype.id) - 1, R2I(BlzGetUnitMaxMana(u) * 0.1))
+            end
         end
 
         function thistype.onLearn(source, ablev, pid)
@@ -207,8 +204,10 @@ OnInit.final("HighPriestessSpells", function(Require)
             end
         end
 
-        local manacost = function(u)
-            BlzSetUnitAbilityManaCost(u, thistype.id, GetUnitAbilityLevel(u, thistype.id) - 1, R2I(BlzGetUnitMaxMana(u) * 0.1))
+        local manacost = function(u, key)
+            if key == "int" or key == "bonus_mana" or key == "bonus_int" then
+                BlzSetUnitAbilityManaCost(u, thistype.id, GetUnitAbilityLevel(u, thistype.id) - 1, R2I(BlzGetUnitMaxMana(u) * 0.1))
+            end
         end
 
         function thistype.onLearn(source, ablev, pid)
@@ -237,13 +236,15 @@ OnInit.final("HighPriestessSpells", function(Require)
             MakeGroupInRange(self.pid, ug, self.x, self.y, self.aoe * LBOOST[self.pid], Condition(FilterAllyHero))
 
             for target in each(ug) do
-                ProtectionBuff:add(self.caster, target)
+                ProtectionBuff:add(self.caster, target):duration(20 + 10 * self.ablev)
                 Shield.add(target, self.shield * BOOST[self.pid], 20 + 10 * self.ablev):color(4)
             end
         end
 
-        local manacost = function(u)
-            BlzSetUnitAbilityManaCost(u, thistype.id, GetUnitAbilityLevel(u, thistype.id) - 1, R2I(BlzGetUnitMaxMana(u) * 0.5))
+        local manacost = function(u, key)
+            if key == "int" or key == "bonus_mana" or key == "bonus_int" then
+                BlzSetUnitAbilityManaCost(u, thistype.id, GetUnitAbilityLevel(u, thistype.id) - 1, R2I(BlzGetUnitMaxMana(u) * 0.5))
+            end
         end
 
         function thistype.onLearn(source, ablev, pid)
@@ -303,8 +304,10 @@ OnInit.final("HighPriestessSpells", function(Require)
             end
         end
 
-        local manacost = function(u)
-            BlzSetUnitAbilityManaCost(u, thistype.id, GetUnitAbilityLevel(u, thistype.id) - 1, R2I(GetUnitState(u, UNIT_STATE_MANA)))
+        local manacost = function(u, key)
+            if key == "int" or key == "bonus_mana" or key == "bonus_int" then
+                BlzSetUnitAbilityManaCost(u, thistype.id, GetUnitAbilityLevel(u, thistype.id) - 1, R2I(GetUnitState(u, UNIT_STATE_MANA)))
+            end
         end
 
         function thistype.onLearn(source)
