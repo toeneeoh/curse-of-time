@@ -2,8 +2,10 @@ OnInit.final("WarriorSpells", function(Require)
     Require('Spells')
     Require('SpellTools')
 
+    local TQ = TimerQueue
     local FPS_32 = FPS_32
     local atan = math.atan
+    local valid_target = VALID_DAMAGE_TARGET
 
     ---@class PARRY : Spell
     ---@field dmg function
@@ -23,15 +25,16 @@ OnInit.final("WarriorSpells", function(Require)
                 BlzStartUnitAbilityCooldown(source, thistype.id, 4.)
                 LAST_CAST[pid] = thistype.id
 
-                local pt = TimerList[pid]:get(ADAPTIVESTRIKE.id)
+                local buff = AdaptiveStrikeBuff:get(source, source) ---@type Buff
                 UnitDisableAbility(source, ADAPTIVESTRIKE.id, false)
 
-                if LIMITBREAK.flag[pid] & 0x10 > 0 and not pt then
+                -- adaptive strike limitbreak auto cast
+                if LIMITBREAK.flag[pid] & 0x10 > 0 and not buff then
                     ADAPTIVESTRIKE.effect(source, GetUnitX(source), GetUnitY(source))
                     UnitDisableAbility(source, ADAPTIVESTRIKE.id, true)
                     BlzUnitHideAbility(source, ADAPTIVESTRIKE.id, false)
-                elseif pt then
-                    BlzStartUnitAbilityCooldown(source, ADAPTIVESTRIKE.id, TimerGetRemaining(pt.timer.timer))
+                elseif buff then
+                    BlzStartUnitAbilityCooldown(source, ADAPTIVESTRIKE.id, buff:remaining())
                 end
 
                 if LIMITBREAK.flag[pid] & 0x1 > 0 then
@@ -42,7 +45,7 @@ OnInit.final("WarriorSpells", function(Require)
             end
         end
 
-        function thistype.onLearn(source, ablev, pid)
+        function thistype.onSetup(source)
             EVENT_ON_ORDER:register_unit_action(source, on_order)
         end
     end
@@ -53,11 +56,11 @@ OnInit.final("WarriorSpells", function(Require)
     do
         local thistype = SPINDASH
         thistype.preCast = function(pid, tpid, caster, target, x, y, targetX, targetY)
-            local pt = TimerList[pid]:get('recast', caster)
+            local buff = SpinDashBuff:get(caster, caster)
             --recast
-            if pt then
-                targetX = pt.x
-                targetY = pt.y
+            if buff then
+                targetX = buff.x
+                targetY = buff.y
             end
 
             local r = GetRectFromCoords(x, y)
@@ -73,111 +76,80 @@ OnInit.final("WarriorSpells", function(Require)
             dmg = function(pid) local ablev = GetUnitAbilityLevel(Hero[pid], thistype.id) return (0.7 + 0.2 * ablev) * (Unit[Hero[pid]].damage) end,
         }
 
-        ---@type fun(pt: PlayerTimer)
-        local function recastExpire(pt)
-            BlzStartUnitAbilityCooldown(pt.source, thistype.id, 3.)
-            BlzSetAbilityIntegerLevelField(BlzGetUnitAbility(pt.source, thistype.id), ABILITY_ILF_TARGET_TYPE, GetUnitAbilityLevel(pt.source, thistype.id) - 1, 2)
-
-            pt:destroy()
+        local function damage(object, self)
+            if not self.g[object] then
+                self.g[object] = true
+                if LIMITBREAK.flag[self.pid] & 0x2 > 0 then
+                    DamageTarget(self.source, object, thistype.dmg(self.pid) * 4. * BOOST[self.pid], ATTACK_TYPE_NORMAL, MAGIC, thistype.tag)
+                    SpinDashDebuff:add(self.source, object):duration(2.)
+                else
+                    DamageTarget(self.source, object, thistype.dmg(self.pid) * BOOST[self.pid], ATTACK_TYPE_NORMAL, MAGIC, thistype.tag)
+                end
+            end
         end
 
-        ---@type fun(pt: PlayerTimer)
-        local function periodic(pt)
-            pt.dur = pt.dur - pt.speed
+        local function periodic(self)
+            self.dur = self.dur - self.speed
 
-            if pt.dur > 0. and IsUnitInRangeXY(pt.source, pt.x, pt.y, pt.dur + 50.) then
-                local x = GetUnitX(pt.source)
-                local y = GetUnitY(pt.source)
-                SetUnitXBounded(pt.source, x + pt.speed * math.cos(pt.angle))
-                SetUnitYBounded(pt.source, y + pt.speed * math.sin(pt.angle))
+            if UnitAlive(self.source) and self.dur > 0. and IsUnitInRangeXY(self.source, self.x, self.y, self.dur + 50.) then
+                local x = GetUnitX(self.source)
+                local y = GetUnitY(self.source)
+                SetUnitXBounded(self.source, x + self.speed * math.cos(self.angle))
+                SetUnitYBounded(self.source, y + self.speed * math.sin(self.angle))
 
-                local ug = CreateGroup()
+                ALICE_ForAllObjectsInRangeDo(damage, x, y, 225. * LBOOST[self.pid], "unit", valid_target, self)
 
-                MakeGroupInRange(pt.pid, ug, x, y, 225. * LBOOST[pt.pid], Condition(FilterEnemy))
-
-                for target in each(ug) do
-                    if not IsUnitInGroup(target, pt.ug) then
-                        GroupAddUnit(pt.ug, target)
-                        if LIMITBREAK.flag[pt.pid] & 0x2 > 0 then
-                            DamageTarget(pt.source, target, thistype.dmg(pt.pid) * 4. * BOOST[pt.pid], ATTACK_TYPE_NORMAL, MAGIC, thistype.tag)
-                            SpinDashDebuff:add(pt.source, target):duration(2.)
-                        else
-                            DamageTarget(pt.source, target, thistype.dmg(pt.pid) * BOOST[pt.pid], ATTACK_TYPE_NORMAL, MAGIC, thistype.tag)
-                        end
-                    end
-                end
-
-                DestroyGroup(ug)
-
-                pt.timer:callDelayed(FPS_32, periodic, pt)
+                self.callback = TQ:callDelayed(FPS_32, periodic, self)
             else
-                SetUnitPropWindow(pt.source, bj_DEGTORAD * 60.)
-                SetUnitTimeScale(pt.source, 1.)
-                AddUnitAnimationProperties(pt.source, "spin", false)
-                SetUnitPathing(pt.source, true)
-                --IssueImmediateOrderById(pt.source, ORDER_ID_STOP)
-                pt:destroy()
+                HideEffect(self.sfx)
+                SetUnitPropWindow(self.source, bj_DEGTORAD * 60.)
+                SetUnitTimeScale(self.source, 1.)
+                AddUnitAnimationProperties(self.source, "spin", false)
+                SetUnitPathing(self.source, true)
             end
         end
 
         function thistype:onCast()
-            local pt = TimerList[self.pid]:get(ADAPTIVESTRIKE.id)
-            local sfx
+            local buff = AdaptiveStrikeBuff:get(self.caster, self.caster) ---@type Buff
+            local startX, startY = GetUnitX(self.caster), GetUnitY(self.caster)
             UnitDisableAbility(self.caster, ADAPTIVESTRIKE.id, false)
 
-            if LIMITBREAK.flag[self.pid] & 0x10 > 0 and not pt then
+            -- adaptive strike limitbreak auto cast
+            if LIMITBREAK.flag[self.pid] & 0x10 > 0 and not buff then
                 ADAPTIVESTRIKE.effect(self.caster, self.x, self.y)
                 UnitDisableAbility(self.caster, ADAPTIVESTRIKE.id, true)
                 BlzUnitHideAbility(self.caster, ADAPTIVESTRIKE.id, false)
-            elseif pt then
-                BlzStartUnitAbilityCooldown(self.caster, ADAPTIVESTRIKE.id, TimerGetRemaining(pt.timer.timer))
+            elseif buff then
+                BlzStartUnitAbilityCooldown(self.caster, ADAPTIVESTRIKE.id, buff:remaining())
             end
 
-            pt = TimerList[self.pid]:get('recast', self.caster)
+            buff = SpinDashBuff:get(self.caster, self.caster)
 
             --recast
-            if pt then
-                self.targetX = pt.x
-                self.targetY = pt.y
-                self.angle = atan(pt.y - self.y, pt.x - self.x)
-                SetUnitPropWindow(pt.source, bj_DEGTORAD * 60.)
-                SetUnitTimeScale(pt.source, 1.)
-                AddUnitAnimationProperties(pt.source, "spin", false)
-                SetUnitPathing(pt.source, true)
-                --IssueImmediateOrderById(pt.source, ORDER_ID_STOP)
+            if buff then
+                self.targetX = buff.x
+                self.targetY = buff.y
+                self.angle = atan(buff.y - self.y, buff.x - self.x)
+                SetUnitPropWindow(buff.source, bj_DEGTORAD * 60.)
+                SetUnitTimeScale(buff.source, 1.)
+                AddUnitAnimationProperties(buff.source, "spin", false)
+                SetUnitPathing(buff.source, true)
 
-                BlzStartUnitAbilityCooldown(pt.source, thistype.id, 3. + TimerGetRemaining(pt.timer.timer))
-                BlzSetAbilityIntegerLevelField(BlzGetUnitAbility(pt.source, thistype.id), ABILITY_ILF_TARGET_TYPE, GetUnitAbilityLevel(pt.source, thistype.id) - 1, 2)
-
-                pt:destroy()
-
-                --if still moving
-                pt = TimerList[self.pid]:get(thistype.id, self.caster)
-                if pt then
-                    pt:destroy()
-                end
+                buff:remove()
             --first cast
             else
-                pt = TimerList[self.pid]:add()
-                pt.x = self.x
-                pt.y = self.y
-                pt.source = self.caster
-                pt.tag = 'recast'
+                buff = SpinDashBuff:add(self.caster, self.caster)
+                buff:duration(3.)
 
-                BlzSetAbilityIntegerLevelField(BlzGetUnitAbility(pt.source, thistype.id), ABILITY_ILF_TARGET_TYPE, GetUnitAbilityLevel(pt.source, thistype.id) - 1, 0)
-
-                pt.timer:callDelayed(3., recastExpire, pt)
+                BlzSetAbilityIntegerLevelField(BlzGetUnitAbility(self.caster, thistype.id), ABILITY_ILF_TARGET_TYPE, GetUnitAbilityLevel(self.caster, thistype.id) - 1, 0)
             end
 
-            pt = TimerList[self.pid]:add()
-            pt.x = self.targetX
-            pt.y = self.targetY
-            pt.angle = self.angle
-            pt.dur = math.min(1000., DistanceCoords(self.x, self.y, pt.x, pt.y))
-            pt.speed = 40.
-            pt.source = self.caster
-            pt.ug = CreateGroup()
-            pt.tag = thistype.id
+            self.x = self.targetX
+            self.y = self.targetY
+            self.dur = math.min(1000., DistanceCoords(startX, startY, self.targetX, self.targetY))
+            self.speed = 40.
+            self.source = self.caster
+            self.g = {}
 
             SetUnitPropWindow(self.caster, 0)
             SetUnitTimeScale(self.caster, 2.)
@@ -185,11 +157,11 @@ OnInit.final("WarriorSpells", function(Require)
             SetUnitPathing(self.caster, false)
 
             if LIMITBREAK.flag[self.pid] & 0x2 > 0 then
-                pt.sfx = AddSpecialEffectTarget("war3mapImported\\Red White Tornado.mdx", self.caster, "origin")
-                BlzPlaySpecialEffectWithTimeScale(pt.sfx, ANIM_TYPE_STAND, 2.)
+                self.sfx = AddSpecialEffectTarget("war3mapImported\\Red White Tornado.mdx", self.caster, "origin")
+                BlzPlaySpecialEffectWithTimeScale(self.sfx, ANIM_TYPE_STAND, 2.)
             end
 
-            pt.timer:callDelayed(FPS_32, periodic, pt)
+            periodic(self)
         end
     end
 
@@ -206,15 +178,16 @@ OnInit.final("WarriorSpells", function(Require)
         }
 
         function thistype:onCast()
-            local pt = TimerList[self.pid]:get(ADAPTIVESTRIKE.id)
+            local buff = AdaptiveStrikeBuff:get(self.caster, self.caster) ---@type Buff
             UnitDisableAbility(self.caster, ADAPTIVESTRIKE.id, false)
 
-            if LIMITBREAK.flag[self.pid] & 0x10 > 0 and not pt then
+            -- adaptive strike limitbreak auto cast
+            if LIMITBREAK.flag[self.pid] & 0x10 > 0 and not buff then
                 ADAPTIVESTRIKE.effect(self.caster, self.x, self.y)
                 UnitDisableAbility(self.caster, ADAPTIVESTRIKE.id, true)
                 BlzUnitHideAbility(self.caster, ADAPTIVESTRIKE.id, false)
-            elseif pt then
-                BlzStartUnitAbilityCooldown(self.caster, ADAPTIVESTRIKE.id, TimerGetRemaining(pt.timer.timer))
+            elseif buff then
+                BlzStartUnitAbilityCooldown(self.caster, ADAPTIVESTRIKE.id, buff:remaining())
             end
 
             local ug = CreateGroup()
@@ -250,7 +223,7 @@ OnInit.final("WarriorSpells", function(Require)
             dmg = function(pid) local ablev = GetUnitAbilityLevel(Hero[pid], thistype.id) return (0.7 + 0.1 * ablev) * (Unit[Hero[pid]].damage) end,
         }
 
-        ---@type fun(pt: PlayerTimer)
+        ---@type fun(pt: PlayerTimer): boolean
         local function periodic(pt)
             local x = GetUnitX(pt.target) ---@type number 
             local y = GetUnitY(pt.target) ---@type number 
@@ -259,7 +232,6 @@ OnInit.final("WarriorSpells", function(Require)
 
             if (pt.dur > 1. and not pt.limitbreak) or (pt.dur > 5. and pt.limitbreak) then
                 SetUnitAnimation(pt.target, "death")
-                pt:destroy()
             else
                 local ug = CreateGroup()
 
@@ -286,13 +258,15 @@ OnInit.final("WarriorSpells", function(Require)
 
                 DestroyGroup(ug)
 
-                pt.timer:callDelayed(FPS_32, periodic, pt)
+                return true
             end
+
+            return false
         end
 
-        ---@type fun(pt: PlayerTimer)
+        ---@type fun(pt: PlayerTimer): boolean
         local function delay(pt)
-            local angle      = 0. ---@type number 
+            local angle = 0.
             local pt2
 
             if LIMITBREAK.flag[pt.pid] & 0x8 > 0 then
@@ -313,7 +287,7 @@ OnInit.final("WarriorSpells", function(Require)
                     BlzSetUnitFacingEx(pt2.target, bj_RADTODEG * (pt2.angle + bj_PI * 0.5))
                     SetUnitVertexColor(pt2.target, 255, 255, 0, 255)
 
-                    pt2.timer:callDelayed(FPS_32, periodic, pt2)
+                    pt2:startLoop(FPS_32, periodic)
                 end
             else
                 SoundHandler("Abilities\\Spells\\Orc\\Shockwave\\Shockwave.flac", true, nil, pt.source)
@@ -343,42 +317,43 @@ OnInit.final("WarriorSpells", function(Require)
                     SetUnitFlyHeight(pt2.target, 10.00, 0.00)
                     BlzSetUnitFacingEx(pt2.target, bj_RADTODEG * pt2.angle)
 
-                    pt2.timer:callDelayed(FPS_32, periodic, pt2)
+                    pt2:startLoop(FPS_32, periodic)
                 end
 
                 SetUnitTimeScale(pt.source, 1.)
             end
 
-            pt:destroy()
+            return false
         end
 
         function thistype:onCast()
-            local pt = TimerList[self.pid]:get(ADAPTIVESTRIKE.id)
+            local buff = AdaptiveStrikeBuff:get(self.caster, self.caster) ---@type Buff
             UnitDisableAbility(self.caster, ADAPTIVESTRIKE.id, false)
 
-            if LIMITBREAK.flag[self.pid] & 0x10 > 0 and not pt then
+            -- adaptive strike limitbreak auto cast
+            if LIMITBREAK.flag[self.pid] & 0x10 > 0 and not buff then
                 ADAPTIVESTRIKE.effect(self.caster, self.x, self.y)
                 UnitDisableAbility(self.caster, ADAPTIVESTRIKE.id, true)
                 BlzUnitHideAbility(self.caster, ADAPTIVESTRIKE.id, false)
-            elseif pt then
-                BlzStartUnitAbilityCooldown(self.caster, ADAPTIVESTRIKE.id, TimerGetRemaining(pt.timer.timer))
+            elseif buff then
+                BlzStartUnitAbilityCooldown(self.caster, ADAPTIVESTRIKE.id, buff:remaining())
             end
 
             TimerQueue:callDelayed(1., DestroyEffect, AddSpecialEffectTarget("war3mapImported\\Sweep_Wind_Medium.mdx", self.caster, "Weapon"))
 
-            pt = TimerList[self.pid]:add()
+            local pt = TimerList[self.pid]:add()
             pt.source = self.caster
 
             if LIMITBREAK.flag[self.pid] & 0x8 > 0 then
                 BlzSetAbilityIntegerLevelField(BlzGetUnitAbility(Hero[self.pid], WINDSCAR.id), ABILITY_ILF_TARGET_TYPE, self.ablev - 1, 0)
 
-                pt.timer:callDelayed(0., delay, pt)
+                pt:after(0., delay)
                 SetUnitAnimation(self.caster, "stand")
             else
                 SetUnitAnimation(self.caster, "attack slam")
                 SetUnitTimeScale(self.caster, 1.5)
                 pt.angle = self.angle
-                pt.timer:callDelayed(0.4, delay, pt)
+                pt:after(0.4, delay)
             end
         end
 
@@ -418,14 +393,13 @@ OnInit.final("WarriorSpells", function(Require)
             tornadodur = 3.,
         }
 
-        ---@type fun(pt: PlayerTimer)
+        ---@type fun(pt: PlayerTimer): boolean
         local function tornado(pt)
             pt.time = pt.time + 0.5
 
             if pt.time >= pt.dur then
                 IssueImmediateOrderById(pt.target, ORDER_ID_STOP)
                 SetUnitAnimation(pt.target, "death")
-                pt:destroy()
             else
                 local x = GetUnitX(pt.target)
                 local y = GetUnitY(pt.target)
@@ -433,18 +407,17 @@ OnInit.final("WarriorSpells", function(Require)
                 IssuePointOrder(pt.target, "move", x + 75. * math.cos(pt.angle), y + 75. * math.sin(pt.angle))
 
                 if ModuloReal(pt.time + 0.5, 1.) == 0. then
-                    local ug = CreateGroup()
-                    MakeGroupInRange(pt.pid, ug, x, y, 200., Condition(FilterEnemy))
+                    MakeGroupInRange(pt.pid, pt.ug, x, y, 200., Condition(FilterEnemy))
 
-                    for target in each(ug) do
+                    for target in each(pt.ug) do
                         DamageTarget(Hero[pt.pid], target, pt.dmg * BOOST[pt.pid], ATTACK_TYPE_NORMAL, MAGIC, thistype.tag)
                     end
-
-                    DestroyGroup(ug)
                 end
 
-                pt.timer:callDelayed(0.5, tornado, pt)
+                return true
             end
+
+            return false
         end
 
         ---@type fun(caster: unit, x: number, y: number)
@@ -457,21 +430,17 @@ OnInit.final("WarriorSpells", function(Require)
                 SetUnitAnimation(caster, "spell")
                 MakeGroupInRange(pid, ug, x, y, thistype.spinaoe * LBOOST[pid], Condition(FilterEnemy))
 
-                local dummy = Dummy.create(x, y, 0, 0, 1.).unit
-                BlzSetUnitSkin(dummy, FourCC('h074'))
-                SetUnitTimeScale(dummy, 1.)
-                SetUnitScale(dummy, 1.25, 1.25, 1.25)
-                SetUnitAnimationByIndex(dummy, 0)
-                SetUnitFlyHeight(dummy, 100., 0)
-                BlzSetUnitFacingEx(dummy, GetUnitFacing(caster))
+                local sfx = AddSpecialEffect("war3mapImported\\Ephemeral Slash Silver.mdl", x, y)
+                BlzSetSpecialEffectScale(sfx, 1.25)
+                BlzSetSpecialEffectZ(sfx, GetLocZ(x, y) + 100.)
+                BlzSetSpecialEffectYaw(sfx, GetUnitFacing(caster) * bj_DEGTORAD)
+                DestroyEffect(sfx)
 
-                dummy = Dummy.create(x, y, 0, 0, 1.).unit
-                BlzSetUnitSkin(dummy, FourCC('h074'))
-                SetUnitTimeScale(dummy, 1.)
-                SetUnitScale(dummy, 1.25, 1.25, 1.25)
-                SetUnitAnimationByIndex(dummy, 0)
-                SetUnitFlyHeight(dummy, 100., 0)
-                BlzSetUnitFacingEx(dummy, GetUnitFacing(caster) + 180.)
+                sfx = AddSpecialEffect("war3mapImported\\Ephemeral Slash Silver.mdl", x, y)
+                BlzSetSpecialEffectScale(sfx, 1.25)
+                BlzSetSpecialEffectZ(sfx, GetLocZ(x, y) + 100.)
+                BlzSetSpecialEffectYaw(sfx, (GetUnitFacing(caster) + 180.) * bj_DEGTORAD)
+                DestroyEffect(sfx)
 
                 for target in each(ug) do
                     DamageTarget(caster, target, thistype.spindmg(pid) * BOOST[pid], ATTACK_TYPE_NORMAL, MAGIC, thistype.tag)
@@ -508,6 +477,7 @@ OnInit.final("WarriorSpells", function(Require)
                     pt.target = Dummy.create(x + 75. * math.cos(pt.angle), y + 75 * math.sin(pt.angle), 0, 0).unit
                     pt.dmg = thistype.tornadodmg(pid)
                     pt.dur = thistype.tornadodur * LBOOST[pid]
+                    pt.ug = CreateGroup()
 
                     SetUnitPathing(pt.target, false)
                     BlzSetUnitSkin(pt.target, FourCC('n001'))
@@ -516,7 +486,7 @@ OnInit.final("WarriorSpells", function(Require)
                     UnitAddAbility(pt.target, FourCC('Amrf'))
                     IssuePointOrder(pt.target, "move", x + 225. * math.cos(pt.angle), y + 225. * math.sin(pt.angle))
 
-                    pt.timer:callDelayed(0.5, tornado, pt)
+                    pt:startLoop(0.5, tornado)
                 end
             end
 
@@ -524,17 +494,20 @@ OnInit.final("WarriorSpells", function(Require)
             BlzUnitHideAbility(caster, thistype.id, false)
 
             --adaptive strike cooldown reset
-            local rand = math.random() ---@type number
+            local cd = true
+            if GetUnitAbilityLevel(caster, LIMITBREAK.id) > 0 then
+                local rand = math.random() ---@type number
 
-            --empowered adaptive strike 50 percent
-            if LIMITBREAK.flag[pid] & 0x10 > 0 then
-                rand = rand * 1.5
+                --empowered adaptive strike 50 percent
+                if LIMITBREAK.flag[pid] & 0x10 > 0 then
+                    rand = rand * 1.5
+                end
+
+                cd = rand < 0.75
             end
 
-            if rand < 0.75 then
-                pt = TimerList[pid]:add()
-                pt.tag = thistype.id
-                pt.timer:callDelayed(4., PlayerTimer.destroy, pt)
+            if cd then
+                AdaptiveStrikeBuff:add(caster, caster):duration(4.)
             end
             DestroyGroup(ug)
         end
@@ -596,6 +569,8 @@ OnInit.final("WarriorSpells", function(Require)
                 BlzSetAbilityIcon(INTIMIDATINGSHOUT.id, "ReplaceableTextures\\CommandButtons\\BTNBattleShout.blp")
                 BlzSetAbilityIcon(WINDSCAR.id, "ReplaceableTextures\\CommandButtons\\BTNimpaledflameswordfinal.blp")
             end
+
+            EVENT_ON_CLEANUP:unregister_action(pid, on_cleanup)
         end
 
         function thistype.onLearn(source, ablev, pid)
