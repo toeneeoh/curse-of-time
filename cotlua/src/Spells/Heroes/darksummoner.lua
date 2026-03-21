@@ -54,7 +54,7 @@ OnInit.final("DarkSummonerSpells", function(Require)
             elseif uid == SUMMON_HOUND then --demon hound
             end
 
-            UnitSetBonus(summon, BONUS_ARMOR, armor)
+            Unit[summon].bonus_armor = Unit[summon].bonus_armor + armor
         end
 
         function thistype:onCast()
@@ -89,13 +89,13 @@ OnInit.final("DarkSummonerSpells", function(Require)
                 for _, hound in ipairs(summons) do
                     SetUnitState(hound, UNIT_STATE_MANA, BlzGetUnitMaxMana(hound) * pt.dur / pt.time)
                 end
-                pt.timer:callDelayed(0.5, hound_duration, pt)
-            else
-                for _, hound in ipairs(summons) do
-                    SummonExpire(hound)
-                end
-                pt:destroy()
+                return true
             end
+
+            for _, hound in ipairs(summons) do
+                SummonExpire(hound)
+            end
+            return false
         end
 
         local function on_cleanup(pid)
@@ -103,6 +103,8 @@ OnInit.final("DarkSummonerSpells", function(Require)
                 TableRemove(PLAYER_SUMMONS, hounds[pid * PLAYER_CAP + i])
                 hounds[pid * PLAYER_CAP + i] = nil
             end
+
+            EVENT_ON_CLEANUP:unregister_action(pid, on_cleanup)
         end
 
         local function on_hit(source, target)
@@ -149,7 +151,7 @@ OnInit.final("DarkSummonerSpells", function(Require)
                     SetUnitPosition(summon, self.x, self.y)
                     BlzSetUnitFacingEx(summon, self.angle)
                     SetUnitVertexColor(summon, 120, 60, 60, 255)
-                    UnitSetBonus(summon, BONUS_ARMOR, 0)
+                    Unit[summon].bonus_armor = 0
                     SetUnitAbilityLevel(summon, FourCC('A06F'), 1)
                 else
                     summon = CreateUnit(Player(self.pid - 1), SUMMON_HOUND, self.x, self.y, self.angle)
@@ -187,7 +189,7 @@ OnInit.final("DarkSummonerSpells", function(Require)
             pt.time = 60.
             pt.tag = SUMMON_HOUND
             pt.count = self.hounds
-            pt.timer:callDelayed(0.5, hound_duration, pt)
+            pt:startLoop(0.5, hound_duration)
         end
     end
 
@@ -207,6 +209,8 @@ OnInit.final("DarkSummonerSpells", function(Require)
         local function on_cleanup(pid)
             TableRemove(PLAYER_SUMMONS, meatgolem[pid])
             meatgolem[pid] = nil
+
+            EVENT_ON_CLEANUP:unregister_action(pid, on_cleanup)
         end
 
         function thistype:onCast()
@@ -230,7 +234,7 @@ OnInit.final("DarkSummonerSpells", function(Require)
                 UnitRemoveAbility(summon, THUNDER_CLAP_GOLEM.id) -- thunder clap
                 UnitRemoveAbility(summon, MAGNETIC_FORCE.id) -- magnetic force
                 UnitRemoveAbility(summon, DEVOUR_GOLEM.id) -- devour
-                UnitSetBonus(summon, BONUS_ARMOR, 0)
+                Unit[summon].bonus_armor = 0
                 Unit[summon].bonus_str = 0
             else
                 summon = CreateUnit(Player(self.pid - 1), SUMMON_GOLEM, self.x, self.y, self.angle)
@@ -271,6 +275,27 @@ OnInit.final("DarkSummonerSpells", function(Require)
             int = function(pid) local ablev = GetUnitAbilityLevel(Hero[pid], thistype.id) return 0.5 * GetHeroInt(Hero[pid], true) * ablev end,
         }
 
+        ---@type fun(pt: PlayerTimer): boolean
+        local function periodic(pt)
+            local base = 0
+
+            if Unit[destroyer[pt.pid]].devour_stacks == 5 then
+                base = 400
+            elseif Unit[destroyer[pt.pid]].devour_stacks >= 3 then
+                base = 200
+            end
+
+            Unit[destroyer[pt.pid]].agi = IMinBJ(GetHeroAgi(destroyer[pt.pid], false) + 50, 400)
+
+            if pt.x == GetUnitX(destroyer[pt.pid]) and pt.y == GetUnitY(destroyer[pt.pid]) then
+                return true
+            end
+
+            Unit[destroyer[pt.pid]].agi = base
+
+            return false
+        end
+
         local function on_attack(source, target)
             local pid = GetPlayerId(GetOwningPlayer(source)) + 1
             local pt = TimerList[pid]:get('datk')
@@ -290,13 +315,15 @@ OnInit.final("DarkSummonerSpells", function(Require)
                     Unit[source].agi = 200
                 end
 
-                pt.timer:callDelayed(1., SUMMONDESTROYER.periodic, pt)
+                pt:startLoop(1., periodic)
             end
         end
 
         local function on_cleanup(pid)
             TableRemove(PLAYER_SUMMONS, destroyer[pid])
             destroyer[pid] = nil
+
+            EVENT_ON_CLEANUP:unregister_action(pid, on_cleanup)
         end
 
         local function on_hit(source, target)
@@ -310,25 +337,6 @@ OnInit.final("DarkSummonerSpells", function(Require)
             end
         end
 
-        ---@type fun(pt: PlayerTimer)
-        function thistype.periodic(pt)
-            local base = 0 ---@type integer 
-
-            if Unit[destroyer[pt.pid]].devour_stacks == 5 then
-                base = 400
-            elseif Unit[destroyer[pt.pid]].devour_stacks >= 3 then
-                base = 200
-            end
-
-            Unit[destroyer[pt.pid]].agi = IMinBJ(GetHeroAgi(destroyer[pt.pid], false) + 50, 400)
-
-            if pt.x == GetUnitX(destroyer[pt.pid]) and pt.y == GetUnitY(destroyer[pt.pid]) then
-                pt.timer:callDelayed(1., thistype.periodic, pt)
-            else
-                Unit[destroyer[pt.pid]].agi = base
-                pt:destroy()
-            end
-        end
 
         function thistype:onCast()
             local summon = destroyer[self.pid]
@@ -352,7 +360,7 @@ OnInit.final("DarkSummonerSpells", function(Require)
                 UnitRemoveAbility(summon, FourCC('A03B')) -- crit
                 UnitRemoveAbility(summon, BORROWED_LIFE.id) -- borrowed life
                 UnitRemoveAbility(summon, FourCC('A04Z')) -- devour
-                UnitSetBonus(summon, BONUS_ARMOR, 0)
+                Unit[summon].bonus_armor = 0
                 Unit[summon].bonus_str = 0
                 Unit[summon].bonus_agi = 0
                 Unit[summon].bonus_int = 0
@@ -395,27 +403,9 @@ OnInit.final("DarkSummonerSpells", function(Require)
     end
 
     ---@class DEVOUR : Spell
-    ---@field autocast function
     DEVOUR = Spell.define("A063")
     do
         local thistype = DEVOUR
-
-        ---@type fun(pt: PlayerTimer, order: string)
-        function thistype.autocast(pt, order)
-            local ug = CreateGroup()
-
-            MakeGroupInRange(pt.pid, ug, GetUnitX(pt.target), GetUnitY(pt.target), 1250., Condition(FilterHound))
-
-            local target = FirstOfGroup(ug)
-
-            if target then
-                IssueTargetOrder(pt.target, order, target)
-            end
-
-            DestroyGroup(ug)
-
-            pt.timer:callDelayed(1., thistype.autocast, pt, order)
-        end
     end
 
     ---@class DEMONICSACRIFICE : Spell
