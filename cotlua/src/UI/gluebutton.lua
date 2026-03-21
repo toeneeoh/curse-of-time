@@ -7,6 +7,8 @@
 OnInit.final("Gluebutton", function(Require)
     Require('TimerQueue')
 
+    local TQ = TimerQueue
+
     local TOOLTIP_SIZE       = 0.2 ---@type number 
     local SCROLL_DELAY       = 0.01 ---@type number 
     local DOUBLE_CLICK_DELAY = 0.25 ---@type number 
@@ -86,15 +88,17 @@ OnInit.final("Gluebutton", function(Require)
             return self.widthSize
         end
 
-        ---@type fun(self: Tooltip, newPoint: framepointtype):framepointtype
-        function thistype:point(newPoint)
+        ---@type fun(self: Tooltip, newPoint: framepointtype, secondPoint: framepointtype?, x: number?, y: number?): framepointtype
+        function thistype:point(newPoint, secondPoint, x, y)
             if newPoint ~= nil then
                 self.pointType = newPoint
 
                 if not self.simple then
                     BlzFrameClearAllPoints(self.tooltip)
 
-                    if newPoint == FRAMEPOINT_TOPLEFT then
+                    if secondPoint then
+                        BlzFrameSetPoint(self.tooltip, newPoint, self.parent, secondPoint, x or 0., y or 0.)
+                    elseif newPoint == FRAMEPOINT_TOPLEFT then
                         BlzFrameSetPoint(self.tooltip, newPoint, self.parent, FRAMEPOINT_TOPRIGHT, 0.005, -0.05)
                     elseif newPoint == FRAMEPOINT_TOPRIGHT then
                         BlzFrameSetPoint(self.tooltip, newPoint, self.parent, FRAMEPOINT_TOPLEFT, -0.005, -0.05)
@@ -388,23 +392,43 @@ OnInit.final("Gluebutton", function(Require)
 
         local FPS_32 = FPS_32
         local format = string.format
+        local Player = Player
 
-        local function cooldown_periodic(self, total_time, pid)
-            local p = GetLocalPlayer()
-            if self.cooldown_time[pid] <= 0 then
-                if p == Player(pid - 1) then
-                    BlzFrameSetVisible(self.cooldownFrame, false)
-                end
-                self.cooldown_callback[pid] = nil
-            else
-                if p == Player(pid - 1) then
-                    BlzFrameSetText(self.cooldownText, format("%.1f", self.cooldown_time[pid]))
-                    BlzFrameSetValue(self.cooldownFrame, 100 - (self.cooldown_time[pid] / total_time) * 100)
-                end
-                self.cooldown_time[pid] = self.cooldown_time[pid] - FPS_32
-
-                self.cooldown_callback[pid] = TimerQueue:callDelayed(FPS_32, cooldown_periodic, self, total_time, pid)
+        local function format_cooldown(t)
+            if t < 10 then
+                return format("%.1f", t)
             end
+
+            return tostring(R2I(t))
+        end
+
+        local function update_cooldown_ui(self, pid, remaining, total_time)
+            if GetLocalPlayer() ~= Player(pid - 1) then
+                return
+            end
+
+            if remaining <= 0 then
+                BlzFrameSetVisible(self.cooldownFrame, false)
+                return
+            end
+
+            BlzFrameSetText(self.cooldownText, format_cooldown(remaining))
+            -- 0 to 100 as cooldown progresses
+            BlzFrameSetValue(self.cooldownFrame, 100 - (remaining / total_time) * 100)
+        end
+
+        local function cooldown_tick(self, total_time, pid)
+            local remaining = (self.cooldown_time[pid] or 0) - FPS_32
+            self.cooldown_time[pid] = remaining
+
+            if remaining <= 0 then
+                update_cooldown_ui(self, pid, 0, total_time)
+                self.cooldown_callback[pid] = nil
+                return
+            end
+
+            update_cooldown_ui(self, pid, remaining, total_time)
+            self.cooldown_callback[pid] = TQ:callDelayed(FPS_32, cooldown_tick, self, total_time, pid)
         end
 
         local on_click_placeholder = function()
@@ -423,19 +447,23 @@ OnInit.final("Gluebutton", function(Require)
             self.cooldown_callback = {}
         end
 
-        function thistype:cooldown(time, pid)
-            if self.cooldown_callback[pid] then
-                self.cooldown_time[pid] = time
-                return
-            end
-            if GetLocalPlayer() == Player(pid - 1) then
-                BlzFrameSetText(self.cooldownText, format("%.1f", tostring(time)))
-                BlzFrameSetValue(self.cooldownFrame, 0)
-                BlzFrameSetVisible(self.cooldownFrame, true)
+        function thistype:cooldown(time, pid, total_time)
+            total_time = total_time or time
+
+            local cb = self.cooldown_callback[pid]
+            if cb then
+                TQ:disableCallback(cb)
             end
 
             self.cooldown_time[pid] = time
-            self.cooldown_callback[pid] = TimerQueue:callDelayed(FPS_32, cooldown_periodic, self, time, pid)
+
+            -- immediate ui update for the first frame
+            update_cooldown_ui(self, pid, time, total_time)
+
+            if GetLocalPlayer() == Player(pid - 1) then
+                BlzFrameSetVisible(self.cooldownFrame, true)
+            end
+            self.cooldown_callback[pid] = TQ:callDelayed(FPS_32, cooldown_tick, self, total_time, pid)
         end
 
         ---@param model string
