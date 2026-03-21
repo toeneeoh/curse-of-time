@@ -67,10 +67,15 @@ do
         end
     end
 
+    ---@return integer
     function enum(...)
+        local count = 0
         for i, name in ipairs{...} do
             rawset(_G, name, i)
+            count = count + 1
         end
+
+        return count
     end
 
     --credits: Bribe
@@ -140,14 +145,15 @@ dofile('Utility/helper.lua')
 dofile('Utility/pathing.lua')
 dofile('Utility/playertimer.lua')
 dofile('Utility/preload.lua')
+dofile('Utility/timerframe.lua')
 dofile('Utility/timerqueue.lua')
 dofile('Utility/unitevent.lua')
 dofile('Utility/unittable.lua')
 dofile('Utility/users.lua')
 dofile('Utility/worldbounds.lua')
+dofile('Utility/shield.lua')
 
 dofile('Utility/PrecomputedHeightMap.lua')
-dofile('Utility/Hook.lua')
 dofile('Utility/HandleType.lua')
 dofile('Utility/ALICE/ALICE.lua')
 dofile('Utility/ALICE/CAT_data.lua')
@@ -204,6 +210,7 @@ dofile('UI/hidemindamage.lua')
 dofile('UI/inventory.lua')
 dofile('UI/inspect.lua')
 dofile('UI/potion.lua')
+dofile('UI/buffbar.lua')
 
 dofile('Game/boss.lua')
 dofile('Game/buffs.lua')

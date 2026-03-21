@@ -43,6 +43,7 @@ OnInit.global("Profile", function(Require)
     Require('TimerQueue')
     Require('Hotkeys')
 
+    local cos, sin = math.cos, math.sin
     local SETUP_X = -690.
     local SETUP_Y = -238.
 
@@ -115,6 +116,10 @@ OnInit.global("Profile", function(Require)
                 profile.save_timer = nil
             end
             profile.autosave = false
+
+            Hero[pid] = nil
+            HeroID[pid] = 0
+            Backpack[pid] = nil
         end
 
         ---@type fun(pid: integer): Profile
@@ -220,11 +225,6 @@ OnInit.global("Profile", function(Require)
                     DisplayTextToPlayer(p, 0, 0, "You can only repick in church, town or tavern.")
                     return
                 end
-            end
-
-            -- close stat window
-            if GetLocalPlayer() == p then
-                BlzFrameSetVisible(STAT_WINDOW.frame, false)
             end
 
             -- reset multiboard
@@ -513,7 +513,7 @@ OnInit.global("Profile", function(Require)
 
         -- save all codes in backup folder with time stamp
         function thistype:generate_backup()
-            local backup_folder = MAP_NAME .. "\\BACKUP\\" .. User[self.pid - 1].name .. "\\" .. os.date("\x25B_\x25d_\x25Y_\x25H_\x25M")
+            local backup_folder = MAP_NAME .. "\\BACKUP\\" .. User[self.pid - 1].name .. "\\" .. os.date("%B_%d_%Y_%H_%M")
 
             if GetLocalPlayer() == Player(self.pid - 1) then
                 FileIO.Save(backup_folder .. "\\profile.pld", "\n" .. self.profile_code)
@@ -565,7 +565,7 @@ OnInit.global("Profile", function(Require)
                 DisplayTimedTextToPlayer(p, 0, 0, 120, "(Warcraft III\\CustomMapData\\" .. MAP_NAME .. "\\" .. GetPlayerName(p) .. ")")
                 DisplayTimedTextToPlayer(p, 0, 0, 120, "|cffffcc00Make sure to type|r -load |cffffcc00the next time you play.|r")
                 DisplayTimedTextToPlayer(p, 0, 0, 120, "|cffffcc00A backup of your data has also been created at:|r")
-                DisplayTimedTextToPlayer(p, 0, 0, 120, "(" .. MAP_NAME .. "\\BACKUP\\" .. GetPlayerName(p) .. "\\" .. os.date("\x25B_\x25d_\x25Y_\x25H_\x25M") .. ")")
+                DisplayTimedTextToPlayer(p, 0, 0, 120, "(" .. MAP_NAME .. "\\BACKUP\\" .. GetPlayerName(p) .. "\\" .. os.date("%B_%d_%Y_%H_%M") .. ")")
                 DisplayTimedTextToPlayer(p, 0, 0, 120, "-------------------------------------------------------------------")
             end
         end
@@ -640,23 +640,25 @@ OnInit.global("Profile", function(Require)
         end
     end
 
-    local function backpack_periodic(bp, pid)
-        if bp then
-            local x = GetUnitX(Hero[pid]) + 50 * math.cos((GetUnitFacing(Hero[pid]) - 45) * bj_DEGTORAD)
-            local y = GetUnitY(Hero[pid]) + 50 * math.sin((GetUnitFacing(Hero[pid]) - 45) * bj_DEGTORAD)
+    local function backpack_periodic(pt)
+        local pid = pt.pid
+        local hero = Hero[pid]
+        local bp = Backpack[pid]
+        local facing = GetUnitFacing(hero)
+        local x = GetUnitX(hero) + 50 * cos((facing - 45) * bj_DEGTORAD)
+        local y = GetUnitY(hero) + 50 * sin((facing - 45) * bj_DEGTORAD)
 
-            if IsUnitInRange(Hero[pid], bp, 1000.) == false then
-                SetUnitXBounded(bp, x)
-                SetUnitYBounded(bp, y)
-                BlzUnitClearOrders(bp, false)
-            elseif not Unit[bp].busy or IsUnitInRange(Hero[pid], bp, 800.) == false then
-                if IsUnitInRange(Hero[pid], bp, 50.) == false then
-                    IssuePointOrderById(bp, ORDER_ID_MOVE, x, y)
-                end
+        if not IsUnitInRange(hero, bp, 1000.) then
+            SetUnitXBounded(bp, x)
+            SetUnitYBounded(bp, y)
+            BlzUnitClearOrders(bp, false)
+        elseif not Unit[bp].busy or not IsUnitInRange(Hero[pid], bp, 800.) then
+            if IsUnitInRange(Hero[pid], bp, 50.) == false then
+                IssuePointOrderById(bp, ORDER_ID_MOVE, x, y)
             end
-
-            TimerQueue:callDelayed(0.35, backpack_periodic, bp, pid)
         end
+
+        return true
     end
 
     ---@class HeroData
@@ -699,13 +701,6 @@ OnInit.global("Profile", function(Require)
                 HeroID[pid] = id
                 PLAYER_SELECTED_UNIT[pid] = hero
 
-                Unit[hero].mr = HERO_STATS[id].magic_resist
-                Unit[hero].pr = HERO_STATS[id].phys_resist
-                Unit[hero].pm = HERO_STATS[id].phys_damage
-                Unit[hero].cc_flat = HERO_STATS[id].crit_chance
-                Unit[hero].cd_flat = HERO_STATS[id].crit_damage
-                Unit[hero].mana_regen_max = HERO_STATS[id].mana_regen_max or 0
-
                 -- backpack
                 local backpack = CreateUnit(Player(pid - 1), BACKPACK, GetRectCenterX(gg_rct_ChurchSpawn), GetRectCenterY(gg_rct_ChurchSpawn), 0)
                 Backpack[pid] = backpack
@@ -721,8 +716,16 @@ OnInit.global("Profile", function(Require)
                     BlzSetUnitBooleanField(backpack, UNIT_BF_HERO_HIDE_HERO_INTERFACE_ICON, false)
                 end
 
+                -- force refresh
                 SetUnitOwner(backpack, Player(PLAYER_NEUTRAL_PASSIVE), false)
                 SetUnitOwner(backpack, Player(pid - 1), false)
+
+                -- locust trick (disable directly clicking)
+                UnitAddAbility(backpack, FourCC('Aloc'))
+                ShowUnit(backpack, false)
+                ShowUnit(backpack, true)
+                UnitRemoveAbility(backpack, FourCC('Aloc'))
+
                 SetUnitAnimation(backpack, "stand")
                 SuspendHeroXP(backpack, true)
                 UnitAddAbility(backpack, TELEPORT.id)
@@ -731,7 +734,8 @@ OnInit.global("Profile", function(Require)
                 UnitAddAbility(backpack, FourCC('A04M'))
                 UnitAddAbility(backpack, FourCC('A00F')) -- settings
 
-                TimerQueue:callDelayed(0.01, backpack_periodic, backpack, pid)
+                local pt = TimerList[pid]:add()
+                pt:startLoop(0.35, backpack_periodic)
                 EVENT_ON_ORDER:register_unit_action(backpack, backpack_ai)
 
                 -- grave
@@ -887,6 +891,7 @@ OnInit.global("Profile", function(Require)
 
     local function on_hero_death(killed, killer)
         local pid = GetPlayerId(GetOwningPlayer(killed)) + 1
+        local x, y = GetUnitX(killed), GetUnitY(killed)
 
         -- disable backpack teleports
         DisableBackpackTeleports(pid, true)
@@ -906,10 +911,10 @@ OnInit.global("Profile", function(Require)
 
     ---@type fun(pid: integer, load: boolean)
     function CharacterSetup(pid, load)
-        local hero = Profile[pid].hero
+        local hero_data = Profile[pid].hero
         local x, y, angle, camera = SETUP_X, SETUP_Y, 0, MAIN_MAP.rect -- outside tavern
 
-        hero:load_data(pid)
+        hero_data:load_data(pid)
 
         if load then
             x, y, angle, camera = GetRectCenterX(gg_rct_ChurchSpawn), GetRectCenterY(gg_rct_ChurchSpawn), 270., gg_rct_Church
@@ -918,30 +923,44 @@ OnInit.global("Profile", function(Require)
             -- new characters can save immediately
             Profile[pid].cannot_load = true
 
-            -- default potions
+            -- give default potions
             PlayerAddItemById(pid, 'I02F')
             PlayerAddItemById(pid, 'I00E')
         end
 
+        -- move passive ability icon position
         if GetLocalPlayer() == Player(pid - 1) then
             BlzSetAbilityPosY(HERO_STATS[HeroID[pid]].passive, 0)
         end
 
-        SetUnitPosition(Hero[pid], x, y)
+        local hero = Hero[pid]
+
+        -- set position and camera
+        SetUnitPosition(hero, x, y)
         SetUnitPosition(Backpack[pid], x, y)
-        BlzSetUnitFacingEx(Hero[pid], angle)
+        BlzSetUnitFacingEx(hero, angle)
         SetCamera(pid, camera)
 
+        -- set to playing and no longer selecting
         SELECTING_HERO[pid] = false
         Profile[pid].playing = true
 
         -- heal to max
-        SetWidgetLife(Hero[pid], BlzGetUnitMaxHP(Hero[pid]))
-        SetUnitState(Hero[pid], UNIT_STATE_MANA, (HeroID[pid] ~= HERO_VAMPIRE and BlzGetUnitMaxMana(Hero[pid])) or 0)
+        SetWidgetLife(hero, BlzGetUnitMaxHP(hero))
+        SetUnitState(hero, UNIT_STATE_MANA, (HeroID[pid] ~= HERO_VAMPIRE and BlzGetUnitMaxMana(hero)) or 0)
 
-        EVENT_ON_UNIT_DEATH:register_unit_action(Hero[pid], on_hero_death)
-        EVENT_STAT_CHANGE:register_unit_action(Hero[pid], UpdateSpellTooltips)
+        -- register on death / stat change events
+        EVENT_ON_UNIT_DEATH:register_unit_action(hero, on_hero_death)
+        EVENT_STAT_CHANGE:register_unit_action(hero, UpdateSpellTooltips)
+
+        -- trigger setup event (for any innates)
         EVENT_ON_SETUP:trigger(pid)
+
+        -- force click event on hero
+        EVENT_ON_UNIT_SELECT:trigger(hero, pid)
+        EVENT_ON_SELECT:trigger(pid, hero)
+
+        ExperienceControl(pid)
     end
 
 end, Debug and Debug.getLine())

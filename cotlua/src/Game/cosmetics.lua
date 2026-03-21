@@ -9,6 +9,7 @@ OnInit.final("Cosmetics", function(Require)
     Require('Variables')
     Require('MapSetup')
 
+    CosmeticTable = array2d(0) ---@type table
     DONATOR_AURA_OFFSET = 1000 ---@type integer 
 
     IS_DONATOR = {} ---@type boolean[] 
@@ -42,7 +43,7 @@ OnInit.final("Cosmetics", function(Require)
     }
 
     for i = 1, #donator do
-        local name, skinFlags, auraFlags = donator[i]:match("(\x25S+) (\x25S+) (\x25S+)")
+        local name, skinFlags, auraFlags = donator[i]:match("(%S+) (%S+) (%S+)")
 
         --flag as donator
         CosmeticTable[name][0] = 1

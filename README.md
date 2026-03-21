@@ -17,7 +17,7 @@ Antares: ALICE (Physics Engine), PrecomputedHeightMap, HandleType
 
 Eikonium: DebugUtils, TimerQueue
 
-Bribe: TotalInitialization, Hook
+Bribe: TotalInitialization
 
 Trokkin: FileIO
 

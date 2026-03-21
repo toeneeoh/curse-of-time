@@ -66,7 +66,7 @@ OnInit.final("Events", function()
             in_flight[self] = nil
             recurseCount[u] = recurseCount[u] - 1
 
-            -- less burden on gc?
+            -- TODO: less burden on gc?
             if recurseCount[u] == 0 then
                 recurse[u] = nil
                 recurseCount[u] = nil
@@ -199,6 +199,10 @@ OnInit.final("Events", function()
     EVENT_ON_KILL       = EVENT.create()
     EVENT_ON_REVIVE     = EVENT.create()
     EVENT_ON_DEATH      = PLAYER_EVENT.create()
+
+    -- shields
+    EVENT_ON_SHIELD_APPLY = EVENT.create()
+    EVENT_ON_SHIELD_EXPIRE = EVENT.create()
 
     -- unit order events
     EVENT_ON_AGGRO = EVENT.create()

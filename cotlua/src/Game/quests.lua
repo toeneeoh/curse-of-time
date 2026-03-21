@@ -340,7 +340,7 @@ OnInit.final("Quests", function(Require)
                         PlayerAddItemById(pid, reward)
                     end
 
-                    local XP = REWARDS[id].XP * XP_Rate[pid] * 0.01
+                    local XP = REWARDS[id].XP * Unit[Hero[pid]].xp_rate * 0.01
                     AwardXP(pid, XP)
                 else
                     DisplayTextToPlayer(Player(pid - 1), 0, 0, "You do not have the head.")
@@ -373,19 +373,152 @@ OnInit.final("Quests", function(Require)
 
     -- kill quests
     do
+        local count = 0
+        local KillQuest = {}
+        local PRECHAOS, CHAOS = 0, 1
+        KillQuest[PRECHAOS] = {}
+        KillQuest[CHAOS] = {}
+
+        ---@param pid integer
+        function DisplayQuestProgress(pid)
+            local i = 0 ---@type integer 
+            local flag = (CHAOS_MODE and 1) or 0
+            local id = KillQuest[flag][i]
+            local kq = KillQuest[id]
+
+            while kq do
+                local s = (kq.count == kq.goal and "|cff40ff40") or ""
+
+                DisplayTimedTextToPlayer(Player(pid - 1), 0, 0, 10, kq.name .. ": " .. s .. (kq.count) .. "/" .. (kq.goal) .. "|r |cffffcc01LVL " .. (kq.min) .. "-" .. (kq.max))
+                i = i + 1
+                id = KillQuest[flag][i]
+                kq = KillQuest[id]
+            end
+        end
+
+        local function kill_quest_handler(p, pid, _, itm)
+            local kq          = KillQuest[itm.id] ---@type table 
+            local min         = kq.min ---@type integer 
+            local max         = kq.max ---@type integer 
+            local avg         = (min + max) // 2
+            local goal        = kq.goal ---@type integer 
+            local playercount = 0 ---@type integer 
+            local U           = User.first ---@type User 
+            local x           = 0.
+            local y           = 0.
+            local myregion    = nil ---@type rect 
+
+            if GetUnitLevel(Hero[pid]) < min then
+                DisplayTimedTextToPlayer(p, 0,0, 10, "You must be level |cffffcc00" .. (min) .. "|r to begin this quest.")
+            elseif GetUnitLevel(Hero[pid]) > max then
+                DisplayTimedTextToPlayer(p, 0,0, 10, "You are too high level to do this quest.")
+            -- progress
+            elseif kq.status == "IN_PROGRESS" then
+                DisplayTimedTextToPlayer(p, 0,0, 10, "Killed " .. (kq.count) .. "/" .. (goal) .. " " .. kq.name)
+                PingMinimap(GetRectCenterX(kq.region), GetRectCenterY(kq.region), 3)
+            -- start quest
+            elseif kq.status == "NOT_STARTED" then
+                kq.status = "IN_PROGRESS"
+                DisplayTimedTextToPlayer(p, 0, 0, 10, "|cffffcc00QUEST:|r Kill " .. (goal) .. " " .. kq.name .. " for a reward.")
+                PingMinimap(GetRectCenterX(kq.region), GetRectCenterY(kq.region), 5)
+            -- completion
+            elseif kq.status == "COMPLETE" then
+                while U do
+                    if Profile[U.id].playing and GetUnitLevel(Hero[U.id]) >= min and GetUnitLevel(Hero[U.id]) <= max then
+                        playercount = playercount + 1
+                    end
+
+                    U = U.next
+                end
+
+                U = User.first
+
+                while U do
+                    if GetHeroLevel(Hero[U.id]) >= min and GetHeroLevel(Hero[U.id]) <= max then
+                        DisplayTimedTextToPlayer(U.player, 0, 0, 10, "|c00c0c0c0" .. kq.name .. " quest completed!|r")
+                        local GOLD = GOLD_TABLE[avg] * goal * 0.5 / (0.5 + playercount * 0.5)
+                        AwardGold(U.id, GOLD, true)
+                        local XP = math.floor(EXPERIENCE_TABLE[max] * Unit[Hero[U.id]].xp_rate * goal * 0.0008) / (0.5 + playercount * 0.5)
+                        AwardXP(U.id, XP)
+                    end
+
+                    U = U.next
+                end
+
+                -- reset
+                kq.status = "IN_PROGRESS"
+                kq.count = 0
+                kq.goal = math.min(goal + 3, 100)
+
+                -- increase max spawns based on last unit killed (until max goal of 100 is reached)
+                if (kq.goal) < 100 and ModuloInteger(kq.goal, 2) == 0 then
+                    myregion = SelectGroupedRegion(UnitData[kq.last].spawn)
+                    repeat
+                        x = GetRandomReal(GetRectMinX(myregion), GetRectMaxX(myregion))
+                        y = GetRandomReal(GetRectMinY(myregion), GetRectMaxY(myregion))
+                    until IsTerrainWalkable(x, y)
+                    CreateUnit(PLAYER_CREEP, kq.last, x, y, GetRandomInt(0, 359))
+                    DisplayTimedTextToForce(FORCE_PLAYING, 20., "An additional " .. GetObjectName(kq.last) .. " has spawned in the area.")
+                end
+            end
+        end
+
+        local function setup_kill_quest(id, itemid, goal, min, max, name, region, chaos)
+            KillQuest[chaos][count] = id
+            local kq = {
+                goal = goal,
+                min = min,
+                max = max,
+                name = name,
+                region = region,
+                count = 0,
+                status = "NOT_STARTED",
+            }
+
+            count = count + 1
+            KillQuest[id] = kq
+            KillQuest[itemid] = kq
+            ITEM_LOOKUP[itemid] = kill_quest_handler
+        end
+
+        setup_kill_quest(FourCC('n0tb'), FourCC('I07D'), 15, 1, 8, "Trolls", gg_rct_Troll_Demon_1, PRECHAOS)
+        setup_kill_quest(FourCC('n0ts'), FourCC('I058'), 20, 3, 14, "Tuskarr", gg_rct_Tuskar_Horror_1, PRECHAOS)
+        setup_kill_quest(FourCC('n0ss'), FourCC('I05F'), 20, 5, 24, "Spiders", gg_rct_Spider_Horror_3, PRECHAOS)
+        setup_kill_quest(FourCC('n0uw'), FourCC('I04U'), 25, 8, 34, "Ursae", gg_rct_Ursa_Abyssal_2, PRECHAOS)
+        setup_kill_quest(FourCC('n0dm'), FourCC('I04V'), 20, 12, 46, "Polar Bears & Mammoths", gg_rct_Bear_2, PRECHAOS)
+        setup_kill_quest(FourCC('n01G'), FourCC('I05B'), 25, 20, 62, "Taurens & Ogres", gg_rct_OgreTauren_Void_5, PRECHAOS)
+        setup_kill_quest(FourCC('n0ud'), FourCC('I05L'), 25, 29, 84, "Unbroken", gg_rct_Unbroken_Dimensional_2, PRECHAOS)
+        setup_kill_quest(FourCC('n0hs'), FourCC('I05E'), 20, 44, 110, "Hellspawn", gg_rct_Hell_4, PRECHAOS)
+        setup_kill_quest(FourCC('n024'), FourCC('I0GD'), 20, 56, 134, "Centaurs", gg_rct_Centaur_Nightmare_5, PRECHAOS)
+        setup_kill_quest(FourCC('n01M'), FourCC('I05K'), 20, 70, 162, "Magnataurs", gg_rct_Magnataur_Despair_1, PRECHAOS)
+        setup_kill_quest(FourCC('n02P'), FourCC('I05M'), 20, 92, 182, "Dragons", gg_rct_Dragon_Astral_8, PRECHAOS)
+        setup_kill_quest(FourCC('n02L'), FourCC('I022'), 20, 110, 198, "Devourers", gg_rct_Devourer_entry, PRECHAOS)
+        count = 0
+        setup_kill_quest(FourCC('n034'), FourCC('I03H'), 20, 166, 256, "Demons", gg_rct_Troll_Demon_1, CHAOS)
+        setup_kill_quest(FourCC('n03A'), FourCC('I09J'), 20, 190, 260, "Horror Beasts", gg_rct_Tuskar_Horror_1, CHAOS)
+        setup_kill_quest(FourCC('n03F'), FourCC('I03C'), 20, 210, 280, "Despairs", gg_rct_Magnataur_Despair_1, CHAOS)
+        setup_kill_quest(FourCC('n08N'), FourCC('I02A'), 20, 229, 299, "Abyssals", gg_rct_Ursa_Abyssal_2, CHAOS)
+        setup_kill_quest(FourCC('n031'), FourCC('I03I'), 20, 250, 320, "Voids", gg_rct_OgreTauren_Void_5, CHAOS)
+        setup_kill_quest(FourCC('n020'), FourCC('I0GE'), 20, 270, 340, "Nightmares", gg_rct_Centaur_Nightmare_5, CHAOS)
+        setup_kill_quest(FourCC('n03D'), FourCC('I03J'), 20, 290, 360, "Hellspawn", gg_rct_Hell_4, CHAOS)
+        setup_kill_quest(FourCC('n03J'), FourCC('I02G'), 30, 310, 380, "Existences", gg_rct_Devourer_entry, CHAOS)
+        setup_kill_quest(FourCC('n03M'), FourCC('I039'), 20, 330, 400, "Astrals", gg_rct_Dragon_Astral_8, CHAOS)
+        setup_kill_quest(FourCC('n026'), FourCC('I0Q1'), 20, 350, 420, "Dimensionals", gg_rct_Unbroken_Dimensional_2, CHAOS)
+
         local function on_death(pid, killed, killer)
             local uid      = GetUnitTypeId(killed)
             local unitType = GetType(uid)
             local kpid     = GetPlayerId(GetOwningPlayer(killer)) + 1
+            local kq       = KillQuest[unitType]
 
-            if unitType > 0 and KillQuest[unitType].status == 1 and GetHeroLevel(Hero[kpid]) <= KillQuest[unitType].max + LEECH_CONSTANT then
-                KillQuest[unitType].count = KillQuest[unitType].count + 1
-                FloatingTextUnit(KillQuest[unitType].name .. " " .. (KillQuest[unitType].count) .. "/" .. (KillQuest[unitType].goal), killed, 3.1 ,80, 90, 9, 125, 200, 200, 0, true)
+            if unitType > 0 and kq and kq.status == "IN_PROGRESS" and GetHeroLevel(Hero[kpid]) <= kq.max + LEECH_CONSTANT then
+                kq.count = kq.count + 1
+                FloatingTextUnit(kq.name .. " " .. (kq.count) .. "/" .. (kq.goal), killed, 3.1 ,80, 90, 9, 125, 200, 200, 0, true)
 
-                if KillQuest[unitType].count >= KillQuest[unitType].goal then
-                    KillQuest[unitType].status = 2
-                    KillQuest[unitType].last = uid
-                    DisplayTimedTextToForce(FORCE_PLAYING, 12, KillQuest[unitType].name .. " quest completed, talk to the Huntsman for your reward.")
+                if kq.count >= kq.goal then
+                    kq.status = "COMPLETE"
+                    kq.last = uid
+                    DisplayTimedTextToForce(FORCE_PLAYING, 12, kq.name .. " quest completed, talk to the Huntsman for your reward.")
                 end
             end
         end
@@ -393,8 +526,8 @@ OnInit.final("Quests", function(Require)
         EVENT_ON_DEATH:register_action(CREEP_ID, on_death)
     end
 
-        -- F9 info
-        CreateQuestBJ(bj_QUESTTYPE_REQ_DISCOVERED, "|c008000ffNevermore|r", [[The Nevermore Series is developed by: Mayday & lcm.
+    -- F9 info
+    CreateQuestBJ(bj_QUESTTYPE_REQ_DISCOVERED, "|c008000ffNevermore|r", [[The Nevermore Series is developed by: Mayday & lcm.
 
 Thanks to previous contributors:
 Waugriff
@@ -435,7 +568,6 @@ Maiev|r]], "ReplaceableTextures\\CommandButtons\\BTNJaina.blp")
 -savetime (time until you can save again)
 -restime (time until you can recharge your ankh again)
 -st (show time until next save)
--flee (leave an instance)
 -hints (enables hint messages)
 -nohints (disables hint messages)
 -color # (changes your player color)

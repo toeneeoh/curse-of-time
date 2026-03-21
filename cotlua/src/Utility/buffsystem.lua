@@ -1,6 +1,7 @@
 OnInit.global("BuffSystem", function(Require)
     Require('TimerQueue')
     Require('UnitEvent')
+    Require('BuffBar')
 
     -------------------------------//
     ----------- BUFF TYPES --------//
@@ -23,18 +24,14 @@ OnInit.global("BuffSystem", function(Require)
     --Each buff applied fully stacks.
     BUFF_STACK_FULL   = 2 ---@type integer 
 
-    --Determines the automatic Buff rawcode based on the Ability rawcode
-    --If BUFF_OFFSET = 0x01000000, then Ability rawcode of FourCC('AXXX') will have Buff rawcode of FourCC('BXXX')
-    local BUFF_OFFSET = 0x01000000 ---@type integer 
     local buffs = {}
-    local count = array2d(0)
+    local TQ = TimerQueue
 
     ---@class Buff
     ---@field pid integer
     ---@field tpid integer
     ---@field target unit
     ---@field source unit
-    ---@field RAWCODE integer
     ---@field buffId integer
     ---@field STACK_TYPE integer
     ---@field DISPEL_TYPE integer
@@ -53,82 +50,69 @@ OnInit.global("BuffSystem", function(Require)
     ---@field create function
     ---@field duration function
     ---@field refresh function
-    ---@field timer TimerQueue
+    ---@field remaining function
     Buff = {} ---@type Buff
     do
         local thistype = Buff
-        thistype.timer = TimerQueue.create()
-
-        --Buff defaults
-        thistype.pid = 0 ---@type integer
-        thistype.tpid = 0 ---@type integer
-        thistype.target = nil ---@type unit 
-        thistype.source = nil ---@type unit 
-        thistype.RAWCODE = 0 ---@type integer 
-        thistype.STACK_TYPE = 0 ---@type integer 
-        thistype.DISPEL_TYPE = 0 ---@type integer 
-        thistype.onApply = nil ---@type function
-        thistype.onRemove = nil ---@type function
 
         --===============================================================
         --======================== BUFF CORE ============================
         --===============================================================    
 
-        ---@type fun(self: Buff, source: unit, target: unit, apply: boolean, dur: number)
-        function thistype:refresh(source, target, dur)
-            local b = self:get(source, target)
-            local oldsource = source
+        ---@type fun(): Buff
+        function Buff.new()
+            local self = setmetatable({
+                pid = 0,
+                tpid = 0,
+                STACK_TYPE = 0,
+                DISPEL_TYPE = 0,
+                ICON = "ReplaceableTextures\\CommandButtons\\BTNShoveler.blp",
+                NAME = "Placeholder",
+                DESC = "Placeholder",
+            }, { __index = Buff })
 
-            if b then
-                oldsource = b.source
-                b:remove()
-                b = self:add(oldsource, target)
-                if dur then
-                    b:duration(dur)
-                end
-            end
+            self.parent = self -- self reference
+
+            return self
         end
 
-        ---@type fun(self: Buff, source: unit, target: unit): Buff | nil
-        function thistype:get(source, target)
-            for i = 1, #buffs do
-                if buffs[i].RAWCODE == self.RAWCODE and target == buffs[i].target and (source == nil or source == buffs[i].source) then
-                    return buffs[i]
+        ---@type fun(self: Buff)
+        function Buff:refresh()
+            if self.onRemove then self:onRemove() end
+            if self.onApply then self:onApply() end
+        end
+
+        ---@type fun(self: Buff, source: unit, target: unit): Buff?
+        function Buff:get(source, target)
+            local tbl = Unit[target].buffs
+
+            if not tbl then
+                return nil
+            end
+
+            -- search target's buffs over global
+            for i = 1, #tbl do
+                local b = tbl[i]
+
+                if b.parent == self.parent and target == b.target and (source == nil or source == b.source) then
+                    return b
                 end
             end
 
             return nil
         end
 
-        ---@type fun(self: Buff, source: unit, target: unit):boolean
-        function thistype:has(source, target)
+        ---@type fun(self: Buff, source: unit, target: unit): boolean
+        function Buff:has(source, target)
             return self:get(source, target) ~= nil
         end
 
         function thistype:remove()
-            local remove = false
-
-            if self.STACK_TYPE == BUFF_STACK_FULL or self.STACK_TYPE == BUFF_STACK_PARTIAL then
-                -- Update Buff count
-                count[self.RAWCODE][self.target] = count[self.RAWCODE][self.target] - 1
-
-                if count[self.RAWCODE][self.target] == 0 then
-                    remove = true
-                end
-            elseif self.STACK_TYPE == BUFF_STACK_NONE then
-                remove = true
+            if self.internal_callback then
+                TQ:disableCallback(self.internal_callback)
             end
 
-            if remove then
-                UnitRemoveAbility(self.target, self.RAWCODE)
-                UnitRemoveAbility(self.target, self.RAWCODE + BUFF_OFFSET)
-            end
-
-            if self.callback then
-                thistype.timer:disableCallback(self.callback)
-            end
-
-            -- remove from buffs
+            -- remove from buffs table
             for i = 1, #buffs do
                 if buffs[i] == self then
                     buffs[i] = buffs[#buffs]
@@ -137,66 +121,87 @@ OnInit.global("BuffSystem", function(Require)
                 end
             end
 
+            -- remove from buff bar
+            UnitRemoveBuff(self.target, self)
+
             if self.onRemove then
                 self:onRemove()
             end
-
-            self = nil
         end
 
         ---@type fun(self: Buff, dur: number)
-        function thistype:duration(dur)
-            if self.callback then
-                thistype.timer:disableCallback(self.callback)
+        function Buff:duration(dur)
+            if self.internal_callback then
+                TQ:disableCallback(self.internal_callback)
             end
 
             if dur then
-                self.callback = thistype.timer:callDelayed(dur, self.remove, self)
+                self.internal_callback = TQ:callDelayed(dur, self.remove, self)
             end
+
+            -- refresh buff bar
+            UnitRefreshBuff(self.target)
         end
 
-        ---@type fun(self: Buff, source: unit, target: unit): Buff
-        function thistype:check(source, target)
-            local apply = false ---@type boolean 
-            local similar = self:get(nil, target) ---@type Buff
+        ---@type fun(self: Buff): number?
+        function Buff:remaining()
+            return TQ:getRemaining(self.internal_callback)
+        end
+
+        ---@type fun(self: Buff): number?
+        function Buff:timeout()
+            return TQ:getTimeout(self.internal_callback)
+        end
+
+        function Buff:check(source, target)
+            local apply = false
 
             if self.STACK_TYPE == BUFF_STACK_FULL then
-                --Update target buff count
-                count[self.RAWCODE][target] = count[self.RAWCODE][target] + 1
                 apply = true
 
             elseif self.STACK_TYPE == BUFF_STACK_PARTIAL then
-                if not similar then
-                    --Update target buff count
-                    count[self.RAWCODE][target] = count[self.RAWCODE][target] + 1
-                    apply = true
+                local same = self:get(nil, target) ---@type Buff
+
+                if same then
+                    -- stronger buff takeover
+                    if self.ablev and same.ablev and self.ablev > same.ablev then
+                        same.ablev = self.ablev
+                        same.source = source
+                        same.target = target
+                        same.pid = GetPlayerId(GetOwningPlayer(source)) + 1
+                        same.tpid = GetPlayerId(GetOwningPlayer(target)) + 1
+
+                        same:refresh()
+                    end
+
+                    return same
                 else
-                    self = similar
+                    apply = true
                 end
 
             elseif self.STACK_TYPE == BUFF_STACK_NONE then
-                if not similar then
-                    apply = true
+                local same = self:get(nil, target)
+
+                if same then
+                    self = same
                 else
-                    self = similar
+                    apply = true
                 end
             end
 
             self.source = source
             self.target = target
+            self.pid = GetPlayerId(GetOwningPlayer(source)) + 1
+            self.tpid = GetPlayerId(GetOwningPlayer(target)) + 1
 
             if apply then
-                --Append to buffs
                 buffs[#buffs + 1] = self
-
-                if GetUnitAbilityLevel(target, self.RAWCODE) == 0 then
-                    UnitAddAbility(target, self.RAWCODE)
-                    UnitMakeAbilityPermanent(target, true, self.RAWCODE)
-                end
 
                 if self.onApply then
                     self:onApply()
                 end
+
+                UnitAddBuff(target, self)
             end
 
             return self
@@ -243,20 +248,37 @@ OnInit.global("BuffSystem", function(Require)
             end
         end
 
-        ---@type fun(self: Buff, source: unit, target: unit)
+        ---@type fun(self: Buff, source: unit, target: unit): boolean
         function thistype:dispel(source, target)
-            for i = 1, #buffs do
-                if buffs[i].RAWCODE == self.RAWCODE and target == buffs[i].target and (source == nil or source == buffs[i].source) and not buffs[i].CANNOT_PURGE then
-                    buffs[i]:remove()
-                    break
+            local tbl = Unit[target]
+
+            if not tbl then
+                return false
+            end
+
+            tbl = Unit[target].buffs
+
+            if not tbl then
+                return false
+            end
+
+            for i = 1, #tbl do
+                local b = tbl[i]
+
+                if b.parent == self and target == b.target and (source == nil or source == b.source) and not b.CANNOT_PURGE then
+                    b:remove()
+                    return true
                 end
             end
+
+            return false
         end
 
+        -- remove all instances of a specific buff (ie. weather)
         function thistype:removeAll()
             local i = 1
             while i <= #buffs do
-                if buffs[i].RAWCODE == self.RAWCODE then
+                if buffs[i].parent == self then
                     buffs[i]:remove()
                 else
                     i = i + 1
@@ -273,15 +295,39 @@ OnInit.global("BuffSystem", function(Require)
 
             local b = setmetatable({}, mts[self])
 
+            b.parent = self
             b.pid = GetPlayerId(GetOwningPlayer(source)) + 1
             b.tpid = GetPlayerId(GetOwningPlayer(target)) + 1
 
             return b
         end
 
-        ---@type fun(self: Buff, source: unit, target: unit): Buff
-        function thistype:add(source, target)
-            local b = self:create(source, target)
+        ---@type fun(self: Buff, source: unit, target: unit, ablev: number?): Buff
+        function Buff:add(source, target, ablev)
+            ablev = ablev or 1
+
+            -- check for existing buffs to refresh
+            if self.STACK_TYPE ~= BUFF_STACK_FULL then
+                local existing = self:get(nil, target)
+
+                if existing then
+                    if self.STACK_TYPE == BUFF_STACK_PARTIAL and ablev > (existing.ablev or 0) then
+                        existing.ablev = ablev
+                        existing.source = source
+                        existing.target = target
+                        existing.pid  = GetPlayerId(GetOwningPlayer(source)) + 1
+                        existing.tpid = GetPlayerId(GetOwningPlayer(target)) + 1
+
+                        existing:refresh()
+                    end
+
+                    return existing
+                end
+            end
+
+            -- create a new buff otherwise
+            local b = self:create(source, target) ---@type Buff
+            b.ablev = ablev or 1
 
             b = b:check(source, target)
 

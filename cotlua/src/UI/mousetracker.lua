@@ -53,11 +53,11 @@ do
  
     local trackerFlickerFrame = 0;
 
-    local screenWid;
-    local screenHei;
+    local screenWidth;
+    local screenHeight;
     local screenAspectRatio;
  
-    local timTick;
+    local timerTick;
  
     local function Fill(arr, arrLen, val)
         for i=1,arrLen do
@@ -293,14 +293,14 @@ do
  
         -- This block only runs once every 512 ticks.
         if (globalFrame&511)==1 then
-            if BlzGetLocalClientWidth() ~= screenWid then
+            if BlzGetLocalClientWidth() ~= screenWidth then
                 MoveTracker(0,0);
             end
     
-            screenWid = BlzGetLocalClientWidth();
-            screenHei = BlzGetLocalClientHeight();
+            screenWidth = BlzGetLocalClientWidth();
+            screenHeight = BlzGetLocalClientHeight();
     
-            screenAspectRatio = screenWid/screenHei;
+            screenAspectRatio = screenWidth/screenHeight;
         end
  
         if (globalFrame&(TRACKER_BUFFER_PERIOD_FRAMES-1))==1 then
@@ -333,20 +333,20 @@ do
         enabled[pid] = false
     end
 
-    -- Init
-    screenWid = BlzGetLocalClientWidth();
-    screenHei = BlzGetLocalClientHeight();
+    -- init
+    screenWidth = BlzGetLocalClientWidth();
+    screenHeight = BlzGetLocalClientHeight();
 
-    screenAspectRatio = screenWid/screenHei;
+    screenAspectRatio = screenWidth/screenHeight;
 
-    BlzSetMousePos(screenWid>>1, screenHei>>1);
+    BlzSetMousePos(screenWidth>>1, screenHeight>>1);
     CreateTracker();
 
     Fill(trackerXBuffer, TRACKER_BUFFER_N, 0.0);
     Fill(trackerYBuffer, TRACKER_BUFFER_N, 0.0);
 
-    timTick = CreateTimer();
-    TimerStart(timTick, .001, true, TimerTick);
+    timerTick = CreateTimer();
+    TimerStart(timerTick, .001, true, TimerTick);
 end
 
 end, Debug and Debug.getLine())

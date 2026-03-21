@@ -98,7 +98,7 @@ OnInit.final("Frames", function(Require)
         local time = 0
         TimerQueue:callPeriodically(1., nil, function()
             time = time + 1
-            BlzFrameSetText(CLOCK_FRAME_TEXT, date("!\x25H:\x25M:\x25S", time))
+            BlzFrameSetText(CLOCK_FRAME_TEXT, date("!%H:%M:%S", time))
         end)
 
         -- Gold (Default Gold)
@@ -345,6 +345,8 @@ OnInit.final("Frames", function(Require)
             local number = MathClamp((tonumber(BlzGetTriggerFrameText()) or 0), -500, 100000)
             PUNCHING_BAG_VALUES[GetPlayerId(GetTriggerPlayer()) + 1] = number
             BlzSetUnitArmor(PUNCHING_BAG, PUNCHING_BAG_VALUES[GetPlayerId(GetTriggerPlayer()) + 1])
+            -- refresh armor buffs/debuffs
+            Unit[PUNCHING_BAG].bonus_armor = Unit[PUNCHING_BAG].bonus_armor
         end
 
         local editText = CreateTrigger()

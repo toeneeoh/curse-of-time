@@ -75,15 +75,11 @@ OnInit.final("VampireSpells", function(Require)
             thistype.add(pid, thistype.gain(pid))
         end
 
-        local function on_cleanup(pid)
-            thistype.set(pid, 0)
-        end
-
         function thistype.onSetup(u)
             EVENT_ON_HIT:register_unit_action(u, on_hit)
             EVENT_STAT_CHANGE:register_unit_action(u, thistype.refresh)
-            EVENT_ON_CLEANUP:register_action(Unit[u].pid, on_cleanup)
             Unit[u].nomanaregen = true
+            thistype.values.bank[Unit[u].pid] = 0
         end
     end
 
@@ -119,7 +115,7 @@ OnInit.final("VampireSpells", function(Require)
             gain = function(pid) return 1. * GetHeroAgi(Hero[pid], true) + 1. * GetHeroStr(Hero[pid], true) end,
         }
 
-        ---@type fun(pt: PlayerTimer)
+        ---@type fun(pt: PlayerTimer): boolean
         local function periodic(pt)
             local ablev = GetUnitAbilityLevel(pt.source, BLOODDOMAIN.id) ---@type integer 
 
@@ -148,10 +144,10 @@ OnInit.final("VampireSpells", function(Require)
                 DestroyGroup(ug)
                 DestroyGroup(ug2)
 
-                pt.timer:callDelayed(1., periodic, pt)
-            else
-                pt:destroy()
+                return true
             end
+
+            return false
         end
 
         function thistype:onCast()
@@ -188,7 +184,7 @@ OnInit.final("VampireSpells", function(Require)
                 dummy:attack(self.caster)
             end
 
-            pt.timer:callDelayed(1., periodic, pt)
+            pt:startLoop(1., periodic)
 
             DestroyGroup(ug)
             DestroyGroup(ug2)
@@ -212,7 +208,7 @@ OnInit.final("VampireSpells", function(Require)
         end
 
         local function on_order(source, target, id)
-            if id == ORDER_ID_UNIMMOLATION and GetUnitAbilityLevel(source, thistype.id) > 0 and IsUnitPaused(source) == false and IsUnitLoaded(source) == false then
+            if id == ORDER_ID_UNIMMOLATION then
                 BloodMistBuff:dispel(source, source)
             end
         end

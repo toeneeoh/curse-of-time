@@ -3,6 +3,7 @@ OnInit.final("ArcanistSpells", function(Require)
     Require('SpellTools')
 
     local FPS_32 = FPS_32
+    local TQ = TimerQueue
     local distance = MISSILE_DISTANCE
 
     ---@class CONTROLTIME : Spell
@@ -23,8 +24,8 @@ OnInit.final("ArcanistSpells", function(Require)
                 local pid = GetPlayerId(GetOwningPlayer(source)) + 1
                 local cd = Spells[sid].cooldown
                 cd = (type(cd) == "function" and cd(pid)) or cd
-                BlzSetUnitAbilityCooldown(source, sid, ablev - 1, math.max(0, cd - 20))
-                TimerQueue:callDelayed(0., delay, source, sid, ablev, cd)
+                BlzSetUnitAbilityCooldown(source, sid, ablev - 1, math.max(0.01, cd - 20))
+                TQ:callDelayed(0., delay, source, sid, ablev, cd)
                 SoundHandler("Abilities\\Spells\\NightElf\\FaerieDragonInvis\\PhaseShift1.flac", false, GetOwningPlayer(source))
             end
         end
@@ -74,11 +75,11 @@ OnInit.final("ArcanistSpells", function(Require)
 
                         local sfx = AddSpecialEffect("war3mapImported\\Voidfall Medium.mdx", x, y)
                         BlzPlaySpecialEffectWithTimeScale(sfx, ANIM_TYPE_STAND, 1.5)
-                        TimerQueue:callDelayed(2., DestroyEffect, sfx)
-                        TimerQueue:callDelayed(0.6, comet_land, self, x, y, pt.aoe)
+                        TQ:callDelayed(2., DestroyEffect, sfx)
+                        TQ:callDelayed(0.6, comet_land, self, x, y, pt.aoe)
                     end
 
-                    TimerQueue:callDelayed(0.2, spawn, self, count)
+                    TQ:callDelayed(0.2, spawn, self, count)
                 end
             end
         end
@@ -151,7 +152,7 @@ OnInit.final("ArcanistSpells", function(Require)
 
                 ALICE_Create(missile)
 
-                TimerQueue:callDelayed(0.2, spawn, self, dur)
+                TQ:callDelayed(0.2, spawn, self, dur)
             end
         end
 
@@ -183,11 +184,12 @@ OnInit.final("ArcanistSpells", function(Require)
                 unit = CAT_UnitCollisionCheck3D,
             },
             identifier = "missile",
-            collisionRadius = 2.,
+            collisionRadius = 10.,
             friendlyFire = false,
             onlyTarget = true,
             speed = 750.,
             visualZ = 50.,
+            launchOffset = 20.,
             onUnitCollision = CAT_UnitImpact3D,
             onUnitCallback = function(self, enemy)
                 DamageTarget(self.source, enemy, self.damage, ATTACK_TYPE_NORMAL, MAGIC, thistype.tag)
@@ -196,7 +198,7 @@ OnInit.final("ArcanistSpells", function(Require)
         missile_template.__index = missile_template
 
         function thistype:onCast()
-            ArcaneBarrageBuff:add(self.caster, self.caster):duration(3)
+            ArcaneBarrageBuff:add(self.caster, self.caster):duration(3.)
 
             local ug = CreateGroup()
 
@@ -218,8 +220,8 @@ OnInit.final("ArcanistSpells", function(Require)
                     end
 
                     local missile = setmetatable({}, missile_template)
-                    missile.x = self.x + 40. * math.cos(bj_DEGTORAD * (GetUnitFacing(Hero[self.pid]) + i * (360. / size)))
-                    missile.y = self.y + 40. * math.sin(bj_DEGTORAD * (GetUnitFacing(Hero[self.pid]) + i * (360. / size)))
+                    missile.x = self.x
+                    missile.y = self.y
                     missile.z = GetUnitZ(self.caster)
                     missile.visual = AddSpecialEffect("war3mapImported\\TinkerRocketMissileModified2.mdl", self.x, self.y)
                     BlzSetSpecialEffectScale(missile.visual, 1.1)
@@ -247,50 +249,45 @@ OnInit.final("ArcanistSpells", function(Require)
         }
         thistype.cooldown = 60.
 
-        ---@type fun(pt: PlayerTimer)
-        local function periodic(pt)
-            MakeGroupInRange(pt.pid, pt.ug, pt.x, pt.y, pt.aoe, Condition(FilterEnemy))
+        local function periodic(self)
+            MakeGroupInRange(self.pid, self.ug, self.x, self.y, self.aoe, Condition(FilterEnemy))
 
-            pt.dur = pt.dur - 0.5
-
-            if pt.dur > 0. then
-                for target in each(pt.ug) do
-                    ArcanosphereDebuff:add(pt.source, target):duration(1.)
-                end
-
-                if IsUnitInRangeXY(pt.source, pt.x, pt.y, pt.aoe) then
-                    ArcanosphereBuff:add(pt.source, pt.source):duration(1.)
-                end
-
-                pt.timer:callDelayed(0.5, periodic, pt)
-            else
-                SetUnitAnimation(pt.target, "death")
-
-                UnitRemoveAbility(pt.source, ARCANECOMETS.id)
-                BlzUnitHideAbility(pt.source, ARCANEBOLTS.id, false)
-                BlzSetUnitAbilityCooldown(pt.source, ARCANEBARRAGE.id, GetUnitAbilityLevel(pt.source, ARCANEBARRAGE.id) - 1, 5.)
-                pt:destroy()
+            for target in each(self.ug) do
+                ArcanosphereDebuff:add(self.source, target):duration(1.)
             end
+
+            if IsUnitInRangeXY(self.source, self.x, self.y, self.aoe) then
+                ArcanosphereBuff:add(self.source, self.source):duration(1.)
+            end
+
+            self.callback = TQ:callDelayed(0.5, periodic, self)
+        end
+
+        local function on_expire(self)
+            TQ:disableCallback(self.callback)
+
+            BlzPlaySpecialEffectWithTimeScale(self.sfx, ANIM_TYPE_DEATH, 1.5)
+            TQ:callDelayed(1.5, HideEffect, self.sfx)
+
+            UnitRemoveAbility(self.source, ARCANECOMETS.id)
+            BlzUnitHideAbility(self.source, ARCANEBOLTS.id, false)
+            BlzSetUnitAbilityCooldown(self.source, ARCANEBARRAGE.id, GetUnitAbilityLevel(self.source, ARCANEBARRAGE.id) - 1, 5.)
+
+            DestroyGroup(self.ug)
         end
 
         function thistype:onCast()
-            local pt = TimerList[self.pid]:add()
+            self.aoe = 800.
+            self.x = self.targetX
+            self.y = self.targetY
+            self.source = self.caster
+            self.tag = thistype.id
+            self.ug = CreateGroup()
 
-            pt.dur = self.dur * LBOOST[self.pid]
-            pt.aoe = 800.
-            pt.x = self.targetX
-            pt.y = self.targetY
-            pt.source = self.caster
-            pt.tag = thistype.id
-            pt.ug = CreateGroup()
-
-            pt.target = Dummy.create(self.targetX, self.targetY, 0, 0, pt.dur + 1.5).unit
-            BlzSetUnitSkin(pt.target, FourCC('e00M'))
-            SetUnitScale(pt.target, 10., 10., 10.)
-            SetUnitFlyHeight(pt.target, -50.00, 0.00)
-            SetUnitAnimation(pt.target, "birth")
-            SetUnitTimeScale(pt.target, 0.4)
-            UnitDisableAbility(pt.target, FourCC('Amov'), true)
+            self.sfx = AddSpecialEffect("war3mapImported\\Ubershield Void.mdl", self.targetX, self.targetY)
+            BlzSetSpecialEffectZ(self.sfx, GetTerrainZ(self.targetX, self.targetY) - 50.)
+            BlzSetSpecialEffectScale(self.sfx, 10.)
+            BlzPlaySpecialEffectWithTimeScale(self.sfx, ANIM_TYPE_BIRTH, 0.4)
 
             --swap to comets
             UnitAddAbility(self.caster, ARCANECOMETS.id)
@@ -301,7 +298,8 @@ OnInit.final("ArcanistSpells", function(Require)
             BlzEndUnitAbilityCooldown(self.caster, ARCANEBARRAGE.id)
             BlzSetUnitAbilityCooldown(self.caster, ARCANEBARRAGE.id, GetUnitAbilityLevel(self.caster, ARCANEBARRAGE.id) - 1, 3.)
 
-            periodic(pt)
+            periodic(self)
+            TQ:callDelayed(self.dur * LBOOST[self.pid], on_expire, self)
         end
     end
 
@@ -318,25 +316,21 @@ OnInit.final("ArcanistSpells", function(Require)
         }
         thistype.cooldown = 20.
 
-        ---@type fun(pt: PlayerTimer)
+        ---@type fun(pt: PlayerTimer): boolean
         local function periodic(pt)
             pt.dur = pt.dur - 0.25
 
             if pt.dur > 0. then
-                local ug = CreateGroup()
+                MakeGroupInRange(pt.pid, pt.ug, pt.x, pt.y, pt.aoe, Condition(FilterEnemy))
 
-                MakeGroupInRange(pt.pid, ug, pt.x, pt.y, pt.aoe, Condition(FilterEnemy))
-
-                for target in each(ug) do
+                for target in each(pt.ug) do
                     StasisFieldDebuff:add(pt.source, target):duration(0.5)
                 end
 
-                DestroyGroup(ug)
-
-                pt.timer:callDelayed(0.25, periodic, pt)
-            else
-                pt:destroy()
+                return true
             end
+
+            return false
         end
 
         function thistype:onCast()
@@ -347,6 +341,7 @@ OnInit.final("ArcanistSpells", function(Require)
             pt.y = self.targetY
             pt.dur = self.dur * LBOOST[self.pid]
             pt.source = self.caster
+            pt.ug = CreateGroup()
 
             pt.target = Dummy.create(pt.x, pt.y, 0, 0, 6.).unit
             BlzSetUnitSkin(pt.target, FourCC('h02B'))
@@ -355,7 +350,7 @@ OnInit.final("ArcanistSpells", function(Require)
             SetUnitFlyHeight(pt.target, 0., 0.)
             SetUnitAnimation(pt.target, "birth")
 
-            pt.timer:callDelayed(0.25, periodic, pt)
+            pt:startLoop(0.25, periodic)
         end
     end
 
@@ -388,7 +383,7 @@ OnInit.final("ArcanistSpells", function(Require)
             end
         end
 
-        ---@type fun(pt: PlayerTimer)
+        ---@type fun(pt: PlayerTimer): boolean
         local function periodic(pt)
             pt.time = pt.time + FPS_32
 
@@ -399,7 +394,7 @@ OnInit.final("ArcanistSpells", function(Require)
                         SetUnitPathing(target, false)
                         SetUnitXBounded(target, pt.x)
                         SetUnitYBounded(target, pt.y)
-                        TimerQueue:callDelayed(2., ResetPathing, target)
+                        TQ:callDelayed(2., ResetPathing, target)
                     end
                     DestroyEffect(AddSpecialEffect("Abilities\\Spells\\Human\\Thunderclap\\ThunderClapCaster.mdl", GetUnitX(target), GetUnitY(target)))
                     DamageTarget(pt.source, target, pt.dmg, ATTACK_TYPE_NORMAL, MAGIC, thistype.tag)
@@ -407,10 +402,10 @@ OnInit.final("ArcanistSpells", function(Require)
 
                 BlzStartUnitAbilityCooldown(pt.source, thistype.id, pt.cooldown - pt.time)
 
-                pt:destroy()
-            else
-                pt.timer:callDelayed(FPS_32, periodic, pt)
+                return true
             end
+
+            return false
         end
 
         function thistype:onCast()
@@ -447,8 +442,8 @@ OnInit.final("ArcanistSpells", function(Require)
                         SetUnitFlyHeight(target, 500.00, 0.00)
                     end
 
-                    TimerQueue:callDelayed(FPS_32, BlzEndUnitAbilityCooldown, pt.source, thistype.id)
-                    pt.timer:callDelayed(FPS_32, periodic, pt)
+                    TQ:callDelayed(FPS_32, BlzEndUnitAbilityCooldown, pt.source, thistype.id)
+                    pt:startLoop(FPS_32, periodic)
                 end
 
                 DestroyGroup(ug)

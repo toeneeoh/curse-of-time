@@ -22,10 +22,10 @@ OnInit.final("Potion", function(Require)
     do
         ---@type fun(pot: Item)
         local potion_effect = function(pot)
-            local fheal = pot:getValue(ITEM_FLAT_HEAL, 0)
-            local fmana = pot:getValue(ITEM_FLAT_MANA, 0)
-            local pheal = pot:getValue(ITEM_PERCENT_HEAL, 0)
-            local pmana = pot:getValue(ITEM_PERCENT_MANA, 0)
+            local fheal = pot.cached_stats[ITEM_FLAT_HEAL]
+            local fmana = pot.cached_stats[ITEM_FLAT_MANA]
+            local pheal = pot.cached_stats[ITEM_PERCENT_HEAL]
+            local pmana = pot.cached_stats[ITEM_PERCENT_MANA]
 
             local heal = fheal + (0.01 * pheal * Unit[Hero[pot.pid]].hp)
             local mana = fmana + (0.01 * pmana * Unit[Hero[pot.pid]].mana)
@@ -45,14 +45,16 @@ OnInit.final("Potion", function(Require)
 
             local f = function(pid, is_down)
                 local pot = Profile[pid].hero.items[POTION_INDEX + capture_index - 1]
+                local button = potion_button[capture_index]
 
-                if is_down and pot and potion_button[capture_index].charges > 0 then
-                    if potion_button[capture_index].cooldown_time[pid] <= 0 then
+                if is_down and pot and button.charges > 0 then
+                    if button.cooldown_time[pid] <= 0 then
                         pot.charges = pot.charges - 1
                         if GetLocalPlayer() == Player(pid - 1) then
-                            potion_button[capture_index]:charge(pot.charges)
+                            button:charge(pot.charges)
                         end
-                        potion_button[capture_index]:cooldown(1., pid)
+
+                        button:cooldown(1., pid)
                         potion_effect(pot)
                         INVENTORY.refresh(pid)
                     end
@@ -108,19 +110,21 @@ OnInit.final("Potion", function(Require)
         for i = POTION_INDEX, POTION_INDEX + 1 do
             local pot = Profile[pid].hero.items[i]
             local index = i - POTION_INDEX + 1
+            local button = potion_button[index]
 
             if pot then
                 if GetLocalPlayer() == Player(pid - 1) then
-                    potion_button[index]:visible(true)
-                    potion_button[index]:charge(pot.charges)
-                    potion_button[index].tooltip:name(GetObjectName(pot.id) .. " '" .. GetHotkeyForFunc(pid, pot_func[index]) .. "'")
-                    potion_button[index]:icon(BlzGetAbilityIcon(pot.id))
-                    potion_button[index].tooltip:icon(BlzGetAbilityIcon(pot.id))
-                    potion_button[index].tooltip:text(BlzGetItemExtendedTooltip(pot.obj))
+                    button:visible(true)
+                    button:charge(pot.charges)
+                    button.tooltip:name(GetObjectName(pot.id) .. " '" .. GetHotkeyForFunc(pid, pot_func[index]) .. "'")
+                    button:icon(BlzGetAbilityIcon(pot.id))
+                    button.tooltip:icon(BlzGetAbilityIcon(pot.id))
+                    button.tooltip:text(BlzGetItemExtendedTooltip(pot.obj))
+                    button:enabled(pot.charges >= 1 and true or false)
                 end
             else
                 if GetLocalPlayer() == Player(pid - 1) then
-                    potion_button[index]:visible(false)
+                    button:visible(false)
                 end
             end
         end
@@ -151,7 +155,7 @@ OnInit.final("Potion", function(Require)
                     local pot = Profile[pid].hero.items[i]
 
                     if pot then
-                        pot.charges = pot:getValue(ITEM_CHARGES, 0)
+                        pot.charges = pot.cached_stats[ITEM_CHARGES]
                     end
                 end
                 INVENTORY.refresh(pid)
@@ -168,7 +172,7 @@ OnInit.final("Potion", function(Require)
             local pot = Profile[pid].hero.items[i]
 
             if pot then
-                price = price + ItemData[pot.id][ITEM_LEVEL_REQUIREMENT] ^ 2 + pot:getValue(ITEM_FLAT_HEAL, 0) * 0.5 + pot:getValue(ITEM_FLAT_MANA, 0) * 0.5
+                price = price + ItemData[pot.id][ITEM_LEVEL_REQUIREMENT] ^ 2 + pot.cached_stats[ITEM_FLAT_HEAL] * 0.5 + pot.cached_stats[ITEM_FLAT_MANA] * 0.5
             end
         end
 

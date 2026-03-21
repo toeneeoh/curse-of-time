@@ -33,10 +33,8 @@ OnInit.final("ItemLookup", function(Require)
         local orig_itm = GetManipulatedItem()
         local itm = Item[orig_itm] ---@type Item
         local itemid = GetItemTypeId(orig_itm)
-        local itemtype = GetItemType(orig_itm)
         local p = GetOwningPlayer(u)
         local pid = GetPlayerId(p) + 1 ---@type integer 
-        local U = User.first ---@type User 
 
         -- ignore non-player inventories / dummy cast items
         if pid > PLAYER_CAP or IsDummyCastItem(itemid) then
@@ -56,18 +54,14 @@ OnInit.final("ItemLookup", function(Require)
             ITEM_LOOKUP[itemid](p, pid, u, itm)
         end
 
-        -- kill quests
-        if KillQuest[itemid][0] ~= 0 and itemtype == ITEM_TYPE_CAMPAIGN then
-            KillQuestHandler(pid, itemid)
-
         -- Buyables / Shops
         -- church donation
-        elseif itemid == FourCC('I07Q') and not CHURCH_DONATION[pid] then
+        if itemid == FourCC('I07Q') and not CHURCH_DONATION[pid] then
             ChargeNetworth(p, 0, 0.01, 100, "")
             CHURCH_DONATION[pid] = true
             donation = donation - donationrate
             DisplayTextToPlayer(p, 0, 0, "|c00408080The Goddesses bestow their blessings.")
-            DisplayTextToForce(FORCE_PLAYING, "Reduced bad weather chance: " .. (R2I((1 - donation) * 100)) .. "\x25")
+            DisplayTextToForce(FORCE_PLAYING, "Reduced bad weather chance: " .. (R2I((1 - donation) * 100)) .. "%")
         -- upgrade teleports & reveal
         elseif itemid == FourCC('I101') or itemid == FourCC('I102') then
             local lvl = (itemid == FourCC('I101') and GetUnitAbilityLevel(Backpack[pid], TELEPORT.id)) or GetUnitAbilityLevel(Backpack[pid], FourCC('A0FK'))

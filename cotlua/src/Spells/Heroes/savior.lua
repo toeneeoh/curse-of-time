@@ -2,6 +2,7 @@ OnInit.final("SaviorSpells", function(Require)
     Require('Spells')
     Require('SpellTools')
 
+    local TQ = TimerQueue
     local distance = MISSILE_DISTANCE
 
     ---@class LIGHTSEAL : Spell
@@ -15,32 +16,26 @@ OnInit.final("SaviorSpells", function(Require)
             dur = 12.,
         }
 
-        ---@type fun(pt: PlayerTimer)
-        function thistype.onExpire(pt)
-            pt:destroy()
+        local on_expire = function(buff, sfx)
+            buff.active = false
+            HideEffect(sfx)
         end
 
         function thistype:onCast()
-            local pt = TimerList[self.pid]:add()
-            pt.dur = self.dur * LBOOST[self.pid]
-            pt.x = self.targetX
-            pt.y = self.targetY
-            pt.source = self.caster
-            pt.target = Dummy.create(pt.x, pt.y, 0, 0, pt.dur).unit
-            pt.aoe = self.aoe
-            pt.tag = self.id
-            pt.ug = CreateGroup()
+            local buff = LightSealBuff:add(self.caster, self.caster)
+            buff.x = self.targetX
+            buff.y = self.targetY
+            buff.aoe = self.aoe
+            buff.active = true
 
-            BlzSetUnitSkin(pt.target, FourCC('h046'))
-            UnitDisableAbility(pt.target, FourCC('Amov'), true)
-            SetUnitScale(pt.target, 6.1, 6.1, 6.1)
-            BlzSetUnitFacingEx(pt.target, 270)
-            SetUnitVertexColor(pt.target, 255, 255, 200, 200)
-            SetUnitAnimation(pt.target, "birth")
-            SetUnitTimeScale(pt.target, 0.9)
-            DelayAnimation(self.pid, pt.target, 1., 0, 1., false)
+            local sfx = AddSpecialEffect("war3mapImported\\newrunetest2.mdl", buff.x, buff.y)
+            BlzSetSpecialEffectZ(sfx, GetLocZ(buff.x, buff.y))
+            BlzSetSpecialEffectScale(sfx, 6.1)
+            BlzSetSpecialEffectYaw(sfx, bj_DEGTORAD * 270)
+            BlzSetSpecialEffectColor(sfx, 255, 255, 200)
+            BlzSetSpecialEffectTimeScale(sfx, 0.9)
 
-            pt.timer:callDelayed(pt.dur, thistype.onExpire, pt)
+            TQ:callDelayed(self.dur * LBOOST[self.pid], on_expire, buff, sfx)
         end
     end
 
@@ -68,11 +63,10 @@ OnInit.final("SaviorSpells", function(Require)
             onUnitCollision = CAT_UnitPassThrough2D,
             onUnitCallback = {
                 other = function(self, enemy, cx, cy, perpSpeed, parSpeed, totalSpeed, comVx, comVy)
-                    local pt = TimerList[self.pid]:get(LIGHTSEAL.id, self.source)
+                    local buff = LightSealBuff:get(self.source, self.source)
 
-                    if pt and IsUnitInRangeXY(enemy, pt.x, pt.y, 450.) then
-                        local b = LightSealBuff:add(self.source, self.source)
-                        b:addStack((IsBoss(enemy) and 5) or 1)
+                    if buff and buff.active and IsUnitInRangeXY(enemy, buff.x, buff.y, buff.aoe) then
+                        buff:addStack(enemy)
                     end
 
                     DamageTarget(self.source, enemy, self.damage, ATTACK_TYPE_NORMAL, MAGIC, thistype.tag)
@@ -111,31 +105,34 @@ OnInit.final("SaviorSpells", function(Require)
         }
 
         function thistype:onCast()
-            local pt = TimerList[self.pid]:get(LIGHTSEAL.id, self.caster)
+            local buff = LightSealBuff:get(self.caster, self.caster)
 
-            --light seal augment
-            if pt then
-                MakeGroupInRange(self.pid, pt.ug, pt.x, pt.y, pt.aoe, Condition(FilterAllyHero))
+            -- light seal augment
+            if buff and buff.active then
+                local ug = CreateGroup()
+                MakeGroupInRange(self.pid, ug, buff.x, buff.y, buff.aoe, Condition(FilterAllyHero))
 
-                if self.caster ~= self.target and UnitAlive(self.target) then
-                    GroupAddUnit(pt.ug, self.target)
+                --because backpack is a valid target
+                if GetUnitTypeId(self.target) == BACKPACK then
+                    self.target = Hero[self.tpid]
                 end
 
-                GroupAddUnit(pt.ug, self.caster)
+                GroupAddUnit(ug, self.caster)
+                GroupAddUnit(ug, self.target)
 
-                for target in each(pt.ug) do
-                    shield.add(target, self.shield * BOOST[self.pid], self.dur)
+                for target in each(ug) do
+                    Shield.add(target, self.shield * BOOST[self.pid], self.dur)
                 end
-            --normal cast
+
+                DestroyGroup(ug)
+            -- normal cast
             else
                 if self.caster ~= self.target and self.target ~= nil then
-                    shield.add(self.target, self.shield * BOOST[self.pid], self.dur)
+                    Shield.add(self.target, self.shield * BOOST[self.pid], self.dur)
                 end
 
-                shield.add(self.caster, self.shield * BOOST[self.pid], self.dur)
+                Shield.add(self.caster, self.shield * BOOST[self.pid], self.dur)
             end
-
-
         end
     end
 
@@ -165,24 +162,23 @@ OnInit.final("SaviorSpells", function(Require)
                 DamageTarget(source, target, dmg, ATTACK_TYPE_NORMAL, MAGIC, thistype.tag)
                 thistype.count[pid] = 0
 
-                local pt = TimerList[pid]:get(LIGHTSEAL.id, source)
+                local ug = CreateGroup()
+                local buff = LightSealBuff:get(source, source)
 
                 --light seal augment
-                if pt then
-                    MakeGroupInRange(pid, pt.ug, pt.x, pt.y, pt.aoe, Condition(FilterEnemy))
+                if buff and buff.active then
+                    MakeGroupInRange(pid, ug, buff.x, buff.y, buff.aoe, Condition(FilterEnemy))
+                    GroupRemoveUnit(ug, target)
 
-                    for u in each(pt.ug) do
-                        if u ~= target then
-                            StunUnit(pid, u, thistype.stundur)
-                            DamageTarget(source, u, dmg, ATTACK_TYPE_NORMAL, MAGIC, thistype.tag)
-                        end
+                    for u in each(ug) do
+                        StunUnit(pid, u, thistype.stundur)
+                        DamageTarget(source, u, dmg, ATTACK_TYPE_NORMAL, MAGIC, thistype.tag)
                     end
                 end
 
                 StunUnit(pid, target, thistype.stundur)
 
                 --aoe heal
-                local ug = CreateGroup()
                 MakeGroupInRange(pid, ug, GetUnitX(Hero[pid]), GetUnitY(Hero[pid]), thistype.aoe * LBOOST[pid], Condition(FilterAlly))
 
                 for u in each(ug) do
@@ -214,7 +210,7 @@ OnInit.final("SaviorSpells", function(Require)
                 thistype.count[pid] = 10
                 BlzSetSpecialEffectTimeScale(sfx, 1.5)
                 BlzSetSpecialEffectTime(sfx, 0.7)
-                TimerQueue:callDelayed(1.5, DestroyEffect, sfx)
+                TQ:callDelayed(1.5, DestroyEffect, sfx)
             end
         end
 
@@ -238,20 +234,19 @@ OnInit.final("SaviorSpells", function(Require)
         }
 
         function thistype:onCast()
-            local pt = TimerList[self.pid]:get(LIGHTSEAL.id, self.caster)
+            local buff = LightSealBuff:get(self.caster, self.caster)
             local ug = CreateGroup()
 
             MakeGroupInRange(self.pid, ug, self.x, self.y, self.aoe * LBOOST[self.pid], Condition(FilterEnemy))
 
-            if pt then
-                LightSealBuff:add(self.caster, self.caster)
-                GroupEnumUnitsInRangeEx(self.pid, ug, pt.x, pt.y, 450., Condition(FilterEnemy))
+            if buff and buff.active then
+                GroupEnumUnitsInRangeEx(self.pid, ug, buff.x, buff.y, 450., Condition(FilterEnemy))
             end
 
             for target in each(ug) do
                 SaviorThunderClap:add(self.caster, target):duration(5.)
-                if pt and IsUnitInRangeXY(target, pt.x, pt.y, 450.) then
-                    LightSealBuff:get(self.caster, self.caster):addStack((IsBoss(target) and 5) or 1)
+                if buff and buff.active and IsUnitInRangeXY(target, buff.x, buff.y, buff.aoe) then
+                    buff:addStack(target)
                 end
                 DamageTarget(self.caster, target, self.dmg * BOOST[self.pid], ATTACK_TYPE_NORMAL, MAGIC, thistype.tag)
             end
@@ -274,7 +269,7 @@ OnInit.final("SaviorSpells", function(Require)
 
         thistype.values = {
             attack = function(pid) local ablev = GetUnitAbilityLevel(Hero[pid], thistype.id) return (UnitGetBonus(Hero[pid], BONUS_DAMAGE) + BlzGetUnitBaseDamage(Hero[pid], 0)) * (.2 + .2 * ablev) end,
-            armor = function(pid) local ablev = GetUnitAbilityLevel(Hero[pid], thistype.id) return BlzGetUnitArmor(Hero[pid]) * (.4 + (.2 * ablev)) end,
+            armor = function(pid) local ablev = GetUnitAbilityLevel(Hero[pid], thistype.id) return Unit[Hero[pid]].armor * (.2 + (.2 * ablev)) end,
             heal = function(pid) local ablev = GetUnitAbilityLevel(Hero[pid], thistype.id) return BlzGetUnitMaxHP(Hero[pid]) * (0.10 + 0.05 * ablev) end,
             dmg = function(pid) local ablev = GetUnitAbilityLevel(Hero[pid], thistype.id) return (ablev + 1) * 2. * GetHeroStr(Hero[pid],true) end,
             dur = function(pid) local ablev = GetUnitAbilityLevel(Hero[pid], thistype.id) return (ablev + 1) * 5. end,
@@ -286,19 +281,13 @@ OnInit.final("SaviorSpells", function(Require)
             local angle = 0. ---@type number 
 
             b.dmg = 0.2 + 0.2 * self.ablev
-            b.armor = self.armor
+            b.armor = 0.2 + 0.2 * self.ablev
             b = b:check(self.caster, self.caster)
             b:duration(self.dur * LBOOST[self.pid])
 
             HP(self.caster, self.caster, self.heal * LBOOST[self.pid], thistype.tag)
 
             DestroyEffect(AddSpecialEffectTarget("war3mapImported\\HolyAwakening.mdx", self.caster, "origin"))
-
-            local pt = TimerList[self.pid]:get(LIGHTSEAL.id, self.caster)
-            if pt then
-                LightSealBuff:add(self.caster, self.caster)
-                GroupEnumUnitsInRangeEx(self.pid, ug, pt.x, pt.y, 450., Condition(FilterEnemy))
-            end
 
             for i = 1, 24 do
                 angle = 2 * bj_PI * i / 24.
@@ -307,10 +296,12 @@ OnInit.final("SaviorSpells", function(Require)
 
             MakeGroupInRange(self.pid, ug, self.x, self.y, 500 * LBOOST[self.pid], Condition(FilterEnemy))
 
+            local buff = LightSealBuff:get(self.caster, self.caster)
+
             for target in each(ug) do
                 DamageTarget(self.caster, target, self.dmg * BOOST[self.pid], ATTACK_TYPE_NORMAL, MAGIC, thistype.tag)
-                if pt and IsUnitInRangeXY(target, pt.x, pt.y, 450.) then
-                    LightSealBuff:get(self.caster, self.caster):addStack((IsBoss(target) and 5) or 1)
+                if buff and buff.active and IsUnitInRangeXY(target, buff.x, buff.y, buff.aoe) then
+                    buff:addStack(target)
                 end
             end
 

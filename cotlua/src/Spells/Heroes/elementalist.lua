@@ -4,9 +4,8 @@ OnInit.final("ElementalistSpells", function(Require)
 
     masterElement = __jarray(0) ---@type integer[] 
 
-    local atan = math.atan
+    local TQ = TimerQueue
     local distance = MISSILE_DISTANCE
-    local FPS_32 = FPS_32
 
     local MASTEROFELEMENTS = Spell.define('A0J5')
 
@@ -40,13 +39,13 @@ OnInit.final("ElementalistSpells", function(Require)
 
                 for enemy in each(ug) do
                     if not UnitIsSleeping(enemy) then
-                        IceElementSlow:add(Hero[pid], enemy):duration(1.)
+                        IceElementDebuff:add(Hero[pid], enemy):duration(1.1)
                     end
                 end
 
                 DestroyGroup(ug)
 
-                TimerQueue:callDelayed(1., periodic, pid)
+                TQ:callDelayed(1., periodic, pid)
             end
         end
 
@@ -55,7 +54,7 @@ OnInit.final("ElementalistSpells", function(Require)
             LightningElementBuff:dispel(self.caster, self.caster)
             EarthElementBuff:dispel(self.caster, self.caster)
             IceElementBuff:add(self.caster, self.caster)
-            TimerQueue:callDelayed(0., periodic, self.pid)
+            TQ:callDelayed(0., periodic, self.pid)
         end
     end
 
@@ -139,8 +138,10 @@ OnInit.final("ElementalistSpells", function(Require)
             ALICE_Create(missile)
         end
 
-        local manacost = function(u)
-            BlzSetUnitAbilityManaCost(u, thistype.id, GetUnitAbilityLevel(u, thistype.id) - 1, R2I(BlzGetUnitMaxMana(u) * 0.05))
+        local manacost = function(u, key)
+            if key == "int" or key == "bonus_mana" or key == "bonus_int" then
+                BlzSetUnitAbilityManaCost(u, thistype.id, GetUnitAbilityLevel(u, thistype.id) - 1, R2I(BlzGetUnitMaxMana(u) * 0.05))
+            end
         end
 
         function thistype.onLearn(source, ablev, pid)
@@ -249,7 +250,7 @@ OnInit.final("ElementalistSpells", function(Require)
 
                 DestroyGroup(ug)
 
-                TimerQueue:callDelayed(1., spawn_icicle, pid, missile)
+                TQ:callDelayed(1., spawn_icicle, pid, missile)
             end
         end
 
@@ -279,7 +280,7 @@ OnInit.final("ElementalistSpells", function(Require)
                 ALICE_Create(missile)
 
                 thistype.missile[self.pid] = missile
-                TimerQueue:callDelayed(0.5, spawn_icicle, self.pid, missile)
+                TQ:callDelayed(0.5, spawn_icicle, self.pid, missile)
 
                 -- show second cast
                 BlzUnitHideAbility(self.caster, thistype.id, true)
@@ -288,8 +289,10 @@ OnInit.final("ElementalistSpells", function(Require)
             end
         end
 
-        local manacost = function(u)
-            BlzSetUnitAbilityManaCost(u, thistype.id, GetUnitAbilityLevel(u, thistype.id) - 1, R2I(BlzGetUnitMaxMana(u) * 0.15))
+        local manacost = function(u, key)
+            if key == "int" or key == "bonus_mana" or key == "bonus_int" then
+                BlzSetUnitAbilityManaCost(u, thistype.id, GetUnitAbilityLevel(u, thistype.id) - 1, R2I(BlzGetUnitMaxMana(u) * 0.15))
+            end
         end
 
         function thistype.onLearn(source, ablev, pid)
@@ -302,99 +305,36 @@ OnInit.final("ElementalistSpells", function(Require)
     GAIAARMOR = Spell.define("A032")
     do
         local thistype = GAIAARMOR
-        thistype.id2 = FourCC("A033") ---@type integer 
 
         thistype.values = {
             shield = function(pid) local ablev = GetUnitAbilityLevel(Hero[pid], thistype.id) return GetHeroInt(Hero[pid], true) * (0.5 + 0.5 * ablev) end,
         }
+        thistype.sfx = {}
 
-        local on_hit
-
-        ---@type fun(pt: PlayerTimer)
-        local function fatal_cooldown(pt)
-            if GetUnitAbilityLevel(pt.source, thistype.id) >= 1 then
-                EVENT_ON_FATAL_DAMAGE:register_unit_action(pt.source, on_hit)
-
-                UnitAddAbility(pt.source, thistype.id2)
-                BlzUnitHideAbility(pt.source, thistype.id2, true)
-            end
-        end
-
-        ---@type fun(pt: PlayerTimer)
-        local function fatal_push(pt)
-            local angle = 0. ---@type number 
-            local x     = 0. ---@type number 
-            local y     = 0. ---@type number 
-
-            pt.dur = pt.dur - 1
-
-            if pt.dur > 0. then
-                for target in each(pt.ug) do
-                    x = GetUnitX(target)
-                    y = GetUnitY(target)
-                    angle = atan(y - GetUnitY(Hero[pt.pid]), x - GetUnitX(Hero[pt.pid]))
-                    if IsTerrainWalkable(x + pt.speed * math.cos(angle), y + pt.speed * math.sin(angle)) then
-                        SetUnitXBounded(target, x + pt.speed * math.cos(angle))
-                        SetUnitYBounded(target, y + pt.speed * math.sin(angle))
-                    end
-                end
-                pt.timer:callDelayed(FPS_32, fatal_push, pt)
-            else
-                pt:destroy()
-            end
-        end
-
-
-        on_hit = function(target, source, amount, damage_type)
-            local tpid = GetPlayerId(GetOwningPlayer(target)) + 1
-            local pt = TimerList[tpid]:add()
-
-            EVENT_ON_FATAL_DAMAGE:unregister_unit_action(target, on_hit)
-            amount.value = 0
-            HP(target, target, BlzGetUnitMaxHP(target) * 0.2 * GetUnitAbilityLevel(target, GAIAARMOR.id), GAIAARMOR.tag)
-            MP(target, BlzGetUnitMaxMana(target) * 0.2 * GetUnitAbilityLevel(target, GAIAARMOR.id))
-            UnitRemoveAbility(target, thistype.id2)
-            UnitRemoveAbility(target, FourCC('B005'))
-            DestroyEffect(AddSpecialEffectTarget("Abilities\\Spells\\Other\\Doom\\DoomDeath.mdl", target, "origin"))
-
-            pt.dur = 35.
-            pt.speed = 20.
-            pt.ug = CreateGroup()
-            MakeGroupInRange(tpid, pt.ug, GetUnitX(target), GetUnitY(target), 400., Condition(FilterEnemy))
-
-            for u in each(pt.ug) do
-                Stun:add(target, u):duration(4.)
-            end
-
-            pt.timer:callDelayed(FPS_32, fatal_push, pt)
-
-            pt = TimerList[tpid]:add()
-            pt.tag = thistype.id2
-            pt.source = target
-            pt.timer:callDelayed(120., fatal_cooldown, pt)
+        local function on_expire(source)
+            local pid = GetPlayerId(GetOwningPlayer(source)) + 1
+            DestroyEffect(thistype.sfx[pid])
+            EVENT_ON_SHIELD_EXPIRE:unregister_unit_action(source, on_expire)
         end
 
         function thistype:onCast()
-            local pt = TimerList[self.pid]:add()
+            DestroyEffect(thistype.sfx[self.pid])
+            thistype.sfx[self.pid] = AddSpecialEffectTarget("war3mapImported\\Archnathid Armor.mdx", self.caster, "chest")
 
-            pt.sfx = AddSpecialEffectTarget("war3mapImported\\Archnathid Armor.mdx", self.caster, "chest")
-            pt.tag = thistype.id
-            BlzSetSpecialEffectColor(pt.sfx, 160, 255, 160)
+            BlzSetSpecialEffectColor(thistype.sfx[self.pid], 160, 255, 160)
 
-            if masterElement[self.pid] == ELEMENTEARTH.value then --earth element bonus
-                shield.add(self.caster, self.shield * 2.5 * BOOST[self.pid], 31.)
+            if masterElement[self.pid] == ELEMENTEARTH.value then -- earth element bonus
+                Shield.add(self.caster, self.shield * 2.5 * BOOST[self.pid], 31.)
             else
-                shield.add(self.caster, self.shield * BOOST[self.pid], 31.)
+                Shield.add(self.caster, self.shield * BOOST[self.pid], 31.)
             end
 
-            pt.timer:callDelayed(30., PlayerTimer.destroy, pt)
+            EVENT_ON_SHIELD_EXPIRE:register_unit_action(self.caster, on_expire)
         end
 
         function thistype.onLearn(source, ablev, pid)
-            if ablev == 1 and not TimerList[pid]:has(thistype.id2) then
-                EVENT_ON_FATAL_DAMAGE:register_unit_action(source, on_hit)
-                UnitAddAbility(source, thistype.id2)
-                BlzUnitHideAbility(source, thistype.id2, true)
+            if ablev == 1 then
+                GaiaArmorBuff:add(source, source)
             end
         end
     end
@@ -411,23 +351,23 @@ OnInit.final("ElementalistSpells", function(Require)
             dmg = function(pid) local ablev = GetUnitAbilityLevel(Hero[pid], thistype.id) return GetHeroInt(Hero[pid], true) * (0.5 + 0.5 * ablev) end,
         }
 
-        ---@type fun(pt: PlayerTimer)
+        ---@type fun(pt: PlayerTimer): boolean
         local function periodic(pt)
             pt.dur = pt.dur + 1
 
-            local mp      = GetUnitState(Hero[pt.pid], UNIT_STATE_MANA) ---@type number 
+            local mp     = GetUnitState(Hero[pt.pid], UNIT_STATE_MANA) ---@type number 
             local x      = GetUnitX(Hero[pt.pid]) ---@type number 
             local y      = GetUnitY(Hero[pt.pid]) ---@type number 
 
-            --trapezoid
-            local Ax      = x + 50 * math.cos(pt.angle + bj_PI * 0.5) ---@type number 
-            local Ay      = y + 50 * math.sin(pt.angle + bj_PI * 0.5) ---@type number 
-            local Bx      = x + 50 * math.cos(pt.angle - bj_PI * 0.5) ---@type number 
-            local By      = y + 50 * math.sin(pt.angle - bj_PI * 0.5) ---@type number 
-            local Cx      = Bx + pt.aoe * math.cos(pt.angle - bj_PI * 0.125) * LBOOST[pt.pid] ---@type number 
-            local Cy      = By + pt.aoe * math.sin(pt.angle - bj_PI * 0.125) * LBOOST[pt.pid] ---@type number 
-            local Dx      = Ax + pt.aoe * math.cos(pt.angle + bj_PI * 0.125) * LBOOST[pt.pid] ---@type number 
-            local Dy      = Ay + pt.aoe * math.sin(pt.angle + bj_PI * 0.125) * LBOOST[pt.pid] ---@type number 
+            -- trapezoid
+            local Ax     = x + 50 * math.cos(pt.angle + bj_PI * 0.5) ---@type number 
+            local Ay     = y + 50 * math.sin(pt.angle + bj_PI * 0.5) ---@type number 
+            local Bx     = x + 50 * math.cos(pt.angle - bj_PI * 0.5) ---@type number 
+            local By     = y + 50 * math.sin(pt.angle - bj_PI * 0.5) ---@type number 
+            local Cx     = Bx + pt.aoe * math.cos(pt.angle - bj_PI * 0.125) * LBOOST[pt.pid] ---@type number 
+            local Cy     = By + pt.aoe * math.sin(pt.angle - bj_PI * 0.125) * LBOOST[pt.pid] ---@type number 
+            local Dx     = Ax + pt.aoe * math.cos(pt.angle + bj_PI * 0.125) * LBOOST[pt.pid] ---@type number 
+            local Dy     = Ay + pt.aoe * math.sin(pt.angle + bj_PI * 0.125) * LBOOST[pt.pid] ---@type number 
             local AB ---@type number 
             local BC ---@type number 
             local CD ---@type number 
@@ -441,10 +381,9 @@ OnInit.final("ElementalistSpells", function(Require)
                     SoundHandler("Abilities\\Spells\\Other\\BreathOfFire\\BreathOfFire1.flac", true, nil, Hero[pt.pid])
                 end
 
-                local ug = CreateGroup()
-                MakeGroupInRange(pt.pid, ug, x, y, pt.aoe * LBOOST[pt.pid], Condition(FilterEnemy))
+                MakeGroupInRange(pt.pid, pt.ug, x, y, pt.aoe * LBOOST[pt.pid], Condition(FilterEnemy))
 
-                for target in each(ug) do
+                for target in each(pt.ug) do
                     x = GetUnitX(target)
                     y = GetUnitY(target)
 
@@ -458,12 +397,10 @@ OnInit.final("ElementalistSpells", function(Require)
                     end
                 end
 
-                DestroyGroup(ug)
-
-                pt.timer:callDelayed(0.5, periodic, pt)
-            else
-                pt:destroy()
+                return true
             end
+
+            return false
         end
 
         function thistype:onCast()
@@ -475,15 +412,18 @@ OnInit.final("ElementalistSpells", function(Require)
             pt.tag = thistype.id
             pt.aoe = self.aoe
             pt.dmg = self.dmg
+            pt.ug = CreateGroup()
             BlzSetSpecialEffectScale(pt.sfx, 1.3 * LBOOST[self.pid])
             BlzSetSpecialEffectTimeScale(pt.sfx, 1.5)
             BlzSetSpecialEffectYaw(pt.sfx, pt.angle)
 
-            pt.timer:callDelayed(0.5, periodic, pt)
+            pt:startLoop(0.5, periodic)
         end
 
-        local manacost = function(u)
-            BlzSetUnitAbilityManaCost(u, thistype.id, GetUnitAbilityLevel(u, thistype.id) - 1, R2I(BlzGetUnitMaxMana(u) * 0.03))
+        local manacost = function(u, key)
+            if key == "int" or key == "bonus_mana" or key == "bonus_int" then
+                BlzSetUnitAbilityManaCost(u, thistype.id, GetUnitAbilityLevel(u, thistype.id) - 1, R2I(BlzGetUnitMaxMana(u) * 0.03))
+            end
         end
 
         function thistype.onLearn(source, ablev, pid)
@@ -505,7 +445,7 @@ OnInit.final("ElementalistSpells", function(Require)
             aoe = 400.,
         }
 
-        ---@type fun(pt: PlayerTimer)
+        ---@type fun(pt: PlayerTimer): boolean
         local function periodic(pt)
             pt.dur = pt.dur - 1
 
@@ -515,7 +455,7 @@ OnInit.final("ElementalistSpells", function(Require)
             local x2 = pt.x + dist * math.cos(angle) ---@type number 
             local y2 = pt.y + dist * math.sin(angle) ---@type number 
 
-            --guarantee the first 6 strikes are your chosen element
+            -- guarantee the first 6 strikes are your chosen element
             if pt.dur >= 6 then
                 rand = pt.element
             else
@@ -524,7 +464,7 @@ OnInit.final("ElementalistSpells", function(Require)
                 end
             end
 
-            --alternate elements
+            -- alternate elements
             if pt.str == 0 then
                 pt.str = rand
             elseif pt.int == 0 then
@@ -535,43 +475,44 @@ OnInit.final("ElementalistSpells", function(Require)
             end
 
             if pt.dur >= 0 then
-                local ug = CreateGroup()
+                TQ:callDelayed(1., DestroyEffect, AddSpecialEffect("war3mapImported\\Lightnings Long.mdx", x2, y2))
 
-                TimerQueue:callDelayed(1., DestroyEffect, AddSpecialEffect("war3mapImported\\Lightnings Long.mdx", x2, y2))
-
-                --fire aoe
+                -- fire aoe
                 if rand == ELEMENTFIRE.value then
-                    MakeGroupInRange(pt.pid, ug, pt.x, pt.y, pt.aoe * 1.5, Condition(FilterEnemy))
-                    TimerQueue:callDelayed(2., DestroyEffect, AddSpecialEffect("war3mapImported\\Flame Burst.mdx", x2, y2))
+                    MakeGroupInRange(pt.pid, pt.ug, pt.x, pt.y, pt.aoe * 1.5, Condition(FilterEnemy))
+                    TQ:callDelayed(2., DestroyEffect, AddSpecialEffect("war3mapImported\\Flame Burst.mdx", x2, y2))
                 else
-                    MakeGroupInRange(pt.pid, ug, pt.x, pt.y, pt.aoe, Condition(FilterEnemy))
+                    MakeGroupInRange(pt.pid, pt.ug, pt.x, pt.y, pt.aoe, Condition(FilterEnemy))
                 end
 
-                local target = FirstOfGroup(ug)
+                local target = FirstOfGroup(pt.ug)
 
-                --sfx
+                -- sfx
                 if rand == ELEMENTICE.value then
-                    TimerQueue:callDelayed(2., DestroyEffect, AddSpecialEffect("Abilities\\Spells\\Undead\\FrostNova\\FrostNovaTarget.mdl", x2, y2))
+                    TQ:callDelayed(2., DestroyEffect, AddSpecialEffect("Abilities\\Spells\\Undead\\FrostNova\\FrostNovaTarget.mdl", x2, y2))
                     MP(Hero[pt.pid], BlzGetUnitMaxMana(Hero[pt.pid]) * 0.15)
                 elseif rand == ELEMENTLIGHTNING.value then
                     DamageTarget(Hero[pt.pid], target, GetWidgetLife(target) * 0.015, ATTACK_TYPE_NORMAL, PURE, thistype.tag)
                     DestroyEffect(AddSpecialEffectTarget("Abilities\\Weapons\\Bolt\\BoltImpact.mdl", target, "origin"))
                 elseif rand == ELEMENTEARTH.value then
-                    TimerQueue:callDelayed(2., DestroyEffect, AddSpecialEffect("war3mapImported\\Earth NovaTarget.mdx", x2, y2))
+                    TQ:callDelayed(2., DestroyEffect, AddSpecialEffect("war3mapImported\\Earth NovaTarget.mdx", x2, y2))
                 end
 
-                --unique effects
-                for enemy in each(ug) do
-                    if rand == ELEMENTFIRE.value then --fire
+                -- unique effects
+                for enemy in each(pt.ug) do
+                    -- fire
+                    if rand == ELEMENTFIRE.value then
                         DamageTarget(Hero[pt.pid], enemy, pt.dmg * 1.5, ATTACK_TYPE_NORMAL, MAGIC, thistype.tag)
                     else
                         DamageTarget(Hero[pt.pid], enemy, pt.dmg, ATTACK_TYPE_NORMAL, MAGIC, thistype.tag)
-                        if rand == ELEMENTICE.value then --ice
+                        -- ice
+                        if rand == ELEMENTICE.value then
                             Freeze:add(Hero[pt.pid], enemy):duration(2.)
-                        elseif rand == ELEMENTEARTH.value then --earth
+                        -- earth
+                        elseif rand == ELEMENTEARTH.value then
                             local b = EarthDebuff:get(nil, enemy)
                             if b then
-                                IncUnitAbilityLevel(enemy, b.RAWCODE)
+                                b.level = b.level + 1
                                 b:refresh()
                             end
                             EarthDebuff:add(Hero[pt.pid], enemy):duration(10.)
@@ -579,12 +520,10 @@ OnInit.final("ElementalistSpells", function(Require)
                     end
                 end
 
-                DestroyGroup(ug)
-
-                pt.timer:callDelayed(0.4, periodic, pt)
-            else
-                pt:destroy()
+                return true
             end
+
+            return false
         end
 
         function thistype:onCast()
@@ -594,6 +533,7 @@ OnInit.final("ElementalistSpells", function(Require)
             pt.dur = self.times
             pt.dmg = self.dmg * BOOST[self.pid]
             pt.aoe = self.aoe * LBOOST[self.pid]
+            pt.ug = CreateGroup()
 
             if masterElement[self.pid] == 0 then
                 pt.element = GetRandomInt(1, 4)
@@ -601,11 +541,13 @@ OnInit.final("ElementalistSpells", function(Require)
                 pt.element = masterElement[self.pid]
             end
 
-            pt.timer:callDelayed(0.4, periodic, pt)
+            pt:startLoop(0.4, periodic)
         end
 
-        local manacost = function(u)
-            BlzSetUnitAbilityManaCost(u, thistype.id, GetUnitAbilityLevel(u, thistype.id) - 1, R2I(BlzGetUnitMaxMana(u) * 0.25))
+        local manacost = function(u, key)
+            if key == "int" or key == "bonus_mana" or key == "bonus_int" then
+                BlzSetUnitAbilityManaCost(u, thistype.id, GetUnitAbilityLevel(u, thistype.id) - 1, R2I(BlzGetUnitMaxMana(u) * 0.25))
+            end
         end
 
         function thistype.onLearn(source, ablev, pid)

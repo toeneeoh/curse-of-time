@@ -262,7 +262,7 @@ OnInit.final("Shop", function(Require)
             self.component = {}
             self.counter = __jarray(0)
 
-            for tag in compstring:gmatch("\x25S+") do
+            for tag in compstring:gmatch("%S+") do
                 if tag:len() > 4 then
                     thistype.save(id, tag)
                 elseif FourCC(tag) ~= 0 then

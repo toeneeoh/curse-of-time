@@ -27,13 +27,13 @@ OnInit.final("BloodzerkerSpells", function(Require)
             aoe = 300.,
         }
 
-        ---@type fun(pt: PlayerTimer)
+        ---@type fun(pt: PlayerTimer): boolean
         local function periodic(pt)
             if pt.dur > 0. and IsUnitInRangeXY(pt.target, pt.x, pt.y, pt.dur) then
                 local x = GetUnitX(pt.target)
                 local y = GetUnitY(pt.target)
                 local accel = pt.dur / pt.dist
-                --movement
+                -- movement
                 SetUnitXBounded(pt.target, x + (pt.speed / (1 + accel)) * math.cos(pt.angle))
                 SetUnitYBounded(pt.target, y + (pt.speed / (1 + accel)) * math.sin(pt.angle))
                 pt.dur = pt.dur - (pt.speed / (1 + accel))
@@ -64,15 +64,16 @@ OnInit.final("BloodzerkerSpells", function(Require)
                     DestroyGroup(ug)
                 end
 
-                pt.timer:callDelayed(FPS_32, periodic, pt)
-            else
-                SetUnitFlyHeight(pt.target, 0, 0)
-                reselect(pt.target)
-                SetUnitTimeScale(pt.target, 1.)
-                SetUnitPropWindow(pt.target, bj_DEGTORAD * 60.)
-                SetUnitPathing(pt.target, true)
-                pt:destroy()
+                return true
             end
+
+            SetUnitFlyHeight(pt.target, 0, 0)
+            reselect(pt.target)
+            SetUnitTimeScale(pt.target, 1.)
+            SetUnitPropWindow(pt.target, bj_DEGTORAD * 60.)
+            SetUnitPathing(pt.target, true)
+
+            return false
         end
 
         function thistype:onCast()
@@ -101,7 +102,7 @@ OnInit.final("BloodzerkerSpells", function(Require)
             SetUnitPropWindow(self.caster, 0)
             DelayAnimation(self.pid, self.caster, (pt.dur / 30. * FPS_32) + 0.5, 1, 0, false)
 
-            pt.timer:callDelayed(FPS_32, periodic, pt)
+            pt:startLoop(FPS_32, periodic)
         end
     end
 
@@ -225,60 +226,71 @@ OnInit.final("BloodzerkerSpells", function(Require)
             regen = __jarray(0),
             attack = __jarray(0),
         }
-        thistype.timer = {}
 
-        function thistype.onHit(target, source, amount, amount_after_red, damage_type)
-            --undying rage delayed damage
-            buff = UndyingRageBuff:get(nil, target)
+        -- updates bonus attack and regen periodically
+        local function refresh(pid)
+            local hero = Hero[pid]
+            local u = Unit[hero]
 
+            u.suppress_stat_events = true
+
+            u.damage_percent = u.damage_percent - thistype.attack[pid] * 0.01
+            u.regen_flat = u.regen_flat - thistype.regen[pid]
+
+            u.suppress_stat_events = false
+
+            local maxhp = BlzGetUnitMaxHP(hero)
+            local hp = GetWidgetLife(hero)
+
+            thistype.attack[pid] = (1. - (hp / maxhp)) * 100.
+
+            u.damage_percent = u.damage_percent + thistype.attack[pid] * 0.01
+
+            local str = u.str + u.bonus_str --GetHeroStr(hero, true)
+            local regen = R2I(str - (hp / maxhp) * str)
+            thistype.regen[pid] = regen
+
+            u.regen_flat = u.regen_flat + regen
+        end
+
+        local function on_hit(target, source, amount, amount_after_red, damage_type)
+            local buff = UndyingRageBuff:get(nil, target)
+
+            -- undying rage delayed damage
             if buff then
                 amount.value = 0.
                 buff:addRegen(-amount_after_red)
             end
+
+            if amount_after_red > 1. then
+                local pid = GetPlayerId(GetOwningPlayer(target)) + 1
+                refresh(pid)
+            end
         end
 
-        local function regen(pid)
-            local hp = GetWidgetLife(Hero[pid])
-            local maxhp = BlzGetUnitMaxHP(Hero[pid])
-            thistype.values.regen[pid] = R2I(GetHeroStr(Hero[pid], true) - (hp / maxhp) * GetHeroStr(Hero[pid], true))
-            return thistype.values.regen[pid]
+        local function periodic(pt)
+            refresh(pt.pid)
+
+            return true
         end
 
-        -- updates bonus attack and regen periodically
-        local function refresh(pid, ratio)
-            local u = Unit[Hero[pid]]
-            local untouched_damage = BlzGetUnitBaseDamage(Hero[pid], 0) + Unit[Hero[pid]].bonus_damage
-
-            u.damage_percent = u.damage_percent - ratio
-            u.regen_flat = u.regen_flat - thistype.values.regen[pid]
-
-            local maxhp = BlzGetUnitMaxHP(Hero[pid])
-            local hp = GetWidgetLife(Hero[pid])
-            ratio = 1. - (hp / maxhp)
-
-            thistype.attack[pid] = untouched_damage * ratio
-
-            u.damage_percent = u.damage_percent + ratio
-            u.regen_flat = u.regen_flat + regen(pid)
-
-            thistype.timer[pid] = TimerQueue:callDelayed(0.25, refresh, pid, ratio)
+        local function on_remove(pt)
+            thistype.regen[pt.pid] = 0
+            thistype.attack[pt.pid] = 0
         end
 
         function thistype:onCast()
             UndyingRageBuff:add(self.caster, self.caster):duration(self.dur * LBOOST[self.pid])
         end
 
-        local function on_cleanup(pid)
-            if thistype.timer[pid] then
-                TimerQueue:disableCallback(thistype.timer[pid])
-            end
-        end
-
         function thistype.onLearn(source, ablev, pid)
-            if ablev == 1 then
-                EVENT_ON_CLEANUP:register_action(pid, on_cleanup)
-                refresh(pid, 0)
-            end
+            TimerList[pid]:stopAllTimers(thistype.id)
+
+            local pt = TimerList[pid]:add(thistype.id)
+            pt.onRemove = on_remove
+            pt:startLoop(1., periodic)
+
+            EVENT_ON_STRUCK_FINAL:register_unit_action(source, on_hit)
         end
     end
 end, Debug and Debug.getLine())

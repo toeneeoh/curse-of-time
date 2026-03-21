@@ -2,7 +2,9 @@ OnInit.final("RoyalGuardianSpells", function(Require)
     Require('Spells')
     Require('SpellTools')
 
+    local TQ = TimerQueue
     local FPS_32 = FPS_32
+    local valid_target = VALID_DAMAGE_TARGET
 
     ---@class STEEDCHARGE : Spell
     ---@field charge function
@@ -15,38 +17,68 @@ OnInit.final("RoyalGuardianSpells", function(Require)
             dur = 10.,
         }
 
-        ---@type fun(pid: integer, angle: number, x: number, y: number)
-        local function charge(pid, angle, x, y)
-            local speed = Unit[Hero[pid]].movespeed * 0.045
+        local function knockback(object, self)
+            if not self.g[object] then
+                self.g[object] = true
 
-            SetUnitPathing(Hero[pid], false)
-            SetUnitPropWindow(Hero[pid], 0)
+                Stun:add(self.caster, object):duration(1.)
+                DestroyEffect(AddSpecialEffectTarget("Objects\\Spawnmodels\\Undead\\ImpaleTargetDust\\ImpaleTargetDust.mdl", object, "origin"))
 
-            if not UnitAlive(Hero[pid]) or IsUnitLoaded(Hero[pid]) or IsUnitInRangeXY(Hero[pid], x, y, speed + 5.) or IsUnitInRangeXY(Hero[pid], x, y, 1000.) == false then
-                SetUnitPropWindow(Hero[pid], bj_DEGTORAD * 60.)
-                SetUnitPathing(Hero[pid], true)
-                SetUnitAnimationByIndex(Hero[pid], 1)
-            else
-                local ug = CreateGroup()
+                -- valid pull target
+                if IsUnitType(object, UNIT_TYPE_HERO) == false and GetUnitMoveSpeed(object) > 0 then
+                    local caster = self.caster
+                    local cx = GetUnitX(caster)
+                    local cy = GetUnitY(caster)
+                    local ox = GetUnitX(object)
+                    local oy = GetUnitY(object)
 
-                BlzSetUnitFacingEx(Hero[pid], bj_RADTODEG * angle)
-                SetUnitXBounded(Hero[pid], GetUnitX(Hero[pid]) + speed * math.cos(angle))
-                SetUnitYBounded(Hero[pid], GetUnitY(Hero[pid]) + speed * math.sin(angle))
-                SetUnitAnimationByIndex(Hero[pid], 0)
+                    local facing = GetUnitFacing(caster) * bj_DEGTORAD
+                    local fx = math.cos(facing)
+                    local fy = math.sin(facing)
 
-                MakeGroupInRange(pid, ug, GetUnitX(Hero[pid]), GetUnitY(Hero[pid]), 150., Condition(FilterEnemy))
+                    local dx = ox - cx
+                    local dy = oy - cy
 
-                for target in each(ug) do
-                    if SteedChargeStun:has(Hero[pid], target) == false then
-                        Stun:add(Hero[pid], target):duration(1.)
-                        SteedChargeStun:add(Hero[pid], target):duration(2.)
-                        DestroyEffect(AddSpecialEffectTarget("Objects\\Spawnmodels\\Undead\\ImpaleTargetDust\\ImpaleTargetDust.mdl", target, "origin"))
+                    -- 2d cross product: F x E
+                    local cross = fx * dy - fy * dx
+
+                    local angle
+                    if cross >= 0 then
+                        -- enemy is to the "left" of facing, knock them left
+                        angle = facing + bj_PI * 0.5
+                    else
+                        -- enemy is to the "right", knock them right
+                        angle = facing - bj_PI * 0.5
                     end
+
+                    CAT_Knockback(object, 400 * math.cos(angle), 400 * math.sin(angle), 0)
+                    CAT_UnitEnableFriction(object, true)
+                    TimerQueue:callDelayed(1., CAT_UnitEnableFriction, object, false)
                 end
+            end
+        end
 
-                TimerQueue:callDelayed(FPS_32, charge, pid, angle, x, y)
+        local function charge(self)
+            local speed = Unit[self.caster].movespeed * 0.045
 
-                DestroyGroup(ug)
+            SetUnitPathing(self.caster, false)
+            SetUnitPropWindow(self.caster, 0)
+
+            if not UnitAlive(self.caster) or IsUnitLoaded(self.caster) or IsUnitInRangeXY(self.caster, self.x, self.y, speed + 5.) or IsUnitInRangeXY(self.caster, self.x, self.y, 1000.) == false then
+                SetUnitPropWindow(self.caster, bj_DEGTORAD * 60.)
+                SetUnitPathing(self.caster, true)
+                SetUnitAnimationByIndex(self.caster, 1)
+            else
+                local x = GetUnitX(self.caster)
+                local y = GetUnitY(self.caster)
+                BlzSetUnitFacingEx(self.caster, bj_RADTODEG * self.angle)
+                SetUnitXBounded(self.caster, x + speed * math.cos(self.angle))
+                SetUnitYBounded(self.caster, y + speed * math.sin(self.angle))
+                SetUnitAnimationByIndex(self.caster, 0)
+
+                ALICE_ForAllObjectsInRangeDo(knockback, x, y, 150., "unit", valid_target, self)
+
+                TQ:callDelayed(FPS_32, charge, self)
             end
         end
 
@@ -59,8 +91,11 @@ OnInit.final("RoyalGuardianSpells", function(Require)
             BlzUnitHideAbility(self.caster, FourCC('A06K'), true)
             BlzStartUnitAbilityCooldown(self.caster, thistype.id, 30.)
             SteedChargeBuff:add(self.caster, self.caster):duration(self.dur * LBOOST[self.pid])
+            self.g = {}
+            self.x = self.targetX
+            self.y = self.targetY
 
-            TimerQueue:callDelayed(0.05, charge, self.pid, self.angle, self.targetX, self.targetY)
+            TQ:callDelayed(0.05, charge, self)
         end
 
         function thistype.onSetup(u)
@@ -88,7 +123,7 @@ OnInit.final("RoyalGuardianSpells", function(Require)
             BlzSetSpecialEffectYaw(sfx, bj_DEGTORAD * GetUnitFacing(self.caster))
             DestroyEffect(sfx)
 
-            if ShieldCount[self.pid] > 0 then
+            if Unit[self.caster].shield_count > 0 then
                 local ug = CreateGroup()
                 MakeGroupInRange(self.pid, ug, GetUnitX(self.target), GetUnitY(self.target), 300 * LBOOST[self.pid], Condition(FilterEnemy))
                 GroupRemoveUnit(ug, self.target)
@@ -171,24 +206,29 @@ OnInit.final("RoyalGuardianSpells", function(Require)
     do
         local thistype = PROTECTOR
 
-        local function periodic(u, pid, ug)
-            if Profile[pid].playing then
-                MakeGroupInRange(pid, ug, x, y, 900. * LBOOST[pid], Condition(FilterAlly))
+        local function buff(object, source, ablev)
+            ProtectedBuff:add(source, object, ablev):duration(2.)
+        end
 
-                for target in each(ug) do
-                    ProtectedBuff:add(u, target):duration(2.)
-                end
+        local function valid_ally(object, source)
+            return IsUnitAlly(object, GetOwningPlayer(source))
+        end
 
-                TimerQueue:callDelayed(1., periodic, pid, ug)
-            else
-                DestroyGroup(ug)
-            end
+        local function periodic(pt)
+            local source = pt.source
+            local x, y = GetUnitX(source), GetUnitY(source)
+            ALICE_ForAllObjectsInRangeDo(buff, x, y, 900. * LBOOST[pt.pid], "unit", valid_ally, pt.source, pt.ablev)
+
+            return true
         end
 
         function thistype.onLearn(source, ablev, pid)
-            local ug = CreateGroup()
+            TimerList[pid]:stopAllTimers(thistype.id)
+            local pt = TimerList[pid]:add(thistype.id)
+            pt.source = source
+            pt.ablev = ablev
 
-            TimerQueue:callDelayed(1., periodic, source, pid, ug)
+            pt:startLoop(1., periodic)
         end
     end
 end, Debug and Debug.getLine())

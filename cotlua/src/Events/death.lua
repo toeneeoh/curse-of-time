@@ -70,13 +70,14 @@ OnInit.final("Death", function(Require)
         CleanupSummons(pid)
         EVENT_GRAVE_DEATH:trigger(Hero[pid])
 
-        -- gods area
-        if TableHas(GODS_GROUP, pid) then
-            TableRemove(GODS_GROUP, pid)
-        -- death exception
-        elseif InColosseum(pid) then
+        -- flag to avoid normal death sequence
+        if Unit[Hero[pid]].death_exception then
+            Unit[Hero[pid]].death_exception = false
+            return
+        end
+
         -- hardcore death
-        elseif Profile[pid].hero.hardcore > 0 then
+        if Profile[pid].hero.hardcore > 0 then
             DisplayTextToPlayer(Player(pid - 1), 0, 0, "You have died on Hardcore mode, you cannot revive. However, you may -repick to begin a new character in a new character save slot.")
 
             PlayerCleanup(pid)
@@ -84,7 +85,7 @@ OnInit.final("Death", function(Require)
         else
             ChargeNetworth(Player(pid - 1), 0, 0.02, 50 * GetHeroLevel(Hero[pid]), "Dying has cost you")
 
-            RevivePlayer(pid, GetLocationX(TOWN_CENTER), GetLocationY(TOWN_CENTER), 1, 1)
+            RevivePlayer(pid, TOWN_CENTER_X, TOWN_CENTER_Y, 1, 1)
             SetCamera(pid, MAIN_MAP.rect)
         end
     end
@@ -126,6 +127,7 @@ OnInit.final("Death", function(Require)
         end
     end
 
+    -- handles visuals and abilities, grave position is already set on death
     ---@type fun(pid: integer)
     function SpawnGrave(pid)
         local itm = GetResurrectionItem(pid, false)
@@ -167,9 +169,8 @@ OnInit.final("Death", function(Require)
         BlzPlaySpecialEffectWithTimeScale(REVIVE_BAR[pid], ANIM_TYPE_BIRTH, 0.099)
         BlzSetSpecialEffectScale(REVIVE_BAR[pid], 1.25)
 
-        local pt = TimerList[pid]:add()
-        pt.tag = 'dead'
-        pt.timer:callDelayed(12.5, grave_expire, pt)
+        local pt = TimerList[pid]:add('dead')
+        pt:after(12.5, grave_expire)
     end
 
     -- main death event

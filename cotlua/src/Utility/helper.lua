@@ -8,6 +8,12 @@ OnInit.global("Helper", function(Require)
     Require('Variables')
     Require('TimerQueue')
 
+    local TQ = TimerQueue
+
+    local floor    = math.floor
+    local tostring = tostring
+    local sub      = string.sub
+    local concat   = table.concat
     local pack = string.pack
     local FPS_32 = FPS_32
 
@@ -81,7 +87,7 @@ OnInit.global("Helper", function(Require)
         function thistype:add_timed(value, time)
             self:add(value)
 
-            TimerQueue:callDelayed(time, remove, self)
+            TQ:callDelayed(time, remove, self)
         end
 
         function thistype:wipe()
@@ -289,262 +295,7 @@ do
             instances[#instances + 1] = self
 
             if #instances == 1 then
-                TimerQueue:callPeriodically(FPS_32, condition, update)
-            end
-
-            return self
-        end
-    end
-end
-
---[[Shield system and UI]]
-do
-    ---@class shieldtimer
-    ---@field shield shield
-    ---@field amount number
-    ---@field create function
-    ---@field destroy function
-    ---@field queue TimerQueue
-    shieldtimer = {}
-    do
-        local thistype = shieldtimer
-        local mt = { __index = thistype }
-
-        function thistype:destroy()
-            self.queue:destroy()
-            self = nil
-        end
-
-        ---@type fun(timer: shieldtimer)
-        local function expire(timer)
-            timer.shield.max = timer.shield.max - timer.amount
-            timer.shield.hp = timer.shield.hp - timer.amount
-
-            if timer.shield.hp <= 0 then
-                timer.shield:destroy()
-            else
-                timer.shield:refresh()
-            end
-
-            TableRemove(timer.shield.timers, timer)
-            timer:destroy()
-        end
-
-        function thistype.create(shield, amount, dur)
-            local self = {}
-
-            setmetatable(self, mt)
-
-            self.shield = shield
-            self.amount = amount
-            self.queue = TimerQueue.create()
-
-            self.queue:callDelayed(dur, expire, self)
-
-            return self
-        end
-
-    end
-
-    ---@class shield
-    ---@field refresh function
-    ---@field sfx effect
-    ---@field max number
-    ---@field queue TimerQueue
-    ---@field target unit
-    ---@field add function
-    ---@field create function
-    ---@field destroy function
-    ---@field color function
-    ---@field c integer
-    ---@field r integer
-    ---@field g integer
-    ---@field b integer
-    ---@field addTimer function
-    ---@field timers shieldtimer[]
-    ---@field shieldheight number[]
-    ---@field list shield[]
-    shield = {}
-    do
-        local thistype = shield
-        local mt = { __index = thistype }
-
-        thistype.list = {}
-        thistype.shieldheight = {
-            HERO_ELEMENTALIST = 200,
-            HERO_MARKSMAN = 220,
-            HERO_MARKSMAN_SNIPER = 220,
-            HERO_ROYAL_GUARDIAN = 230,
-            HERO_MASTER_ROGUE = 230,
-            HERO_ASSASSIN = 230,
-            HERO_DARK_SUMMONER = 230,
-            HERO_THUNDERBLADE = 240,
-            HERO_HIGH_PRIEST = 240,
-            HERO_VAMPIRE = 240,
-            HERO_OBLIVION_GUARD = 275
-        }
-
-        --shieldheight default value
-        __jarray(250, thistype.shieldheight)
-
-        function thistype:color(c)
-            self.c = c
-            self.r = OriginalRGB[c].r
-            self.g = OriginalRGB[c].g
-            self.b = OriginalRGB[c].b
-            BlzSetSpecialEffectColorByPlayer(self.sfx, Player(c))
-        end
-
-        function thistype:refresh()
-            BlzSetSpecialEffectTime(self.sfx, self.hp / self.max)
-        end
-
-        ---@type fun(self: shield, dmg: number, source: unit): number
-        function thistype:damage(dmg, source)
-            local angle = math.atan(GetUnitY(source) - GetUnitY(self.target), GetUnitX(source) - GetUnitX(self.target)) ---@type number 
-            local x     = GetUnitX(self.target) + 80. * math.cos(angle) ---@type number 
-            local y     = GetUnitY(self.target) + 80. * math.sin(angle) ---@type number 
-            local e     = AddSpecialEffect("war3mapImported\\BoneArmorCasterTC.mdx", x, y) ---@type effect 
-
-            BlzSetSpecialEffectZ(e, BlzGetUnitZ(self.target) + 90.)
-            BlzSetSpecialEffectColorByPlayer(e, Player(self.c))
-            BlzSetSpecialEffectYaw(e, angle)
-            BlzSetSpecialEffectScale(e, 0.85)
-            BlzSetSpecialEffectTimeScale(e, 3.5)
-
-            DestroyEffect(e)
-
-            self.hp = self.hp - dmg
-
-            if self.hp <= 0. then
-                self:destroy()
-                return -self.hp
-            else
-                self:refresh()
-                return 0.00
-            end
-        end
-
-        local function update()
-            local u = GetMainSelectedUnit() ---@type unit 
-
-            if thistype[u] then
-                BlzFrameSetVisible(SHIELD_BACKDROP, true)
-
-                if thistype[u].max >= 100000 then
-                    BlzFrameSetText(SHIELD_TEXT, "|cff22ddff" .. R2I(thistype[u].hp))
-                else
-                    BlzFrameSetText(SHIELD_TEXT, "|cff22ddff" .. R2I(thistype[u].hp) .. " / " .. R2I(thistype[u].max))
-                end
-            else
-                BlzFrameSetVisible(SHIELD_BACKDROP, false)
-            end
-
-            --move shield visual positions
-            for i = 1, #thistype.list do
-                local s = thistype.list[i]
-                if UnitAlive(s.target) then
-                    BlzSetSpecialEffectX(s.sfx, GetUnitX(s.target))
-                    BlzSetSpecialEffectY(s.sfx, GetUnitY(s.target))
-                    BlzSetSpecialEffectZ(s.sfx, BlzGetUnitZ(s.target) + thistype.shieldheight[GetUnitTypeId(s.target)])
-                else
-                    s:destroy()
-                end
-            end
-
-            if thistype.queue then
-                thistype.queue:callDelayed(FPS_32, update)
-            end
-        end
-
-        local function onStruck(target, source, amount, amount_after_red)
-            amount.color = {thistype[target].r, thistype[target].g, thistype[target].b}
-            amount.value = thistype[target]:damage(amount_after_red, source)
-        end
-
-        --shield fully expires
-        function thistype:onDestroy()
-            local pid = GetPlayerId(GetOwningPlayer(self.target)) + 1 ---@type integer 
-
-            TimerList[pid]:stopAllTimers(GAIAARMOR.id) --gaia armor attachment
-            ProtectionBuff:dispel(nil, self.target) --high priestess protection attack speed
-
-            BlzSetSpecialEffectAlpha(self.sfx, 0)
-            DestroyEffect(self.sfx)
-
-            --destroy all active shieldtimers
-            for _, v in ipairs(self.timers) do
-                v:destroy()
-            end
-
-            TableRemove(thistype.list, self)
-
-            if #thistype.list == 0 then
-                BlzFrameSetVisible(SHIELD_BACKDROP, false)
-                thistype.queue:destroy()
-            end
-
-            EVENT_ON_STRUCK_AFTER_REDUCTIONS:unregister_unit_action(self.target, onStruck)
-        end
-
-        function thistype:destroy()
-            self:onDestroy()
-            thistype[self.target] = nil
-            self = nil
-        end
-
-        ---@type fun(self: shield, amount: number, dur: number)
-        function thistype:addTimer(amount, dur)
-            local timer = shieldtimer.create(self, amount, dur)
-
-            self.timers[#self.timers + 1] = timer
-        end
-
-        ---@type fun(u: unit, amount: number, dur: number):shield
-        function thistype.add(u, amount, dur)
-            local self = shield[u] ---@type shield
-
-            --shield already exists
-            if self then
-                self.max = self.max + amount
-                self.hp = self.hp + amount
-
-                self:refresh()
-            else
-            --make a new one
-                self = thistype.create(u, amount, dur)
-                EVENT_ON_STRUCK_AFTER_REDUCTIONS:register_unit_action(u, onStruck)
-            end
-
-            self:addTimer(amount, dur)
-
-            return self
-        end
-
-        ---@type fun(u: unit, amount: number, dur: number):shield
-        function thistype.create(u, amount, dur)
-            ---@diagnostic disable-next-line: missing-fields
-            local self = {} ---@type shield
-
-            setmetatable(self, mt)
-
-            --setup
-            self.max = amount
-            self.hp = amount
-            self.target = u
-            self.sfx = AddSpecialEffect("war3mapImported\\HPbar.mdx", GetUnitX(u), GetUnitY(u))
-            self.timers = {}
-            self:color(2)
-            BlzSetSpecialEffectTime(self.sfx, 1.)
-            BlzSetSpecialEffectTimeScale(self.sfx, 0.)
-            BlzSetSpecialEffectScale(self.sfx, 1.6)
-
-            thistype[u] = self
-            thistype.list[#thistype.list + 1] = self
-
-            if #thistype.list == 1 then
-                thistype.queue = TimerQueue.create()
-                thistype.queue:callDelayed(FPS_32, update)
+                TQ:callPeriodically(FPS_32, condition, update)
             end
 
             return self
@@ -717,113 +468,6 @@ do
     end
 end
 
----@class TimerFrame
----@field running boolean
----@field stop function
----@field create function
----@field update function
----@field destroy function
----@field expire function
----@field frame framehandle
----@field text framehandle
----@field timer integer
----@field time integer
----@field title string
----@field trig trigger
----@field minimize framehandle
----@field minimize_frame framehandle
----@field playerGroup table
-TimerFrame = {}
-do
-    local thistype = TimerFrame
-    local mt = { __index = thistype }
-    local date = os.date
-    local minimize = BlzCreateFrameByType("GLUEBUTTON", "", BlzGetOriginFrame(ORIGIN_FRAME_WORLD_FRAME, 0), "ScoreScreenTabButtonTemplate", 0)
-    local minimize_frame = BlzCreateFrameByType("BACKDROP", "", minimize, "", 0)
-    local frame = BlzCreateFrame("ListBoxWar3", minimize_frame, 0, 0)
-    local text = BlzCreateFrameByType("TEXT", "", frame, "", 0)
-
-    function thistype:run()
-        self.time = self.time - 1
-
-        if self.time < 0 then
-            self:stop()
-        else
-            self:update()
-            self.timer = TimerQueue:callDelayed(1, thistype.run, self)
-        end
-    end
-
-    function thistype:destroy()
-        TimerQueue:disableCallback(self.timer)
-        DestroyTrigger(self.trig)
-        local pid = GetPlayerId(GetLocalPlayer()) + 1
-        if TableHas(self.playerGroup, GetLocalPlayer()) or TableHas(self.playerGroup, pid) then
-            BlzFrameSetVisible(minimize, false)
-        end
-        setmetatable(self, nil)
-        self = nil
-    end
-
-    function thistype:stop()
-        self.expire()
-        self:destroy()
-    end
-
-    function thistype:update()
-        BlzFrameSetText(text, self.title .. "|n" .. date("!\x25H:\x25M:\x25S", self.time))
-    end
-
-    function TimerFrame.create(title, time, onExpire, playerGroup)
-        local self = {
-            running = true,
-            expire = onExpire,
-            time = time,
-            title = title,
-            playerGroup = playerGroup,
-        }
-
-        BlzFrameSetSize(minimize, 0.015, 0.015)
-        BlzFrameSetTexture(minimize_frame, "war3mapImported\\expand.blp", 0, true)
-
-        self.trig = CreateTrigger()
-        BlzTriggerRegisterFrameEvent(self.trig, minimize, FRAMEEVENT_CONTROL_CLICK)
-        TriggerAddAction(self.trig, function()
-            if GetTriggerPlayer() == GetLocalPlayer() then
-                BlzFrameSetEnable(BlzGetTriggerFrame(), false)
-                BlzFrameSetEnable(BlzGetTriggerFrame(), true)
-
-                if BlzFrameIsVisible(frame) then
-                    BlzFrameSetVisible(frame, false)
-                    BlzFrameSetTexture(minimize_frame, "war3mapImported\\minimize.blp", 0, true)
-                else
-                    BlzFrameSetVisible(frame, true)
-                    BlzFrameSetTexture(minimize_frame, "war3mapImported\\expand.blp", 0, true)
-                end
-            end
-        end)
-
-        setmetatable(self, mt)
-
-        BlzFrameSetTextAlignment(text, TEXT_JUSTIFY_CENTER, TEXT_JUSTIFY_CENTER)
-        BlzFrameSetPoint(minimize, FRAMEPOINT_CENTER, BlzGetOriginFrame(ORIGIN_FRAME_WORLD_FRAME, 0), FRAMEPOINT_CENTER, 0, -0.154)
-        BlzFrameSetAllPoints(minimize_frame, minimize)
-        BlzFrameSetPoint(text, FRAMEPOINT_BOTTOM, minimize_frame, FRAMEPOINT_TOP, 0, 0.018)
-        BlzFrameSetPoint(frame, FRAMEPOINT_TOPLEFT, text, FRAMEPOINT_TOPLEFT, -0.04, 0.02)
-        BlzFrameSetPoint(frame, FRAMEPOINT_BOTTOMRIGHT, text, FRAMEPOINT_BOTTOMRIGHT, 0.04, -0.02)
-        BlzFrameSetVisible(minimize, false)
-
-        local pid = GetPlayerId(GetLocalPlayer()) + 1
-        if TableHas(playerGroup, GetLocalPlayer()) or TableHas(playerGroup, pid) then
-            BlzFrameSetVisible(minimize, true)
-        end
-
-        self:update()
-        self.timer = TimerQueue:callDelayed(1, thistype.run, self)
-
-        return self
-    end
-end
 
 -- simple priority queue
 
@@ -973,7 +617,7 @@ function HealthGradient(position, returnHex)
 
     if returnHex then
         -- Convert RGB values to hexadecimal string
-        local hexString = string.format("|cff\x2502X\x2502X\x2502X", interpolatedColor[1], interpolatedColor[2], interpolatedColor[3])
+        local hexString = string.format("|cff%02X%02X%02X", interpolatedColor[1], interpolatedColor[2], interpolatedColor[3])
         return hexString
     else
         return interpolatedColor[1], interpolatedColor[2], interpolatedColor[3]
@@ -1242,7 +886,7 @@ end
 ---@param target unit
 function InstantAttack(source, target)
     UnitAddAbility(source, FourCC('IATK'))
-    TimerQueue:callDelayed(FPS_32, AttackDelay, source, target)
+    TQ:callDelayed(FPS_32, AttackDelay, source, target)
 end
 
 ---@param pid integer
@@ -1262,27 +906,46 @@ function RemovePlayerUnits(pid)
     DestroyGroup(ug)
 end
 
----@param hero unit
----@return integer
-function HighestStat(hero)
-    local str = GetHeroStr(hero, true) ---@type integer 
-    local agi = GetHeroAgi(hero, true) ---@type integer 
-    local int = GetHeroInt(hero, true) ---@type integer 
+local stat_map = {
+    "str",
+    "int",
+    "agi",
+}
 
-    if str > agi and str > int then
+local literal_stat_map = {
+    "Strength",
+    "Intelligence",
+    "Agility",
+}
+
+---@param hero unit
+---@param include_bonus boolean
+---@return integer
+function HighestStat(hero, include_bonus)
+    local str = GetHeroStr(hero, include_bonus) ---@type integer 
+    local int = GetHeroInt(hero, include_bonus) ---@type integer 
+    local agi = GetHeroAgi(hero, include_bonus) ---@type integer 
+
+    if str >= agi and str >= int then
         return 1
-    elseif agi > str and agi > int then
+    elseif int >= str and int >= agi then
         return 2
-    elseif int > str and int > agi then
-        return 3
     else
-        return MainStat(hero)
+        return 3
+    end
+end
+
+function HighestStatName(hero, literal, include_bonus)
+    if literal then
+        return literal_stat_map[HighestStat(hero, include_bonus)]
+    else
+        return stat_map[HighestStat(hero, include_bonus)]
     end
 end
 
 ---@param hero unit
 ---@return integer
-function MainStat(hero) --returns integer signifying primary attribute
+function MainStat(hero) -- returns integer signifying primary attribute
     return BlzGetUnitIntegerField(hero, UNIT_IF_PRIMARY_ATTRIBUTE)
 end
 
@@ -1302,10 +965,46 @@ function NearbyRect(r, x, y)
     return false
 end
 
+---@type fun(pt: PlayerTimer)
+function DelayAnimationExpire(pt)
+    if pt.pause then
+        BlzPauseUnitEx(pt.target, false)
+    end
+
+    if pt.dur > 0. then
+        SetUnitTimeScale(pt.target, pt.dur)
+    end
+
+    if UnitAlive(pt.target) then
+        SetUnitAnimationByIndex(pt.target, pt.index)
+    end
+end
+
+---@type fun(pid: integer, u: unit, delay: number, index: integer, timescale: number, pause: boolean)
+function DelayAnimation(pid, u, delay, index, timescale, pause)
+    local pt = TimerList[pid]:add() ---@type PlayerTimer
+
+    pt.target = u
+    pt.index = index
+    pt.pause = false
+    pt.dur = timescale
+
+    if pause then
+        BlzPauseUnitEx(u, true)
+        pt.pause = true
+    end
+
+    pt:after(delay, DelayAnimationExpire)
+end
+
+--#region TODO: move lighting stuff somewhere?
+
+local CustomLighting = __jarray(0)
+
 ---@param i integer
 ---@param x number
 ---@param y number
-function CustomLightingPlayerCheck(i, x, y)
+local function CustomLightingPlayerCheck(i, x, y)
     local daynightmodel = DEFAULT_LIGHTING ---@type string 
 
     CustomLighting[i] = 1
@@ -1349,43 +1048,10 @@ function CustomLightingPlayerCheck(i, x, y)
     end
 end
 
----@type fun(pt: PlayerTimer)
-function DelayAnimationExpire(pt)
-    if pt.pause then
-        BlzPauseUnitEx(pt.target, false)
-    end
-
-    if pt.dur > 0. then
-        SetUnitTimeScale(pt.target, pt.dur)
-    end
-
-    if UnitAlive(pt.target) then
-        SetUnitAnimationByIndex(pt.target, pt.index)
-    end
-
-    pt:destroy()
-end
-
----@type fun(pid: integer, u: unit, delay: number, index: integer, timescale: number, pause: boolean)
-function DelayAnimation(pid, u, delay, index, timescale, pause)
-    local pt = TimerList[pid]:add() ---@type PlayerTimer
-
-    pt.target = u
-    pt.index = index
-    pt.pause = false
-    pt.dur = timescale
-
-    if pause then
-        BlzPauseUnitEx(u, true)
-        pt.pause = true
-    end
-
-    pt.timer:callDelayed(delay, DelayAnimationExpire, pt)
-end
 
 ---@param p player
 ---@param r rect
-function SetCameraBoundsRectForPlayerEx(p, r)
+local function SetCameraBoundsRectForPlayerEx(p, r)
     local minX = GetRectMinX(r) ---@type number 
     local minY = GetRectMinY(r) ---@type number 
     local maxX = GetRectMaxX(r) ---@type number 
@@ -1400,6 +1066,23 @@ function SetCameraBoundsRectForPlayerEx(p, r)
         SetCameraBounds(minX, minY, minX, maxY, maxX, maxY, maxX, minY)
     end
 end
+
+function SetCamera(pid, r)
+    local data = REGION_DATA[r]
+
+    if data.vision then
+        SetCameraBoundsRectForPlayerEx(Player(pid - 1), data.vision)
+    end
+
+    if Hero[pid] then
+        PanCameraToTimedForPlayer(Player(pid - 1), GetUnitX(Hero[pid]), GetUnitY(Hero[pid]), 0.)
+    end
+
+    if data.minimap then
+        SetMinimapTexture(pid, data.minimap)
+    end
+end
+--#endregion
 
 ---@type fun(u: unit)
 function ResetPathing(u)
@@ -1424,21 +1107,6 @@ function GetLine(line, contents)
     end
 
     return ""
-end
-
----@param pid integer
-function DisplayQuestProgress(pid)
-    local i = 0 ---@type integer 
-    local flag = (CHAOS_MODE and 1) or 0
-    local index = KillQuest[flag][i]
-
-    while index ~= 0 do
-        local s = (KillQuest[index].count == KillQuest[index].goal and "|cff40ff40") or ""
-
-        DisplayTimedTextToPlayer(Player(pid - 1), 0, 0, 10, KillQuest[index].name .. ": " .. s .. (KillQuest[index].count) .. "/" .. (KillQuest[index].goal) .. "|r |cffffcc01LVL " .. (KillQuest[index].min) .. "-" .. (KillQuest[index].max))
-        i = i + 1
-        index = KillQuest[flag][i]
-    end
 end
 
 ---@return boolean
@@ -1499,24 +1167,19 @@ function PlayerCleanup(pid)
 
     PLAYER_SELECTED_UNIT[pid] = nil
 
-    -- TODO: Use this more
-    EVENT_ON_CLEANUP:trigger(pid)
-
     -- cleanup bound items
     ALICE_ForAllObjectsDo(CleanupBoundItems, "item", valid_item, p)
 
+    -- TODO: Use this more
+    EVENT_ON_CLEANUP:trigger(pid)
+
     RemovePlayerUnits(pid)
     SetCameraLocked(pid, false)
-    Hero[pid] = nil
-    HeroID[pid] = 0
-    Backpack[pid] = nil
     IS_AUTO_ATTACK_OFF[pid] = false
     SetCurrency(pid, GOLD, 0)
     SetCurrency(pid, PLATINUM, 0)
     SetCurrency(pid, CRYSTAL, 0)
-    ItemGoldRate[pid] = 0
     CustomLighting[pid] = 1
-    IS_FLEEING[pid] = false
 
     if GetLocalPlayer() == p then
         BlzFrameSetVisible(DPS_FRAME, false)
@@ -1602,10 +1265,14 @@ function MakeDummyCastItem(u)
         end
     end
 
-    local itm = OldCreateItem(dummies[index], 30000, 30000)
-    UnitAddItem(u, itm)
+    if dummies[index] then
+        local itm = OldCreateItem(dummies[index], 30000, 30000)
+        UnitAddItem(u, itm)
 
-    return itm
+        return itm
+    end
+
+    return nil
 end
 
 ---@param pid integer
@@ -1659,20 +1326,55 @@ function SelectGroupedRegion(groupnumber)
     return RegionCount[GetRandomInt(lowBound, highBound - 1)]
 end
 
---formats a number to a string with commas (no decimals), Lua handles string representation of numbers greater than integer limit
+-- formats a number to a string with commas (no decimals)
 ---@param value number
 ---@return string
 function RealToString(value)
+    -- let Lua handle giant values directly
     if value >= INT_32_LIMIT then
-        return tostring(tonumber(value))
+        return tostring(value)
     end
 
-    local s = tostring(math.floor(value + 0.5))
-    local _, _, minus, int = s:find("([-]?)(\x25d+)")
+    -- handle sign
+    local negative = false
+    if value < 0 then
+        negative = true
+        value = -value
+    end
 
-    int = int:reverse():gsub("(\x25d\x25d\x25d)", "\x251,")
+    -- round to nearest int
+    local s = tostring(floor(value + 0.5))
+    local len = #s
 
-    return minus .. int:reverse():gsub("^,", "")
+    -- fast path: no commas needed
+    if len <= 3 then
+        return negative and ("-" .. s) or s
+    end
+
+    -- split "head" group and remaining 3-digit groups
+    local first = len % 3
+    if first == 0 then first = 3 end
+
+    local parts = {}
+    local idx = 1
+
+    -- first group (1–3 digits, no leading comma)
+    parts[idx] = sub(s, 1, first)
+    idx = idx + 1
+
+    -- remaining groups in chunks of 3 with commas
+    for i = first + 1, len, 3 do
+        parts[idx] = ","
+        parts[idx + 1] = sub(s, i, i + 2)
+        idx = idx + 2
+    end
+
+    local out = concat(parts)
+    if negative then
+        out = "-" .. out
+    end
+
+    return out
 end
 
 ---@type fun(pid: integer, prof: integer): boolean
@@ -1799,7 +1501,7 @@ function RewardXPGold(killed, killer)
 
     for i = 1, #xpgroup do
         local pid = xpgroup[i]
-        local XP = math.floor(expbase * XP_Rate[pid])
+        local XP = math.floor(expbase * Unit[Hero[pid]].xp_rate)
 
         AwardGold(pid, teamgold, false)
         AwardXP(pid, XP)
@@ -1893,20 +1595,6 @@ function ToggleAutoAttack(pid)
     end
 end
 
----@type fun(num: integer)
-function SpawnForgotten(num)
-    if UnitAlive(forgotten_spawner) and forgottenCount < 5 then
-        for _ = 1, num do
-            local id = forgottenTypes[GetRandomInt(0, 4)] ---@type integer 
-
-            forgottenCount = forgottenCount + 1
-            CreateUnit(PLAYER_CREEP, id, 13699 + GetRandomInt(-250, 250), -14393 + GetRandomInt(-250, 250), GetRandomInt(0, 359))
-        end
-
-        TimerQueue:callDelayed(60., SpawnForgotten, 1)
-    end
-end
-
 local VALID_TREES = {
     ['ITtw'] = 1,
     ['JTtw'] = 1,
@@ -1973,7 +1661,7 @@ function ParseItemTooltip(itm, s)
     local gmatch, gsub = string.gmatch, string.gsub
 
     -- store original tooltip
-    ItemData[itemid][ITEM_TOOLTIP] = orig
+    ItemData[itemid].tooltip = orig
 
     -- store original icon path
     ItemData[itemid].path = BlzGetItemIconPath(itm)
@@ -1982,10 +1670,10 @@ function ParseItemTooltip(itm, s)
     ItemData[itemid].name = GetItemName(itm)
 
     -- match balanced brackets
-    orig = orig:gsub("(\x25b[])", function(contents)
+    orig = orig:gsub("(%b[])", function(contents)
         contents = contents:sub(2, -2) ---@type string
 
-        local tag, suffix, value = contents:match("(\x25a+)([ \x25*])(\x25-?\x25d+\x25.?\x25d*)")
+        local tag, suffix, value = contents:match("(%a+)([ %*])(%-?%d+%.?%d*)")
         local index
         for i = 1, #STAT_TAG do
             local v = STAT_TAG[i]
@@ -2011,7 +1699,7 @@ function ParseItemTooltip(itm, s)
                 ItemData[itemid][index .. "data"] = data
 
                 -- read sfx data
-                for entry in gmatch(data, "(\x25S+)") do
+                for entry in gmatch(data, "(%S+)") do
                     local args = {}
 
                     -- parse [sfx,level,attach,path] entries
@@ -2042,7 +1730,7 @@ function ParseItemTooltip(itm, s)
             end)
 
             -- process affixes
-            local affix = "([|=>\x25@])(\x25-?\x25d+\x25.?\x25d*)"
+            local affix = "([|=>%@])(%-?%d+%.?%d*)"
             local start = contents:find(affix)
 
             if start then
@@ -2059,7 +1747,7 @@ function ParseItemTooltip(itm, s)
                     elseif prefix == ">" then
                         ItemData[itemid][index .. "fpr"] = tonumber(capture)
                     -- percent effectiveness
-                    elseif prefix == "\x25" then
+                    elseif prefix == "%" then
                         ItemData[itemid][index .. "percent"] = tonumber(capture)
                     -- unlock at
                     elseif prefix == "@" then
@@ -2072,11 +1760,30 @@ function ParseItemTooltip(itm, s)
 end
 
 local function finish_cast(u)
-    PauseUnit(u, false)
+    Unit[u]._casting = false
 end
 
----@type fun(u: unit, id: integer, dur: number, anim: integer, timescale: number)
-function CastSpell(u, id, dur, anim, timescale)
+local function finish_pause(u, pause_override)
+    if not pause_override then
+        PauseUnit(u, false)
+    end
+    TQ:callDelayed(3., finish_cast, u) -- internal spacing between boss spell casts
+end
+
+---@param whichRect rect
+---@return number x
+---@return number y
+function GetRandomXYInRect(whichRect)
+	return GetRandomReal(GetRectMinX(whichRect), GetRectMaxX(whichRect)), GetRandomReal(GetRectMinY(whichRect), GetRectMaxY(whichRect))
+end
+
+--- Helper for boss casting
+---@type fun(u: unit, id: integer, dur: number, anim: integer, timescale: number, pause_override: boolean?): boolean
+function CastSpell(u, id, dur, anim, timescale, pause_override)
+    if not BlzGetUnitAbilityCooldownRemaining(target, thistype.id) <= 0. or not UnitAlive(u) then
+        return false
+    end
+
     BlzStartUnitAbilityCooldown(u, id, BlzGetUnitAbilityCooldown(u, id, GetUnitAbilityLevel(u, id) - 1))
     DelayAnimation(BOSS_ID, u, dur, 0, 1., true)
     if anim ~= -1 then
@@ -2084,25 +1791,13 @@ function CastSpell(u, id, dur, anim, timescale)
         SetUnitAnimationByIndex(u, anim)
     end
 
-    Unit[u].cast_time = dur
-    PauseUnit(u, true)
-    TimerQueue:callDelayed(dur, finish_cast, u)
-end
-
-function SetCamera(pid, r)
-    local data = REGION_DATA[r]
-
-    if data.vision then
-        SetCameraBoundsRectForPlayerEx(Player(pid - 1), data.vision)
+    Unit[u]._casting = true
+    if not pause_override then
+        PauseUnit(u, true)
     end
+    TQ:callDelayed(dur, finish_pause, u, pause_override)
 
-    if Hero[pid] then
-        PanCameraToTimedForPlayer(Player(pid - 1), GetUnitX(Hero[pid]), GetUnitY(Hero[pid]), 0.)
-    end
-
-    if data.minimap then
-        SetMinimapTexture(pid, data.minimap)
-    end
+    return true
 end
 
 ---@type fun(pid: integer, x: number, y: number)
@@ -2120,29 +1815,11 @@ function MoveHero(pid, x, y)
     end
 end
 
----@type fun(pid: integer, loc: location)
-function MoveHeroLoc(pid, loc)
-    SetUnitPositionLoc(Hero[pid], loc)
-    SetUnitPositionLoc(HeroGrave[pid], loc)
-    BlzUnitClearOrders(Hero[pid], false)
-
-    local r = GetRectFromCoords(GetLocationX(loc), GetLocationY(loc))
-
-    if r then
-        SetCamera(pid, r)
-    end
-end
-
 ---@param pid integer
 function ExperienceControl(pid)
     local level = GetHeroLevel(Hero[pid]) ---@type integer 
-    local xpRate = BASE_XP_RATE[level] ---@type number 
 
-    if IS_IN_STRUGGLE[pid] then
-        xpRate = xpRate * .3
-    end
-
-    XP_Rate[pid] = math.max(0, xpRate * (1. + 0.04 * PrestigeTable[pid][0]))
+    Unit[Hero[pid]].xp_rate = math.max(0, BASE_XP_RATE[level])
 end
 
 ---@type fun(pid: integer, texture: string)
@@ -2159,7 +1836,7 @@ local conversion_reset_cd = function(pid) conversion_cd[pid] = nil end
 function ConversionEffect(pid)
     if not conversion_cd[pid] then
         conversion_cd[pid] = true
-        TimerQueue:callDelayed(1., conversion_reset_cd, pid)
+        TQ:callDelayed(1., conversion_reset_cd, pid)
         local x = GetUnitX(Hero[pid])
         local y = GetUnitY(Hero[pid])
 
@@ -2338,13 +2015,13 @@ local function apply_fade(u, dur, fade, amount)
     end
 
     if amount < 255 and UnitAlive(u) then
-        TimerQueue:callDelayed(FPS_32, apply_fade, u, dur, fade, amount)
+        TQ:callDelayed(FPS_32, apply_fade, u, dur, fade, amount)
     end
 end
 
 ---@type fun(u: unit, dur: number, fade: boolean)
 function Fade(u, dur, fade)
-    TimerQueue:callDelayed(0, apply_fade, u, dur, fade, 0)
+    TQ:callDelayed(0, apply_fade, u, dur, fade, 0)
 end
 
 local function apply_sfx_fade(sfx, fade, count)
@@ -2357,7 +2034,7 @@ local function apply_sfx_fade(sfx, fade, count)
             BlzSetSpecialEffectAlpha(sfx, 255 - count * 7)
         end
 
-        TimerQueue:callDelayed(FPS_32, apply_sfx_fade, sfx, fade, count)
+        TQ:callDelayed(FPS_32, apply_sfx_fade, sfx, fade, count)
     end
 end
 
@@ -2369,7 +2046,7 @@ function FadeSFX(sfx, fade)
         BlzSetSpecialEffectAlpha(sfx, 0)
     end
 
-    TimerQueue:callDelayed(FPS_32, apply_sfx_fade, sfx, fade, count)
+    TQ:callDelayed(FPS_32, apply_sfx_fade, sfx, fade, count)
 end
 
 function ShopkeeperMove()
@@ -2406,7 +2083,7 @@ function ShopkeeperMove()
         ShopSetStock(FourCC('n01F'), 'I0FC:0', 1)
         ShopSetStock(FourCC('n01F'), 'I00A:0', 1)
 
-        TimerQueue:callDelayed(300., ShopkeeperMove)
+        TQ:callDelayed(300., ShopkeeperMove)
     end
 end
 
@@ -2422,7 +2099,7 @@ function HideSummon(pt)
     SetUnitXBounded(pt.target, 30000)
     SetUnitYBounded(pt.target, 30000)
 
-    pt.timer:callDelayed(1., HideSummonDelay, pt)
+    pt:after(1., HideSummonDelay)
 end
 
 ---@param u unit
@@ -2438,12 +2115,12 @@ function SummonExpire(u)
         if uid == SUMMON_DESTROYER or uid == SUMMON_HOUND or uid == SUMMON_GOLEM then
             UnitRemoveAbility(u, FourCC('BNpa'))
             UnitRemoveAbility(u, FourCC('BNpm'))
-            local pt = TimerList[pid]:add()
+            local pt = TimerList[pid]:add(u)
             pt.target = u
-            pt.tag = u
-            TimerQueue:callDelayed(2., DestroyEffect, AddSpecialEffectTarget("Abilities\\Spells\\Undead\\Darksummoning\\DarkSummonTarget.mdl", u, "origin"))
+            pt.autoDestroy = false
+            TQ:callDelayed(2., DestroyEffect, AddSpecialEffectTarget("Abilities\\Spells\\Undead\\Darksummoning\\DarkSummonTarget.mdl", u, "origin"))
 
-            pt.timer:callDelayed(2., HideSummon, pt)
+            pt:after(2., HideSummon)
         end
 
         if UnitAlive(u) then
@@ -2467,8 +2144,8 @@ end
 
 ---@param p player
 function CleanupSummons(p)
-    for i = 1, #SummonGroup do
-        local target = SummonGroup[i]
+    for i = 1, #PLAYER_SUMMONS do
+        local target = PLAYER_SUMMONS[i]
         if GetOwningPlayer(target) == p then
             SummonExpire(target)
         end
@@ -2481,8 +2158,8 @@ function RecallSummons(pid)
     local x = GetUnitX(Hero[pid]) + 200 * math.cos(bj_DEGTORAD * GetUnitFacing(Hero[pid])) ---@type number 
     local y = GetUnitY(Hero[pid]) + 200 * math.sin(bj_DEGTORAD * GetUnitFacing(Hero[pid])) ---@type number 
 
-    for i = 1, #SummonGroup do
-        local target = SummonGroup[i]
+    for i = 1, #PLAYER_SUMMONS do
+        local target = PLAYER_SUMMONS[i]
         if GetOwningPlayer(target) == p and (GetUnitTypeId(target) == SUMMON_HOUND or GetUnitTypeId(target) == SUMMON_GOLEM or GetUnitTypeId(target) == SUMMON_DESTROYER) and IsUnitHidden(target) == false then
             SetUnitPosition(target, x, y)
             SetUnitPathing(target, false)
@@ -2706,6 +2383,7 @@ do
     end
 
     function thistype:point(p1, p2, x, y)
+        BlzFrameClearAllPoints(self.tooltip)
         BlzFrameSetPoint(self.tooltip, p1, self.frame, p2, x, y)
     end
 
@@ -2724,8 +2402,6 @@ do
             BlzFrameSetPoint(self.tooltip, point, self.frame, FRAMEPOINT_TOPLEFT, -0.005, -0.05)
         elseif point == FRAMEPOINT_BOTTOMLEFT then
             BlzFrameSetPoint(self.tooltip, point, self.frame, FRAMEPOINT_BOTTOMRIGHT, 0.005, 0.0)
-        else
-            BlzFrameSetPoint(self.tooltip, point, self.frame, FRAMEPOINT_BOTTOMLEFT, -0.005, 0.0)
         end
 
         BlzFrameSetPoint(self.box, FRAMEPOINT_TOPLEFT, self.iconFrame, FRAMEPOINT_TOPLEFT, -0.005, 0.005)
@@ -2885,7 +2561,6 @@ end
 local applyblackmask = function(tbl, fadedur, fade)
     for _, pid in ipairs(tbl) do
         pid = (type(pid) == "userdata" and GetPlayerId(pid) + 1) or pid
-        player_fog[pid] = false
 
         if GetLocalPlayer() == Player(pid - 1) then
             SetCineFilterTexture("ReplaceableTextures\\CameraMasks\\Black_mask.blp")
@@ -2905,7 +2580,7 @@ end
 ---@type fun(tbl: table, fadein: number, fadeout: number)
 function BlackMask(tbl, fadein, fadeout)
     applyblackmask(tbl, fadein, true)
-    TimerQueue:callDelayed(fadein, applyblackmask, tbl, fadeout, false)
+    TQ:callDelayed(fadein, applyblackmask, tbl, fadeout, false)
 end
 
 ---@type fun(tbl: table, x: number, y: number)

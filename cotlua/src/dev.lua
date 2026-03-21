@@ -5,16 +5,18 @@
 ]]
 
 OnInit.final("Dev", function(Require)
-    DEV_ENABLED         = true
-    SAVE_LOAD_VERSION   = 0x40000000
-    MAP_NAME            = "CoT Nevermore BETA"
-    EXTRA_DEBUG         = false ---@type boolean 
-    BUDDHA_MODE         = {} ---@type boolean[] 
-    DEBUG_COUNT         = 0 ---@type integer 
-    WEATHER_OVERRIDE    = 0 ---@type integer 
+    DEV_ENABLED        = true
+    SAVE_LOAD_VERSION  = 0x40000000
+    MAP_NAME           = "CoT Nevermore BETA"
+    EXTRA_DEBUG        = false
+    BUDDHA_MODE        = {} ---@type boolean[] 
+    DEBUG_COUNT        = 0
+    WEATHER_OVERRIDE   = 0
+
+    local BOOST_OFF = false
 
     Require('GameStatus')
-    GAME_STATE          = (GAME_STATE == 0) and 2 or GAME_STATE -- keep game state as replay if replay
+    GAME_STATE = (GAME_STATE == 0) and 2 or GAME_STATE -- keep game state as replay if replay
 
     Require('TimerQueue')
     local pack, find, lower = string.pack, string.find, string.lower
@@ -199,7 +201,7 @@ modifiers:
             for i = 2, #args do
                 search = search .. args[i] .. " "
             end
-            search = search:gsub("\x25s+$", "")
+            search = search:gsub("%s+$", "")
 
             find_item(search, pid)
         end,
@@ -255,7 +257,7 @@ modifiers:
             local w = (args[2] and S2I(args[2])) or 0
 
             WEATHER_OVERRIDE = w
-            WeatherPeriodic()
+            WEATHER_PERIODIC()
         end,
 
         ["getrate"] = function(p, pid, args)
@@ -265,7 +267,7 @@ modifiers:
                 rate = FourCC(rate)
 
                 for i = 1, ItemDrops[rate][100] do
-                    print(ItemDrops[rate][i .. "\x25"])
+                    print(ItemDrops[rate][i .. "%"])
                 end
             end
         end,
@@ -385,11 +387,9 @@ modifiers:
         ["boost"] = function(p, pid, args)
             if BOOST_OFF then
                 DisplayTextToPlayer(p, 0, 0, "Boost enabled.")
-                BOOST_OFF = false
                 setmetatable(BOOST, nil)
             else
                 DisplayTextToPlayer(p, 0, 0, "Boost disabled.")
-                BOOST_OFF = true
                 local U = User.first
                 while U do
                     BOOST[U.id] = nil
@@ -397,9 +397,29 @@ modifiers:
                 end
                 setmetatable(BOOST, boost_mt)
             end
+
+            BOOST_OFF = not BOOST_OFF
         end,
         ["hurt"] = function(p, pid, args)
-            SetWidgetLife(PLAYER_SELECTED_UNIT[pid], GetWidgetLife(PLAYER_SELECTED_UNIT[pid]) - BlzGetUnitMaxHP(PLAYER_SELECTED_UNIT[pid]) * 0.01 * S2I(args[2]))
+            local u = PLAYER_SELECTED_UNIT[pid]
+            if not u then return end
+
+            local maxHP = BlzGetUnitMaxHP(u)
+            local percent = S2I(args[2])
+            local damage = math.floor(maxHP * percent * 0.01 + 0.5)
+
+            local currentHP = GetWidgetLife(u)
+            local newHP = currentHP - damage
+
+            if newHP < 1.0 then
+                newHP = 1.0
+            elseif newHP > maxHP then
+                newHP = maxHP
+            else
+                newHP = math.floor(newHP + 0.5)
+            end
+
+            SetWidgetLife(u, newHP)
         end,
         ["buddha"] = function(p, pid, args)
             if BUDDHA_MODE[pid] then
@@ -503,7 +523,7 @@ modifiers:
             print(BlzGetItemExtendedTooltip(UnitItemInSlot(Hero[pid], 0)))
         end,
         ["itemformula"] = function(p, pid, args)
-            print(ItemData[GetItemTypeId(UnitItemInSlot(Hero[pid], 0))][ITEM_TOOLTIP])
+            print(ItemData[GetItemTypeId(UnitItemInSlot(Hero[pid], 0))].tooltip)
         end,
         ["mode"] = function(p, pid, args)
             print(GetLocalizedString("ASSET_MODE"))
@@ -620,12 +640,14 @@ modifiers:
         ["go"] = function(p, pid, args)
             local hero = (args[2]) or "oblivion"
 
-            for _, v in ipairs(HERO_STATS) do
-                local name = v.name:lower()
+            for _, v in pairs(HERO_STATS) do
+                if v.name then
+                    local name = v.name:lower()
 
-                if name:find(hero, nil, true) then
-                    SelectHero(pid, v.id)
-                    break
+                    if name:find(hero, nil, true) then
+                        SelectHero(pid, v.id)
+                        break
+                    end
                 end
             end
         end,
@@ -782,12 +804,89 @@ modifiers:
         local args = {}
 
         --propogate args table
-        for arg in GetEventPlayerChatString():gmatch("\x25S+") do
+        for arg in GetEventPlayerChatString():gmatch("%S+") do
             args[#args + 1] = arg
         end
 
         if dev_cmds[args[1]:sub(2)] then
             dev_cmds[args[1]:sub(2)](p, pid, args)
+        end
+    end
+
+    -- profiler.lua-ish
+    local clock = os.clock
+
+    Profiler = {
+        enabled = false,
+        data = {},
+        threshold = 0.0, -- seconds; set >0 to only log "slow" stuff
+    }
+
+    local data = Profiler.data
+
+    function Profiler.clear()
+        for k in pairs(data) do
+            data[k] = nil
+        end
+    end
+
+    function Profiler.start()
+        Profiler.enabled = true
+        Profiler.clear()
+    end
+
+    function Profiler.stop()
+        Profiler.enabled = false
+        return data
+    end
+
+    function Profiler.time(name, fn, ...)
+        if not Profiler.enabled then
+            return fn(...)
+        end
+
+        local t0 = clock()
+        local r1, r2, r3, r4, r5 = fn(...)
+        local dt = clock() - t0
+
+        local entry = data[name]
+        if not entry then
+            entry = { total = 0.0, count = 0, max = 0.0 }
+            data[name] = entry
+        end
+        entry.total = entry.total + dt
+        entry.count = entry.count + 1
+        if dt > entry.max then
+            entry.max = dt
+        end
+
+        if dt >= (Profiler.threshold or 0.0) then
+            -- you can also gate this by player id etc
+            DisplayTimedTextToPlayer(Player(0), 0, 0, 5,
+                string.format("[prof] %s: %.4f s", name, dt))
+        end
+
+        return r1, r2, r3, r4, r5
+    end
+
+    function Profiler.dump(top_n)
+        top_n = top_n or 10
+
+        -- flatten into array to sort
+        local arr = {}
+        for name, e in pairs(data) do
+            arr[#arr+1] = { name = name, total = e.total, count = e.count, max = e.max }
+        end
+
+        table.sort(arr, function(a, b)
+            return a.total > b.total
+        end)
+
+        for i = 1, math.min(top_n, #arr) do
+            local e = arr[i]
+            DisplayTimedTextToPlayer(Player(0), 0, 0, 10,
+                string.format("[prof] #%d %s  total=%.4f  max=%.4f  count=%d",
+                    i, e.name, e.total, e.max, e.count))
         end
     end
 
@@ -808,10 +907,12 @@ modifiers:
     end
     RegisterHotkeyToFunc('P', "Dev Teleport", teleport)
 
+    Require("HeroSelect")
+
     local setup = function(x, y)
         local pid = 1
         local p = Player(0)
-        dev_cmds["go"](p, pid, {"go", "arcani"})
+        dev_cmds["go"](p, pid, {"go", "warrior"})
 
         SetUnitXBounded(Hero[pid], x)
         SetUnitYBounded(Hero[pid], y)
@@ -819,6 +920,6 @@ modifiers:
     end
 
     --- start somewhere
-    -- TimerQueue:callDelayed(1.5, setup, 0, 0)
+    TimerQueue:callDelayed(0.5, setup, 0, 0)
 
 end, Debug and Debug.getLine())

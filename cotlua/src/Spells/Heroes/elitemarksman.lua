@@ -2,6 +2,7 @@ OnInit.final("MarksmanSpells", function(Require)
     Require('Spells')
     Require('SpellTools')
 
+    local TQ = TimerQueue
     local FPS_32 = FPS_32
     local atan = math.atan
 
@@ -47,7 +48,7 @@ OnInit.final("MarksmanSpells", function(Require)
             toggle(self.pid, self.caster)
 
             UnitAddAbility(self.caster, FourCC('Avul'))
-            TimerQueue:callDelayed(FPS_32, delay, self)
+            TQ:callDelayed(FPS_32, delay, self)
             DestroyEffect(AddSpecialEffectTarget("Abilities\\Spells\\Human\\Defend\\DefendCaster.mdl", self.caster, "origin"))
         end
 
@@ -61,6 +62,7 @@ OnInit.final("MarksmanSpells", function(Require)
 
         local function on_cleanup(pid)
             thistype.enabled[pid] = false
+            EVENT_ON_CLEANUP:unregister_action(pid, on_cleanup)
         end
 
         function thistype.onSetup(u)
@@ -135,7 +137,7 @@ OnInit.final("MarksmanSpells", function(Require)
 
             CAT_Knockback(self.caster, 500 * math.cos(self.angle + bj_PI), 500 * math.sin(self.angle + bj_PI), 0)
             CAT_UnitEnableFriction(self.caster, true)
-            TimerQueue:callDelayed(1., CAT_UnitEnableFriction, self.caster, false)
+            TQ:callDelayed(1., CAT_UnitEnableFriction, self.caster, false)
         end
     end
 
@@ -174,133 +176,153 @@ OnInit.final("MarksmanSpells", function(Require)
         }
         missile_template.__index = missile_template
 
-        local function cluster_rocket(pt)
-            local to_remove = {}
-
-            for target in each(pt.ug) do
-                if UnitAlive(target) == false or UnitDistance(target, pt.source) > 1500. or IsUnitAlly(target, Player(pt.pid - 1)) then
-                    to_remove[#to_remove + 1] = target
-                end
-            end
-
-            --clean helitargets
-            for i = 1, #to_remove do
-                GroupRemoveUnit(pt.ug, to_remove[i])
-            end
-
-            local x, y, z = GetUnitX(pt.source), GetUnitY(pt.source), GetUnitZ(pt.source)
-
-            --single shot
-            if SNIPERSTANCE.enabled[pt.pid] then
-                local target = FirstOfGroup(pt.ug)
-
-                if UnitAlive(Unit[Hero[pt.pid]].target) then
-                    target = Unit[Hero[pt.pid]].target
-                end
-
-                local missile = setmetatable({}, missile_template)
-                missile.x = x
-                missile.y = y
-                missile.z = z
-                missile.visual = AddSpecialEffect("war3mapImported\\HighSpeedProjectile_ByEpsilon.mdx", x, y)
-                BlzSetSpecialEffectScale(missile.visual, 1.1)
-                missile.speed = 1800
-                missile.source = Hero[pt.pid]
-                missile.target = target
-                missile.owner = Player(pt.pid - 1)
-                missile.damage = pt.dmg * 2.5 * pt.boost
-
-                ALICE_Create(missile)
-            --multi shot
-            else
-                for enemy in each(pt.ug) do
-                    local missile = setmetatable({}, missile_template)
-                    missile.x = x
-                    missile.y = y
-                    missile.z = z
-                    missile.visual = AddSpecialEffect("Abilities\\Spells\\Other\\TinkerRocket\\TinkerRocketMissile.mdl", x, y)
-                    BlzSetSpecialEffectScale(missile.visual, 1.1)
-                    missile.speed = 1400
-                    missile.source = Hero[pt.pid]
-                    missile.target = enemy
-                    missile.owner = Player(pt.pid - 1)
-                    missile.damage = pt.dmg * pt.boost
-
-                    ALICE_Create(missile)
-                end
-            end
-        end
-
         local function cooldown(pt)
             pt.rocket_cd = false
         end
 
+        local function sniper_rocket(pt, target)
+            local x, y, z = GetUnitX(pt.source), GetUnitY(pt.source), GetUnitZ(pt.source)
+
+            local missile = setmetatable({}, missile_template)
+            missile.x = x
+            missile.y = y
+            missile.z = z
+            missile.visual = AddSpecialEffect("war3mapImported\\HighSpeedProjectile_ByEpsilon.mdx", x, y)
+            BlzSetSpecialEffectScale(missile.visual, 1.1)
+            missile.speed = 1800
+            missile.source = Hero[pt.pid]
+            missile.target = target
+            missile.owner = Player(pt.pid - 1)
+            missile.damage = pt.dmg * 2.5 * pt.boost
+
+            ALICE_Create(missile)
+
+            return true
+        end
+
+        local function cluster_rocket(pt, target)
+            local x, y, z = GetUnitX(pt.source), GetUnitY(pt.source), GetUnitZ(pt.source)
+
+            local missile = setmetatable({}, missile_template)
+            missile.x = x
+            missile.y = y
+            missile.z = z
+            missile.visual = AddSpecialEffect("Abilities\\Spells\\Other\\TinkerRocket\\TinkerRocketMissile.mdl", x, y)
+            BlzSetSpecialEffectScale(missile.visual, 1.1)
+            missile.speed = 1400
+            missile.source = Hero[pt.pid]
+            missile.target = target
+            missile.owner = Player(pt.pid - 1)
+            missile.damage = pt.dmg * pt.boost
+
+            ALICE_Create(missile)
+
+            return true
+        end
+
         local function attack(pt)
-            local x = GetUnitX(Hero[pt.pid]) + 60. * math.cos(bj_DEGTORAD * (pt.angle + GetUnitFacing(Hero[pt.pid])))
-            local y = GetUnitY(Hero[pt.pid]) + 60. * math.sin(bj_DEGTORAD * (pt.angle + GetUnitFacing(Hero[pt.pid])))
+            local source = pt.source
+            local pid = pt.pid
+            local hero_x = GetUnitX(Hero[pid])
+            local hero_y = GetUnitY(Hero[pid])
+            local x = hero_x + 60. * math.cos(bj_DEGTORAD * (pt.angle + GetUnitFacing(Hero[pid])))
+            local y = hero_y + 60. * math.sin(bj_DEGTORAD * (pt.angle + GetUnitFacing(Hero[pid])))
 
             -- leash
-            if UnitDistance(Hero[pt.pid], pt.source) > 700. then
-                SetUnitPosition(pt.source, GetUnitX(Hero[pt.pid]), GetUnitY(Hero[pt.pid]))
+            if UnitDistance(Hero[pid], source) > 700. then
+                SetUnitPosition(source, hero_x, hero_y)
             end
 
             -- follow
-            if DistanceCoords(x, y, GetUnitX(pt.source), GetUnitY(pt.source)) > 75. then
-                IssuePointOrder(pt.source, "move", x, y)
+            if DistanceCoords(x, y, GetUnitX(source), GetUnitY(source)) > 75. then
+                IssuePointOrder(source, "move", x, y)
             end
 
             -- prioritize facing target hero is attacking
-            local target = Unit[Hero[pt.pid]].target
+            local target = Unit[Hero[pid]].target
             if target and UnitAlive(target) then
-                SetUnitFacing(pt.source, bj_RADTODEG * atan(GetUnitY(target) - GetUnitY(pt.source), GetUnitX(target) - GetUnitX(pt.source)))
+                SetUnitFacing(source, bj_RADTODEG * atan(GetUnitY(target) - GetUnitY(source), GetUnitX(target) - GetUnitX(source)))
             end
 
-            -- acquire helicopter targets near hero
-            GroupEnumUnitsInRangeEx(pt.pid, pt.ug, GetUnitX(Hero[pt.pid]), GetUnitY(Hero[pt.pid]), 1200., Condition(FilterEnemyAwake))
+            if not pt.rocket_cd then
+                local launched = false
+                MakeGroupInRange(pid, pt.ug, hero_x, hero_y, 1200., Condition(FilterEnemyAwake))
 
-            if BlzGroupGetSize(pt.ug) > 0 and not pt.rocket_cd then
-                pt.rocket_cd = true
-                TimerQueue:callDelayed(pt.cd, cooldown, pt)
-                cluster_rocket(pt)
+                if SNIPERSTANCE.enabled[pid] then
+                    target = target or FirstOfGroup(pt.ug)
+                    if target then
+                        launched = sniper_rocket(pt, target)
+                    end
+                else
+                    for enemy in each(pt.ug) do
+                        launched = cluster_rocket(pt, enemy)
+                    end
+                end
+
+                if launched then
+                    pt.rocket_cd = true
+                    TQ:callDelayed(pt.cd, cooldown, pt)
+                end
             end
         end
 
-        local function periodic(pt, tag)
-            SetTextTagPosUnit(tag, pt.source, -200.)
+        local function periodic(pt)
+            SetTextTagPosUnit(pt.text_tag, pt.source, -200.)
         end
 
         local function wander(pt)
-            pt.angle = math.random(1, 3) * 120. - 60
+            pt.reference.angle = math.random(1, 3) * 120. - 60
+        end
+
+        local function on_expire(pt)
+            TimerList[pt.pid]:stopAllTimers(thistype.id)
+
+            SoundHandler("Units\\Human\\Gyrocopter\\GyrocopterPissed6.flac", true, nil, pt.source)
+            IssuePointOrder(pt.source, "move", GetUnitX(Hero[pt.pid]) + 1000. * math.cos(bj_DEGTORAD * GetUnitFacing(Hero[pt.pid])), GetUnitY(Hero[pt.pid]) + 1000. * math.sin(bj_DEGTORAD * GetUnitFacing(Hero[pt.pid])))
+            TQ:callDelayed(2., RemoveUnit, pt.source)
+            Fade(pt.source, 2., true)
+            DestroyTextTag(pt.text_tag)
         end
 
         function thistype:onCast()
-            local pt = TimerList[self.pid]:add()
             local tag = CreateTextTag()
-            pt.source = CreateUnit(Player(self.pid - 1), type[self.ablev], self.x + 75. * math.cos(self.angle), self.y + 75. * math.sin(self.angle), bj_RADTODEG * self.angle)
-            SoundHandler("Units\\Human\\Gyrocopter\\GyrocopterWhat" .. (GetRandomInt(1,5)) .. ".flac", true, nil, pt.source)
-            SetUnitFlyHeight(pt.source, 1100., 0.)
-            SetUnitFlyHeight(pt.source, 300., 500.)
-            UnitAddIndicator(pt.source, 255, 255, 255, 255)
+            local heli = CreateUnit(Player(self.pid - 1), type[self.ablev], self.x + 75. * math.cos(self.angle), self.y + 75. * math.sin(self.angle), bj_RADTODEG * self.angle)
+            local boost = BOOST[self.pid]
+            SoundHandler("Units\\Human\\Gyrocopter\\GyrocopterWhat" .. (GetRandomInt(1,5)) .. ".flac", true, nil, heli)
+            SetUnitFlyHeight(heli, 1100., 0.)
+            SetUnitFlyHeight(heli, 300., 500.)
+            UnitAddIndicator(heli, 255, 255, 255, 255)
+            SetTextTagText(tag, RealToString(boost * 100) .. "%", 0.024)
+            SetTextTagColor(tag, 255, R2I(270 - boost * 150), R2I(270 - boost * 150), 255)
 
-            pt.boost = BOOST[self.pid]
+            -- duration
+            local pt = TimerList[self.pid]:add()
+            pt.source = heli
+            pt.text_tag = tag
+            pt.onRemove = on_expire
+            pt:after(self.dur * LBOOST[self.pid], nil)
+
+            -- text tag loop
+            pt = TimerList[self.pid]:add(thistype.id)
+            pt.source = heli
+            pt.text_tag = tag
+            pt:startLoop(FPS_32, periodic)
+
+            -- attack loop
+            pt = TimerList[self.pid]:add(thistype.id)
+            pt.boost = boost
             pt.dmg = self.dmg
-            SetTextTagText(tag, RealToString(pt.boost * 100) .. "\x25", 0.024)
-            SetTextTagColor(tag, 255, R2I(270 - pt.boost * 150), R2I(270 - pt.boost * 150), 255)
             pt.cd = self.cd * LBOOST[self.pid]
             pt.ug = CreateGroup()
-            wander(pt)
-            pt.timer:callPeriodically(FPS_32, nil, periodic, pt, tag)
-            pt.timer:callPeriodically(0.25, nil, attack, pt)
-            pt.timer:callPeriodically(6., nil, wander, pt)
-            pt.timer:callDelayed(self.dur * LBOOST[self.pid], PlayerTimer.destroy, pt)
-            pt.onRemove = function()
-                SoundHandler("Units\\Human\\Gyrocopter\\GyrocopterPissed6.flac", true, nil, pt.source)
-                IssuePointOrder(pt.source, "move", GetUnitX(Hero[pt.pid]) + 1000. * math.cos(bj_DEGTORAD * GetUnitFacing(Hero[pt.pid])), GetUnitY(Hero[pt.pid]) + 1000. * math.sin(bj_DEGTORAD * GetUnitFacing(Hero[pt.pid])))
-                TimerQueue:callDelayed(2., RemoveUnit, pt.source)
-                Fade(pt.source, 2., true)
-                DestroyTextTag(tag)
-            end
-            pt.tag = thistype.id
+            pt.source = heli
+            pt.angle = math.random(1, 3) * 120. - 60
+            pt:startLoop(0.25, attack)
+
+            -- wander loop
+            local pt2 = TimerList[self.pid]:add(thistype.id)
+            pt2.reference = pt
+            pt2.source = heli
+            pt2:startLoop(6, wander)
         end
 
     end
@@ -450,7 +472,7 @@ OnInit.final("MarksmanSpells", function(Require)
                 DestroyEffect(AddSpecialEffect("Abilities\\Spells\\Human\\Flare\\FlareCaster.mdl", self.x, self.y))
                 DestroyEffect(AddSpecialEffect("Abilities\\Spells\\Human\\Flare\\FlareTarget.mdl", self.targetX, self.targetY))
 
-                TimerQueue:callDelayed(2., rocket, heli, self)
+                TQ:callDelayed(2., rocket, heli, self)
             else
                 SoundHandler("war3mapImported\\grenade pin.mp3", true, nil, self.caster)
                 local missile = setmetatable({}, grenade_template)
@@ -492,20 +514,20 @@ OnInit.final("MarksmanSpells", function(Require)
             cd = function(pid) return 42. - 2 * GetUnitAbilityLevel(Hero[pid], thistype.id) end,
         }
 
-        local function cooldown(pt)
-            local MAX_CHARGES = 2
+        local MAX_CHARGES = 2
 
-            thistype.charges[pt.pid] = IMinBJ(MAX_CHARGES, thistype.charges[pt.pid] + 1)
+        local function cooldown(pt)
+            thistype.charges[pt.pid] = math.min(MAX_CHARGES, thistype.charges[pt.pid] + 1)
 
             if GetLocalPlayer() == Player(pt.pid - 1) then
                 BlzSetAbilityIcon(thistype.id, "ReplaceableTextures\\CommandButtons\\BTNFlamingBetty" .. (thistype.charges[pt.pid]) .. ".blp")
             end
 
-            if thistype.charges[pt.pid] >= MAX_CHARGES then
-                pt:destroy()
-            else
+            if thistype.charges[pt.pid] < MAX_CHARGES then
                 BlzStartUnitAbilityCooldown(pt.source, thistype.id, 0.)
-                pt.timer:callDelayed(thistype.cd(pt.pid), cooldown, pt)
+                pt:after(thistype.cd(pt.pid), cooldown)
+            else
+                pt:destroy()
             end
         end
 
@@ -540,24 +562,28 @@ OnInit.final("MarksmanSpells", function(Require)
                 BlzSetAbilityIcon(thistype.id, "ReplaceableTextures\\CommandButtons\\BTNFlamingBetty" .. (thistype.charges[self.pid]) .. ".blp")
             end
 
-            --refresh charge timer
+            -- refresh charge timer
             local pt = TimerList[self.pid]:get(thistype.id, self.caster)
             if not pt then
-                pt = TimerList[self.pid]:add()
+                pt = TimerList[self.pid]:add(thistype.id)
                 pt.source = self.caster
-                pt.tag = thistype.id
+                pt.autoDestroy = false
 
-                pt.timer:callDelayed(self.cd, cooldown, pt)
+                pt:after(self.cd, cooldown)
             end
 
             if thistype.charges[self.pid] <= 0 then
-                BlzStartUnitAbilityCooldown(self.caster, thistype.id, TimerGetRemaining(pt.timer.timer))
+                BlzStartUnitAbilityCooldown(self.caster, thistype.id, TQ:getRemaining(pt.cb))
             end
         end
 
-        function thistype.onLearn(u)
-            local pid = GetPlayerId(GetOwningPlayer(u)) + 1
-            thistype.charges[pid] = 2
+        function thistype.onLearn(u, ablev, pid)
+            if ablev == 1 then
+                thistype.charges[pid] = MAX_CHARGES
+                if GetLocalPlayer() == Player(pid - 1) then
+                    BlzSetAbilityIcon(thistype.id, "ReplaceableTextures\\CommandButtons\\BTNFlamingBetty" .. MAX_CHARGES .. ".blp")
+                end
+            end
         end
     end
 end, Debug and Debug.getLine())

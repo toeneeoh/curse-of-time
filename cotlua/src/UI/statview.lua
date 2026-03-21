@@ -5,12 +5,49 @@
 ]]
 
 OnInit.final("StatView", function(Require)
+    ---@class STAT_WINDOW
+    ---@field display function
+    ---@field refresh function
     STAT_WINDOW = {}
 
-    local tab_tags = {
-        STAT_TAG, -- defined in variables.lua
+    local ST = STAT_TAG
+    local STAT_WINDOW = STAT_WINDOW
 
-        -- priority does not matter here
+    local STAT_LOOKUP = {
+        str = ITEM_STRENGTH,
+        bonus_str = ITEM_STRENGTH,
+        agi = ITEM_AGILITY,
+        bonus_agi = ITEM_AGILITY,
+        int = ITEM_INTELLIGENCE,
+        bonus_int = ITEM_INTELLIGENCE,
+        bonus_mana = ITEM_MANA,
+        base_bat = ITEM_BASE_ATTACK_SPEED,
+        bonus_bat = ITEM_BASE_ATTACK_SPEED,
+        bonus_damage = ITEM_DAMAGE,
+        damage_percent = ITEM_DAMAGE,
+        bonus_armor = ITEM_ARMOR,
+        armor_percent = ITEM_ARMOR,
+        bonus_hp = ITEM_HEALTH,
+        cc = ITEM_CRIT_CHANCE,
+        cd_= ITEM_CRIT_DAMAGE,
+        cc_percent = ITEM_CRIT_CHANCE_MULT,
+        cd_percent = ITEM_CRIT_DAMAGE_MULT,
+        ms_= ITEM_MOVESPEED,
+        ms_percent = ITEM_MOVESPEED,
+        overmovespeed = ITEM_MOVESPEED,
+        regen_= ITEM_REGENERATION,
+        regen_percent = ITEM_REGENERATION,
+        regen_max = ITEM_REGENERATION,
+        mana_regen_= ITEM_MANA_REGENERATION,
+        mana_regen_percent = ITEM_MANA_REGENERATION,
+        mana_regen_max = ITEM_MANA_REGENERATION,
+        nomanaregen = ITEM_MANA_REGENERATION,
+        gold_rate = ITEM_GOLD_GAIN,
+        xp_rate = XP_RATE,
+    }
+
+    local tab_tags = {
+        ST,
         {
             { tag = "|cffffcc00Gold|r", priority = 1, getter = function(u) local pid = GetPlayerId(GetOwningPlayer(u)) + 1 return GetCurrency(pid, GOLD) end},
             { tag = "|cffccccccPlatinum|r", priority = 1, getter = function(u) local pid = GetPlayerId(GetOwningPlayer(u)) + 1 return GetCurrency(pid, PLATINUM) end},
@@ -21,8 +58,59 @@ OnInit.final("StatView", function(Require)
         },
     }
 
-    -- main UI
+    local function build_tab_order(tab)
+        local order = {}
+        for i = 1, #tab do
+            local p = tab[i].priority or 99
+            order[p] = order[p] or {}
+            order[p][#order[p] + 1] = i
+        end
+        return order
+    end
+
+    --#region frame setup
     local frame = BlzCreateFrame("ListBoxWar3", BlzGetFrameByName("ConsoleUIBackdrop", 0), 0, 0)
+
+    local MAX_ROWS = 32
+    local tab_ui = {} -- tab_ui[page] = { rows = { [1]=slot,... }, order = ..., entries = ... }
+
+    local function make_slot(parent, breakdown_parent, y)
+        local tag_f = BlzCreateFrameByType("TEXT", "", parent, "", 0)
+        local val_f = BlzCreateFrameByType("TEXT", "", parent, "", 0)
+
+        BlzFrameSetPoint(tag_f, FRAMEPOINT_TOPLEFT, parent, FRAMEPOINT_TOPLEFT, 0.015, y)
+        BlzFrameSetTextAlignment(tag_f, TEXT_JUSTIFY_CENTER, TEXT_JUSTIFY_LEFT)
+        BlzFrameSetEnable(tag_f, false)
+
+        BlzFrameSetPoint(val_f, FRAMEPOINT_TOPLEFT, parent, FRAMEPOINT_TOPLEFT, 0.113, y)
+        BlzFrameSetTextAlignment(val_f, TEXT_JUSTIFY_CENTER, TEXT_JUSTIFY_LEFT)
+        BlzFrameSetEnable(val_f, false)
+
+        -- breakdown icon (slot-based)
+        local icon = BlzCreateFrameByType("BACKDROP", "", breakdown_parent, "", 0)
+        local icon_frame = BlzCreateFrameByType("FRAME", "", breakdown_parent, "", 0)
+        BlzFrameSetTexture(icon, "war3mapImported\\question.blp", 0, true)
+        BlzFrameSetScale(icon, 0.6)
+        BlzFrameSetSize(icon, 0.016, 0.016)
+        BlzFrameSetAllPoints(icon_frame, icon)
+
+        local tip = FrameAddSimpleTooltip(icon_frame, "", "", true, FRAMEPOINT_BOTTOMLEFT, FRAMEPOINT_TOPRIGHT, 0., 0.008, 0.01)
+
+        BlzFrameSetVisible(icon, false) -- hidden by default
+
+        return {
+            tag = tag_f,
+            val = val_f,
+            icon = icon,
+            tip = tip,
+            has_breakdown = false,
+            last_icon_x = nil,
+            last_tag = nil,
+            last_val = nil,
+            last_tip = nil,
+        }
+    end
+
     -- separate breakdowns per tab (if they exist)
     local breakdown_frames = {
         BlzCreateFrameByType("FRAME", "", frame, "", 0),
@@ -34,10 +122,25 @@ OnInit.final("StatView", function(Require)
         BlzFrameSetSize(breakdown_frames[i], 0.001, 0.001)
         BlzFrameSetEnable(breakdown_frames[i], false)
     end
+
+    local function init_tab(page)
+        local entries = tab_tags[page]
+        tab_ui[page] = { entries = entries, order = build_tab_order(entries), rows = {} }
+
+        for line = 1, MAX_ROWS do
+            local y = -0.04 + (-line + 1) * 0.01
+            tab_ui[page].rows[line] = make_slot(frame, breakdown_frames[page], y)
+            BlzFrameSetVisible(tab_ui[page].rows[line].tag, false)
+            BlzFrameSetVisible(tab_ui[page].rows[line].val, false)
+        end
+    end
+
+    for page = 1, #tab_tags do
+        init_tab(page)
+    end
+
     local tab_frame = BlzCreateFrame("ListBoxWar3", frame, 0, 0)
     local title = BlzCreateFrame("TitleText", frame, 0, 0)
-    local text = BlzCreateFrameByType("TEXT", "", frame, "", 0)
-    local number = BlzCreateFrameByType("TEXT", "", frame, "", 0)
     local viewing = {}
 
     -- initialize viewing tables
@@ -45,7 +148,6 @@ OnInit.final("StatView", function(Require)
         viewing[i] = {unit = nil, page = 1}
     end
 
-    STAT_WINDOW.frame = frame
     BlzFrameSetAbsPoint(frame, FRAMEPOINT_TOPLEFT, -0.05, 0.55)
     BlzFrameSetSize(frame, 0.3, 0.33)
     BlzFrameSetEnable(frame, false)
@@ -53,34 +155,34 @@ OnInit.final("StatView", function(Require)
     BlzFrameSetPoint(title, FRAMEPOINT_TOP, frame, FRAMEPOINT_TOP, 0., -0.013)
     BlzFrameSetEnable(title, false)
 
-    BlzFrameSetPoint(number, FRAMEPOINT_TOPLEFT, frame, FRAMEPOINT_TOPLEFT, 0.113, -0.04)
-    BlzFrameSetTextAlignment(number, TEXT_JUSTIFY_CENTER, TEXT_JUSTIFY_LEFT)
-    BlzFrameSetScale(number, 1.)
-    BlzFrameSetEnable(number, false)
-
-    BlzFrameSetPoint(text, FRAMEPOINT_TOPLEFT, frame, FRAMEPOINT_TOPLEFT, 0.015, -0.04)
-    BlzFrameSetTextAlignment(text, TEXT_JUSTIFY_CENTER, TEXT_JUSTIFY_LEFT)
-    BlzFrameSetScale(text, 1.)
-    BlzFrameSetEnable(text, false)
-
     BlzFrameSetPoint(tab_frame, FRAMEPOINT_TOPLEFT, frame, FRAMEPOINT_BOTTOMLEFT, 0., 0.005)
     BlzFrameSetSize(tab_frame, 0.3, 0.05)
     BlzFrameSetEnable(tab_frame, false)
 
-    local on_refresh = function(target)
-        local U = User.first
-        while U do
-            local u = viewing[U.id].unit
+    -- hide by default
+    BlzFrameSetVisible(frame, false)
+    --#endregion frame setup
 
-            if u == target then
-                STAT_WINDOW.refresh(U.id)
-            end
+    local is_open = {}
 
-            U = U.next
+    local on_refresh = function(target, stat)
+        local pid = GetPlayerId(GetLocalPlayer()) + 1
+        if viewing[pid].unit ~= target then
+            return
+        end
+
+        -- try to map event key -> STAT_TAG index
+        local stat_idx = STAT_LOOKUP[stat]
+
+        if stat_idx then
+            STAT_WINDOW.refresh(pid, stat_idx)
+        else
+            STAT_WINDOW.refresh(pid)
         end
     end
 
     local close = function(pid)
+        is_open[pid] = false
         if GetLocalPlayer() == Player(pid - 1) then
             BlzFrameSetVisible(frame, false)
         end
@@ -91,7 +193,6 @@ OnInit.final("StatView", function(Require)
             viewing[pid].unit = nil
         end
     end
-    STAT_WINDOW.close = close
     AddToEsc(close) -- close window hotkey reference
 
     local onClose = function()
@@ -181,6 +282,7 @@ OnInit.final("StatView", function(Require)
             tabs[viewing[pid].page]:enable(true)
         end
 
+        -- always rebuild from scratch for correct page visibility on all clients
         STAT_WINDOW.refresh(pid)
     end
 
@@ -188,60 +290,203 @@ OnInit.final("StatView", function(Require)
     tabs[2]:onClick(switch_tab)
     tabs[3]:onClick(switch_tab)
 
-    -- hide by default
-    BlzFrameSetVisible(frame, false)
+    local function set_if_changed(slot, field, f, s)
+        if slot[field] ~= s then
+            slot[field] = s
+            BlzFrameSetText(f, s)
+        end
+    end
 
-    STAT_WINDOW.refresh = function(pid)
-        local u = viewing[pid].unit
+    local function set_tip_if_changed(slot, s)
+        if slot.last_tip ~= s then
+            slot.last_tip = s
+            BlzFrameSetText(slot.tip.tooltip, s)
+        end
+    end
 
-        if u then
-            local page = viewing[pid].page
-            local tab = tab_tags[page]
-            local tpid = GetPlayerId(GetOwningPlayer(u)) + 1
-            local stat_number = ""
-            local stat_tag = ""
-            local name = (u == Hero[tpid] and User[tpid - 1].nameColored) or GetUnitName(u)
-            local ishero = (u == Hero[tpid] and 3) or 2
+    -- Shared row rendering
+    local function render_stat_row(u, page, row, idx)
+        local T       = tab_ui[page]
+        local entries = T.entries
+        local rows    = T.rows
+        local v       = entries[idx]
+        local slot    = rows[row]
 
-            if GetLocalPlayer() == Player(pid - 1) then
-                for i = 1, #breakdown_frames do
-                    if i ~= page then
-                        BlzFrameSetVisible(breakdown_frames[i], false)
-                    end
-                end
-                BlzFrameSetVisible(breakdown_frames[page], true)
+        local tag_s = v.alternate or v.tag or ""
+        local num   = v.getter and v.getter(u) or ""
+        local num_s = tostring(num)
+        local val_s = num_s .. (v.suffix or "")
+
+        -- update text only if changed
+        set_if_changed(slot, "last_tag", slot.tag, tag_s)
+        set_if_changed(slot, "last_val", slot.val, val_s)
+
+        BlzFrameSetVisible(slot.tag, true)
+        BlzFrameSetVisible(slot.val, true)
+
+        -- breakdown handling
+        if v.breakdown then
+            local b = v.breakdown(u)
+            set_tip_if_changed(slot, b)
+
+            -- position icon near the value text
+            local x = 0.01 + (v.suffix and 0.01 or 0) + num_s:len() * 0.0085
+            if slot.last_icon_x ~= x then
+                slot.last_icon_x = x
+                BlzFrameClearAllPoints(slot.icon)
+                BlzFrameSetPoint(slot.icon, FRAMEPOINT_TOPLEFT, slot.val, FRAMEPOINT_TOPLEFT, x, 0.0)
             end
 
-            -- propogate tags belonging to each tab
-            for priority = 1, ishero do
-                for i = 1, #tab do
-                    local v = tab[i]
-
-                    if v.priority == priority then
-                        local num = v.getter and v.getter(u) or ""
-
-                        if v.breakdown then
-                            local breakdown = v.breakdown(u)
-
-                            if GetLocalPlayer() == Player(pid - 1) then
-                                BlzFrameSetText(v.breakdown_tooltip.tooltip, breakdown)
-                                BlzFrameSetPoint(v.breakdown_backdrop, FRAMEPOINT_TOPLEFT, number, FRAMEPOINT_TOPLEFT, 0.01 + (v.suffix and 0.01 or 0) + num:len() * 0.0085, (-i + 1) * 0.01575)
-                            end
-                        end
-
-                        stat_tag = stat_tag .. (v.alternate or v.tag) .. "|n"
-                        stat_number = stat_number .. num .. (v.suffix or "") .. "|n"
-                    end
-                end
-            end
-
-            if GetLocalPlayer() == Player(pid - 1) then
-                --set text and size
-                BlzFrameSetText(title, name)
-                BlzFrameSetText(number, stat_number)
-                BlzFrameSetText(text, stat_tag)
+            BlzFrameSetVisible(slot.icon, true)
+            slot.has_breakdown = true
+        else
+            if slot.has_breakdown then
+                slot.has_breakdown = false
+                BlzFrameSetVisible(slot.icon, false)
+                slot.last_tip    = nil
+                slot.last_icon_x = nil
             end
         end
+    end
+
+    local function clear_all_rows()
+        for page = 1, #tab_tags do
+            local T = tab_ui[page]
+            if T then
+                local rows = T.rows
+                if rows then
+                    for l = 1, MAX_ROWS do
+                        local slot = rows[l]
+                        BlzFrameSetVisible(slot.tag, false)
+                        BlzFrameSetVisible(slot.val, false)
+                        BlzFrameSetVisible(slot.icon, false)
+                        slot.has_breakdown = false
+                        slot.last_tip      = nil
+                        slot.last_icon_x   = nil
+                    end
+                end
+            end
+        end
+    end
+
+    -- Full refresh: rebuilds all rows AND the stat->row index map
+    local function full_refresh(pid)
+        -- local-only safety + window visibility
+        if GetLocalPlayer() ~= Player(pid - 1) or not is_open[pid] then
+            return
+        end
+
+        local u = viewing[pid].unit
+        if not u then
+            return
+        end
+
+        local page = viewing[pid].page
+        local T    = tab_ui[page]
+        if not T then
+            return
+        end
+
+        -- hard clear all rows for all pages
+        clear_all_rows()
+
+        -- update title
+        local tpid = GetPlayerId(GetOwningPlayer(u)) + 1
+        local name = (u == Hero[tpid] and User[tpid - 1].nameColored) or GetUnitName(u)
+        BlzFrameSetText(title, name)
+
+        -- hero vs non-hero gating
+        local ishero = (u == Hero[tpid] and 3) or 2
+
+        -- show correct breakdown frame for this page
+        for i = 1, #breakdown_frames do
+            BlzFrameSetVisible(breakdown_frames[i], i == page)
+        end
+
+        -- row index map: stat index -> row number (per page)
+        T.row_index = T.row_index or {}
+        local row_index = T.row_index
+        -- clear previous mapping
+        for k in pairs(row_index) do
+            row_index[k] = nil
+        end
+
+        local line = 0
+        local order   = T.order
+
+        -- walk through stats by priority buckets
+        for priority = 1, ishero do
+            local list = order[priority]
+            if list then
+                for li = 1, #list do
+                    local idx = list[li]
+
+                    line = line + 1
+                    if line > MAX_ROWS then
+                        break
+                    end
+
+                    row_index[idx] = line
+                    render_stat_row(u, page, line, idx)
+                end
+            end
+
+            if line > MAX_ROWS then
+                break
+            end
+        end
+    end
+
+    -- Public API: optional stat_idx for single-stat refresh
+    -- stat_idx is the STAT_TAG index (e.g. ITEM_HEALTH, ITEM_DAMAGE, ...)
+    STAT_WINDOW.refresh = function(pid, stat_idx)
+        -- no specific stat -> full refresh
+        if not stat_idx then
+            full_refresh(pid)
+            return
+        end
+
+        -- local-only safety + window visibility
+        if GetLocalPlayer() ~= Player(pid - 1) or not is_open[pid] then
+            return
+        end
+
+        local u = viewing[pid].unit
+        if not u then
+            return
+        end
+
+        local page = viewing[pid].page
+        local T    = tab_ui[page]
+        if not T then
+            return
+        end
+
+        -- only do targeted updates on stats tab for now
+        if page ~= 1 then
+            full_refresh(pid)
+            return
+        end
+
+        local row_index = T.row_index
+        local row       = row_index and row_index[stat_idx]
+
+        -- if we don't know where this stat is (e.g. first time, unit changed, etc.) fallback
+        if not row or row < 1 or row > MAX_ROWS then
+            full_refresh(pid)
+            return
+        end
+
+        -- keep title and breakdown frame up-to-date (cheap)
+        local tpid = GetPlayerId(GetOwningPlayer(u)) + 1
+        local name = (u == Hero[tpid] and User[tpid - 1].nameColored) or GetUnitName(u)
+        BlzFrameSetText(title, name)
+        for i = 1, #breakdown_frames do
+            BlzFrameSetVisible(breakdown_frames[i], i == page)
+        end
+
+        -- update just this one row
+        render_stat_row(u, page, row, stat_idx)
     end
 
     STAT_WINDOW.display = function(u, pid)
@@ -250,10 +495,12 @@ OnInit.final("StatView", function(Require)
         if viewing[pid].unit == u then
             close(pid)
         elseif u and not BlzGetUnitBooleanField(u, UNIT_BF_IS_A_BUILDING) then
+            EVENT_STAT_CHANGE:unregister_unit_action(viewing[pid].unit, on_refresh)
             viewing[pid].unit = u
             viewing[pid].page = (tpid <= PLAYER_CAP and viewing[pid].page) or 1 -- set page to stats for non-player units
             EVENT_STAT_CHANGE:register_unit_action(u, on_refresh)
 
+            is_open[pid] = true
             if GetLocalPlayer() == Player(pid - 1) then
                 BlzFrameSetVisible(frame, true)
                 for i = 1, #tabs do
@@ -266,115 +513,14 @@ OnInit.final("StatView", function(Require)
         end
     end
 
-    -- getters and breakdowns for stats
-    STAT_TAG[1].breakdown = function(u)
-        local lvl = GetUnitLevel(u)
-        local s = ""
-        if IsUnitType(u, UNIT_TYPE_HERO) then
-            s = "XP: " .. GetHeroXP(u) .. "/" .. RequiredXP(lvl)
-        end
-        return s
-    end
-    STAT_TAG[1].getter = function(u)
-        local lvl = GetUnitLevel(u)
-        local s = RealToString(lvl)
-        return s
+    local function on_cleanup(pid)
+        close(pid)
     end
 
-    STAT_TAG[ITEM_HEALTH].getter = function(u) return RealToString(GetWidgetLife(u)) .. " / " .. RealToString(Unit[u].hp) end
-    STAT_TAG[ITEM_MANA].getter = function(u) return RealToString(GetUnitState(u, UNIT_STATE_MANA)) .. " / " .. RealToString(GetUnitState(u, UNIT_STATE_MAX_MANA)) end
-    STAT_TAG[ITEM_DAMAGE].getter = function(u) return RealToString(Unit[u].damage + 1) end -- include dice
-    STAT_TAG[ITEM_DAMAGE].breakdown = function(u)
-        return "|cffffcc00Base Damage:|r " .. BlzGetUnitBaseDamage(u, 0) ..
-            "\n|cffffcc00Spell/Item Bonus:|r " .. Unit[u].bonus_damage ..
-            "\n|cffffcc00Percent Bonus:|r " .. string.format("\x25.3f", (Unit[u].damage_percent - 1.) * 100.) .. "\x25" .. " (" .. string.format("\x25.3f", Unit[u].damage - Unit[u].bonus_damage - BlzGetUnitBaseDamage(u, 0)) .. ")" ..
-            "\n|cffffcc00Total Damage:|r " .. (Unit[u].damage + 1)
-    end
-    STAT_TAG[ITEM_ARMOR].getter = function(u) return RealToString(BlzGetUnitArmor(u)) end
-    STAT_TAG[ITEM_STRENGTH].getter = function(u) return RealToString(GetHeroStr(u, true)) end
-    STAT_TAG[ITEM_AGILITY].getter = function(u) return RealToString(GetHeroAgi(u, true)) end
-    STAT_TAG[ITEM_INTELLIGENCE].getter = function(u) return RealToString(GetHeroInt(u, true)) end
-    STAT_TAG[ITEM_REGENERATION].getter = function(u) return RealToString(Unit[u].regen) end
-    STAT_TAG[ITEM_REGENERATION].breakdown = function(u)
-        return "|cffffcc00Flat Regeneration:|r " .. Unit[u].regen_flat ..
-            "\n|cffffcc00Percent Regeneration:|r " .. string.format("\x25.3f", Unit[u].regen_max) .. "\x25" .. " (" .. string.format("\x25.3f", Unit[u].regen_max * Unit[u].hp * 0.01) .. ")" ..
-            "\n|cffffcc00Healing Received:|r " .. string.format("\x25.3f", Unit[u].regen_percent * 100.) .. "\x25" ..
-            "\n|cffffcc00Total Regeneration:|r " .. Unit[u].regen
-    end
-    STAT_TAG[ITEM_MANA_REGENERATION].getter = function(u) return RealToString(Unit[u].mana_regen) end
-    STAT_TAG[ITEM_MANA_REGENERATION].breakdown = function(u)
-        return "|cffffcc00Flat Regeneration:|r " .. Unit[u].mana_regen_flat ..
-            "\n|cffffcc00Intelligence Regeneration:|r " .. GetHeroInt(u, true) * 0.05 ..
-            "\n|cffffcc00Percent Regeneration:|r " .. string.format("\x25.2f", Unit[u].mana_regen_max) .. "\x25" .. " (" .. Unit[u].mana_regen_max * Unit[u].mana * 0.01 .. ")" ..
-            "\n|cffffcc00Mana Received:|r " .. string.format("\x25.2f", Unit[u].mana_regen_percent * 100.) .. "\x25" ..
-            "\n|cffffcc00Total Regeneration:|r " .. Unit[u].mana_regen
-    end
-
-    STAT_TAG[ITEM_DAMAGE_RESIST].breakdown = function(u)
-        local dtype = BlzGetUnitIntegerField(u, UNIT_IF_DEFENSE_TYPE)
-        local chaos_reduc = (dtype == ARMOR_CHAOS or dtype == ARMOR_CHAOS_BOSS) and 0.03 or 1.
-        local chaos = (chaos_reduc == 0.03 and "\n|cffffcc00Chaos Reduction:|r " .. string.format("\x25.3f", (1. - chaos_reduc) * 100) .. "\x25" or "")
-        return "|cffffcc00Base Reduction:|r " .. string.format("\x25.3f", 100. - (HERO_STATS[GetType(u)].phys_resist) * 100.)  .. "\x25" ..
-            "\n|cffffcc00Spell/Item Reduction:|r " .. string.format("\x25.3f", 100. - (Unit[u].dr * Unit[u].pr) / HERO_STATS[GetType(u)].phys_resist * 100.)  .. "\x25" ..
-            "\n|cffffcc00Armor Reduction:|r " .. string.format("\x25.3f", ((0.05 * BlzGetUnitArmor(u)) / (1. + 0.05 * BlzGetUnitArmor(u))) * 100.)  .. "\x25" ..
-            chaos ..
-            "\n|cffffcc00Total Reduction:|r " .. string.format("\x25.3f", 100. - (Unit[u].dr * Unit[u].pr) * 100. * (1. - ((0.05 * BlzGetUnitArmor(u)) / (1. + 0.05 * BlzGetUnitArmor(u)))) * chaos_reduc) .. "\x25"
-    end
-
-    STAT_TAG[ITEM_DAMAGE_RESIST].getter = function(u)
-        local dtype = BlzGetUnitIntegerField(u, UNIT_IF_DEFENSE_TYPE)
-        local chaos_reduc = (dtype == ARMOR_CHAOS or dtype == ARMOR_CHAOS_BOSS) and 0.03 or 1.
-        return string.format("\x25.3f", (Unit[u].dr * Unit[u].pr) * 100. * (1. - ((0.05 * BlzGetUnitArmor(u)) / (1. + 0.05 * BlzGetUnitArmor(u)))) * chaos_reduc)
-    end
-
-    STAT_TAG[ITEM_MAGIC_RESIST].breakdown = function(u)
-        local dtype = BlzGetUnitIntegerField(u, UNIT_IF_DEFENSE_TYPE)
-        local chaos_reduc = (dtype == ARMOR_CHAOS or dtype == ARMOR_CHAOS_BOSS) and 0.03 or 1.
-        local chaos = (chaos_reduc == 0.03 and "\n|cffffcc00Chaos Reduction:|r " .. string.format("\x25.3f", (1. - chaos_reduc) * 100) .. "\x25" or "")
-        return "|cffffcc00Base Reduction:|r " .. string.format("\x25.3f", 100. - (HERO_STATS[GetType(u)].magic_resist) * 100.)  .. "\x25" ..
-            "\n|cffffcc00Spell/Item Reduction:|r " .. string.format("\x25.3f", 100. - (Unit[u].dr * Unit[u].mr) / HERO_STATS[GetType(u)].magic_resist * 100.)  .. "\x25" ..
-            chaos ..
-            "\n|cffffcc00Total Reduction:|r " .. string.format("\x25.3f", 100. - (Unit[u].dr * Unit[u].mr) * 100. * chaos_reduc) .. "\x25"
-    end
-
-    STAT_TAG[ITEM_MAGIC_RESIST].getter = function(u)
-        local dtype = BlzGetUnitIntegerField(u, UNIT_IF_DEFENSE_TYPE)
-        local chaos_reduc = (dtype == ARMOR_CHAOS or dtype == ARMOR_CHAOS_BOSS) and 0.03 or 1.
-        return string.format("\x25.3f", (Unit[u].dr * Unit[u].mr) * 100. * chaos_reduc)
-    end
-
-    STAT_TAG[ITEM_DAMAGE_MULT].getter = function(u) return string.format("\x25.3f", (Unit[u].dm * Unit[u].pm) * 100.) end
-    STAT_TAG[ITEM_MAGIC_MULT].getter = function(u) return string.format("\x25.3f", (Unit[u].dm * Unit[u].mm) * 100.) end
-    STAT_TAG[ITEM_MOVESPEED].getter = function(u) return RealToString(Unit[u].movespeed) end
-    STAT_TAG[ITEM_EVASION].getter = function(u) return math.min(100, (Unit[u].evasion)) end
-    STAT_TAG[ITEM_SPELLBOOST].getter = function(u) return string.format("\x25.3f", Unit[u].spellboost * 100.) end
-    STAT_TAG[ITEM_CRIT_CHANCE].getter = function(u) return string.format("\x25.2f", Unit[u].cc) end
-    STAT_TAG[ITEM_CRIT_DAMAGE].getter = function(u) return string.format("\x25.2f", Unit[u].cd) end
-    STAT_TAG[ITEM_CRIT_CHANCE_MULT].getter = function(u) return string.format("\x25.2f", Unit[u].cc) end
-    STAT_TAG[ITEM_CRIT_DAMAGE_MULT].getter = function(u) return string.format("\x25.2f", Unit[u].cd * 100.) end
-    STAT_TAG[ITEM_BASE_ATTACK_SPEED].getter = function(u) local as = BlzGetUnitWeaponBooleanField(u, UNIT_WEAPON_BF_ATTACKS_ENABLED, 0) and 1. / Unit[u].bat or 0 return string.format("\x25.2f", as) .. " attacks per second" end
-    STAT_TAG[ITEM_GOLD_GAIN].getter = function(u) local pid = GetPlayerId(GetOwningPlayer(u)) + 1 return ItemGoldRate[pid] end
-    STAT_TAG[ITEM_STACK + 1].getter = function(u) local as = BlzGetUnitWeaponBooleanField(u, UNIT_WEAPON_BF_ATTACKS_ENABLED, 0) and (1. / Unit[u].bat) * (1 + math.min(GetHeroAgi(u, true), 400) * 0.01) or 0 return string.format("\x25.2f", as) .. " attacks per second" end
-    STAT_TAG[ITEM_STACK + 2].getter = function(u) local pid = GetPlayerId(GetOwningPlayer(u)) + 1 return string.format("\x25.2f", XP_Rate[pid]) end
-    STAT_TAG[ITEM_STACK + 3].getter = function(u) local pid = GetPlayerId(GetOwningPlayer(u)) + 1 return (Profile[pid].hero.time // 60) .. " hours and " .. ModuloInteger(Profile[pid].hero.time, 60) .. " minutes" end
-    STAT_TAG[ITEM_STACK + 4].getter = function(u) local pid = GetPlayerId(GetOwningPlayer(u)) + 1 return (Profile[pid].total_time) // 60 .. " hours and " .. ModuloInteger(Profile[pid].total_time, 60) .. " minutes" end
-
-    -- initialize breakdown frames
-    for j = 1, #tab_tags do
-        local tab = tab_tags[j]
-        for i = 1, #tab do
-            local v = tab[i]
-
-            if v.breakdown then
-                v.breakdown_backdrop = BlzCreateFrameByType("BACKDROP", "", breakdown_frames[j], "", 0)
-                v.breakdown_frame = BlzCreateFrameByType("FRAME", "", breakdown_frames[j], "", 0)
-                BlzFrameSetTexture(v.breakdown_backdrop, "war3mapImported\\question.blp", 0, true)
-                BlzFrameSetScale(v.breakdown_backdrop, 0.6)
-                BlzFrameSetSize(v.breakdown_backdrop, 0.016, 0.016)
-                BlzFrameSetAllPoints(v.breakdown_frame, v.breakdown_backdrop)
-                v.breakdown_tooltip = FrameAddSimpleTooltip(v.breakdown_frame, "", "", true, FRAMEPOINT_BOTTOMLEFT, FRAMEPOINT_TOPRIGHT, 0., 0.008, 0.01)
-            end
-        end
+    local U = User.first
+    while U do
+        EVENT_ON_CLEANUP:register_action(U.id, on_cleanup)
+        U = U.next
     end
 
 end, Debug and Debug.getLine())

@@ -7,12 +7,14 @@
 OnInit.final("ItemSpells", function(Require)
     Require("Spells")
 
+    local TQ = TimerQueue
+
     local ARMOR_OF_THE_GODS = Spell.define('Aarm')
     do
         local thistype = ARMOR_OF_THE_GODS
 
         function thistype.onEquip(itm, id, index)
-            BlzSetAbilityRealLevelField(BlzGetUnitAbility(itm.holder, id), ABILITY_RLF_ARMOR_BONUS_HAD1, 0, itm:getValue(index, 0))
+            BlzSetAbilityRealLevelField(BlzGetUnitAbility(itm.holder, id), ABILITY_RLF_ARMOR_BONUS_HAD1, 0, itm.cached_stats[index])
         end
     end
 
@@ -21,7 +23,7 @@ OnInit.final("ItemSpells", function(Require)
         local thistype = BASH
 
         function thistype.onEquip(itm, id, index)
-            BlzSetAbilityRealLevelField(BlzGetUnitAbility(itm.holder, id), ABILITY_RLF_CHANCE_TO_BASH, 0, itm:getValue(index, 0))
+            BlzSetAbilityRealLevelField(BlzGetUnitAbility(itm.holder, id), ABILITY_RLF_CHANCE_TO_BASH, 0, itm.cached_stats[index])
             BlzSetAbilityRealLevelField(BlzGetUnitAbility(itm.holder, id), ABILITY_RLF_DURATION_NORMAL, 0, ItemData[itm.id][index .. "data" .. 1])
             BlzSetAbilityRealLevelField(BlzGetUnitAbility(itm.holder, id), ABILITY_RLF_DURATION_HERO, 0, ItemData[itm.id][index .. "data" .. 1])
 
@@ -56,45 +58,40 @@ OnInit.final("ItemSpells", function(Require)
     do
         local thistype = AZAZOTH_BLADE_STORM
 
-        ---@type fun(pt: PlayerTimer)
+        ---@type fun(pt: PlayerTimer): boolean
         local function periodic(pt)
             pt.dur = pt.dur - 0.05 --tick rate
 
             if pt.dur > 0. then
-                --spawn effect
-                local dummy = Dummy.create(GetUnitX(pt.source), GetUnitY(pt.source), 0, 0, 0.75).unit
-                BlzSetUnitSkin(dummy, FourCC('h00D'))
-                SetUnitTimeScale(dummy, GetRandomReal(0.8, 1.1))
-                SetUnitScale(dummy, 1.30, 1.30, 1.30)
-                SetUnitAnimationByIndex(dummy, 0)
-                SetUnitFlyHeight(dummy, GetRandomReal(50., 100.), 0)
-                BlzSetUnitFacingEx(dummy, GetRandomReal(0, 359.))
+                -- spawn effect
+                local x, y = GetUnitX(pt.source), GetUnitY(pt.source)
+                local sfx = AddSpecialEffect("war3mapImported\\Ephemeral Slash Purple.mdl", x, y)
+                BlzSetSpecialEffectTimeScale(sfx, GetRandomReal(0.8, 1.1))
+                BlzSetSpecialEffectZ(sfx, GetUnitZ(pt.source) + 50.)
+                BlzSetSpecialEffectScale(sfx, 1.3)
+                BlzSetSpecialEffectYaw(sfx, math.random() * 2 * bj_PI)
+                TQ:callDelayed(0.75, DestroyEffect, sfx)
 
-                dummy = Dummy.create(GetUnitX(pt.source), GetUnitY(pt.source), 0, 0, 0.75).unit
-                BlzSetUnitSkin(dummy, FourCC('h00D'))
-                SetUnitTimeScale(dummy, GetRandomReal(0.8, 1.1))
-                SetUnitScale(dummy, 0.7, 0.7, 0.7)
-                SetUnitAnimationByIndex(dummy, 0)
-                SetUnitFlyHeight(dummy, GetRandomReal(50., 100.), 0)
-                BlzSetUnitFacingEx(dummy, GetRandomReal(0, 359.))
+                sfx = AddSpecialEffect("war3mapImported\\Ephemeral Slash Purple.mdl", x, y)
+                BlzSetSpecialEffectTimeScale(sfx, GetRandomReal(0.8, 1.1))
+                BlzSetSpecialEffectZ(sfx, GetUnitZ(pt.source) + 50.)
+                BlzSetSpecialEffectScale(sfx, 0.7)
+                BlzSetSpecialEffectYaw(sfx, math.random() * 2 * bj_PI)
+                TQ:callDelayed(0.75, DestroyEffect, sfx)
 
                 if pt.dur < 4.85 and ModuloReal(pt.dur, 0.25) < 0.05 then --do damage every 0.25 second
-                    local ug = CreateGroup()
+                    MakeGroupInRange(pt.pid, pt.ug, GetUnitX(pt.source), GetUnitY(pt.source), 300., Condition(FilterEnemy))
 
-                    MakeGroupInRange(pt.pid, ug, GetUnitX(pt.source), GetUnitY(pt.source), 300., Condition(FilterEnemy))
-
-                    for target in each(ug) do
+                    for target in each(pt.ug) do
                         DestroyEffect(AddSpecialEffectTarget("Objects\\Spawnmodels\\Critters\\Albatross\\CritterBloodAlbatross.mdl", target, "chest"))
                         DamageTarget(pt.source, target, (UnitGetBonus(pt.source, BONUS_DAMAGE) + GetHeroStr(pt.source, true)) * 0.25 * BOOST[pt.pid], ATTACK_TYPE_NORMAL, MAGIC, "Blade Storm")
                     end
-
-                    DestroyGroup(ug)
                 end
 
-                pt.timer:callDelayed(0.05, periodic, pt)
-            else
-                pt:destroy()
+                return true
             end
+
+            return false
         end
 
         function thistype:onCast()
@@ -102,7 +99,8 @@ OnInit.final("ItemSpells", function(Require)
                 local pt = TimerList[self.pid]:add()
                 pt.dur = 5.
                 pt.source = self.caster
-                pt.timer:callDelayed(0.05, periodic, pt)
+                pt.ug = CreateGroup()
+                pt:startLoop(0.05, periodic)
             else
                 DisplayTimedTextToPlayer(Player(self.pid - 1), 0, 0, 15., "You do not have the proficiency to use this spell!")
             end
@@ -243,7 +241,7 @@ OnInit.final("ItemSpells", function(Require)
         function thistype.onUnequip(itm, id, index)
             EVENT_ON_HIT:unregister_unit_action(itm.holder, onHit)
             EVENT_ON_STRUCK_MULTIPLIER:unregister_unit_action(itm.holder, onStruck)
-            for _, v in ipairs(SummonGroup) do
+            for _, v in ipairs(PLAYER_SUMMONS) do
                 if itm.owner == GetOwningPlayer(v) then
                     EVENT_ON_HIT:unregister_unit_action(v, onHit)
                 end
@@ -253,7 +251,7 @@ OnInit.final("ItemSpells", function(Require)
         function thistype.onEquip(itm, id, index)
             EVENT_ON_HIT:register_unit_action(itm.holder, onHit)
             EVENT_ON_STRUCK_MULTIPLIER:register_unit_action(itm.holder, onStruck)
-            for _, v in ipairs(SummonGroup) do
+            for _, v in ipairs(PLAYER_SUMMONS) do
                 if itm.owner == GetOwningPlayer(v) then
                     EVENT_ON_HIT:register_unit_action(v, onHit)
                 end
@@ -271,7 +269,7 @@ OnInit.final("ItemSpells", function(Require)
             local wings = GetItemFromPlayer(self.pid, 'I04E:-1')
 
             if wings then
-                local max = wings:getValue(ITEM_ABILITY, 0)
+                local max = wings.cached_stats[ITEM_ABILITY]
 
                 if wings.sfx_index then
                     wings.sfx_index = ((wings.sfx_index + 1) > max and 1) or wings.sfx_index + 1
@@ -291,7 +289,7 @@ OnInit.final("ItemSpells", function(Require)
         end
 
         function thistype.onEquip(itm, id, index)
-            local sfx = ItemData[itm.id].sfx[itm.sfx_index or itm:getValue(index, 0)]
+            local sfx = ItemData[itm.id].sfx[itm.sfx_index or itm.cached_stats[index]]
 
             itm.sfx = AddSpecialEffectTarget(sfx.path, itm.holder, sfx.attach)
         end
@@ -330,7 +328,7 @@ OnInit.final("ItemSpells", function(Require)
         end
 
         function thistype.onEquip(itm, id, index)
-            BlzSetAbilityRealLevelField(BlzGetUnitAbility(itm.holder, id), ABILITY_RLF_MAXIMUM_RANGE, 0, itm:getValue(index, 0))
+            BlzSetAbilityRealLevelField(BlzGetUnitAbility(itm.holder, id), ABILITY_RLF_MAXIMUM_RANGE, 0, itm.cached_stats[index])
         end
     end
 
@@ -359,7 +357,7 @@ OnInit.final("ItemSpells", function(Require)
             itm.sfx = AddSpecialEffectTarget(tbl[1].path, itm.holder, tbl[1].attach)
             itm.sfx2 = AddSpecialEffectTarget(tbl[2].path, itm.holder, tbl[2].attach)
 
-            BlzSetAbilityRealLevelField(BlzGetUnitAbility(itm.holder, id), ABILITY_RLF_MAXIMUM_RANGE, 0, itm:getValue(index, 0))
+            BlzSetAbilityRealLevelField(BlzGetUnitAbility(itm.holder, id), ABILITY_RLF_MAXIMUM_RANGE, 0, itm.cached_stats[index])
 
             return true
         end
@@ -439,11 +437,10 @@ OnInit.final("ItemSpells", function(Require)
             if HasProficiency(self.pid, PROF_STAFF) then
                 local pt = TimerList[self.pid]:add()
                 pt.source = self.caster
-                pt.dmg = 40 * GetHeroInt(self.caster, true) * BOOST[self.pid]
-                pt.angle = bj_RADTODEG * math.atan(self.targetY - self.y, self.targetX - self.x)
-                pt.time = 4
+                pt.dmg = 40. * GetHeroInt(self.caster, true) * BOOST[self.pid]
+                pt.angle = bj_RADTODEG * self.angle
 
-                pt.timer:callDelayed(0., ASTRAL_FREEZE.periodic, pt)
+                pt:after(0., ASTRAL_FREEZE.effect)
             else
                 DisplayTimedTextToPlayer(Player(self.pid - 1), 0, 0, 15., "You do not have the proficiency to use this spell!")
             end
@@ -535,12 +532,12 @@ OnInit.final("ItemSpells", function(Require)
                 end
 
                 DestroyGroup(ug)
-                TimerQueue:callDelayed(1., periodic, itm, holder)
+                TQ:callDelayed(1., periodic, itm, holder)
             end
         end
 
         function thistype.onEquip(itm, id, index)
-            TimerQueue:callDelayed(0., periodic, itm, itm.holder)
+            TQ:callDelayed(0., periodic, itm, itm.holder)
             return true
         end
     end
@@ -559,12 +556,12 @@ OnInit.final("ItemSpells", function(Require)
                 end
 
                 DestroyGroup(ug)
-                TimerQueue:callDelayed(1., periodic, itm, holder)
+                TQ:callDelayed(1., periodic, itm, holder)
             end
         end
 
         function thistype.onEquip(itm, id, index)
-            TimerQueue:callDelayed(0., periodic, itm, itm.holder)
+            TQ:callDelayed(0., periodic, itm, itm.holder)
             return true
         end
     end
@@ -575,7 +572,7 @@ OnInit.final("ItemSpells", function(Require)
         thistype.ACTIVE = false
 
         function thistype:onCast(itm)
-            local heal = itm:getValue(ITEM_ABILITY, 0) * 0.01
+            local heal = itm.cached_stats[ITEM_ABILITY] * 0.01
 
             itm:consumeCharge()
 
@@ -598,7 +595,7 @@ OnInit.final("ItemSpells", function(Require)
         thistype.ACTIVE = false
 
         function thistype:onCast(itm)
-            local heal = itm:getValue(ITEM_ABILITY, 0) * 0.01
+            local heal = itm.cached_stats[ITEM_ABILITY] * 0.01
 
             itm.charges = itm.charges - 1
             local dummy = itm.abilities[ITEM_ABILITY].obj

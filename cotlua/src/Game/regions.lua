@@ -184,7 +184,7 @@ OnInit.final("Regions", function(Require)
 
         -- prevent town units from leaving
         if GetOwningPlayer(u) == Player(PLAYER_TOWN) then
-            IssuePointOrderLoc(u, "move", TOWN_CENTER)
+            IssuePointOrder(u, "move", TOWN_CENTER_X, TOWN_CENTER_Y)
         end
     end
 

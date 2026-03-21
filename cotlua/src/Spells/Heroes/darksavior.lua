@@ -2,6 +2,8 @@ OnInit.final("DarkSaviorSpells", function(Require)
     Require('Spells')
     Require('SpellTools')
 
+    local TQ = TimerQueue
+
     ---@class SOULSTEAL : Spell
     SOULSTEAL = Spell.define("A08Z")
     do
@@ -33,17 +35,18 @@ OnInit.final("DarkSaviorSpells", function(Require)
         }
 
         function thistype:onCast()
-            local b = DarkSealBuff:add(self.caster, self.caster)
-
-            b:duration(self.dur * LBOOST[self.pid])
+            local b = DarkSealBuff:create(self.caster, self.caster)
             b.x = self.targetX
             b.y = self.targetY
-            SetUnitXBounded(b.sfx, b.x)
-            SetUnitYBounded(b.sfx, b.y)
+
+            b:check(self.caster, self.caster)
+            b:duration(self.dur * LBOOST[self.pid])
         end
 
-        local manacost = function(u)
-            BlzSetUnitAbilityManaCost(u, thistype.id, GetUnitAbilityLevel(u, thistype.id) - 1, R2I(BlzGetUnitMaxMana(u) * 0.2))
+        local manacost = function(u, key)
+            if key == "int" or key == "bonus_mana" or key == "bonus_int" then
+                BlzSetUnitAbilityManaCost(u, thistype.id, GetUnitAbilityLevel(u, thistype.id) - 1, R2I(BlzGetUnitMaxMana(u) * 0.2))
+            end
         end
 
         function thistype.onLearn(source, ablev, pid)
@@ -73,7 +76,7 @@ OnInit.final("DarkSaviorSpells", function(Require)
             DamageTarget(source, target, thistype.dmg(pid) * BOOST[pid], ATTACK_TYPE_NORMAL, MAGIC, thistype.tag)
         end
 
-        ---@type fun(pt: PlayerTimer)
+        ---@type fun(pt: PlayerTimer): boolean
         local function periodic(pt)
             local x = GetUnitX(pt.source) ---@type number 
             local y = GetUnitY(pt.source) ---@type number 
@@ -81,31 +84,27 @@ OnInit.final("DarkSaviorSpells", function(Require)
             pt.dur = pt.dur - 1
             DestroyEffect(pt.sfx)
 
-            if pt.dur < 0 then
-                pt:destroy()
-            else
-                local ug = CreateGroup()
-
-                MakeGroupInRange(pt.pid, ug, x, y, pt.aoe, Condition(FilterEnemy))
+            if pt.dur >= 0 then
+                MakeGroupInRange(pt.pid, pt.ug, x, y, pt.aoe, Condition(FilterEnemy))
 
                 local target
                 for i = 0, pt.time - 1 do
-                    target = BlzGroupUnitAt(ug, i)
+                    target = BlzGroupUnitAt(pt.ug, i)
                     if not target then break end
                     local dummy = Dummy.create(x, y, FourCC('A01Y'), 1, 2.5)
                     dummy:attack(target, pt.source, on_hit)
                 end
 
-                --dark seal augment
+                -- dark seal augment
                 local b = DarkSealBuff:get(pt.source, pt.source)
 
                 if b then
-                    BlzGroupAddGroupFast(ug, b.ug)
-                    local count = BlzGroupGetSize(ug)
+                    BlzGroupAddGroupFast(pt.ug, b.ug)
+                    local count = BlzGroupGetSize(pt.ug)
 
                     if count > 0 then
                         for index = 0, count - 1 do
-                            target = BlzGroupUnitAt(ug, index)
+                            target = BlzGroupUnitAt(pt.ug, index)
 
                             if GetUnitAbilityLevel(target, FourCC('A06W')) > 0 then
                                 local angle = 360. / count * (index + 1) * bj_DEGTORAD
@@ -125,10 +124,10 @@ OnInit.final("DarkSaviorSpells", function(Require)
                     BlzPlaySpecialEffect(pt.sfx, ANIM_TYPE_STAND)
                 end
 
-                DestroyGroup(ug)
-
-                pt.timer:callDelayed(1., periodic, pt)
+                return true
             end
+
+            return false
         end
 
         function thistype:onCast()
@@ -139,13 +138,16 @@ OnInit.final("DarkSaviorSpells", function(Require)
             pt.dur = self.dur * LBOOST[self.pid]
             pt.sfx = AddSpecialEffectTarget("Abilities\\Spells\\Orc\\LightningShield\\LightningShieldTarget.mdl", self.caster, "origin")
             pt.source = self.caster
+            pt.ug = CreateGroup()
             BlzSetSpecialEffectTimeScale(pt.sfx, 1.5)
 
-            pt.timer:callDelayed(1., periodic, pt)
+            pt:startLoop(1., periodic)
         end
 
-        local manacost = function(u)
-            BlzSetUnitAbilityManaCost(u, thistype.id, GetUnitAbilityLevel(u, thistype.id) - 1, R2I(BlzGetUnitMaxMana(u) * 0.1))
+        local manacost = function(u, key)
+            if key == "int" or key == "bonus_mana" or key == "bonus_int" then
+                BlzSetUnitAbilityManaCost(u, thistype.id, GetUnitAbilityLevel(u, thistype.id) - 1, R2I(BlzGetUnitMaxMana(u) * 0.1))
+            end
         end
 
         function thistype.onLearn(source, ablev, pid)
@@ -169,13 +171,17 @@ OnInit.final("DarkSaviorSpells", function(Require)
             freeze = 1.5,
         }
 
+        local function slow(self)
+            FreezingBlastDebuff:add(self.source, self.target):duration(FREEZINGBLAST.freeze * LBOOST[self.pid])
+        end
+
         function thistype:onCast()
             local b = DarkSealBuff:get(self.caster, self.caster)
             local ug = CreateGroup()
 
             MakeGroupInRange(self.pid, ug, self.targetX, self.targetY, self.aoe * LBOOST[self.pid], Condition(FilterEnemy))
 
-            --dark seal
+            -- dark seal
             if b then
                 BlzGroupAddGroupFast(ug, b.ug)
 
@@ -193,11 +199,16 @@ OnInit.final("DarkSaviorSpells", function(Require)
                 else
                     DamageTarget(self.caster, target, self.dmg * BOOST[self.pid], ATTACK_TYPE_NORMAL, MAGIC, thistype.tag)
                 end
+
+                -- apply slow after
+                TQ:callDelayed(self.freeze * LBOOST[self.pid], slow, self)
             end
         end
 
-        local manacost = function(u)
-            BlzSetUnitAbilityManaCost(u, thistype.id, GetUnitAbilityLevel(u, thistype.id) - 1, R2I(BlzGetUnitMaxMana(u) * 0.1))
+        local manacost = function(u, key)
+            if key == "int" or key == "bonus_mana" or key == "bonus_int" then
+                BlzSetUnitAbilityManaCost(u, thistype.id, GetUnitAbilityLevel(u, thistype.id) - 1, R2I(BlzGetUnitMaxMana(u) * 0.1))
+            end
         end
 
         function thistype.onLearn(source, ablev, pid)

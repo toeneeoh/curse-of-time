@@ -63,9 +63,8 @@ OnInit.final("Timers", function(Require)
             if profile and profile.playing then
                 profile.hero.time = profile.hero.time + 1
                 profile.total_time = profile.total_time + 1
+                ExperienceControl(U.id)
             end
-
-            ExperienceControl(U.id)
             U = U.next
         end
     end
@@ -117,7 +116,7 @@ OnInit.final("Timers", function(Require)
 
     local function OneSecond()
         -- set space bar camera to town
-        SetCameraQuickPositionLoc(TOWN_CENTER)
+        SetCameraQuickPosition(TOWN_CENTER_X, TOWN_CENTER_Y)
 
         -- fountain regeneration
         ALICE_ForAllObjectsInRangeDo(fountain, -260., 350., 600., "unit")

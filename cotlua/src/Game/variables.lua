@@ -1,7 +1,7 @@
 --[[
     variables.lua
 
-    A big bucket of defined globals.
+    Assorted defined globals / constants
 ]]
 
 OnInit.global("Variables", function()
@@ -79,6 +79,7 @@ OnInit.global("Variables", function()
         phys_damage  = 1.2,
         crit_chance  = 5.,
         crit_damage  = 100.,
+        mana_regen_max = 0,
         passive      = FourCC('A0HQ'),
         select       = FourCC('A07S'),
         armor        = 5,
@@ -101,6 +102,7 @@ OnInit.global("Variables", function()
         phys_damage  = 1.2,
         crit_chance  = 5.,
         crit_damage  = 100.,
+        mana_regen_max = 0,
         passive      = FourCC('A06N'),
         select       = FourCC('A07T'),
         armor        = 1,
@@ -123,6 +125,7 @@ OnInit.global("Variables", function()
         phys_damage  = 1.2,
         crit_chance  = 5.,
         crit_damage  = 100.,
+        mana_regen_max = 0,
         passive      = FourCC('A0I5'),
         select       = FourCC('A07U'),
         armor        = 7,
@@ -145,6 +148,7 @@ OnInit.global("Variables", function()
         phys_damage  = 1.2,
         crit_chance  = 5.,
         crit_damage  = 100.,
+        mana_regen_max = 0,
         passive      = FourCC('A0IE'),
         select       = FourCC('A07V'),
         armor        = 1,
@@ -167,6 +171,7 @@ OnInit.global("Variables", function()
         phys_damage  = 1.25,
         crit_chance  = 5.,
         crit_damage  = 100.,
+        mana_regen_max = 0,
         passive      = FourCC('A05E'),
         select       = FourCC('A029'),
         armor        = 2,
@@ -182,13 +187,14 @@ OnInit.global("Variables", function()
         stars        = {3, 2, 2, 0, 3}
         },
         [HERO_SAVIOR] = {
-        model        = "war3mapImported\\TheCaptain.mdx",
+        model        = "SaviorSprite.mdx",
         prof         = PROF_SWORD + PROF_PLATE + PROF_HEAVY + PROF_FULLPLATE,
         phys_resist  = 1.2,
         magic_resist = 1.3,
         phys_damage  = 1.2,
         crit_chance  = 5.,
         crit_damage  = 100.,
+        mana_regen_max = 0,
         passive      = FourCC('A0HW'),
         select       = FourCC('A07W'),
         armor        = 4,
@@ -204,13 +210,14 @@ OnInit.global("Variables", function()
         stars        = {2, 3, 2, 1, 3}
         },
         [HERO_DARK_SAVIOR] = {
-        model        = "war3mapImported\\BloodElfLieutenant.mdx",
+        model        = "DarkSaviorSprite.mdx",
         prof         = PROF_SWORD + PROF_PLATE + PROF_STAFF + PROF_CLOTH,
         phys_resist  = 1.6,
         magic_resist = 1.0,
         phys_damage  = 1.2,
         crit_chance  = 5.,
         crit_damage  = 100.,
+        mana_regen_max = 0,
         passive      = FourCC('A0DL'),
         select       = FourCC('A07Z'),
         armor        = 3,
@@ -226,13 +233,14 @@ OnInit.global("Variables", function()
         stars        = {1, 3, 3, 1, 1}
         },
         [HERO_CRUSADER] = {
-        model        = "war3mapImported\\HeroBloodKnight.mdx",
+        model        = "CrusaderSprite.mdx",
         prof         = PROF_HEAVY + PROF_FULLPLATE + PROF_STAFF + PROF_CLOTH,
         phys_resist  = 1.1,
         magic_resist = 1.1,
         phys_damage  = 1.2,
         crit_chance  = 5.,
         crit_damage  = 100.,
+        mana_regen_max = 0,
         passive      = FourCC('A0I4'),
         select       = FourCC('A080'),
         armor        = 4,
@@ -248,13 +256,14 @@ OnInit.global("Variables", function()
         stars        = {1, 0, 1, 3, 0}
         },
         [HERO_ARCANIST] = {
-        model        = "units\\human\\Kael\\Kael.mdx",
+        model        = "ArcanistSprite.mdx",
         prof         = PROF_STAFF + PROF_CLOTH,
         phys_resist  = 1.8,
         magic_resist = 1.6,
         phys_damage  = 1.0,
         crit_chance  = 5.,
         crit_damage  = 100.,
+        mana_regen_max = 0,
         passive      = FourCC('A0EY'),
         select       = FourCC('A081'),
         armor        = 0,
@@ -270,13 +279,14 @@ OnInit.global("Variables", function()
         stars        = {0, 2, 2, 1, 0}
         },
         [HERO_DARK_SUMMONER] = {
-        model        = "war3mapImported\\HeroDeposedWarlock.mdx",
+        model        = "DarkSummonerSprite.mdx",
         prof         = PROF_STAFF + PROF_CLOTH,
         phys_resist  = 1.8,
         magic_resist = 1.6,
         phys_damage  = 1.0,
         crit_chance  = 5.,
         crit_damage  = 100.,
+        mana_regen_max = 0,
         passive      = FourCC('A0I0'),
         select       = FourCC('A082'),
         armor        = 0,
@@ -292,13 +302,14 @@ OnInit.global("Variables", function()
         stars        = {2.5, 2.5, 1, 0, 2}
         },
         [HERO_BARD] = {
-        model        = "war3mapImported\\Medivh.mdx",
+        model        = "BardSprite.mdx",
         prof         = PROF_STAFF + PROF_CLOTH,
         phys_resist  = 1.8,
         magic_resist = 1.6,
         phys_damage  = 1.0,
         crit_chance  = 5.,
         crit_damage  = 100.,
+        mana_regen_max = 0,
         passive      = FourCC('A0HV'),
         select       = FourCC('A084'),
         armor        = 0,
@@ -321,6 +332,7 @@ OnInit.global("Variables", function()
         phys_damage  = 1.0,
         crit_chance  = 5.,
         crit_damage  = 100.,
+        mana_regen_max = 0,
         passive      = FourCC('A0EC'),
         select       = FourCC('A086'),
         armor        = 0,
@@ -336,13 +348,14 @@ OnInit.global("Variables", function()
         stars        = {0, 1, 3, 3, 1}
         },
         [HERO_HIGH_PRIEST] = {
-        model        = "war3mapImported\\HighElfPriestess.mdx",
+        model        = "HighPriestessSprite.mdx",
         prof         = PROF_STAFF + PROF_CLOTH,
         phys_resist  = 1.8,
         magic_resist = 1.6,
         phys_damage  = 1.0,
         crit_chance  = 5.,
         crit_damage  = 100.,
+        mana_regen_max = 0,
         passive      = FourCC('A0I2'),
         select       = FourCC('A087'),
         armor        = 0,
@@ -358,13 +371,14 @@ OnInit.global("Variables", function()
         stars        = {0, 0.5, 0, 3, 0}
         },
         [HERO_ELEMENTALIST] = {
-        model        = "war3mapImported\\Geomancer_E_002.mdx",
+        model        = "ElementalistSprite.mdx",
         prof         = PROF_STAFF + PROF_CLOTH,
         phys_resist  = 1.8,
         magic_resist = 1.6,
         phys_damage  = 1.0,
         crit_chance  = 5.,
         crit_damage  = 100.,
+        mana_regen_max = 0,
         passive      = FourCC('A0I3'),
         select       = FourCC('A089'),
         armor        = 2,
@@ -380,15 +394,15 @@ OnInit.global("Variables", function()
         stars        = {0, 2, 3, 1, 2}
         },
         [HERO_ASSASSIN] = {
-        model          = "war3mapImported\\ShadowWarrior.mdx",
+        model          = "AssassinSprite.mdx",
         prof           = PROF_DAGGER + PROF_LEATHER,
         phys_resist    = 1.6,
         magic_resist   = 1.8,
         phys_damage    = 1.25,
         crit_chance    = 5.,
         crit_damage    = 100.,
-        passive        = FourCC('A01N'),
         mana_regen_max = 2,
+        passive        = FourCC('A01N'),
         select         = FourCC('A07J'),
         armor          = 0,
         str            = 8,
@@ -403,13 +417,14 @@ OnInit.global("Variables", function()
         stars          = {0, 2, 1, 1, 0}
         },
         [HERO_THUNDERBLADE] = {
-        model        = "war3mapImported\\WanderingSwordman3.mdx",
+        model        = "ThunderBladeSprite.mdx",
         prof         = PROF_DAGGER + PROF_LEATHER,
         phys_resist  = 1.6,
         magic_resist = 1.8,
         phys_damage  = 1.25,
         crit_chance  = 5.,
         crit_damage  = 100.,
+        mana_regen_max = 0,
         passive      = FourCC('A039'),
         select       = FourCC('A01P'),
         armor        = 0,
@@ -425,13 +440,14 @@ OnInit.global("Variables", function()
         stars        = {0, 2, 2, 0, 0}
         },
         [HERO_MASTER_ROGUE] = {
-        model        = "war3mapImported\\BloodelfPhoenixGuard.mdx",
+        model        = "MasterRogueSprite.mdx",
         prof         = PROF_DAGGER + PROF_LEATHER,
         phys_resist  = 1.6,
         magic_resist = 1.8,
         phys_damage  = 1.25,
         crit_chance  = 5.,
         crit_damage  = 100.,
+        mana_regen_max = 0,
         passive      = FourCC('A0I1'),
         select       = FourCC('A07L'),
         armor        = 0,
@@ -447,13 +463,14 @@ OnInit.global("Variables", function()
         stars        = {0, 3, 0, 1, 0}
         },
         [HERO_MARKSMAN] = {
-        model        = "war3mapImported\\HeroGoblinGunner.mdx",
+        model        = "EliteMarksmanSprite.mdx",
         prof         = PROF_BOW + PROF_LEATHER,
         phys_resist  = 2.0,
         magic_resist = 1.8,
         phys_damage  = 1.3,
         crit_chance  = 5.,
         crit_damage  = 100.,
+        mana_regen_max = 0,
         passive      = FourCC('A070'),
         select       = FourCC('A07M'),
         armor        = -5,
@@ -469,13 +486,14 @@ OnInit.global("Variables", function()
         stars        = {0, 3, 2, 0, 0}
         },
         [HERO_PHOENIX_RANGER] = {
-        model        = "war3mapImported\\Bloodelf_ArcherMaiden.mdx",
+        model        = "PhoenixRangerSprite.mdx",
         prof         = PROF_BOW + PROF_LEATHER,
         phys_resist  = 2.0,
         magic_resist = 1.8,
         phys_damage  = 1.3,
         crit_chance  = 5.,
         crit_damage  = 100.,
+        mana_regen_max = 0,
         passive      = FourCC('A0I6'),
         select       = FourCC('A07N'),
         armor        = -3,
@@ -493,7 +511,7 @@ OnInit.global("Variables", function()
     }
 
     -- default stats for other units
-    local default_stats = {phys_resist = 1., magic_resist = 1., phys_damage = 1.}
+    local default_stats = {phys_resist = 1., magic_resist = 1., phys_damage = 1., crit_chance = 0., crit_damage = 100., mana_regen_max = 0.}
     setmetatable(HERO_STATS, { __index = function(tbl, key)
         return default_stats
     end})
@@ -535,7 +553,7 @@ OnInit.global("Variables", function()
     ITEM_MAX_LEVEL_VARIANCE            = 11
     QUALITY_SAVED                      = 7
 
-    enum(
+    TOTAL_STATS = enum(
         -- item stats
         "ITEM_LEVEL",
         "ITEM_HEALTH",
@@ -570,7 +588,6 @@ OnInit.global("Variables", function()
         -- end of item stats
         "ITEM_ABILITY2",
         -- not part of body
-        "ITEM_TOOLTIP",
         "ITEM_NOCRAFT",
         "ITEM_TIER",
         "ITEM_TYPE",
@@ -579,7 +596,11 @@ OnInit.global("Variables", function()
         "ITEM_LIMIT",
         "ITEM_COST",
         "ITEM_DISCOUNT",
-        "ITEM_STACK"
+        "ITEM_STACK",
+        "TOTAL_ATTACK_SPEED",
+        "XP_RATE",
+        "HERO_TIME",
+        "PLAYER_TIME"
     )
 
     CUSTOM_ITEM_OFFSET = FourCC('I000') ---@type integer 
@@ -599,258 +620,33 @@ OnInit.global("Variables", function()
     MAIN_MAP.centerX = (MAIN_MAP.minX + MAIN_MAP.maxX) / 2.00
     MAIN_MAP.centerY = (MAIN_MAP.minY + MAIN_MAP.maxY) / 2.00
 
-    ItemGoldRate = __jarray(0) ---@type integer[] 
-
-    SummonGroup = {} ---@type unit[]
+    PLAYER_SUMMONS = {} ---@type unit[]
     DAMAGE_TAG = {}
-    IS_FLEEING = {} ---@type boolean[]
-    PlatTag    = "|cffccccccPlatinum Coins|r: " ---@type string 
-    CrystalTag = "|cff6969FFCrystals: |r" ---@type string 
+    PLATINUM_TAG    = "|cffccccccPlatinum Coins|r: " ---@type string 
+    CRYSTAL_TAG = "|cff6969FFCrystals: |r" ---@type string 
     CHAOS_MODE = false ---@type boolean 
     CHAOS_LOADING = false ---@type boolean 
 
-    infoString=__jarray("") ---@type string[] 
-    XP_Rate=__jarray(0) ---@type number[]
-    player_fog = {} ---@type boolean[]
-
-    KillQuest = array2d(0) ---@type table
     ItemData = array2d(0) ---@type table
-    CosmeticTable = array2d(0) ---@type table
 
     ZOOM = __jarray(0) ---@type integer[]
-
-    forgottenTypes = __jarray(0) ---@type integer[] 
-    forgottenCount         = 0 ---@type integer 
-    forgotten_spawner      = nil ---@type unit 
-    charLight={} ---@type effect[] 
 
     Hero={} ---@type unit[] 
     HeroGrave={} ---@type unit[] 
     Backpack={} ---@type unit[] 
-
     HeroID=__jarray(0) ---@type integer[] 
-    prMulti=__jarray(0) ---@type integer[] 
-    ShieldCount=__jarray(0) ---@type integer[] 
-    HuntedLevel=__jarray(0) ---@type integer[] 
-    CustomLighting=__jarray(0) ---@type integer[] 
 
     BOOST=__jarray(1) ---@type number[] 
     LBOOST=__jarray(1) ---@type number[] 
 
-    TOWN_CENTER = Location(-250., 160.) ---@type location 
-    StruggleCenter = Location(28030., 4361.) ---@type location 
-    IS_IN_STRUGGLE = {} ---@type boolean[] 
+    TOWN_CENTER_X = -250.
+    TOWN_CENTER_Y = 160.
+    STRUGGLE_CENTER_X = 28030.
+    STRUGGLE_CENTER_Y = 4361.
 
-    DEFAULT_LIGHTING        = "Environment\\DNC\\DNCAshenvale\\DNCAshenValeTerrain\\DNCAshenValeTerrain.mdx" ---@type string 
+    DEFAULT_LIGHTING = "Environment\\DNC\\DNCAshenvale\\DNCAshenValeTerrain\\DNCAshenValeTerrain.mdx" ---@type string 
 
-    BOOST_OFF         = false ---@type boolean 
-
-    GodsEnterFlag         = false ---@type boolean 
-    GodsRepeatFlag         = false ---@type boolean 
-    DeadGods         = 4 ---@type integer 
-    BANISH_FLAG         = false ---@type boolean 
-    GODS_GROUP = {} ---@type player[]
-
-    IS_HERO_PANEL_ON = {} ---@type boolean[] 
-
-    --trolls
-    local id         = FourCC('n0tb') ---@type integer 
-    KillQuest[0][0] = id
-    KillQuest[FourCC('I07D')][0] = id
-    KillQuest[id].goal = 15
-    KillQuest[id].min = 1
-    KillQuest[id].max = 8
-    KillQuest[id].name = "Trolls"
-    KillQuest[id].region = gg_rct_Troll_Demon_1
-    --tuskarr
-    id = FourCC('n0ts')
-    KillQuest[0][1] = id
-    KillQuest[FourCC('I058')][0] = id
-    KillQuest[id].goal = 20
-    KillQuest[id].min = 3
-    KillQuest[id].max = 14
-    KillQuest[id].name = "Tuskarr"
-    KillQuest[id].region = gg_rct_Tuskar_Horror_1
-    --spider
-    id = FourCC('n0ss')
-    KillQuest[0][2] = id
-    KillQuest[FourCC('I05F')][0] = id
-    KillQuest[id].goal = 20
-    KillQuest[id].min = 5
-    KillQuest[id].max = 24
-    KillQuest[id].name = "Spiders"
-    KillQuest[id].region = gg_rct_Spider_Horror_3
-    --ursa
-    id = FourCC('n0uw')
-    KillQuest[0][3] = id
-    KillQuest[FourCC('I04U')][0] = id
-    KillQuest[id].goal = 25
-    KillQuest[id].min = 8
-    KillQuest[id].max = 34
-    KillQuest[id].name = "Ursae"
-    KillQuest[id].region = gg_rct_Ursa_Abyssal_2
-    --polar bears
-    id = FourCC('n0dm')
-    KillQuest[0][4] = id
-    KillQuest[FourCC('I04V')][0] = id
-    KillQuest[id].goal = 20
-    KillQuest[id].min = 12
-    KillQuest[id].max = 46
-    KillQuest[id].name = "Polar Bears & Mammoths"
-    KillQuest[id].region = gg_rct_Bear_2
-    --tauren/ogre
-    id = FourCC('n01G')
-    KillQuest[0][5] = id
-    KillQuest[FourCC('I05B')][0] = id
-    KillQuest[id].goal = 25
-    KillQuest[id].min = 20
-    KillQuest[id].max = 62
-    KillQuest[id].name = "Taurens & Ogres"
-    KillQuest[id].region = gg_rct_OgreTauren_Void_5
-    --unbroken
-    id = FourCC('n0ud')
-    KillQuest[0][6] = id
-    KillQuest[FourCC('I05L')][0] = id
-    KillQuest[id].goal = 25
-    KillQuest[id].min = 29
-    KillQuest[id].max = 84
-    KillQuest[id].name = "Unbroken"
-    KillQuest[id].region = gg_rct_Unbroken_Dimensional_2
-    --hellhounds
-    id = FourCC('n0hs')
-    KillQuest[0][7] = id
-    KillQuest[FourCC('I05E')][0] = id
-    KillQuest[id].goal = 20
-    KillQuest[id].min = 44
-    KillQuest[id].max = 110
-    KillQuest[id].name = "Hellspawn"
-    KillQuest[id].region = gg_rct_Hell_4
-    --centaur
-    id = FourCC('n024')
-    KillQuest[0][8] = id
-    KillQuest[FourCC('I0GD')][0] = id
-    KillQuest[id].goal = 20
-    KillQuest[id].min = 56
-    KillQuest[id].max = 134
-    KillQuest[id].name = "Centaurs"
-    KillQuest[id].region = gg_rct_Centaur_Nightmare_5
-    --magnataur
-    id = FourCC('n01M')
-    KillQuest[0][9] = id
-    KillQuest[FourCC('I05K')][0] = id
-    KillQuest[id].goal = 20
-    KillQuest[id].min = 70
-    KillQuest[id].max = 162
-    KillQuest[id].name = "Magnataurs"
-    KillQuest[id].region = gg_rct_Magnataur_Despair_1
-    --dragon
-    id = FourCC('n02P')
-    KillQuest[0][10] = id
-    KillQuest[FourCC('I05M')][0] = id
-    KillQuest[id].goal = 20
-    KillQuest[id].min = 92
-    KillQuest[id].max = 182
-    KillQuest[id].name = "Dragons"
-    KillQuest[id].region = gg_rct_Dragon_Astral_8
-    --devourers
-    id = FourCC('n02L')
-    KillQuest[0][11] = id
-    KillQuest[FourCC('I022')][0] = id
-    KillQuest[id].goal = 20
-    KillQuest[id].min = 110
-    KillQuest[id].max = 198
-    KillQuest[id].name = "Devourers"
-    KillQuest[id].region = gg_rct_Devourer_entry
-    --demons
-    id = FourCC('n034')
-    KillQuest[1][0] = id
-    KillQuest[FourCC('I03H')][0] = id
-    KillQuest[id].goal = 20
-    KillQuest[id].min = 166
-    KillQuest[id].max = 256
-    KillQuest[id].name = "Demons"
-    KillQuest[id].region = gg_rct_Troll_Demon_1
-    --horror beast
-    id = FourCC('n03A')
-    KillQuest[1][1] = id
-    KillQuest[FourCC('I09J')][0] = id
-    KillQuest[id].goal = 20
-    KillQuest[id].min = 190
-    KillQuest[id].max = 260
-    KillQuest[id].name = "Horror Beasts"
-    KillQuest[id].region = gg_rct_Tuskar_Horror_1
-    --despair
-    id = FourCC('n03F')
-    KillQuest[1][2] = id
-    KillQuest[FourCC('I03C')][0] = id
-    KillQuest[id].goal = 20
-    KillQuest[id].min = 210
-    KillQuest[id].max = 280
-    KillQuest[id].name = "Despairs"
-    KillQuest[id].region = gg_rct_Magnataur_Despair_1
-    --abyssal
-    id = FourCC('n08N')
-    KillQuest[1][3] = id
-    KillQuest[FourCC('I02A')][0] = id
-    KillQuest[id].goal = 20
-    KillQuest[id].min = 229
-    KillQuest[id].max = 299
-    KillQuest[id].name = "Abyssals"
-    KillQuest[id].region = gg_rct_Ursa_Abyssal_2
-    --void
-    id = FourCC('n031')
-    KillQuest[1][4] = id
-    KillQuest[FourCC('I03I')][0] = id
-    KillQuest[id].goal = 20
-    KillQuest[id].min = 250
-    KillQuest[id].max = 320
-    KillQuest[id].name = "Voids"
-    KillQuest[id].region = gg_rct_OgreTauren_Void_5
-    --nightmares
-    id = FourCC('n020')
-    KillQuest[1][5] = id
-    KillQuest[FourCC('I0GE')][0] = id
-    KillQuest[id].goal = 20
-    KillQuest[id].min = 270
-    KillQuest[id].max = 340
-    KillQuest[id].name = "Nightmares"
-    KillQuest[id].region = gg_rct_Centaur_Nightmare_5
-    --hellspawn
-    id = FourCC('n03D')
-    KillQuest[1][6] = id
-    KillQuest[FourCC('I03J')][0] = id
-    KillQuest[id].goal = 20
-    KillQuest[id].min = 290
-    KillQuest[id].max = 360
-    KillQuest[id].name = "Hellspawn"
-    KillQuest[id].region = gg_rct_Hell_4
-    --denied existence
-    id = FourCC('n03J')
-    KillQuest[1][7] = id
-    KillQuest[FourCC('I02G')][0] = id
-    KillQuest[id].goal = 30
-    KillQuest[id].min = 310
-    KillQuest[id].max = 380
-    KillQuest[id].name = "Existences"
-    KillQuest[id].region = gg_rct_Devourer_entry
-    --astral
-    id = FourCC('n03M')
-    KillQuest[1][8] = id
-    KillQuest[FourCC('I039')][0] = id
-    KillQuest[id].goal = 20
-    KillQuest[id].min = 330
-    KillQuest[id].max = 400
-    KillQuest[id].name = "Astrals"
-    KillQuest[id].region = gg_rct_Dragon_Astral_8
-    --dimensionals
-    id = FourCC('n026')
-    KillQuest[1][9] = id
-    KillQuest[FourCC('I0Q1')][0] = id
-    KillQuest[id].goal = 20
-    KillQuest[id].min = 350
-    KillQuest[id].max = 420
-    KillQuest[id].name = "Dimensionals"
-    KillQuest[id].region = gg_rct_Unbroken_Dimensional_2
+    BANISH_FLAG = false ---@type boolean 
 
     EXPERIENCE_TABLE = {}
     GOLD_TABLE = {}
@@ -865,36 +661,20 @@ OnInit.global("Variables", function()
         BASE_XP_RATE[i] = (i <= 1 and 100) or (BASE_XP_RATE[i - 1] * 0.988)
     end
 
-    Gold_Mod = {
-        1,
-        0.55 ^ 0.5,
-        0.50 ^ 0.5,
-        0.45 ^ 0.5,
-        0.40 ^ 0.5,
-        0.35 ^ 0.5,
-    }
-
-    infoString[0] = "Use -info # for see more info about your chosen catagory\n\n -info 1, Unit Respawning\n -info 2, Boss Respawning\n -info 3, Safezone\n -info 4, Hardcore\n -info 5, Perks\n -info 6, Proficiency"
-    infoString[1] = "Units in the overworld will attempt to revive where they died 30 seconds after death. If a player hero/unit is within 800 range they will spawn frozen and invulnerable until no players are around."
-    infoString[2] = "Bosses respawn after 10 minutes and non-hero bosses respawn after 5 minutes, players may choose to fight a stronger version of the boss after defeating them once.\x25"
-    infoString[3] = "The town is protected from enemy invasion and any entering enemy will be teleported back to their original spawn."
-    infoString[4] = [[Hardcore players that die without a reincarnation item/spell will be removed from the game and cannot save/load or start a new character. 
+    INFO_STRING = {}
+    INFO_STRING[0] = "Use -info # for see more info about your chosen catagory\n\n -info 1, Unit Respawning\n -info 2, Boss Respawning\n -info 3, Safezone\n -info 4, Hardcore\n -info 5, Perks\n -info 6, Proficiency"
+    INFO_STRING[1] = "Units in the overworld will attempt to revive where they died 30 seconds after death. If a player hero/unit is within 800 range they will spawn frozen and invulnerable until no players are around."
+    INFO_STRING[2] = "Bosses respawn after 10 minutes and non-hero bosses respawn after 5 minutes, players may choose to fight a stronger version of the boss after defeating them once.%"
+    INFO_STRING[3] = "The town is protected from enemy invasion and any entering enemy will be teleported back to their original spawn."
+    INFO_STRING[4] = [[Hardcore players that die without a reincarnation item/spell will be removed from the game and cannot save/load or start a new character. 
     A hardcore hero can only save every 30 minutes- the timer starts upon saving OR upon loading your hardcore hero. 
-    Hardcore heroes receive double the bonus from prestiging.
-    infoString[5] = "Perk Points are earned by completing specific trials for the first time on a character and will apply to ALL of your existing characters when spent."
-    infoString[6] = [[Most items in this game have a proficiency requirement in their description.
+    Hardcore heroes receive double the bonus from prestiging.]]
+    INFO_STRING[5] = "Perk Points are earned by completing specific trials for the first time on a character and will apply to ALL of your existing characters when spent."
+    INFO_STRING[6] = [[Most items in this game have a proficiency requirement in their description.
     While any hero can equip them regardless of proficiency, those lacking proficiency receive 75% of the stats.
     Check your hero's proficiency with -pf.]]
 
-    prMulti[0] = FourCC('A0A3')
-    prMulti[1] = FourCC('A0IW')
-    prMulti[2] = FourCC('A0IX')
-    prMulti[3] = FourCC('A0IY')
-    prMulti[4] = FourCC('A0IZ')
-    prMulti[5] = FourCC('A00A')
-
     --TODO: expand channel fields?
-
     SPELL_FIELD = {} ---@type abilityreallevelfield[] 
     SPELL_FIELD[0] = ABILITY_RLF_ART_DURATION
     SPELL_FIELD[1] = ABILITY_RLF_AREA_OF_EFFECT
@@ -905,14 +685,13 @@ OnInit.global("Variables", function()
     SPELL_FIELD[6] = ABILITY_RLF_DURATION_NORMAL
     SPELL_FIELD_TOTAL = 6 ---@type integer 
 
-    TIER_NAME= {} ---@type string[] 
-    TYPE_NAME= {} ---@type string[] 
-    ITEM_MODEL= {} ---@type integer[] 
-    LEVEL_PREFIX= {} ---@type string[] 
-    SPRITE_RARITY= {} ---@type string[] 
-    ITEM_MULT= {} ---@type number[] 
-    CRYSTAL_PRICE= {} ---@type integer[] 
-    LIMIT_STRING= {} ---@type string[] 
+    TIER_NAME = {} ---@type string[] 
+    TYPE_NAME = {} ---@type string[] 
+    ITEM_MODEL = {} ---@type integer[] 
+    LEVEL_PREFIX = {} ---@type string[] 
+    SPRITE_RARITY = {} ---@type string[] 
+    ITEM_STAT_MULTIPLIER = {} ---@type number[] 
+    CRYSTAL_PRICE = {} ---@type integer[] 
 
     TIER_NAME[0] = ""
     TIER_NAME[1] = "Common"
@@ -1021,26 +800,26 @@ OnInit.global("Variables", function()
     SPRITE_RARITY[19] = "war3mapImported\\ChaosBorder.dds"
     SPRITE_RARITY[20] = "war3mapImported\\ChaosBorder.dds"
     --...
-    ITEM_MULT[0] = 0
-    ITEM_MULT[1] = 0.2
-    ITEM_MULT[2] = 0.4
-    ITEM_MULT[3] = 0.6
-    ITEM_MULT[4] = 0.8
-    ITEM_MULT[5] = 1.2
-    ITEM_MULT[6] = 1.6
-    ITEM_MULT[7] = 2.
-    ITEM_MULT[8] = 2.4
-    ITEM_MULT[9] = 3.2
-    ITEM_MULT[10] = 4.
-    ITEM_MULT[11] = 4.8
-    ITEM_MULT[12] = 5.6
-    ITEM_MULT[13] = 7.
-    ITEM_MULT[14] = 8.4
-    ITEM_MULT[15] = 9.8
-    ITEM_MULT[16] = 11.2
-    ITEM_MULT[17] = 13.4
-    ITEM_MULT[18] = 15.6
-    ITEM_MULT[19] = 17.8
+    ITEM_STAT_MULTIPLIER[0] = 0
+    ITEM_STAT_MULTIPLIER[1] = 0.2
+    ITEM_STAT_MULTIPLIER[2] = 0.4
+    ITEM_STAT_MULTIPLIER[3] = 0.6
+    ITEM_STAT_MULTIPLIER[4] = 0.8
+    ITEM_STAT_MULTIPLIER[5] = 1.2
+    ITEM_STAT_MULTIPLIER[6] = 1.6
+    ITEM_STAT_MULTIPLIER[7] = 2.
+    ITEM_STAT_MULTIPLIER[8] = 2.4
+    ITEM_STAT_MULTIPLIER[9] = 3.2
+    ITEM_STAT_MULTIPLIER[10] = 4.
+    ITEM_STAT_MULTIPLIER[11] = 4.8
+    ITEM_STAT_MULTIPLIER[12] = 5.6
+    ITEM_STAT_MULTIPLIER[13] = 7.
+    ITEM_STAT_MULTIPLIER[14] = 8.4
+    ITEM_STAT_MULTIPLIER[15] = 9.8
+    ITEM_STAT_MULTIPLIER[16] = 11.2
+    ITEM_STAT_MULTIPLIER[17] = 13.4
+    ITEM_STAT_MULTIPLIER[18] = 15.6
+    ITEM_STAT_MULTIPLIER[19] = 17.8
     --...
     CRYSTAL_PRICE[0] = 1
     CRYSTAL_PRICE[1] = 1
@@ -1090,27 +869,26 @@ OnInit.global("Variables", function()
         [ITEM_INTELLIGENCE] = { tag = "|cff2255ffIntelligence|r", priority = 1, syntax = "int" },
         [ITEM_REGENERATION] = { tag = "|cffa00070Regeneration|r", priority = 1, syntax = "regen" },
         [ITEM_MANA_REGENERATION] = { tag = "|cff1144ddMana Regen|r", priority = 1, syntax = "manaregen" },
-        [ITEM_DAMAGE_RESIST] = { tag = "|cffff8040Damage Resist|r", alternate = "|cffff8040Physical Taken|r", priority = 1, suffix = "\x25", syntax = "dr" },
-        [ITEM_MAGIC_RESIST] = { tag = "|cff8000ffMagic Resist|r", alternate = "|cff8000ffMagical Taken|r", priority = 1, suffix = "\x25", syntax = "mr" },
-        [ITEM_DAMAGE_MULT] = { tag = "|cffff8040Physical Dealt|r", priority = 1, suffix = "\x25", syntax = "dm" },
-        [ITEM_MAGIC_MULT] = { tag = "|cff8000ffMagic Dealt|r", priority = 1, suffix = "\x25", syntax = "mm" },
+        [ITEM_DAMAGE_RESIST] = { tag = "|cffff8040Damage Resist|r", alternate = "|cffff8040Physical Taken|r", priority = 1, suffix = "%", syntax = "dr" },
+        [ITEM_MAGIC_RESIST] = { tag = "|cff8000ffMagic Resist|r", alternate = "|cff8000ffMagical Taken|r", priority = 1, suffix = "%", syntax = "mr" },
+        [ITEM_DAMAGE_MULT] = { tag = "|cffff8040Physical Dealt|r", priority = 1, suffix = "%", syntax = "dm" },
+        [ITEM_MAGIC_MULT] = { tag = "|cff8000ffMagic Dealt|r", priority = 1, suffix = "%", syntax = "mm" },
         [ITEM_MOVESPEED] = { tag = "|cff888888Movespeed|r", priority = 2, syntax = "ms" },
-        [ITEM_EVASION] = { tag = "|cff008080Evasion|r", priority = 2, suffix = "\x25", syntax = "evasion" },
-        [ITEM_SPELLBOOST] = { tag = "|cff80ffffSpellboost|r", priority = 1, suffix = "\x25", syntax = "spellboost" },
-        [ITEM_CRIT_CHANCE] = { tag = "|cffffcc00Critical Chance|r", priority = 1, suffix = "\x25", syntax = "cc" },
-        [ITEM_CRIT_DAMAGE] = { tag = "|cffffcc00Critical Damage|r", priority = 1, suffix = "\x25", syntax = "cd" },
-        [ITEM_CRIT_CHANCE_MULT] = { tag = "|cffffcc00Critical Chance Multiplier|r", priority = 4, suffix = "\x25", syntax = "cc_percent" },
-        [ITEM_CRIT_DAMAGE_MULT] = { tag = "|cffffcc00Critical Damage Multiplier|r", priority = 4, suffix = "\x25", syntax = "cd_percent" },
-        [ITEM_BASE_ATTACK_SPEED] = { tag = "|cff446600Base Attack Speed|r", priority = 1, item_suffix = "\x25", syntax = "bat" },
-        [ITEM_GOLD_GAIN] = { tag = "|cffffff00Gold Find|r", priority = 3, suffix = "\x25", syntax = "gold" },
+        [ITEM_EVASION] = { tag = "|cff008080Evasion|r", priority = 2, suffix = "%", syntax = "evasion" },
+        [ITEM_SPELLBOOST] = { tag = "|cff80ffffSpellboost|r", priority = 1, suffix = "%", syntax = "spellboost" },
+        [ITEM_CRIT_CHANCE] = { tag = "|cffffcc00Critical Chance|r", priority = 1, suffix = "%", syntax = "cc" },
+        [ITEM_CRIT_DAMAGE] = { tag = "|cffffcc00Critical Damage|r", priority = 1, suffix = "%", syntax = "cd" },
+        [ITEM_CRIT_CHANCE_MULT] = { tag = "|cffffcc00Critical Chance Multiplier|r", priority = 4, suffix = "%", syntax = "cc_percent" },
+        [ITEM_CRIT_DAMAGE_MULT] = { tag = "|cffffcc00Critical Damage Multiplier|r", priority = 4, suffix = "%", syntax = "cd_percent" },
+        [ITEM_BASE_ATTACK_SPEED] = { tag = "|cff446600Base Attack Speed|r", priority = 1, item_suffix = "%", syntax = "bat" },
+        [ITEM_GOLD_GAIN] = { tag = "|cffffff00Gold Find|r", priority = 3, suffix = "%", syntax = "gold" },
         [ITEM_FLAT_HEAL] = { tag = "|rHealth Restored", priority = 4, syntax = "fheal" },
-        [ITEM_PERCENT_HEAL] = { tag = "|rPercent Health Restored", priority = 4, syntax = "pheal", suffix = "\x25" },
+        [ITEM_PERCENT_HEAL] = { tag = "|rPercent Health Restored", priority = 4, syntax = "pheal", suffix = "%" },
         [ITEM_FLAT_MANA] = { tag = "|rMana Restored", priority = 4, syntax = "fmana" },
-        [ITEM_PERCENT_MANA] = { tag = "|rPercent Mana Restored", priority = 4, syntax = "pmana", suffix = "\x25" },
+        [ITEM_PERCENT_MANA] = { tag = "|rPercent Mana Restored", priority = 4, syntax = "pmana", suffix = "%" },
         [ITEM_CHARGES] = { tag = "|rCharges", priority = 4, syntax = "charges" },
         [ITEM_ABILITY] = { priority = 4, syntax = "abil" },
         [ITEM_ABILITY2] = { priority = 4, syntax = "abiltwo" },
-        [ITEM_TOOLTIP] = { priority = 4, syntax = "" },
         [ITEM_NOCRAFT] = { priority = 4, syntax = "nocraft" },
         [ITEM_TIER] = { priority = 4, syntax = "tier" },
         [ITEM_TYPE] = { priority = 4, syntax = "type" },
@@ -1120,40 +898,137 @@ OnInit.global("Variables", function()
         [ITEM_COST] = { priority = 4, syntax = "cost" },
         [ITEM_DISCOUNT] = { priority = 4, syntax = "discount" },
         [ITEM_STACK] = { priority = 4, syntax = "stack" },
-        [ITEM_STACK + 1] = { tag = "|cff446600Total Attack Speed|r", priority = 1 },
-        [ITEM_STACK + 2] = { tag = "|cff808080Experience Rate|r", priority = 3, suffix = "\x25" },
-        [ITEM_STACK + 3] = { tag = "|cff808000Hero Time Played|r", priority = 3 },
-        [ITEM_STACK + 4] = { tag = "|cff808000Total Time Played|r", priority = 3 }
+        [TOTAL_ATTACK_SPEED] = { tag = "|cff446600Total Attack Speed|r", priority = 1 },
+        [XP_RATE] = { tag = "|cff808080Experience Rate|r", priority = 3, suffix = "%" },
+        [HERO_TIME] = { tag = "|cff808000Hero Time Played|r", priority = 3 },
+        [PLAYER_TIME] = { tag = "|cff808000Total Time Played|r", priority = 3 }
     }
 
-    LIMIT_STRING[1] = "You can only wear one of this item."
-    LIMIT_STRING[2] = "You only have two feet"
-    LIMIT_STRING[3] = "A second set of wings won't help you fly better"
-    LIMIT_STRING[4] = "You can only wear one Bloody armor"
-    LIMIT_STRING[5] = "You can only use one Bloody weapon"
-    LIMIT_STRING[6] = "You can only wear one Absolute Horror armor"
-    LIMIT_STRING[7] = "You can only use one Absolute Horror weapon"
-    LIMIT_STRING[8] = "You can only wear one Legion armor"
-    LIMIT_STRING[9] = "You can only use one Legion weapon"
-    LIMIT_STRING[10] = "You can only wear one Azazoth armor"
-    LIMIT_STRING[11] = "You can only use one Azazoth weapon"
-    LIMIT_STRING[12] = "You can only use one Slaughterer weapon"
-    LIMIT_STRING[13] = "You can only hold one Forgotten gem"
-    LIMIT_STRING[14] = "You can only wear one Ursine Set"
-    LIMIT_STRING[15] = "You can only wear one Ogre Set"
-    LIMIT_STRING[16] = "You can only wear one Unbroken Set"
-    LIMIT_STRING[17] = "You can only wear one Magnataur Set"
-    LIMIT_STRING[18] = "You can only wear one Demon Set"
-    LIMIT_STRING[19] = "You can only wear one Horror Set"
-    LIMIT_STRING[20] = "You can only wear one Despair Set"
-    LIMIT_STRING[21] = "You can only wear one Abyssal Set"
-    LIMIT_STRING[22] = "You can only wear one Void Set"
-    LIMIT_STRING[23] = "You can only wear one Nightmare Set"
-    LIMIT_STRING[24] = "You can only wear one Hell Set"
-    LIMIT_STRING[25] = "You can only wear one Existence Set"
-    LIMIT_STRING[26] = "You can only wear one Astral Set"
-    LIMIT_STRING[27] = "You can only wear one Dimensional Set"
-    LIMIT_STRING[28] = "You can only wear one Devourer Set"
+    local format = string.format
+
+    -- getters and breakdowns for stats
+    STAT_TAG[ITEM_LEVEL].breakdown = function(u)
+        local lvl = GetUnitLevel(u)
+        local s = ""
+        if IsUnitType(u, UNIT_TYPE_HERO) then
+            s = "XP: " .. GetHeroXP(u) .. "/" .. RequiredXP(lvl)
+        end
+        return s
+    end
+    STAT_TAG[ITEM_LEVEL].getter = function(u)
+        local lvl = GetUnitLevel(u)
+        local s = RealToString(lvl)
+        return s
+    end
+
+    STAT_TAG[ITEM_HEALTH].getter = function(u) return RealToString(GetWidgetLife(u)) .. " / " .. RealToString(Unit[u].hp) end
+    STAT_TAG[ITEM_MANA].getter = function(u) return RealToString(GetUnitState(u, UNIT_STATE_MANA)) .. " / " .. RealToString(GetUnitState(u, UNIT_STATE_MAX_MANA)) end
+    STAT_TAG[ITEM_DAMAGE].getter = function(u) return RealToString(Unit[u].damage + 1) end -- include dice
+    STAT_TAG[ITEM_DAMAGE].breakdown = function(u)
+        return "|cffffcc00Base Damage:|r " .. BlzGetUnitBaseDamage(u, 0) ..
+            "\n|cffffcc00Spell/Item Bonus:|r " .. Unit[u].bonus_damage ..
+            "\n|cffffcc00Percent Bonus:|r " .. format("%.3f", (Unit[u].damage_percent - 1.) * 100.) .. "%" .. " (" .. format("%.3f", Unit[u].damage - Unit[u].bonus_damage - BlzGetUnitBaseDamage(u, 0)) .. ")" ..
+            "\n|cffffcc00Total Damage:|r " .. (Unit[u].damage + 1)
+    end
+    STAT_TAG[ITEM_ARMOR].getter = function(u) return RealToString(BlzGetUnitArmor(u)) end
+    STAT_TAG[ITEM_STRENGTH].getter = function(u) return RealToString(GetHeroStr(u, true)) end
+    STAT_TAG[ITEM_AGILITY].getter = function(u) return RealToString(GetHeroAgi(u, true)) end
+    STAT_TAG[ITEM_INTELLIGENCE].getter = function(u) return RealToString(GetHeroInt(u, true)) end
+    STAT_TAG[ITEM_REGENERATION].getter = function(u) return RealToString(Unit[u].regen) end
+    STAT_TAG[ITEM_REGENERATION].breakdown = function(u)
+        return "|cffffcc00Flat Regeneration:|r " .. Unit[u].regen_flat ..
+            "\n|cffffcc00Percent Regeneration:|r " .. format("%.3f", Unit[u].regen_max) .. "%" .. " (" .. format("%.3f", Unit[u].regen_max * Unit[u].hp * 0.01) .. ")" ..
+            "\n|cffffcc00Healing Received:|r " .. format("%.3f", Unit[u].regen_percent * 100.) .. "%" ..
+            "\n|cffffcc00Total Regeneration:|r " .. Unit[u].regen
+    end
+    STAT_TAG[ITEM_MANA_REGENERATION].getter = function(u) return RealToString(Unit[u].mana_regen) end
+    STAT_TAG[ITEM_MANA_REGENERATION].breakdown = function(u)
+        return "|cffffcc00Flat Regeneration:|r " .. Unit[u].mana_regen_flat ..
+            "\n|cffffcc00Intelligence Regeneration:|r " .. GetHeroInt(u, true) * 0.05 ..
+            "\n|cffffcc00Percent Regeneration:|r " .. format("%.2f", Unit[u].mana_regen_max) .. "%" .. " (" .. Unit[u].mana_regen_max * Unit[u].mana * 0.01 .. ")" ..
+            "\n|cffffcc00Mana Received:|r " .. format("%.2f", Unit[u].mana_regen_percent * 100.) .. "%" ..
+            "\n|cffffcc00Total Regeneration:|r " .. Unit[u].mana_regen
+    end
+
+    STAT_TAG[ITEM_DAMAGE_RESIST].breakdown = function(u)
+        local dtype = BlzGetUnitIntegerField(u, UNIT_IF_DEFENSE_TYPE)
+        local chaos_reduc = (dtype == ARMOR_CHAOS or dtype == ARMOR_CHAOS_BOSS) and 0.03 or 1.
+        local chaos = (chaos_reduc == 0.03 and "\n|cffffcc00Chaos Reduction:|r " .. format("%.3f", (1. - chaos_reduc) * 100) .. "%" or "")
+        return "|cffffcc00Base Reduction:|r " .. format("%.3f", 100. - (HERO_STATS[GetType(u)].phys_resist) * 100.)  .. "%" ..
+            "\n|cffffcc00Spell/Item Reduction:|r " .. format("%.3f", 100. - (Unit[u].dr * Unit[u].pr) / HERO_STATS[GetType(u)].phys_resist * 100.)  .. "%" ..
+            "\n|cffffcc00Armor Reduction:|r " .. format("%.3f", ((0.05 * BlzGetUnitArmor(u)) / (1. + 0.05 * BlzGetUnitArmor(u))) * 100.)  .. "%" ..
+            chaos ..
+            "\n|cffffcc00Total Reduction:|r " .. format("%.3f", 100. - (Unit[u].dr * Unit[u].pr) * 100. * (1. - ((0.05 * BlzGetUnitArmor(u)) / (1. + 0.05 * BlzGetUnitArmor(u)))) * chaos_reduc) .. "%"
+    end
+
+    STAT_TAG[ITEM_DAMAGE_RESIST].getter = function(u)
+        local dtype = BlzGetUnitIntegerField(u, UNIT_IF_DEFENSE_TYPE)
+        local chaos_reduc = (dtype == ARMOR_CHAOS or dtype == ARMOR_CHAOS_BOSS) and 0.03 or 1.
+        return format("%.3f", (Unit[u].dr * Unit[u].pr) * 100. * (1. - ((0.05 * BlzGetUnitArmor(u)) / (1. + 0.05 * BlzGetUnitArmor(u)))) * chaos_reduc)
+    end
+
+    STAT_TAG[ITEM_MAGIC_RESIST].breakdown = function(u)
+        local dtype = BlzGetUnitIntegerField(u, UNIT_IF_DEFENSE_TYPE)
+        local chaos_reduc = (dtype == ARMOR_CHAOS or dtype == ARMOR_CHAOS_BOSS) and 0.03 or 1.
+        local chaos = (chaos_reduc == 0.03 and "\n|cffffcc00Chaos Reduction:|r " .. format("%.3f", (1. - chaos_reduc) * 100) .. "%" or "")
+        return "|cffffcc00Base Reduction:|r " .. format("%.3f", 100. - (HERO_STATS[GetType(u)].magic_resist) * 100.)  .. "%" ..
+            "\n|cffffcc00Spell/Item Reduction:|r " .. format("%.3f", 100. - (Unit[u].dr * Unit[u].mr) / HERO_STATS[GetType(u)].magic_resist * 100.)  .. "%" ..
+            chaos ..
+            "\n|cffffcc00Total Reduction:|r " .. format("%.3f", 100. - (Unit[u].dr * Unit[u].mr) * 100. * chaos_reduc) .. "%"
+    end
+
+    STAT_TAG[ITEM_MAGIC_RESIST].getter = function(u)
+        local dtype = BlzGetUnitIntegerField(u, UNIT_IF_DEFENSE_TYPE)
+        local chaos_reduc = (dtype == ARMOR_CHAOS or dtype == ARMOR_CHAOS_BOSS) and 0.03 or 1.
+        return format("%.3f", (Unit[u].dr * Unit[u].mr) * 100. * chaos_reduc)
+    end
+
+    STAT_TAG[ITEM_DAMAGE_MULT].getter = function(u) return format("%.3f", (Unit[u].dm * Unit[u].pm) * 100.) end
+    STAT_TAG[ITEM_MAGIC_MULT].getter = function(u) return format("%.3f", (Unit[u].dm * Unit[u].mm) * 100.) end
+    STAT_TAG[ITEM_MOVESPEED].getter = function(u) return RealToString(Unit[u].movespeed) end
+    STAT_TAG[ITEM_EVASION].getter = function(u) return math.min(100, (Unit[u].evasion)) end
+    STAT_TAG[ITEM_SPELLBOOST].getter = function(u) return format("%.3f", Unit[u].spellboost * 100.) end
+    STAT_TAG[ITEM_CRIT_CHANCE].getter = function(u) return format("%.2f", Unit[u].cc) end
+    STAT_TAG[ITEM_CRIT_DAMAGE].getter = function(u) return format("%.2f", Unit[u].cd) end
+    STAT_TAG[ITEM_CRIT_CHANCE_MULT].getter = function(u) return format("%.2f", Unit[u].cc) end
+    STAT_TAG[ITEM_CRIT_DAMAGE_MULT].getter = function(u) return format("%.2f", Unit[u].cd * 100.) end
+    STAT_TAG[ITEM_BASE_ATTACK_SPEED].getter = function(u) local as = BlzGetUnitWeaponBooleanField(u, UNIT_WEAPON_BF_ATTACKS_ENABLED, 0) and 1. / Unit[u].bat or 0 return format("%.2f", as) .. " attacks per second" end
+    STAT_TAG[ITEM_GOLD_GAIN].getter = function(u) return Unit[u].gold_rate end
+    STAT_TAG[TOTAL_ATTACK_SPEED].getter = function(u) local as = BlzGetUnitWeaponBooleanField(u, UNIT_WEAPON_BF_ATTACKS_ENABLED, 0) and (1. / Unit[u].bat) * (1 + math.min(GetHeroAgi(u, true), 400) * 0.01) or 0 return format("%.2f", as) .. " attacks per second" end
+    STAT_TAG[XP_RATE].getter = function(u) return format("%.2f", Unit[u].xp_rate) end
+    STAT_TAG[HERO_TIME].getter = function(u) local pid = GetPlayerId(GetOwningPlayer(u)) + 1 return (Profile[pid].hero.time // 60) .. " hours and " .. ModuloInteger(Profile[pid].hero.time, 60) .. " minutes" end
+    STAT_TAG[PLAYER_TIME].getter = function(u) local pid = GetPlayerId(GetOwningPlayer(u)) + 1 return (Profile[pid].total_time) // 60 .. " hours and " .. ModuloInteger(Profile[pid].total_time, 60) .. " minutes" end
+
+    LIMIT_STRING = {
+        "You can only wear one of this item.",
+        "You only have two feet",
+        "A second set of wings won't help you fly better",
+        "You can only wear one Bloody armor",
+        "You can only use one Bloody weapon",
+        "You can only wear one Absolute Horror armor",
+        "You can only use one Absolute Horror weapon",
+        "You can only wear one Legion armor",
+        "You can only use one Legion weapon",
+        "You can only wear one Azazoth armor",
+        "You can only use one Azazoth weapon",
+        "You can only use one Slaughterer weapon",
+        "You can only hold one Forgotten gem",
+        "You can only wear one Ursine Set",
+        "You can only wear one Ogre Set",
+        "You can only wear one Unbroken Set",
+        "You can only wear one Magnataur Set",
+        "You can only wear one Demon Set",
+        "You can only wear one Horror Set",
+        "You can only wear one Despair Set",
+        "You can only wear one Abyssal Set",
+        "You can only wear one Void Set",
+        "You can only wear one Nightmare Set",
+        "You can only wear one Hell Set",
+        "You can only wear one Existence Set",
+        "You can only wear one Astral Set",
+        "You can only wear one Dimensional Set",
+        "You can only wear one Devourer Set",
+    }
 
     --hints
     HINT_TOOLTIP = { ---@type string[]
@@ -1166,7 +1041,7 @@ OnInit.global("Variables", function()
         "|cffc0c0c0You can type|r |cff9966ff-hints|r or |cff9966ff-nohints|r |cffc0c0c0to toggle these messages on and off.|r",
         "|cffc0c0c0Once you challenge the gods you cannot flee.|r",
         "|cffc0c0c0Some artifacts remain frozen in ice, waiting to be recovered...|r",
-        "|cffc0c0c0Spellboost innately affects the damage of your spells by plus or minus 20\x25.|r",
+        "|cffc0c0c0Spellboost innately affects the damage of your spells by plus or minus 20%.|r",
         "|cffc0c0c0Critical strike items and spells can stack their effect, the multipliers are additive.|r",
         "|cffc0c0c0The settings menu (Q on your backpack) provides many useful features such as displaying allied hero portraits on the left.|r",
         "|cffc0c0c0You can toggle off your auto attacks with CTRL + A.|r",

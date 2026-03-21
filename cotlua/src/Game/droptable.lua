@@ -30,9 +30,9 @@ OnInit.final("DropTable", function()
 
             for i = 1, max do
                 if drop[i] == drop[index] then
-                    drop[i .. "\x25"] = drop[i .. "\x25"] - adjust
+                    drop[i .. "%"] = drop[i .. "%"] - adjust
                 else
-                    drop[i .. "\x25"] = drop[i .. "\x25"] + balance
+                    drop[i .. "%"] = drop[i .. "%"] + balance
                 end
             end
         end
@@ -46,7 +46,7 @@ OnInit.final("DropTable", function()
             local i = GetRandomInt(1, max)
 
             while true do
-                if GetRandomReal(0., 1.) < drop[i .. "\x25"] then
+                if GetRandomReal(0., 1.) < drop[i .. "%"] then
                     adjust_rate(id, i)
                     break
                 end
@@ -69,7 +69,7 @@ OnInit.final("DropTable", function()
 
             for i, v in ipairs(t) do
                 ItemDrops[id][i] = FourCC(v)
-                ItemDrops[id][i .. "\x25"] = rate
+                ItemDrops[id][i .. "%"] = rate
             end
         end
 

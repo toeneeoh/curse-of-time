@@ -25,6 +25,7 @@ OnInit.final("Level", function(Require)
         local uid   = GetUnitTypeId(u) ---@type integer 
 
         if u == Hero[pid] then
+            -- TODO: add custom level event
             if uid == HERO_DARK_SUMMONER then -- summoning improvement level
                 SetUnitAbilityLevel(u, SUMMONINGIMPROVEMENT.id, level // 10 + 1)
             elseif uid == HERO_DARK_SAVIOR then -- dark seal level
@@ -34,7 +35,8 @@ OnInit.final("Level", function(Require)
             elseif uid == HERO_OBLIVION_GUARD then -- body of fire level
                 SetUnitAbilityLevel(u, BODYOFFIRE.id, level // 100 + 1)
             elseif uid == HERO_PHOENIX_RANGER then -- multishot level
-                SetUnitAbilityLevel(u, FourCC('A05R'), math.min(level // 50 + 1, 5))
+                SetUnitAbilityLevel(u, FourCC('A05R'), math.min(level // 50 + 1, 6))
+                SetUnitAbilityLevel(u, FourCC('A0A3'), math.min(level // 50 + 1, 6))
             elseif uid == HERO_THUNDERBLADE then -- overload level
                 SetUnitAbilityLevel(u, OVERLOAD.id, level // 75 + 1)
             elseif uid == HERO_ASSASSIN then -- blade spin level
@@ -42,9 +44,10 @@ OnInit.final("Level", function(Require)
                 SetUnitAbilityLevel(u, BLADESPIN.id2, IMinBJ(4, level // 100 + 1))
             elseif uid == HERO_MASTER_ROGUE then -- instant death level
                 SetUnitAbilityLevel(u, INSTANTDEATH.id, level // 50 + 1)
-                INSTANTDEATH.apply(u, pid)
+                INSTANTDEATH.apply(u)
             end
 
+            -- update backpack level but disable XP gain
             SuspendHeroXP(Backpack[pid], false)
             SetHeroLevel(Backpack[pid], GetHeroLevel(Hero[pid]),false)
             SuspendHeroXP(Backpack[pid], true)

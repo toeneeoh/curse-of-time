@@ -2,6 +2,7 @@ OnInit.final("BardSpells", function(Require)
     Require('Spells')
     Require('SpellTools')
 
+    local TQ = TimerQueue
     local valid_damage_target = VALID_DAMAGE_TARGET
     local valid_pull_target = VALID_PULL_TARGET
     local BARD_SONG = __jarray(0)
@@ -14,15 +15,14 @@ OnInit.final("BardSpells", function(Require)
     }
 
     local function song_periodic(pt)
-        local ug = CreateGroup()
         local pt2 = TimerList[pt.pid]:get(IMPROV.id, nil, pt.caster)
-        MakeGroupInRange(pt.pid, ug, GetUnitX(pt.caster), GetUnitY(pt.caster), 900. * LBOOST[pt.pid], Condition(isalive))
+        MakeGroupInRange(pt.pid, pt.ug, GetUnitX(pt.caster), GetUnitY(pt.caster), 900. * LBOOST[pt.pid], Condition(isalive))
 
         if pt2 then
-            GroupEnumUnitsInRangeEx(pt.pid, ug, pt2.x, pt2.y, pt2.aoe, Condition(isalive))
+            GroupEnumUnitsInRangeEx(pt.pid, pt.ug, pt2.x, pt2.y, pt2.aoe, Condition(isalive))
         end
 
-        for target in each(ug) do
+        for target in each(pt.ug) do
             if IsUnitAlly(target, Player(pt.pid - 1)) then
                 if (BARD_SONG[pt.pid] == SONG_WAR and IsUnitInRange(target, pt.caster, 900.)) or (pt2 and pt2.song == SONG_WAR and IsUnitInRangeXY(target, pt2.x, pt2.y, pt2.aoe)) then
                     SongOfWarBuff:add(pt.caster, target):duration(2.)
@@ -40,7 +40,7 @@ OnInit.final("BardSpells", function(Require)
             end
         end
 
-        pt.timer:callDelayed(1., song_periodic, pt)
+        return true
     end
 
     local songeffect = {} ---@type effect[] 
@@ -52,10 +52,10 @@ OnInit.final("BardSpells", function(Require)
         if pt then
             pt.song = song
         else
-            pt = TimerList[self.pid]:add()
+            pt = TimerList[self.pid]:add('song')
             pt.caster = self.caster
             pt.song = song
-            pt.tag = 'song'
+            pt.ug = CreateGroup()
             pt.onRemove = function(this)
                 BARD_SONG[this.pid] = 0
                 SetPlayerAbilityAvailable(Player(this.pid - 1), SONG_FATIGUE, false)
@@ -65,7 +65,7 @@ OnInit.final("BardSpells", function(Require)
                 DestroyEffect(songeffect[this.pid])
             end
 
-            song_periodic(pt)
+            pt:startLoop(1., song_periodic)
         end
 
         BARD_SONG[self.pid] = song
@@ -222,9 +222,11 @@ OnInit.final("BardSpells", function(Require)
             end
         end
 
-        local manacost = function(u)
-            local pid = GetPlayerId(GetOwningPlayer(u)) + 1
-            BlzSetUnitAbilityManaCost(u, thistype.id, GetUnitAbilityLevel(u, thistype.id) - 1, R2I(thistype.values.cost(pid)))
+        local manacost = function(u, key)
+            if key == "int" or key == "bonus_mana" or key == "bonus_int" then
+                local pid = GetPlayerId(GetOwningPlayer(u)) + 1
+                BlzSetUnitAbilityManaCost(u, thistype.id, GetUnitAbilityLevel(u, thistype.id) - 1, R2I(thistype.cost(pid)))
+            end
         end
 
         function thistype.onLearn(source, ablev, pid)
@@ -248,29 +250,26 @@ OnInit.final("BardSpells", function(Require)
             dur = 20.,
         }
 
-        ---@type fun(pt: PlayerTimer)
+        ---@type fun(pt: PlayerTimer): boolean
         local function periodic(pt)
             pt.time = pt.time + 1.
 
             if pt.time >= pt.dur then
                 BlzSetSpecialEffectScale(pt.sfx, 1.)
                 SetUnitScale(pt.source, 1., 1., 1.)
-                pt:destroy()
             else
-                local ug = CreateGroup()
+                MakeGroupInRange(pt.pid, pt.ug, pt.x, pt.y, pt.aoe, Condition(FilterEnemy))
 
-                MakeGroupInRange(pt.pid, ug, pt.x, pt.y, pt.aoe, Condition(FilterEnemy))
-
-                for target in each(ug) do
+                for target in each(pt.ug) do
                     if ModuloInteger(R2I(pt.time), 2) == 0 then
                         DamageTarget(Hero[pt.pid], target, pt.dmg * BOOST[pt.pid], ATTACK_TYPE_NORMAL, MAGIC, thistype.tag)
                     end
                 end
 
-                DestroyGroup(ug)
-
-                pt.timer:callDelayed(1., periodic, pt)
+                return true
             end
+
+            return false
         end
 
         function thistype:onCast()
@@ -286,6 +285,7 @@ OnInit.final("BardSpells", function(Require)
                 pt.dur = self.dur * LBOOST[self.pid]
                 pt.target = self.caster
                 pt.source = Dummy.create(pt.x, pt.y, 0, 0, pt.dur).unit
+                pt.ug = CreateGroup()
 
                 SetUnitScale(pt.source, 3., 3., 3.)
                 SetUnitOwner(pt.source, Player(PLAYER_TOWN), true)
@@ -296,8 +296,8 @@ OnInit.final("BardSpells", function(Require)
                 --auras for allies
                 if BARD_SONG[self.pid] ~= SONG_FATIGUE then
                     BlzSetAbilityRealLevelField(BlzGetUnitAbility(pt.source, BARD_SONG[self.pid]), ABILITY_RLF_AREA_OF_EFFECT, 0, pt.aoe)
-                    IncUnitAbilityLevel(pt.source, BARD_SONG[self.pid])
-                    DecUnitAbilityLevel(pt.source, BARD_SONG[self.pid])
+                    --IncUnitAbilityLevel(pt.source, BARD_SONG[self.pid])
+                    --DecUnitAbilityLevel(pt.source, BARD_SONG[self.pid])
                 end
 
                 if BARD_SONG[self.pid] == SONG_WAR then
@@ -312,7 +312,7 @@ OnInit.final("BardSpells", function(Require)
 
                 BlzSetSpecialEffectScale(pt.sfx, 4.5)
 
-                pt.timer:callDelayed(1., periodic, pt)
+                pt:startLoop(1., periodic)
             end
         end
     end
@@ -321,26 +321,60 @@ OnInit.final("BardSpells", function(Require)
     INSPIRE = Spell.define("A09Y")
     do
         local thistype = INSPIRE
+        thistype.callback = {}
 
-        function thistype:onCast()
-            InspireBuff:add(self.caster, self.caster)
+        local function buff(object, source, ablev)
+            InspireBuff:add(source, object, ablev):duration(1.1)
         end
 
-        local manacost = function(u)
-            BlzSetUnitAbilityManaCost(u, thistype.id, GetUnitAbilityLevel(u, thistype.id) - 1, R2I(BlzGetUnitMaxMana(u) * 0.02))
+        local function valid_ally(object, source)
+            return IsUnitAlly(object, GetOwningPlayer(source))
+        end
+
+        -- mana cost per second
+        local function periodic(self)
+            local mana = GetUnitState(self.caster, UNIT_STATE_MANA)
+            local cost = BlzGetUnitMaxMana(self.caster) * 0.02
+            SetUnitState(self.caster, UNIT_STATE_MANA, math.max(mana - cost, 0))
+            if mana - cost > 0 then
+                ALICE_ForAllObjectsInRangeDo(buff, GetUnitX(self.caster), GetUnitY(self.caster), 900. * LBOOST[self.pid], "unit", valid_ally, self.caster, self.ablev)
+                thistype.callback[self.pid] = TQ:callDelayed(1, periodic, self)
+            else
+                IssueImmediateOrderById(self.caster, ORDER_ID_UNIMMOLATION)
+                InspireBuff:dispel(self.caster, self.caster)
+            end
+        end
+
+        function thistype:onCast()
+            thistype.callback[self.pid] = TQ:callDelayed(1, periodic, self)
+        end
+
+        local manacost = function(u, key)
+            if key == "int" or key == "bonus_mana" or key == "bonus_int" then
+                BlzSetUnitAbilityManaCost(u, thistype.id, GetUnitAbilityLevel(u, thistype.id) - 1, R2I(BlzGetUnitMaxMana(u) * 0.02))
+            end
         end
 
         local function on_order(source, target, id)
             if id == ORDER_ID_UNIMMOLATION then
                 if IsUnitPaused(source) == false and IsUnitLoaded(source) == false then
+                    local pid = GetPlayerId(GetOwningPlayer(source)) + 1
                     InspireBuff:dispel(source, source)
+                    TQ:disableCallback(thistype.callback[pid])
                 end
             end
+        end
+
+        local function on_cleanup(pid)
+            TQ:disableCallback(thistype.callback[pid])
+            thistype.callback[pid] = nil
+            EVENT_ON_CLEANUP:unregister_action(pid, on_cleanup)
         end
 
         function thistype.onLearn(source, ablev, pid)
             EVENT_STAT_CHANGE:register_unit_action(source, manacost)
             EVENT_ON_ORDER:register_unit_action(source, on_order)
+            EVENT_ON_CLEANUP:register_action(pid, on_cleanup)
         end
     end
 
@@ -447,8 +481,10 @@ OnInit.final("BardSpells", function(Require)
             TimerQueue:callDelayed(FPS_32, pull, missile)
         end
 
-        local manacost = function(u)
-            BlzSetUnitAbilityManaCost(u, thistype.id, GetUnitAbilityLevel(u, thistype.id) - 1, R2I(BlzGetUnitMaxMana(u) * 0.2))
+        local manacost = function(u, key)
+            if key == "int" or key == "bonus_mana" or key == "bonus_int" then
+                BlzSetUnitAbilityManaCost(u, thistype.id, GetUnitAbilityLevel(u, thistype.id) - 1, R2I(BlzGetUnitMaxMana(u) * 0.2))
+            end
         end
 
         function thistype.onLearn(source, ablev, pid)

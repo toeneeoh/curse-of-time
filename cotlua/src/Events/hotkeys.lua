@@ -258,7 +258,7 @@ OnInit.final("Hotkeys", function(Require)
         local base = key_string
 
         -- split off any single prefix "SHIFT+" / "CTRL+" / "ALT+"
-        local prefix, rest = key_string:match("(\x25a+)+?(.+)")
+        local prefix, rest = key_string:match("(%a+)+?(.+)")
         if     prefix == "SHIFT" then meta_bits = meta_shift; base = rest
         elseif prefix == "CTRL"  then meta_bits = meta_ctrl;  base = rest
         elseif prefix == "ALT"   then meta_bits = meta_alt;   base = rest

@@ -12,20 +12,23 @@ OnInit.final("PhoenixRangerSpells", function(Require)
         local thistype = MULTISHOT
         thistype.enabled = setmetatable({}, {__mode = 'k'}) -- weak keys for units
 
-        local function on_order(source, target, id)
-            local p = GetOwningPlayer(source)
+        local multi_shot_ability = FourCC('A0A3')
 
+        local function on_order(source, target, id)
+            -- toggle on
             if id == ORDER_ID_IMMOLATION then
                 if not thistype.enabled[source] then
-                    SetPlayerAbilityAvailable(p, prMulti[IMinBJ(5, GetHeroLevel(source) // 50)], true)
+                    UnitRemoveAbility(source, multi_shot_ability)
+                    UnitAddAbility(source, multi_shot_ability)
+                    SetUnitAbilityLevel(source, multi_shot_ability, (GetHeroLevel(source) // 50) + 1)
+                    BlzUnitHideAbility(source, multi_shot_ability, true)
                     thistype.enabled[source] = true
                     Unit[source].pm = Unit[source].pm * 0.6
                 end
+            -- toggle off
             elseif id == ORDER_ID_UNIMMOLATION then
                 if thistype.enabled[source] then
-                    for i = 0, 5 do
-                        SetPlayerAbilityAvailable(p, prMulti[i], false)
-                    end
+                    UnitRemoveAbility(source, multi_shot_ability)
                     thistype.enabled[source] = false
                     Unit[source].pm = Unit[source].pm / 0.6
                 end
@@ -113,10 +116,10 @@ OnInit.final("PhoenixRangerSpells", function(Require)
                     DestroyEffect(AddSpecialEffectTarget("Abilities\\Weapons\\PhoenixMissile\\Phoenix_Missile.mdl", enemy, "chest"))
                     DamageTarget(self.source, enemy, self.damage * BOOST[self.pid], ATTACK_TYPE_NORMAL, MAGIC, thistype.tag)
 
-                    local b = IgniteDebuff:get(nil, enemy)
+                    local b = BurningDebuff:get(nil, enemy)
                     if b then
                         b:dispel()
-                        SEARINGARROWS.ignite(self.source, enemy)
+                        IgniteDebuff:add(self.source, enemy):duration(5.)
                     end
                 end
             },
@@ -174,10 +177,10 @@ OnInit.final("PhoenixRangerSpells", function(Require)
                 DamageTarget(source, target, (((UnitGetBonus(source, BONUS_DAMAGE) + GetHeroAgi(source, true)) * .3 + GetHeroAgi(source, true) * ablev)) * BOOST[pid], ATTACK_TYPE_NORMAL, MAGIC, thistype.tag)
                 DestroyEffect(AddSpecialEffect("Abilities\\Weapons\\PhoenixMissile\\Phoenix_Missile.mdl", GetUnitX(target),GetUnitY(target)))
 
-                local b = IgniteDebuff:get(nil, target)
+                local b = BurningDebuff:get(nil, target)
                 if b then
                     b:dispel()
-                    SEARINGARROWS.ignite(source, target)
+                    IgniteDebuff:add(source, target):duration(5.)
                 end
             end
         end
@@ -189,8 +192,6 @@ OnInit.final("PhoenixRangerSpells", function(Require)
     end
 
     ---@class SEARINGARROWS : Spell
-    ---@field ignite function
-    ---@field burn function
     ---@field aoe number
     ---@field dmg function
     ---@field dot function
@@ -203,34 +204,6 @@ OnInit.final("PhoenixRangerSpells", function(Require)
             dmg = function(pid) return Unit[Hero[pid]].damage end,
             dot = function(pid) local ablev = GetUnitAbilityLevel(Hero[pid], thistype.id) return (0.05 + ablev * 0.05) * (Unit[Hero[pid]].damage) end,
         }
-
-        ---@type fun(pt: PlayerTimer)
-        local function burn(pt)
-            pt.dur = pt.dur - 1
-
-            if pt.dur >= 0 then
-                DamageTarget(pt.source, pt.target, pt.dmg, ATTACK_TYPE_NORMAL, MAGIC, thistype.tag)
-                pt.timer:callDelayed(1., burn, pt)
-            else
-                pt:destroy()
-            end
-        end
-
-        ---@type fun(source: unit, target: unit)
-        function thistype.ignite(source, target)
-            local pid = GetPlayerId(GetOwningPlayer(source)) + 1
-            local pt = TimerList[pid]:add()
-
-            local sfx = AddSpecialEffectTarget("war3mapImported\\Real Fire2.mdx", target, "origin")
-            TimerQueue:callDelayed(5., DestroyEffect, sfx)
-
-            pt.dmg = thistype.dot(pid) * BOOST[pid]
-            pt.dur = 5.
-            pt.source = source
-            pt.target = target
-
-            pt.timer:callDelayed(1., burn, pt)
-        end
 
         local missile_template = {
             selfInteractions = {
@@ -248,7 +221,7 @@ OnInit.final("PhoenixRangerSpells", function(Require)
             arc = 0.65,
             onUnitCollision = CAT_UnitImpact3D,
             onUnitCallback = function(self, enemy)
-                IgniteDebuff:add(self.source, enemy):duration(5.)
+                BurningDebuff:add(self.source, enemy):duration(5.)
                 DamageTarget(self.source, enemy, self.damage, ATTACK_TYPE_NORMAL, MAGIC, thistype.tag)
             end,
         }

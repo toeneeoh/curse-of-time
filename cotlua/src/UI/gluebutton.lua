@@ -7,6 +7,8 @@
 OnInit.final("Gluebutton", function(Require)
     Require('TimerQueue')
 
+    local TQ = TimerQueue
+
     local TOOLTIP_SIZE       = 0.2 ---@type number 
     local SCROLL_DELAY       = 0.01 ---@type number 
     local DOUBLE_CLICK_DELAY = 0.25 ---@type number 
@@ -25,6 +27,7 @@ OnInit.final("Gluebutton", function(Require)
     ---@field pointType framepointtype
     ---@field create function
     ---@field destroy function
+    ---@field visible function
     Tooltip = {}
     do
         local thistype = Tooltip
@@ -85,15 +88,17 @@ OnInit.final("Gluebutton", function(Require)
             return self.widthSize
         end
 
-        ---@type fun(self: Tooltip, newPoint: framepointtype):framepointtype
-        function thistype:point(newPoint)
+        ---@type fun(self: Tooltip, newPoint: framepointtype, secondPoint: framepointtype?, x: number?, y: number?): framepointtype
+        function thistype:point(newPoint, secondPoint, x, y)
             if newPoint ~= nil then
                 self.pointType = newPoint
 
                 if not self.simple then
                     BlzFrameClearAllPoints(self.tooltip)
 
-                    if newPoint == FRAMEPOINT_TOPLEFT then
+                    if secondPoint then
+                        BlzFrameSetPoint(self.tooltip, newPoint, self.parent, secondPoint, x or 0., y or 0.)
+                    elseif newPoint == FRAMEPOINT_TOPLEFT then
                         BlzFrameSetPoint(self.tooltip, newPoint, self.parent, FRAMEPOINT_TOPRIGHT, 0.005, -0.05)
                     elseif newPoint == FRAMEPOINT_TOPRIGHT then
                         BlzFrameSetPoint(self.tooltip, newPoint, self.parent, FRAMEPOINT_TOPLEFT, -0.005, -0.05)
@@ -216,6 +221,7 @@ OnInit.final("Gluebutton", function(Require)
     ---@field charge function
     ---@field cooldown function
     ---@field use_cooldowns function
+    ---@field use_click_placeholder function
     Button = {}
     do
         local thistype = Button
@@ -386,37 +392,78 @@ OnInit.final("Gluebutton", function(Require)
 
         local FPS_32 = FPS_32
         local format = string.format
+        local Player = Player
 
-        local function cooldown_periodic(self, total_time, pid)
-            local p = GetLocalPlayer()
-            if self.cooldown_time[pid] <= 0 then
-                if p == Player(pid - 1) then
-                    BlzFrameSetVisible(self.cooldownFrame, false)
-                end
-            else
-                if p == Player(pid - 1) then
-                    BlzFrameSetText(self.cooldownText, format("\x25.1f", self.cooldown_time[pid]))
-                    BlzFrameSetValue(self.cooldownFrame, 100 - (self.cooldown_time[pid] / total_time) * 100)
-                end
-                self.cooldown_time[pid] = self.cooldown_time[pid] - FPS_32
-
-                TimerQueue:callDelayed(FPS_32, cooldown_periodic, self, total_time, pid)
+        local function format_cooldown(t)
+            if t < 10 then
+                return format("%.1f", t)
             end
+
+            return tostring(R2I(t))
+        end
+
+        local function update_cooldown_ui(self, pid, remaining, total_time)
+            if GetLocalPlayer() ~= Player(pid - 1) then
+                return
+            end
+
+            if remaining <= 0 then
+                BlzFrameSetVisible(self.cooldownFrame, false)
+                return
+            end
+
+            BlzFrameSetText(self.cooldownText, format_cooldown(remaining))
+            -- 0 to 100 as cooldown progresses
+            BlzFrameSetValue(self.cooldownFrame, 100 - (remaining / total_time) * 100)
+        end
+
+        local function cooldown_tick(self, total_time, pid)
+            local remaining = (self.cooldown_time[pid] or 0) - FPS_32
+            self.cooldown_time[pid] = remaining
+
+            if remaining <= 0 then
+                update_cooldown_ui(self, pid, 0, total_time)
+                self.cooldown_callback[pid] = nil
+                return
+            end
+
+            update_cooldown_ui(self, pid, remaining, total_time)
+            self.cooldown_callback[pid] = TQ:callDelayed(FPS_32, cooldown_tick, self, total_time, pid)
+        end
+
+        local on_click_placeholder = function()
+            local f = BlzGetTriggerFrame()
+
+            BlzFrameSetEnable(f, false)
+            BlzFrameSetEnable(f, true)
+        end
+
+        function thistype:use_click_placeholder()
+            self:onClick(on_click_placeholder)
         end
 
         function thistype:use_cooldowns()
             self.cooldown_time = __jarray(0)
+            self.cooldown_callback = {}
         end
 
-        function thistype:cooldown(time, pid)
-            self.cooldown_time[pid] = time
-            if GetLocalPlayer() == Player(pid - 1) then
-                BlzFrameSetText(self.cooldownText, format("\x25.1f", tostring(time)))
-                BlzFrameSetValue(self.cooldownFrame, 0)
-                BlzFrameSetVisible(self.cooldownFrame, true)
+        function thistype:cooldown(time, pid, total_time)
+            total_time = total_time or time
+
+            local cb = self.cooldown_callback[pid]
+            if cb then
+                TQ:disableCallback(cb)
             end
 
-            TimerQueue:callDelayed(FPS_32, cooldown_periodic, self, time, pid)
+            self.cooldown_time[pid] = time
+
+            -- immediate ui update for the first frame
+            update_cooldown_ui(self, pid, time, total_time)
+
+            if GetLocalPlayer() == Player(pid - 1) then
+                BlzFrameSetVisible(self.cooldownFrame, true)
+            end
+            self.cooldown_callback[pid] = TQ:callDelayed(FPS_32, cooldown_tick, self, total_time, pid)
         end
 
         ---@param model string
@@ -498,6 +545,8 @@ OnInit.final("Gluebutton", function(Require)
             BlzFrameSetVisible(self.cooldownFrame, false)
             BlzFrameSetPoint(self.cooldownText, FRAMEPOINT_CENTER, self.iconFrame, FRAMEPOINT_CENTER, 0., 0.)
             BlzFrameSetScale(self.cooldownText, 1.5)
+            BlzFrameSetEnable(self.cooldownFrame, false)
+            BlzFrameSetEnable(self.cooldownText, false)
 
             BlzFrameSetPoint(self.chargeFrame, FRAMEPOINT_BOTTOMRIGHT, self.iconFrame, FRAMEPOINT_BOTTOMRIGHT, -0.003, 0.003)
             BlzFrameSetSize(self.chargeFrame, width * 0.35, height * 0.35)
