@@ -79,7 +79,7 @@ OnInit.final("UnitTable", function(Require)
     ---@field proxy table
     ---@field hidehp boolean
     ---@field busy boolean
-    ---@field casting boolean
+    ---@field _casting boolean
     ---@field aggro_timer integer
     ---@field boss Boss
     ---@field nomanaregen boolean
@@ -103,10 +103,6 @@ OnInit.final("UnitTable", function(Require)
             -- make keys weak for when units are removed
             __mode = 'k'
         })
-
-        local function finish_cast(self)
-            self.casting = false
-        end
 
         local function recalc_armor(tbl)
             local u = tbl.unit
@@ -302,11 +298,6 @@ OnInit.final("UnitTable", function(Require)
                     BlzSetUnitWeaponBooleanField(tbl.unit, UNIT_WEAPON_BF_ATTACKS_ENABLED, 0, val)
                 end
             end,
-            cast_time = function(tbl, val)
-                tbl.casting = true
-
-                TQ:callDelayed(val, finish_cast, tbl)
-            end,
             hidehp = function(tbl, val)
                 if GetMainSelectedUnit() == tbl.unit then
                     BlzFrameSetVisible(HIDE_HEALTH_FRAME, val)
@@ -381,7 +372,7 @@ OnInit.final("UnitTable", function(Require)
             self.id = GetUnitTypeId(u)
             self.unit = u
             self.attackCount = 0
-            self.casting = false
+            self._casting = false
             self.can_attack = true
             self.base_hp = BlzGetUnitMaxHP(u)
             self.base_mana = BlzGetUnitMaxMana(u)
