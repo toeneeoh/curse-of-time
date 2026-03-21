@@ -11,6 +11,9 @@ OnInit.final("Items", function(Require)
     Require('Inventory')
     Require('ItemLookup')
 
+    local get_widget_life, get_unit_state, set_widget_life, set_unit_state = GetWidgetLife, GetUnitState, SetWidgetLife, SetUnitState
+    local ItemData = ItemData
+
     local shop_prices = {
         [FourCC('I00O')] = 80,
         [FourCC('I01T')] = 15000,
@@ -64,7 +67,7 @@ OnInit.final("Items", function(Require)
     ---@type fun(itm: Item)
     ---@return number total, number gold, number plat
     function GetItemSellPrice(itm)
-        local total = itm:getValue(ITEM_COST, 0) // 2
+        local total = itm.cached_stats[ITEM_COST] // 2
 
         if total == 0 then
             total = shop_prices[itm.id] and shop_prices[itm.id] // 2 or 0
@@ -78,6 +81,94 @@ OnInit.final("Items", function(Require)
 
     local floor = math.floor
     local log = math.log
+
+    -- per-stat applicators
+    -- sig: applier(unit, mult, value, mod, self_item)
+    local STAT_APPLIERS = {}
+
+    STAT_APPLIERS[ITEM_ARMOR] = function(unit, mult, value, mod)
+        unit.bonus_armor = unit.bonus_armor + mult * floor(mod * value)
+    end
+
+    STAT_APPLIERS[ITEM_DAMAGE] = function(unit, mult, value, mod)
+        unit.bonus_damage = unit.bonus_damage + mult * floor(mod * value)
+    end
+
+    STAT_APPLIERS[ITEM_HEALTH] = function(unit, mult, value, mod)
+        unit.bonus_hp = unit.bonus_hp + mult * floor(mod * value)
+    end
+
+    STAT_APPLIERS[ITEM_MANA] = function(unit, mult, value, mod)
+        unit.bonus_mana = unit.bonus_mana + mult * floor(mod * value)
+    end
+
+    STAT_APPLIERS[ITEM_STRENGTH] = function(unit, mult, value, mod)
+        unit.bonus_str = unit.bonus_str + mult * floor(mod * value)
+    end
+
+    STAT_APPLIERS[ITEM_AGILITY] = function(unit, mult, value, mod)
+        unit.bonus_agi = unit.bonus_agi + mult * floor(mod * value)
+    end
+
+    STAT_APPLIERS[ITEM_INTELLIGENCE] = function(unit, mult, value, mod)
+        unit.bonus_int = unit.bonus_int + mult * floor(mod * value)
+    end
+
+    STAT_APPLIERS[ITEM_GOLD_GAIN] = function(unit, mult, value)
+        unit.gold_rate = unit.gold_rate + mult * value
+    end
+
+    STAT_APPLIERS[ITEM_SPELLBOOST] = function(unit, mult, value)
+        unit.spellboost = unit.spellboost + mult * value * 0.01
+    end
+
+    STAT_APPLIERS[ITEM_MOVESPEED] = function(unit, mult, value)
+        unit.ms_flat = unit.ms_flat + mult * value
+    end
+
+    STAT_APPLIERS[ITEM_REGENERATION] = function(unit, mult, value)
+        unit.regen_flat = unit.regen_flat + mult * value
+    end
+
+    STAT_APPLIERS[ITEM_EVASION] = function(unit, mult, value)
+        unit.evasion = unit.evasion + mult * value
+    end
+
+    STAT_APPLIERS[ITEM_CRIT_CHANCE] = function(unit, mult, value)
+        unit.cc_flat = unit.cc_flat + mult * value
+    end
+
+    STAT_APPLIERS[ITEM_CRIT_DAMAGE] = function(unit, mult, value)
+        unit.cd_flat = unit.cd_flat + mult * value
+    end
+
+    -- multiplicative / special ones
+    STAT_APPLIERS[ITEM_MAGIC_RESIST] = function(unit, mult, value)
+        local factor = 1 - value * 0.01
+        if mult > 0 then
+            unit.mr = unit.mr * factor
+        else
+            unit.mr = unit.mr / factor
+        end
+    end
+
+    STAT_APPLIERS[ITEM_DAMAGE_RESIST] = function(unit, mult, value)
+        local factor = 1 - value * 0.01
+        if mult > 0 then
+            unit.dr = unit.dr * factor
+        else
+            unit.dr = unit.dr / factor
+        end
+    end
+
+    STAT_APPLIERS[ITEM_BASE_ATTACK_SPEED] = function(unit, mult, value)
+        local factor = 1. + value * 0.01
+        if mult > 0 then
+            unit.bonus_bat = unit.bonus_bat / factor
+        else
+            unit.bonus_bat = unit.bonus_bat * factor
+        end
+    end
 
     CHURCH_DONATION   = {} ---@type boolean[] 
     RECHARGE_COOLDOWN = __jarray(0) ---@type timer[] 
@@ -117,7 +208,7 @@ OnInit.final("Items", function(Require)
     ---@field quality integer[]
     ---@field eval conditionfunc
     ---@field consumeCharge function
-    ---@field getValue function
+    ---@field calculateValue function
     ---@field equip function
     ---@field drop function
     ---@field update function
@@ -144,6 +235,7 @@ OnInit.final("Items", function(Require)
     ---@field abil integer
     ---@field info function
     ---@field abilities table
+    ---@field cache_stats function
     Item = {} ---@type Item|Item[]
     do
         local thistype = Item
@@ -211,7 +303,7 @@ OnInit.final("Items", function(Require)
             }, mt)
 
             -- first time setup
-            if ItemData[self.id][ITEM_TOOLTIP] == 0 then
+            if ItemData[self.id].tooltip == 0 then
                 -- if an item's description exists, use that for parsing (exception for default shops)
                 ParseItemTooltip(self.obj, ((BlzGetItemDescription(self.obj):len()) > 1 and BlzGetItemDescription(self.obj)) or "")
             end
@@ -261,6 +353,8 @@ OnInit.final("Items", function(Require)
 
             if ItemData[self.id][ITEM_TIER] ~= 0 then
                 self:update()
+            else
+                self:cache_stats()
             end
 
             Item[self.obj] = self
@@ -355,7 +449,7 @@ OnInit.final("Items", function(Require)
                 if ItemData[self.id][i] ~= 0 and STAT_TAG[i] then
                     s = STAT_TAG[i].item_suffix or STAT_TAG[i].suffix or ""
 
-                    DisplayTimedTextToPlayer(p, 0, 0, 15., (STAT_TAG[i].tag or "") .. ": " .. RealToString(self:getValue(i, 0)) .. s)
+                    DisplayTimedTextToPlayer(p, 0, 0, 15., (STAT_TAG[i].tag or "") .. ": " .. RealToString(self.cached_stats[i]) .. s)
                 end
             end
 
@@ -364,6 +458,7 @@ OnInit.final("Items", function(Require)
             end
         end
 
+
         local function apply_item_stats(self, mult)
             if not self.holder then
                 return
@@ -371,48 +466,35 @@ OnInit.final("Items", function(Require)
 
             local u = Hero[self.pid]
             local unit = Unit[u]
-            local hp   = GetWidgetLife(u) ---@type number 
-            local mana = GetUnitState(u, UNIT_STATE_MANA) ---@type number 
+            local hp   = get_widget_life(u) ---@type number 
+            local mana = get_unit_state(u, UNIT_STATE_MANA) ---@type number 
             local mod  = ItemProfMod(self.id, self.pid) ---@type number 
+            local cs = self.cached_stats
 
-            unit.bonus_armor = unit.bonus_armor + mult * floor(mod * self:getValue(ITEM_ARMOR, 0))
-            unit.bonus_damage = unit.bonus_damage + mult * floor(mod * self:getValue(ITEM_DAMAGE, 0))
-            unit.bonus_hp = unit.bonus_hp + mult * floor(mod * self:getValue(ITEM_HEALTH, 0))
-            unit.bonus_mana = unit.bonus_mana + mult * floor(mod * self:getValue(ITEM_MANA, 0))
-            unit.bonus_str = unit.bonus_str + mult * floor(mod * self:getValue(ITEM_STRENGTH, 0))
-            unit.bonus_agi = unit.bonus_agi + mult * floor(mod * self:getValue(ITEM_AGILITY, 0))
-            unit.bonus_int = unit.bonus_int + mult * floor(mod * self:getValue(ITEM_INTELLIGENCE, 0))
+            unit.suppress_stat_events = true
 
-            SetWidgetLife(u, math.max(1, hp))
-            SetUnitState(u, UNIT_STATE_MANA, mana)
+            -- apply stats with cooresponding appliers
+            for i = 1, TOTAL_STATS do
+                local s = STAT_APPLIERS[i]
 
-            unit.gold_rate = unit.gold_rate + mult * self:getValue(ITEM_GOLD_GAIN, 0)
-            unit.spellboost = unit.spellboost + mult * self:getValue(ITEM_SPELLBOOST, 0) * 0.01
-            unit.ms_flat = unit.ms_flat + mult * self:getValue(ITEM_MOVESPEED, 0)
-            unit.regen_flat = unit.regen_flat + mult * self:getValue(ITEM_REGENERATION, 0)
-            unit.evasion = unit.evasion + mult * self:getValue(ITEM_EVASION, 0)
-            unit.cc_flat = unit.cc_flat + mult * self:getValue(ITEM_CRIT_CHANCE, 0)
-            unit.cd_flat = unit.cd_flat + mult * self:getValue(ITEM_CRIT_DAMAGE, 0)
-
-            -- exceptions
-            if mult > 0 then
-                unit.mr = unit.mr * (1 - self:getValue(ITEM_MAGIC_RESIST, 0) * 0.01)
-                unit.dr = unit.dr * (1 - self:getValue(ITEM_DAMAGE_RESIST, 0) * 0.01)
-                unit.bonus_bat = unit.bonus_bat / (1. + self:getValue(ITEM_BASE_ATTACK_SPEED, 0) * 0.01)
-
-                -- profiency warning
-                if GetHeroLevel(u) < 15 and mod < 1 then
-                    DisplayTimedTextToPlayer(self.owner, 0, 0, 10, "You lack the proficiency (-pf) to use this item, therefore it only gives 75% of most stats.\n|cffFF0000You will stop getting this warning at level 15.|r")
+                if s and cs[i] ~= 0 then
+                    s(unit, mult, cs[i], mod)
                 end
-            else
-                unit.mr = unit.mr / (1 - self:getValue(ITEM_MAGIC_RESIST, 0) * 0.01)
-                unit.dr = unit.dr / (1 - self:getValue(ITEM_DAMAGE_RESIST, 0) * 0.01)
-                unit.bonus_bat = unit.bonus_bat * (1. + self:getValue(ITEM_BASE_ATTACK_SPEED, 0) * 0.01)
             end
+
+            set_widget_life(u, math.max(1, hp))
+            set_unit_state(u, UNIT_STATE_MANA, mana)
 
             -- shield
             if ItemData[self.id][ITEM_TYPE] == 5 then
-                unit.shield_count = unit.shield_count + mult * 1
+                unit.shield_count = unit.shield_count + mult
+            end
+
+            unit.suppress_stat_events = false
+
+            -- profiency warning
+            if GetHeroLevel(u) < 15 and mult > 0 and mod < 1 then
+                DisplayTimedTextToPlayer(self.owner, 0, 0, 10, "You lack the proficiency (-pf) to use this item, therefore it only gives 75% of most stats.\n|cffFF0000You will stop getting this warning at level 15.|r")
             end
         end
 
@@ -462,7 +544,7 @@ OnInit.final("Items", function(Require)
                     -- generate item spell dummy
                     if not itm.abilities[index] then
                         local dummy
-                        local desc = ParseItemAbilityTooltip(itm, index, itm:getValue(index))
+                        local desc = ParseItemAbilityTooltip(itm, index, itm.cached_stats[index])
                         if backpack_allowed[abilid] then
                             dummy = MakeDummyCastItem(Backpack[itm.pid])
                             desc = desc .. "\n|cffffcc00This ability may be used from your backpack.|r"
@@ -484,7 +566,7 @@ OnInit.final("Items", function(Require)
                             -- if onequip returns true, dont allocate real fields
                             if not Spells[abilid].onEquip(itm, abilid, index) then
                                 local ab = BlzGetItemAbility(dummy, abilid)
-                                BlzSetAbilityRealLevelField(ab, SPELL_FIELD[0], 0, itm:getValue(index, 0))
+                                BlzSetAbilityRealLevelField(ab, SPELL_FIELD[0], 0, itm.cached_stats[index])
                                 for i = 1, SPELL_FIELD_TOTAL do
                                     local v = ItemData[itm.id][index .. "data" .. i]
                                     if v ~= 0 then
@@ -522,29 +604,39 @@ OnInit.final("Items", function(Require)
             end
         end
 
-        -- Gets the value of a stat from an item, 0 = actual, 1 = lower, 2 = upper
+        function Item:cache_stats()
+            self.cached_stats = self.cached_stats or {}
+
+            for i = 1, TOTAL_STATS do
+                self.cached_stats[i] = self:calculateValue(i)
+            end
+        end
+
+        -- Calculates the value of a stat given the formula in the tooltip
+        -- 1 = lower, 2 = upper
         ---@type fun(self: Item, STAT: integer, flag: integer): number
-        function Item:getValue(STAT, flag)
-            local unlockat = ItemData[self.id][STAT .. "unlock"] ---@type number 
+        function Item:calculateValue(STAT, flag)
+            local tbl = ItemData[self.id]
+            local unlockat = tbl[STAT .. "unlock"] ---@type number 
 
             if self.level < unlockat then
                 return 0
             end
 
-            local flatPerLevel  = ItemData[self.id][STAT .. "fpl"] ---@type number 
-            local flatPerRarity = ItemData[self.id][STAT .. "fpr"] ---@type number 
-            local percent       = ItemData[self.id][STAT .. "percent"] ---@type number 
-            local fixed         = ItemData[self.id][STAT .. "fixed"] ---@type number 
-            local lower         = ItemData[self.id][STAT]  ---@type number 
-            local upper         = ItemData[self.id][STAT .. "range"]  ---@type number 
+            local flatPerLevel  = tbl[STAT .. "fpl"] ---@type number 
+            local flatPerRarity = tbl[STAT .. "fpr"] ---@type number 
+            local percent       = tbl[STAT .. "percent"] ---@type number 
+            local fixed         = tbl[STAT .. "fixed"] ---@type number 
+            local lower         = tbl[STAT]  ---@type number 
+            local upper         = tbl[STAT .. "range"]  ---@type number 
             local hasVariance   = (upper ~= 0) ---@type boolean 
             local pmult         = (percent ~= 0 and percent * 0.01) or 1 ---@type number
 
-            --calculate values after applying affixes
+            -- calculate values after applying affixes
             lower = lower + ((flatPerLevel * self.level + flatPerRarity * (math.max(self.level - 1, 0) // 4)) * pmult)
             upper = upper + ((flatPerLevel * self.level + flatPerRarity * (math.max(self.level - 1, 0) // 4)) * pmult)
 
-            --values are not fixed
+            -- values are not fixed
             if fixed == 0 then
                 lower = lower + lower * ITEM_STAT_MULTIPLIER[self.level] * pmult
                 upper = upper + upper * ITEM_STAT_MULTIPLIER[self.level] * pmult
@@ -560,7 +652,7 @@ OnInit.final("Items", function(Require)
                 if hasVariance then
                     local count = 1
 
-                    --find the quality index
+                    -- find the quality index
                     for index = 0, STAT - 1 do
                         if ItemData[self.id][index .. "range"] ~= 0 then
                             count = count + 1
@@ -572,7 +664,7 @@ OnInit.final("Items", function(Require)
                     final = lower
                 end
 
-                --round to nearest 10s
+                -- round to nearest 10s
                 if final >= 1000 then
                     final = (final + 5) // 10 * 10
                 end
@@ -583,7 +675,7 @@ OnInit.final("Items", function(Require)
 
         local function remove_item_ability(self, abil, index)
             if self and (not self.holder or (not backpack_allowed[abil.id] and self.holder == Backpack[self.pid])) then
-                SetWidgetLife(abil.obj, 1.)
+                set_widget_life(abil.obj, 1.)
                 RemoveItem(abil.obj)
                 self.abilities[index] = nil
             end
@@ -711,7 +803,7 @@ OnInit.final("Items", function(Require)
                 local items = Profile[self.pid].hero.items
 
                 -- if item is stackable
-                local stack = self:getValue(ITEM_STACK, 0)
+                local stack = self.cached_stats[ITEM_STACK]
                 if stack > 1 then
                     self:stack(self.pid, stack)
                 end
@@ -726,8 +818,6 @@ OnInit.final("Items", function(Require)
                 -- determine whether to add or remove stats
                 if not self.equipped and slot <= 6 then
                     self.equipped = true
-
-                    apply_item_stats(self, 1)
 
                     -- bind item
                     if SAVE_TABLE.KEY_ITEMS[self.id] then
@@ -748,6 +838,8 @@ OnInit.final("Items", function(Require)
                 SetItemVisible(self.obj, false)
 
                 INVENTORY.refresh(self.pid)
+
+                -- TODO: use item equipped event
                 Shop.refresh(self.pid)
 
                 return true
@@ -777,11 +869,11 @@ OnInit.final("Items", function(Require)
         parse_item_stat[ITEM_ABILITY2] = parse_item_stat[ITEM_ABILITY]
 
         function thistype:update()
-            local orig    = ItemData[self.id][ITEM_TOOLTIP] ---@type string 
-            local norm_new   = "" ---@type string 
-            local alt_new = "" ---@type string 
+            local orig     = ItemData[self.id].tooltip ---@type string 
+            local norm_new = ""
+            local alt_new  = ""
 
-            --first "header" lines: rarity, upg level, tier, type, req level
+            -- first "header" lines: rarity, upg level, tier, type, req level
             if self.level > 0 then
                 norm_new = norm_new .. (LEVEL_PREFIX[self.level])
 
@@ -801,14 +893,19 @@ OnInit.final("Items", function(Require)
             norm_new = norm_new .. "|n"
             alt_new = norm_new
 
-            --body stats
-            for index = 1, ITEM_ABILITY2 do
-                local value = self:getValue(index, 0)
+            -- cache stats
+            self:cache_stats()
 
-                --write non-zero stats
+            local cs = self.cached_stats
+
+            -- body stats
+            for index = 1, ITEM_ABILITY2 do
+                local value = cs[index]
+
+                -- write non-zero stats
                 if value ~= 0 then
-                    local lower = self:getValue(index, 1)
-                    local upper = self:getValue(index, 2)
+                    local lower = self:calculateValue(index, 1)
+                    local upper = self:calculateValue(index, 2)
                     local valuestr = tostring(value)
                     local posneg = "+ |cffffcc00"
 
@@ -835,8 +932,8 @@ OnInit.final("Items", function(Require)
                 end
             end
 
-            --flavor text
-            --remove bracket pairs, extra spaces, and extra newlines
+            -- flavor text
+            -- remove bracket pairs, extra spaces, and extra newlines
             orig = "|n" .. orig:gsub("(%b[]%s*)", "")
             orig = (orig:len() > 5 and ("|n" .. orig)) or ""
 
@@ -958,7 +1055,7 @@ OnInit.final("Items", function(Require)
 
             -- proper removal
             DestroyTrigger(self.trig)
-            SetWidgetLife(self.obj, 1.)
+            set_widget_life(self.obj, 1.)
             RemoveItem(self.obj)
         end
 
@@ -1117,8 +1214,8 @@ function UpgradeItem()
         dw:destroy()
 
         if itm then
-            local goldCost = ModuloInteger(itm:getValue(ITEM_COST, 0), 1000000)
-            local platCost = itm:getValue(ITEM_COST, 0) // 1000000
+            local goldCost = ModuloInteger(itm.cached_stats[ITEM_COST], 1000000)
+            local platCost = itm.cached_stats[ITEM_COST] // 1000000
             local crystalCost = CRYSTAL_PRICE[itm.level]
             local s = "Upgrade cost: |n" ---@type string 
 
