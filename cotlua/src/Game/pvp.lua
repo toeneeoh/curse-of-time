@@ -26,7 +26,7 @@ OnInit.final("PVP", function(Require)
             BlzFrameSetVisible(exit_button.frame, false)
         end
 
-        MoveHeroLoc(pid, TOWN_CENTER)
+        MoveHero(pid, TOWN_CENTER_X, TOWN_CENTER_Y)
         ArenaQueue[pid] = 0
         TableRemove(Arena[ARENA_FFA], pid)
 
@@ -123,7 +123,7 @@ OnInit.final("PVP", function(Require)
                 PauseUnit(Hero[U.id], false)
                 UnitRemoveAbility(Hero[U.id], FourCC('Avul'))
                 SetUnitAnimation(Hero[U.id], "stand")
-                MoveHeroLoc(U.id, TOWN_CENTER)
+                MoveHero(U.id, TOWN_CENTER_X, TOWN_CENTER_Y)
             end
 
             U = U.next
@@ -210,7 +210,7 @@ OnInit.final("PVP", function(Require)
             local pid = GetPlayerId(GetOwningPlayer(killed)) + 1
             TableRemove(Arena[arena], pid)
             SetUnitAnimation(killed, "stand")
-            MoveHeroLoc(pid, TOWN_CENTER)
+            MoveHero(pid, TOWN_CENTER_X, TOWN_CENTER_Y)
             SetWidgetLife(killed, BlzGetUnitMaxHP(killed))
             ArenaQueue[pid] = 0
             TimerQueue:callDelayed(2., unpause_arena, pid)
@@ -218,7 +218,7 @@ OnInit.final("PVP", function(Require)
             for _, pid in ipairs(Arena[arena]) do
                 SetUnitAnimation(Hero[pid], "stand")
                 SetWidgetLife(Hero[pid], BlzGetUnitMaxHP(Hero[pid]))
-                MoveHeroLoc(pid, TOWN_CENTER)
+                MoveHero(pid, TOWN_CENTER_X, TOWN_CENTER_Y)
                 ArenaQueue[pid] = 0
                 TimerQueue:callDelayed(2., unpause_arena, pid)
             end

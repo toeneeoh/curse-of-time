@@ -85,7 +85,7 @@ OnInit.final("Death", function(Require)
         else
             ChargeNetworth(Player(pid - 1), 0, 0.02, 50 * GetHeroLevel(Hero[pid]), "Dying has cost you")
 
-            RevivePlayer(pid, GetLocationX(TOWN_CENTER), GetLocationY(TOWN_CENTER), 1, 1)
+            RevivePlayer(pid, TOWN_CENTER_X, TOWN_CENTER_Y, 1, 1)
             SetCamera(pid, MAIN_MAP.rect)
         end
     end

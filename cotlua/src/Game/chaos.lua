@@ -68,12 +68,11 @@ OnInit.final("Chaos", function(Require)
         FourCC('o02Y'), -- monster
     }
 
-
     ---@type fun(num: integer)
     local function spawn_forgotten(num)
         if UnitAlive(forgotten_spawner) and forgotten_count < 5 then
             for _ = 1, num do
-                local id = forgotten_types[GetRandomInt(0, 4)] ---@type integer 
+                local id = forgotten_types[math.random(1, 5)] ---@type integer 
 
                 forgotten_count = forgotten_count + 1
                 CreateUnit(PLAYER_CREEP, id, 13699 + GetRandomInt(-250, 250), -14393 + GetRandomInt(-250, 250), GetRandomInt(0, 359))
@@ -155,7 +154,7 @@ OnInit.final("Chaos", function(Require)
             x = GetUnitX(Hero[u.id])
             y = GetUnitY(Hero[u.id])
             if not SELECTING_HERO[u.id] and RectContainsCoords(gg_rct_Colosseum, x, y) == false and RectContainsCoords(gg_rct_Infinite_Struggle, x, y) == false and RectContainsCoords(gg_rct_Church, x, y) == false then
-                MoveHeroLoc(u.id, TOWN_CENTER)
+                MoveHero(u.id, TOWN_CENTER_X, TOWN_CENTER_Y)
             end
 
             u = u.next
@@ -169,41 +168,42 @@ OnInit.final("Chaos", function(Require)
         -- clean up bosses
         for i = BOSS_OFFSET, #Boss do
             RemoveUnit(Boss[i].unit)
-            RemoveLocation(Boss[i].loc)
         end
 
         -- Demon Prince
-        Boss.create(BOSS_DEMON_PRINCE, GetRectCenter(gg_rct_Demon_Prince_Boss_Spawn), 315.00, FourCC('N038'), "Demon Prince", 190,
+        Boss.create(BOSS_DEMON_PRINCE, GetRectCenterX(gg_rct_Demon_Prince_Boss_Spawn), GetRectCenterY(gg_rct_Demon_Prince_Boss_Spawn), 315.00, FourCC('N038'), "Demon Prince", 190,
         1, 2000)
         -- Absolute Horror
-        Boss.create(BOSS_ABSOLUTE_HORROR, GetRectCenter(gg_rct_Absolute_Horror_Spawn), 270.00, FourCC('N017'), "Absolute Horror", 230,
+        Boss.create(BOSS_ABSOLUTE_HORROR, GetRectCenterX(gg_rct_Absolute_Horror_Spawn), GetRectCenterY(gg_rct_Absolute_Horror_Spawn), 270.00, FourCC('N017'), "Absolute Horror", 230,
         2, 2000)
         -- Orsted
-        Boss.create(BOSS_ORSTED, GetRectCenter(gg_rct_Orsted_Boss_Spawn), 270.00, FourCC('N00F'), "Orsted", 250,
+        Boss.create(BOSS_ORSTED, GetRectCenterX(gg_rct_Orsted_Boss_Spawn), GetRectCenterY(gg_rct_Orsted_Boss_Spawn), 270.00, FourCC('N00F'), "Orsted", 250,
         3, 2000)
         -- Slaughter Queen
-        Boss.create(BOSS_SLAUGHTER_QUEEN, Location(-5400, -15470), 135.00, FourCC('O02B'), "Slaughter Queen", 270,
+        Boss.create(BOSS_SLAUGHTER_QUEEN, -5400, -15470, 135.00, FourCC('O02B'), "Slaughter Queen", 270,
         3, 2000)
         -- Satan
-        Boss.create(BOSS_SATAN, GetRectCenter(gg_rct_Hell_Boss_Spawn), 315.00, FourCC('O02I'), "Satan", 310,
+        Boss.create(BOSS_SATAN, GetRectCenterX(gg_rct_Hell_Boss_Spawn), GetRectCenterY(gg_rct_Hell_Boss_Spawn), 315.00, FourCC('O02I'), "Satan", 310,
         5, 2000)
         -- Dark Soul
-        Boss.create(BOSS_DARK_SOUL, GetRectCenter(gg_rct_Dark_Soul_Boss_Spawn), bj_UNIT_FACING, FourCC('O02H'), "Essence of Darkness", 300,
+        Boss.create(BOSS_DARK_SOUL, GetRectCenterX(gg_rct_Dark_Soul_Boss_Spawn), GetRectCenterY(gg_rct_Dark_Soul_Boss_Spawn), bj_UNIT_FACING, FourCC('O02H'), "Essence of Darkness", 300,
         3, 2000)
         -- Legion
-        Boss.create(BOSS_LEGION, GetRectCenter(gg_rct_To_The_Forrest), bj_UNIT_FACING, FourCC('H04R'), "Legion", 340,
+        Boss.create(BOSS_LEGION, GetRectCenterX(gg_rct_To_The_Forrest), GetRectCenterY(gg_rct_To_The_Forrest), bj_UNIT_FACING, FourCC('H04R'), "Legion", 340,
         8, 2000)
         -- Thanatos
-        Boss.create(BOSS_THANATOS, GetRandomLocInRect(gg_rct_Thanatos_Boss_Spawn), bj_UNIT_FACING, FourCC('O02K'), "Thanatos", 320,
+        x, y = GetRandomXYInRect(gg_rct_Thanatos_Boss_Spawn)
+        Boss.create(BOSS_THANATOS, x, y, bj_UNIT_FACING, FourCC('O02K'), "Thanatos", 320,
         5, 2000)
         -- Existence
-        Boss.create(BOSS_EXISTENCE, GetRandomLocInRect(gg_rct_Existence_Boss_Spawn), bj_UNIT_FACING, FourCC('O02M'), "Pure Existence", 320,
+        x, y = GetRandomXYInRect(gg_rct_Existence_Boss_Spawn)
+        Boss.create(BOSS_EXISTENCE, x, y, bj_UNIT_FACING, FourCC('O02M'), "Pure Existence", 320,
         8, 2000)
         -- Azazoth
-        Boss.create(BOSS_AZAZOTH, GetRectCenter(gg_rct_Azazoth_Boss_Spawn), 270.00, FourCC('O02T'), "Azazoth", 380,
+        Boss.create(BOSS_AZAZOTH, GetRectCenterX(gg_rct_Azazoth_Boss_Spawn), GetRectCenterY(gg_rct_Azazoth_Boss_Spawn), 270.00, FourCC('O02T'), "Azazoth", 380,
         12, 2000)
         -- Xallarath
-        Boss.create(BOSS_XALLARATH, GetRectCenter(gg_rct_Forgotten_Leader_Boss_Spawn), 135.00, FourCC('O03G'), "Xallarath", 360,
+        Boss.create(BOSS_XALLARATH, GetRectCenterX(gg_rct_Forgotten_Leader_Boss_Spawn), GetRectCenterY(gg_rct_Forgotten_Leader_Boss_Spawn), 135.00, FourCC('O03G'), "Xallarath", 360,
         12, 4000)
 
         BOSS_OFFSET = BOSS_DEMON_PRINCE

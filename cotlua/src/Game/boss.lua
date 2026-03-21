@@ -19,7 +19,8 @@ OnInit.final("Boss", function(Require)
     ---@field index integer
     ---@field revive function
     ---@field id integer
-    ---@field loc location
+    ---@field loc_x number
+    ---@field loc_y number
     ---@field facing number
     ---@field difficulty integer
     ---@field unit unit
@@ -108,9 +109,9 @@ OnInit.final("Boss", function(Require)
                 local pid = GetPlayerId(GetOwningPlayer(target)) + 1
 
                 if target == Hero[pid] then
-                    MoveHeroLoc(pid, TOWN_CENTER)
+                    MoveHero(pid, TOWN_CENTER_X, TOWN_CENTER_Y)
                 else
-                    SetUnitPositionLoc(target, TOWN_CENTER)
+                    SetUnitPosition(target, TOWN_CENTER_X, TOWN_CENTER_Y)
                 end
             end
 
@@ -150,13 +151,14 @@ OnInit.final("Boss", function(Require)
                             x = GetRandomReal(MAIN_MAP.minX, MAIN_MAP.maxX)
                             y = GetRandomReal(MAIN_MAP.minY, MAIN_MAP.maxY)
                         until IsTerrainWalkable(x, y) and RectContainsCoords(gg_rct_Town_Main, x, y) == false
-                        boss.loc = Location(x, y)
+                        boss.loc_x = x
+                        boss.loc_y = y
                     elseif boss.index == BOSS_AZAZOTH then
                         AddItemToStock(god_portal, FourCC('I08T'), 1, 1)
                     end
 
                     boss:revive()
-                    DestroyEffect(AddSpecialEffectLoc("Abilities\\Spells\\Orc\\Reincarnation\\ReincarnationTarget.mdl", boss.loc))
+                    DestroyEffect(AddSpecialEffect("Abilities\\Spells\\Orc\\Reincarnation\\ReincarnationTarget.mdl", boss.loc_x, boss.loc_y))
                 end
             end
         end
@@ -255,8 +257,8 @@ OnInit.final("Boss", function(Require)
 
         local function boss_safe_zone(u)
             local boss = IsBoss(u)
-            SetUnitXBounded(u, GetLocationX(boss.loc))
-            SetUnitYBounded(u, GetLocationY(boss.loc))
+            SetUnitXBounded(u, boss.loc_x)
+            SetUnitYBounded(u, boss.loc_y)
         end
 
         -- bosses deal an additional 1 damage to attack count based units
@@ -267,11 +269,12 @@ OnInit.final("Boss", function(Require)
             end
         end
 
-        ---@type fun(index: integer, loc: location, facing: number, id: integer, name: string, level: integer, crystal: integer, leash: number): unit
-        function Boss.create(index, loc, facing, id, name, level, crystal, leash)
+        ---@type fun(index: integer, loc_x: number, loc_y: number, facing: number, id: integer, name: string, level: integer, crystal: integer, leash: number): unit
+        function Boss.create(index, loc_x, loc_y, facing, id, name, level, crystal, leash)
             local self = setmetatable({
                 index = index,
-                loc = loc,
+                loc_x = loc_x,
+                loc_y = loc_y,
                 facing = facing,
                 difficulty = 1,
                 respawn_modifier = 1,
@@ -444,13 +447,13 @@ OnInit.final("Boss", function(Require)
         ---@type fun(boss: Boss)
         local function return_boss(boss)
             if UnitAlive(boss.unit) and not CHAOS_LOADING then
-                if IsUnitInRangeLoc(boss.unit, boss.loc, 100.) then
+                if IsUnitInRangeXY(boss.unit, boss.loc_x, boss.loc_y, 100.) then
                     Unit[boss.unit].overmovespeed = nil
                     SetUnitPathing(boss.unit, true)
                     UnitRemoveAbility(boss.unit, FourCC('Amrf'))
                 else
                     if GetUnitCurrentOrder(boss.unit) ~= ORDER_ID_MOVE then
-                        IssuePointOrder(boss.unit, "move", GetLocationX(boss.loc), GetLocationY(boss.loc))
+                        IssuePointOrder(boss.unit, "move", boss.loc_x, boss.loc_y)
                     end
                     Buff.dispelAll(boss.unit)
                     TQ:callDelayed(0.25, return_boss, boss)
@@ -468,7 +471,7 @@ OnInit.final("Boss", function(Require)
 
                     -- death knight / legion exception
                     if boss.id ~= FourCC('H04R') and boss.id ~= FourCC('H040') then
-                        if IsUnitInRangeLoc(boss.unit, boss.loc, boss.leash) == false and GetUnitAbilityLevel(boss.unit, FourCC('Amrf')) == 0 then
+                        if IsUnitInRangeXY(boss.unit, boss.loc_x, boss.loc_y, boss.leash) == false and GetUnitAbilityLevel(boss.unit, FourCC('Amrf')) == 0 then
                             bossUnit.regen_max = 16 -- 16 percent
                             bossUnit.overmovespeed = 750
                             UnitAddAbility(boss.unit, FourCC('Amrf'))
@@ -554,7 +557,7 @@ OnInit.final("Boss", function(Require)
         end
 
         function thistype:revive()
-            self.unit = CreateUnitAtLoc(PLAYER_BOSS, self.id, self.loc, self.facing)
+            self.unit = CreateUnit(PLAYER_BOSS, self.id, self.loc_x, self.loc_y, self.facing)
             EVENT_ON_STRUCK_FINAL:register_unit_action(self.unit, BossAI)
             EVENT_ON_UNIT_DEATH:register_unit_action(self.unit, on_boss_death)
 
@@ -651,7 +654,7 @@ OnInit.final("Boss", function(Require)
         GroupEnumUnitsInRect(g, gg_rct_Town_Main, Condition(ischar))
 
         for i = BOSS_OFFSET, #Boss do
-            GroupEnumUnitsInRangeEx(BOSS_ID, g, GetLocationX(Boss[i].loc), GetLocationY(Boss[i].loc), 2000., Condition(ischar))
+            GroupEnumUnitsInRangeEx(BOSS_ID, g, Boss[i].loc_x, Boss[i].loc_y, 2000., Condition(ischar))
         end
 
         if BlzGroupGetSize(g) > 0 then
@@ -735,8 +738,8 @@ OnInit.final("Boss", function(Require)
             local count = 0
             local x2 = 0.
             local y2 = 0.
-            local x = GetLocationX(Boss[BOSS_LEGION].loc)
-            local y = GetLocationY(Boss[BOSS_LEGION].loc)
+            local x = Boss[BOSS_LEGION].loc_x
+            local y = Boss[BOSS_LEGION].loc_y
             local rand = GetRandomInt(0, 359)
 
             repeat
