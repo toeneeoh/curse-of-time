@@ -25,18 +25,20 @@ OnInit.final("Orders", function(Require)
     ORDER_ID_IMMOLATION    = 852177
     ORDER_ID_UNIMMOLATION  = 852178
 
-    local function OnOrder()
-        local source = GetTriggerUnit() ---@type unit 
-        local p      = GetTriggerPlayer()
-        local pid    = GetPlayerId(p) + 1 ---@type integer 
-        local id     = GetIssuedOrderId() ---@type integer 
-        local i      = GetOrderTargetItem()
+    local gtu, gtp, gpi, gioi, goti, gox, goy, gotu, gux, guy = GetTriggerUnit, GetTriggerPlayer, GetPlayerId, GetIssuedOrderId, GetOrderTargetItem, GetOrderPointX, GetOrderPointY, GetOrderTargetUnit, GetUnitX, GetUnitY
+
+    local function on_order()
+        local source = gtu() ---@type unit 
+        local p      = gtp()
+        local pid    = gpi(p) + 1 ---@type integer 
+        local id     = gioi() ---@type integer 
+        local i      = goti()
         local itm    = i and Item[i] or nil
-        local x      = GetOrderPointX()
-        local y      = GetOrderPointY()
-        local target = GetOrderTargetUnit() ---@type unit 
-        local targetX = target and GetUnitX(target)
-        local targetY = target and GetUnitY(target)
+        local x      = gox()
+        local y      = goy()
+        local target = gotu() ---@type unit 
+        local targetX = target and gux(target)
+        local targetY = target and guy(target)
 
         -- cache issued point / target
         local u = Unit[source]
@@ -63,7 +65,7 @@ OnInit.final("Orders", function(Require)
         end
     end
 
-    RegisterPlayerUnitEvent(EVENT_PLAYER_UNIT_ISSUED_ORDER, OnOrder)
-    RegisterPlayerUnitEvent(EVENT_PLAYER_UNIT_ISSUED_TARGET_ORDER, OnOrder)
-    RegisterPlayerUnitEvent(EVENT_PLAYER_UNIT_ISSUED_POINT_ORDER, OnOrder)
+    RegisterPlayerUnitEvent(EVENT_PLAYER_UNIT_ISSUED_ORDER, on_order)
+    RegisterPlayerUnitEvent(EVENT_PLAYER_UNIT_ISSUED_TARGET_ORDER, on_order)
+    RegisterPlayerUnitEvent(EVENT_PLAYER_UNIT_ISSUED_POINT_ORDER, on_order)
 end, Debug and Debug.getLine())
