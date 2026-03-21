@@ -523,7 +523,7 @@ modifiers:
             print(BlzGetItemExtendedTooltip(UnitItemInSlot(Hero[pid], 0)))
         end,
         ["itemformula"] = function(p, pid, args)
-            print(ItemData[GetItemTypeId(UnitItemInSlot(Hero[pid], 0))][ITEM_TOOLTIP])
+            print(ItemData[GetItemTypeId(UnitItemInSlot(Hero[pid], 0))].tooltip)
         end,
         ["mode"] = function(p, pid, args)
             print(GetLocalizedString("ASSET_MODE"))
@@ -810,6 +810,83 @@ modifiers:
 
         if dev_cmds[args[1]:sub(2)] then
             dev_cmds[args[1]:sub(2)](p, pid, args)
+        end
+    end
+
+    -- profiler.lua-ish
+    local clock = os.clock
+
+    Profiler = {
+        enabled = false,
+        data = {},
+        threshold = 0.0, -- seconds; set >0 to only log "slow" stuff
+    }
+
+    local data = Profiler.data
+
+    function Profiler.clear()
+        for k in pairs(data) do
+            data[k] = nil
+        end
+    end
+
+    function Profiler.start()
+        Profiler.enabled = true
+        Profiler.clear()
+    end
+
+    function Profiler.stop()
+        Profiler.enabled = false
+        return data
+    end
+
+    function Profiler.time(name, fn, ...)
+        if not Profiler.enabled then
+            return fn(...)
+        end
+
+        local t0 = clock()
+        local r1, r2, r3, r4, r5 = fn(...)
+        local dt = clock() - t0
+
+        local entry = data[name]
+        if not entry then
+            entry = { total = 0.0, count = 0, max = 0.0 }
+            data[name] = entry
+        end
+        entry.total = entry.total + dt
+        entry.count = entry.count + 1
+        if dt > entry.max then
+            entry.max = dt
+        end
+
+        if dt >= (Profiler.threshold or 0.0) then
+            -- you can also gate this by player id etc
+            DisplayTimedTextToPlayer(Player(0), 0, 0, 5,
+                string.format("[prof] %s: %.4f s", name, dt))
+        end
+
+        return r1, r2, r3, r4, r5
+    end
+
+    function Profiler.dump(top_n)
+        top_n = top_n or 10
+
+        -- flatten into array to sort
+        local arr = {}
+        for name, e in pairs(data) do
+            arr[#arr+1] = { name = name, total = e.total, count = e.count, max = e.max }
+        end
+
+        table.sort(arr, function(a, b)
+            return a.total > b.total
+        end)
+
+        for i = 1, math.min(top_n, #arr) do
+            local e = arr[i]
+            DisplayTimedTextToPlayer(Player(0), 0, 0, 10,
+                string.format("[prof] #%d %s  total=%.4f  max=%.4f  count=%d",
+                    i, e.name, e.total, e.max, e.count))
         end
     end
 
