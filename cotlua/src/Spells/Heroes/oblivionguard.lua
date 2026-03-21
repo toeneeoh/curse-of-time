@@ -2,6 +2,8 @@ OnInit.final("OblivionGuardSpells", function(Require)
     Require('Spells')
     Require('SpellTools')
 
+    local TQ = TimerQueue
+
     ---@class BODYOFFIRE : Spell
     ---@field dmg function
     ---@field cooldown function
@@ -9,50 +11,57 @@ OnInit.final("OblivionGuardSpells", function(Require)
     BODYOFFIRE = Spell.define("A07R")
     do
         local thistype = BODYOFFIRE
+        local MAX_CHARGES = 5
 
         thistype.charges = __jarray(0)
         thistype.values = {
             dmg = function(pid) local ablev = GetUnitAbilityLevel(Hero[pid], thistype.id) return GetHeroStr(Hero[pid], true) * (0.25 + 0.05 * ablev) end,
         }
+        thistype.callback = {}
 
-        ---@type fun(pt: PlayerTimer)
-        function thistype.cooldown(pt)
-            local MAX_CHARGES = 5
-
-            BODYOFFIRE.charges[pt.pid] = IMinBJ(MAX_CHARGES, BODYOFFIRE.charges[pt.pid] + 1)
-            UnitDisableAbility(pt.source, INFERNALSTRIKE.id, false)
-            UnitDisableAbility(pt.source, MAGNETICSTRIKE.id, false)
-
-            if GetLocalPlayer() == Player(pt.pid - 1) then
-                BlzSetAbilityIcon(BODYOFFIRE.id, "ReplaceableTextures\\CommandButtons\\BTNBodyOfFire" .. (BODYOFFIRE.charges[pt.pid]) .. ".blp")
-            end
-
-            if BODYOFFIRE.charges[pt.pid] >= MAX_CHARGES then
-                BlzStartUnitAbilityCooldown(pt.source, BODYOFFIRE.id, 0.)
-                pt:destroy()
-            else
-                BlzStartUnitAbilityCooldown(pt.source, BODYOFFIRE.id, 5.)
-                pt.timer:callDelayed(5., thistype.cooldown, pt)
-            end
-        end
-
-        local function on_hit(target, source, amount, amount_after_red, damage_type)
-            local ablev = GetUnitAbilityLevel(target, BODYOFFIRE.id)
-            if ablev > 0 and damage_type == PHYSICAL and IsUnitEnemy(target, GetOwningPlayer(source)) then
-                local tpid = GetPlayerId(GetOwningPlayer(target)) + 1
-                local returnDmg = (amount_after_red * 0.05 * ablev) + BODYOFFIRE.dmg(tpid)
-                DamageTarget(target, source, returnDmg * BOOST[tpid], ATTACK_TYPE_NORMAL, MAGIC, BODYOFFIRE.tag)
-            end
-        end
-
-        function thistype.onSetup(u)
-            local pid = GetPlayerId(GetOwningPlayer(u)) + 1
-            thistype.charges[pid] = 5 --default
+        function thistype.cooldown(pid, source)
+            thistype.charges[pid] = math.min(MAX_CHARGES, thistype.charges[pid] + 1)
+            UnitDisableAbility(source, INFERNALSTRIKE.id, false)
+            UnitDisableAbility(source, MAGNETICSTRIKE.id, false)
 
             if GetLocalPlayer() == Player(pid - 1) then
                 BlzSetAbilityIcon(thistype.id, "ReplaceableTextures\\CommandButtons\\BTNBodyOfFire" .. (thistype.charges[pid]) .. ".blp")
             end
 
+            if thistype.charges[pid] >= MAX_CHARGES then
+                BlzStartUnitAbilityCooldown(source, thistype.id, 0.)
+                thistype.callback[pid] = nil
+            else
+                BlzStartUnitAbilityCooldown(source, thistype.id, 5.)
+                thistype.callback[pid] = TQ:callDelayed(5., thistype.cooldown, pid, source)
+            end
+        end
+
+        local function on_hit(target, source, amount, amount_after_red, damage_type)
+            local ablev = GetUnitAbilityLevel(target, thistype.id)
+            if ablev > 0 and damage_type == PHYSICAL and IsUnitEnemy(target, GetOwningPlayer(source)) then
+                local tpid = GetPlayerId(GetOwningPlayer(target)) + 1
+                local returnDmg = (amount_after_red * 0.05 * ablev) + thistype.dmg(tpid)
+                DamageTarget(target, source, returnDmg * BOOST[tpid], ATTACK_TYPE_NORMAL, MAGIC, thistype.tag)
+            end
+        end
+
+        local function on_cleanup(pid)
+            TQ:disableCallback(thistype.callback[pid])
+            thistype.callback[pid] = nil
+
+            EVENT_ON_CLEANUP:unregister_action(pid, on_cleanup)
+        end
+
+        function thistype.onSetup(u)
+            local pid = GetPlayerId(GetOwningPlayer(u)) + 1
+            thistype.charges[pid] = MAX_CHARGES
+
+            if GetLocalPlayer() == Player(pid - 1) then
+                BlzSetAbilityIcon(thistype.id, "ReplaceableTextures\\CommandButtons\\BTNBodyOfFire" .. (thistype.charges[pid]) .. ".blp")
+            end
+
+            EVENT_ON_CLEANUP:register_action(pid, on_cleanup)
             EVENT_ON_STRUCK_AFTER_REDUCTIONS:register_unit_action(u, on_hit)
         end
     end
@@ -96,8 +105,6 @@ OnInit.final("OblivionGuardSpells", function(Require)
             Fade(Hero[pt.pid], 0.8, false)
 
             DestroyGroup(ug)
-
-            pt:destroy()
         end
 
         function thistype:onCast()
@@ -113,10 +120,10 @@ OnInit.final("OblivionGuardSpells", function(Require)
 
             local sfx = AddSpecialEffect("Units\\Demon\\Infernal\\InfernalBirth.mdl", pt.x, pt.y)
             BlzSetSpecialEffectScale(sfx, 2.5)
-            TimerQueue:callDelayed(2., DestroyEffect, sfx)
+            TQ:callDelayed(2., DestroyEffect, sfx)
             BlzSetSpecialEffectYaw(sfx, self.angle)
 
-            pt.timer:callDelayed(0.9, expire, pt)
+            pt:after(0.9, expire)
         end
     end
 
@@ -136,7 +143,12 @@ OnInit.final("OblivionGuardSpells", function(Require)
         end
 
         function thistype.onLearn(source, ablev, pid)
-            MagneticStanceBuff:refresh(source, source)
+            local b = MagneticStanceBuff:get(nil, source)
+
+            if b then
+                b.ablev = ablev
+                b:refresh()
+            end
             EVENT_ON_ORDER:register_unit_action(source, on_order)
         end
     end
@@ -206,17 +218,15 @@ OnInit.final("OblivionGuardSpells", function(Require)
                 DamageTarget(Hero[pt.pid], target, thistype.dmg(pt.pid) * BOOST[pt.pid], ATTACK_TYPE_NORMAL, MAGIC, thistype.tag)
             end
 
-            pt:destroy()
-
             DestroyGroup(ug)
         end
 
         function thistype:onCast()
             local pt = TimerList[self.pid]:add()
+            pt.sfx = AddSpecialEffect("war3mapImported\\AnnihilationTarget.mdx", self.x, self.y)
 
             BlzPauseUnitEx(self.caster, true)
-            TimerQueue:callDelayed(2, DestroyEffect, AddSpecialEffect("war3mapImported\\AnnihilationTarget.mdx", self.x, self.y))
-            pt.timer:callDelayed(2, expire, pt)
+            pt:after(2., expire)
         end
     end
 end, Debug and Debug.getLine())
