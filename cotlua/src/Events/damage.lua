@@ -87,6 +87,20 @@ OnInit.final("Damage", function(Require)
         return str
     end
 
+    local get_event_damage_source = GetEventDamageSource
+    local blz_get_event_damage_target = BlzGetEventDamageTarget
+    local get_event_damage = GetEventDamage
+    local blz_get_event_damage_type = BlzGetEventDamageType
+    local get_player_id = GetPlayerId
+    local get_owning_player = GetOwningPlayer
+    local blz_set_event_damage = BlzSetEventDamage
+
+    local EVENT_DUMMY_ON_HIT = EVENT_DUMMY_ON_HIT
+    local EVENT_ON_HIT, EVENT_ON_HIT_EVADE, EVENT_ON_HIT_MULTIPLIER, EVENT_ON_HIT_AFTER_REDUCTIONS, EVENT_ON_HIT_FINAL = EVENT_ON_HIT, EVENT_ON_HIT_EVADE, EVENT_ON_HIT_MULTIPLIER, EVENT_ON_HIT_AFTER_REDUCTIONS, EVENT_ON_HIT_FINAL
+    local EVENT_ON_STRUCK, EVENT_ON_STRUCK_MULTIPLIER, EVENT_ON_STRUCK_AFTER_REDUCTIONS, EVENT_ON_STRUCK_FINAL = EVENT_ON_STRUCK, EVENT_ON_STRUCK_MULTIPLIER, EVENT_ON_STRUCK_AFTER_REDUCTIONS, EVENT_ON_STRUCK_FINAL
+    local EVENT_ON_FATAL_DAMAGE = EVENT_ON_FATAL_DAMAGE
+    local EVENT_ENEMY_AI = EVENT_ENEMY_AI
+
     ---@return boolean
     function OnDamage()
         --[[
@@ -101,14 +115,16 @@ OnInit.final("Damage", function(Require)
             event library prevents infinite recursion (i.e. for physical attacks that proc physical damage)
         ]]
 
-        local source      = GetEventDamageSource() ---@type unit 
-        local target      = BlzGetEventDamageTarget() ---@type unit 
-        local amount      = { value = GetEventDamage() }
-        local damage_type = BlzGetEventDamageType() ---@type damagetype 
-        local pid         = GetPlayerId(GetOwningPlayer(source)) + 1 ---@type integer 
-        local tpid        = GetPlayerId(GetOwningPlayer(target)) + 1 ---@type integer 
+        local source      = get_event_damage_source()
+        local target      = blz_get_event_damage_target()
+        local amount      = { value = get_event_damage() }
+        local damage_type = blz_get_event_damage_type()
+        local pid         = get_player_id(get_owning_player(source)) + 1
+        local tpid        = get_player_id(get_owning_player(target)) + 1
         local crit        = 1.
         local tag         = GetDamageTag()
+        local source_tbl  = Unit[source]
+        local target_tbl  = Unit[target]
 
         -- prevents 0 damage events from applying debuffs
         if source == nil or target == nil then
@@ -126,18 +142,18 @@ OnInit.final("Damage", function(Require)
 
         if dummy then
             EVENT_DUMMY_ON_HIT:trigger(dummy.source, target)
-            BlzSetEventDamage(0.00)
+            blz_set_event_damage(0.00)
             BlzSetUnitWeaponBooleanField(source, UNIT_WEAPON_BF_ATTACKS_ENABLED, 0, false) -- prevent dummies from attacking twice
 
             return false
         end
 
         -- source and target must be enemies for onhit and onstruck
-        if IsUnitEnemy(target, GetOwningPlayer(source)) then
+        if IsUnitEnemy(target, get_owning_player(source)) then
 
             -- physical damage
             if damage_type == PHYSICAL then
-                local evade = Unit[target].evasion
+                local evade = target_tbl.evasion
 
                 -- evasion
                 if math.random(0, 99) < evade then
@@ -151,8 +167,8 @@ OnInit.final("Damage", function(Require)
                 EVENT_ON_HIT_MULTIPLIER:trigger(source, target, amount)
 
                 -- critical strike
-                if math.random() * 100. < Unit[source].cc then
-                    crit = crit + Unit[source].cd * 0.01
+                if math.random() * 100. < source_tbl.cc then
+                    crit = crit + source_tbl.cd * 0.01
                 end
 
                 -- apply crit multiplier
@@ -164,32 +180,21 @@ OnInit.final("Damage", function(Require)
             EVENT_ON_STRUCK:trigger(target, source, damage_type)
             EVENT_ON_STRUCK_MULTIPLIER:trigger(target, source, amount, damage_type)
 
-            -- struck or hit
-            if IsEnemy(tpid) and not Unit[target].casting then
-                EVENT_ENEMY_AI:trigger(target, source)
-            elseif IsEnemy(pid) and not Unit[source].casting then
-                EVENT_ENEMY_AI:trigger(source, target)
-            end
-
-            -- main hero damage taken
-            if target == Hero[tpid] then
-            end
-
             -- armor pen
-            if Unit[source].armor_pen_percent > 0 then
+            if source_tbl.armor_pen_percent > 0 then
                 amount.value = amount.value * ReduceArmorCalc(source, target)
             end
 
             -- source multipliers and target resistances
-            amount.value = amount.value * Unit[source].dm
-            amount.value = amount.value * Unit[target].dr
+            amount.value = amount.value * source_tbl.dm
+            amount.value = amount.value * target_tbl.dr
 
             if damage_type == PHYSICAL then
-                amount.value = amount.value * Unit[source].pm
-                amount.value = amount.value * Unit[target].pr
+                amount.value = amount.value * source_tbl.pm
+                amount.value = amount.value * target_tbl.pr
             elseif damage_type == MAGIC then
-                amount.value = amount.value * Unit[source].mm
-                amount.value = amount.value * Unit[target].mr
+                amount.value = amount.value * source_tbl.mm
+                amount.value = amount.value * target_tbl.mr
             end
         end
 
@@ -228,15 +233,24 @@ OnInit.final("Damage", function(Require)
         -- TODO: Investigate whether this could be bugged?
         if GetWidgetLife(target) - amount_after_red < MIN_LIFE then
             EVENT_ON_FATAL_DAMAGE:trigger(target, source, amount, damage_type)
+        else
+            -- enemy ai
+            if not target_tbl._casting then
+                EVENT_ENEMY_AI:trigger(target, source)
+            end
+
+            if not source_tbl._casting then
+                EVENT_ENEMY_AI:trigger(source, target)
+            end
         end
 
         -- set final event damage
-        BlzSetEventDamage(amount.value)
+        blz_set_event_damage(amount.value)
 
         -- attack count based health
-        if Unit[target].attackCount > 0 then
-            Unit[target].attackCount = Unit[target].attackCount - 1
-            BlzSetEventDamage(0.00)
+        if target_tbl.attackCount > 0 then
+            target_tbl.attackCount = target_tbl.attackCount - 1
+            blz_set_event_damage(0.00)
             SetWidgetLife(target, GetWidgetLife(target) - 1)
         end
 
