@@ -345,6 +345,8 @@ OnInit.final("Frames", function(Require)
             local number = MathClamp((tonumber(BlzGetTriggerFrameText()) or 0), -500, 100000)
             PUNCHING_BAG_VALUES[GetPlayerId(GetTriggerPlayer()) + 1] = number
             BlzSetUnitArmor(PUNCHING_BAG, PUNCHING_BAG_VALUES[GetPlayerId(GetTriggerPlayer()) + 1])
+            -- refresh armor buffs/debuffs
+            Unit[PUNCHING_BAG].bonus_armor = Unit[PUNCHING_BAG].bonus_armor
         end
 
         local editText = CreateTrigger()
