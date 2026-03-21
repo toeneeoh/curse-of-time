@@ -15,14 +15,36 @@ OnInit.final("Spells", function(Require)
     Require("Users")
     Require("UnitEvent")
 
+    -- this only exists to update mana costs if a spell is readded for any reason
+    local OldUnitAddAbility = UnitAddAbility
+    UnitAddAbility = function(u, id)
+        OldUnitAddAbility(u, id)
+
+        EVENT_STAT_CHANGE:trigger(u, "int")
+    end
+
+    -- storage for spell definitions
+    Spells = {} ---@type Spell[]
+
+    local Spells = Spells
+    local real_to_string = RealToString
+    local HL = HL
+    local format = string.format
+    local pattern = "(~?)(>?)([\\{%[])(%w-)=(.-)]"
+    local gsub = string.gsub
+
+    -- set by getTooltip before calling gsub
+    local current_spell      ---@type Spell
+    local current_unit       ---@type unit
+    local current_pid        ---@type integer
+    local current_alt        ---@type boolean
+
     SONG_WAR     = FourCC('A024') ---@type integer 
     SONG_HARMONY = FourCC('A01A') ---@type integer 
     SONG_PEACE   = FourCC('A09X') ---@type integer 
     SONG_FATIGUE = FourCC('A00N') ---@type integer 
     LAST_CAST    = __jarray(0) ---@type integer[] 
 
-    --storage for spell definitions
-    Spells = {} ---@type Spell[]
     INVALID_TARGET_MESSAGE = "|cffff0000Cannot target there!|r" ---@type string 
 
     ---@class Spell
@@ -40,7 +62,6 @@ OnInit.final("Spells", function(Require)
     ---@field angle number
     ---@field values table
     ---@field create function
-    ---@field destroy function
     ---@field onEquip function
     ---@field onUnequip function
     ---@field onSetup function
@@ -169,59 +190,77 @@ OnInit.final("Spells", function(Require)
         RegisterHotkeyToFunc('ALT', nil, extended_spell_tooltip, nil, true)
         RegisterHotkeyToFunc('ALT+ALT', nil, extended_spell_tooltip, nil, true)
 
-        ---@type fun(self: Spell, u: unit?, ablev: integer?): string
-        function thistype:getTooltip(u, ablev)
-            local orig = thistype.TOOLTIPS[self.id][self.ablev or ablev or 1]
+        local function tooltip_replacer(defaultflag, colorflag, prefix, tag, content)
+            local self = current_spell
+            local u    = current_unit
 
-            -- create temporary spell object to calculate values
-            if not self.pid and u then
-                self = self:create(u)
+            -- if we don't have a unit, just show raw content
+            if not u then
+                return content
             end
 
-            -- return original tooltip if no values to parse
-            if not self.values then
+            -- only calculate if alt mode is active for this player
+            local alt = current_alt or (defaultflag == "~")
+            if not alt then
+                return content
+            end
+
+            local color = (colorflag ~= ">")
+
+            -- lookup value
+            local val = self[tag]
+            if val == nil then
+                return content
+            end
+
+            local calc = (type(val) == "table") and val[current_pid] or val
+
+            if prefix == "[" then
+                local sb = Unit[u].spellboost
+                return HL(
+                    real_to_string(calc * (1 + sb - 0.2)) ..
+                    " - " ..
+                    real_to_string(calc * (1 + sb + 0.2)),
+                    color
+                )
+
+            elseif prefix == "{" then
+                local mult = LBOOST[current_pid]
+                local v = calc * mult
+                local out
+                if v < 1000 then
+                    out = format("%.2f", v)
+                else
+                    out = real_to_string(v)
+                end
+                return HL(out, color)
+
+            elseif prefix == "\\" then
+                return HL(real_to_string(calc), color)
+            end
+
+            return content
+        end
+
+        ---@type fun(self: Spell, u: unit?, ablev: integer?): string
+        function thistype:getTooltip(u, ablev)
+            local level = self.ablev or ablev or 1
+            local orig  = thistype.TOOLTIPS[self.id][level]
+
+            -- just return raw tooltip if no dynamic values
+            if not self.values or (not string.find(orig, "=", 1, true)) then
                 return orig
             end
 
-            --[[
-                >: no color
-                ~: only shows calculated value
-                [: normal boost
-                {: low boost
-                \: no boost
-                =: tag identifier
-            ]]
-            local pattern = "(~?)(>?)([\\{%[])(%w-)=(.-)]"
-            orig = string.gsub(orig, pattern, function(defaultflag, colorflag, prefix, tag, content)
-                local color = (colorflag ~= ">")
-                local alt   = alt_down[self.pid] or defaultflag == "~"
-                if not alt or not u then
-                    return content
-                end
+            -- set context for the replacer
+            current_spell = self
+            current_unit  = u
+            current_pid   = self.pid
+            current_alt   = alt_down[self.pid] or false
 
-                -- calculate value based on bracket type
-                local val  = self[tag]
-                local calc = (type(val) == "table") and val[self.pid] or val
+            local result = gsub(orig, pattern, tooltip_replacer)
 
-                if prefix == "[" then
-                    local sb = Unit[u].spellboost
-                    return HL(RealToString(calc * (1 + sb - 0.2)) .. " - " .. RealToString(calc * (1 + sb + 0.2)), color)
-
-                elseif prefix == "{" then
-                    local out
-                    if calc < 1000 then
-                        out = string.format("%.2f", calc * LBOOST[self.pid])
-                    else
-                        out = RealToString(calc * LBOOST[self.pid])
-                    end
-                    return HL(out, color)
-
-                elseif prefix == "\\" then
-                    return HL(RealToString(calc), color)
-                end
-            end)
-
-            return orig
+            return result
         end
 
         ---@type fun(self: Spell, u: unit, sid: integer?)
@@ -256,9 +295,10 @@ OnInit.final("Spells", function(Require)
         local y       = GetUnitY(caster) ---@type number 
         local targetX = GetSpellTargetX() ---@type number 
         local targetY = GetSpellTargetY() ---@type number 
+        local spell   = Spells[sid]
 
-        if Spells[sid] then
-            Spells[sid].preCast(pid, tpid, caster, target, x, y, targetX, targetY)
+        if spell then
+            spell.preCast(pid, tpid, caster, target, x, y, targetX, targetY)
         end
 
         return false
@@ -281,6 +321,7 @@ OnInit.final("Spells", function(Require)
         local ablev  = GetUnitAbilityLevel(source, sid) ---@type integer 
         local i      = 0 ---@type integer 
         local abil   = BlzGetUnitAbilityByIndex(source, i) ---@type ability 
+        local spell  = Spells[sid]
 
         -- find ability
         while abil and BlzGetAbilityId(abil) ~= sid do
@@ -291,8 +332,8 @@ OnInit.final("Spells", function(Require)
         UpdateSpellTooltips(source)
 
         -- execute onlearn function
-        if Spells[sid] and Spells[sid].onLearn then
-            Spells[sid].onLearn(source, ablev, pid)
+        if spell and spell.onLearn then
+            spell.onLearn(source, ablev, pid)
         end
 
         return false
@@ -302,7 +343,6 @@ OnInit.final("Spells", function(Require)
         local caster = GetTriggerUnit() ---@type unit 
         local target = GetSpellTargetUnit() ---@type unit 
         local p      = GetOwningPlayer(caster)
-        --local itm  = GetSpellTargetItem() ---@type item?
         local sid    = GetSpellAbilityId() ---@type integer 
         local pid    = GetPlayerId(p) + 1 ---@type integer 
         local tpid   = GetPlayerId(GetOwningPlayer(target)) + 1 ---@type integer 
@@ -311,6 +351,7 @@ OnInit.final("Spells", function(Require)
         local y      = GetUnitY(caster) ---@type number 
         local targetX = GetSpellTargetX() ---@type number 
         local targetY = GetSpellTargetY() ---@type number 
+        local spell   = Spells[sid]
 
         EVENT_ON_CAST:trigger(caster, sid, ablev)
 
@@ -320,8 +361,8 @@ OnInit.final("Spells", function(Require)
         end
 
         -- check existing spell definition
-        if Spells[sid] then
-            local spell = Spells[sid]:create(caster)
+        if spell then
+            spell = spell:create(caster)
             spell.owner = p
             spell.sid = sid
             spell.tpid = tpid
@@ -354,34 +395,28 @@ OnInit.final("Spells", function(Require)
         end
     end
 
-    -- Hook UnitAddAbility
-    function Hook:UnitAddAbility(whichUnit, id)
-        local returnValue = self.old(whichUnit, id)
-
-        -- force mana cost update
-        EVENT_STAT_CHANGE:trigger(whichUnit)
-
-        return returnValue
-    end
+    local blzgetunitabilitybyindex = BlzGetUnitAbilityByIndex
+    local blzgetabilityid = BlzGetAbilityId
 
     ---@param u unit
     function UpdateSpellTooltips(u)
         local i = 0
-        local abil = BlzGetUnitAbilityByIndex(u, i)
+        local abil = blzgetunitabilitybyindex(u, i)
 
         while abil do
-            local sid = BlzGetAbilityId(abil)
+            local sid = blzgetabilityid(abil)
+            local spell = Spells[sid]
 
-            if Spells[sid] then
-                Spells[sid]:setTooltip(u, sid)
+            if spell then
+                spell:setTooltip(u, sid)
             end
 
             i = i + 1
-            abil = BlzGetUnitAbilityByIndex(u, i)
+            abil = blzgetunitabilitybyindex(u, i)
         end
 
-        SetPlayerAbilityAvailable(PLAYER_CREEP, FourCC('Agyv'), true)
-        SetPlayerAbilityAvailable(PLAYER_CREEP, FourCC('Agyv'), false)
+        --SetPlayerAbilityAvailable(PLAYER_CREEP, FourCC('Agyv'), true)
+        --SetPlayerAbilityAvailable(PLAYER_CREEP, FourCC('Agyv'), false)
     end
 
     RegisterPlayerUnitEvent(EVENT_PLAYER_UNIT_SPELL_CAST, SpellCast)
