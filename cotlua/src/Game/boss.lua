@@ -294,7 +294,7 @@ OnInit.final("Boss", function(Require)
             }, mt)
 
             thistype[index] = self
-            self.unit = CreateUnitAtLoc(PLAYER_BOSS, id, loc, facing)
+            self.unit = CreateUnit(PLAYER_BOSS, id, loc_x, loc_y, facing)
 
             SetHeroLevel(self.unit, level, false)
             SetUnitCreepGuard(self.unit, true)
