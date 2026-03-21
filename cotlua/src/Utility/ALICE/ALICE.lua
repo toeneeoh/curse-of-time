@@ -1,5 +1,6 @@
 if Debug then Debug.beginFile "ALICE" end
 ---@require HandleType, PrecomputedHeightMap?
+---@version 2.12.3
 ---@diagnostic disable: need-check-nil
 ---@nodebug
 do
@@ -7,7 +8,7 @@ do
     =============================================================================================================================================================
                                                             A Limitless Interaction Caller Engine
                                                                          by Antares
-                                                                          v2.12.2
+                                                                           v2.12.3
 
                                 A Lua system to easily create highly performant callbacks and interactions, between any type of objects.
                         
@@ -39,7 +40,7 @@ do
 
         --Calls all interaction functions in protected mode, so that the main cycle is not interrupted on an error. Each unique error will be printed only once to the
         --map creator. This is recommended for playtest versions which are not fully stable yet.
-        ,PROCTECTED_MODE                    = false     ---@constant boolean
+        ,PROTECTED_MODE                     = false     ---@constant boolean
 
         --An option that is available if PROTECTED_MODE is also activated. If enabled, ALICE will write the next executed callback or interaction function into the file
         --ALICE\ALICECrashDump.txt, giving you information about which function causes a crash. Functions need to be global or named with ALICE_FuncSetName to get any
@@ -193,6 +194,7 @@ do
 
     local EMPTY_TABLE = {}                      ---@constant table
     local SELF_INTERACTION_ACTOR                ---@type Actor
+    local CALL_EXCLUSIVE_ACTOR
     local DUMMY_PAIR                            ---@constant Pair
         = {destructionQueued = true}
     local OUTSIDE_OF_CYCLE =                    ---@constant Pair
@@ -206,6 +208,8 @@ do
         isHalted = false,                       ---@type boolean
         isCrash = false,                        ---@type boolean
         freezeCounter = 0,                      ---@type number
+        persistingCallbacks = {},               ---@type function[]
+        persistingCallbackCounter = {}          ---@type table<function,integer>
     }
 
     local currentPair = OUTSIDE_OF_CYCLE        ---@type Pair | nil
@@ -643,10 +647,10 @@ do
 
     local toCamelCase = setmetatable({}, {
         __index = function(self, whichString)
-            whichString = whichString:gsub("|[cC]\x25x\x25x\x25x\x25x\x25x\x25x\x25x\x25x", "") --remove color codes
+            whichString = whichString:gsub("|[cC]%x%x%x%x%x%x%x%x", "")                         --remove color codes
             whichString = whichString:gsub("|[rR]", "")                                         --remove closing color codes
-            whichString = whichString:gsub("(\x25s)(\x25a)", ToUpperCase)                       --remove spaces and convert to upper case after space
-            whichString = whichString:gsub("[^\x25w]", "")                                      --remove special characters
+            whichString = whichString:gsub("(%s)(%a)", ToUpperCase)                             --remove spaces and convert to upper case after space
+            whichString = whichString:gsub("[^%w]", "")                                         --remove special characters
             self[whichString] = string.lower(whichString:sub(1,1)) .. string.sub(whichString,2) --converts first character to lower case
             return self[whichString]
         end
@@ -800,8 +804,8 @@ do
                 end
             else
                 local match = true
-                for __, tableKey in ipairs(key) do
-                    if not identifier[tableKey] then
+                for i = 1, #key do
+                    if not identifier[i] then
                         match = false
                         break
                     end
@@ -1272,18 +1276,18 @@ do
             self.originalAnchor = self.anchor
 
             --Execute onCreation functions before flags are initialized.
-            for __, keyword in ipairs(tempIdentifier) do
-                if onCreation.funcs[keyword] then
-                    for __, func in ipairs(onCreation.funcs[keyword]) do
+            for i = 1, #tempIdentifier do
+                if onCreation.funcs[tempIdentifier[i]] then
+                    for __, func in ipairs(onCreation.funcs[tempIdentifier[i]]) do
                         func(self.host)
                     end
                 end
             end
 
             --Add additional flags from onCreation hooks.
-            for __, keyword in ipairs(tempIdentifier) do
-                if onCreation.flags[keyword] then
-                    local onCreationFlags = onCreation.flags[keyword]
+            for i = 1, #tempIdentifier do
+                if onCreation.flags[tempIdentifier[i]] then
+                    local onCreationFlags = onCreation.flags[tempIdentifier[i]]
                     for key, __ in next, OVERWRITEABLE_FLAGS do
                         if onCreationFlags[key] then
                             if type(onCreationFlags[key]) == "function" then
@@ -1298,11 +1302,11 @@ do
 
             --Transform identifier sequence into hashmap.
             local onCreationIdentifiers
-            for __, keyword in ipairs(tempIdentifier) do
-                self.identifier[keyword] = true
-                if onCreation.identifiers[keyword] then
+            for i = 1, #tempIdentifier do
+                self.identifier[tempIdentifier[i]] = true
+                if onCreation.identifiers[tempIdentifier[i]] then
                     onCreationIdentifiers = onCreationIdentifiers or GetTable()
-                    for __, newIdentifier in ipairs(onCreation.identifiers[keyword]) do
+                    for __, newIdentifier in ipairs(onCreation.identifiers[tempIdentifier[i]]) do
                         if type(newIdentifier) == "function" then
                             onCreationIdentifiers[#onCreationIdentifiers + 1] = newIdentifier(self.host)
                         else
@@ -1313,8 +1317,8 @@ do
             end
 
             if onCreationIdentifiers then
-                for __, keyword in ipairs(onCreationIdentifiers) do
-                    self.identifier[keyword] = true
+                for i = 1, #onCreationIdentifiers do
+                    self.identifier[onCreationIdentifiers[i]] = true
                 end
             end
 
@@ -1387,7 +1391,10 @@ do
 
             --Pair with global actors or all actors if self is global.
             local selfFunc, actorFunc
-            for __, actor in ipairs(self.usesCells and celllessActorList or actorList) do
+            local list = self.usesCells and celllessActorList or actorList
+            local actor
+            for i = 1, #list do
+                actor = list[i]
                 selfFunc = GetInteractionFunc(self, actor)
                 actorFunc = GetInteractionFunc(actor, self)
                 if selfFunc and actorFunc then
@@ -1407,7 +1414,9 @@ do
             local selfInteractions = interactions and interactions.self or flags.selfInteractions
             if selfInteractions then
                 if type(selfInteractions) == "table" then
-                    for __, func in ipairs(selfInteractions) do
+                    local func
+                    for i = 1, #selfInteractions do
+                        func = selfInteractions[i]
                         self.selfInteractions[func] = CreatePair(self, SELF_INTERACTION_ACTOR, func)
                     end
                     if self.actorClass then
@@ -1426,14 +1435,15 @@ do
             end
 
             --Add additional self-interactions from onCreation hooks.
-            for __, keyword in ipairs(tempIdentifier) do
+            for i = 1, #tempIdentifier do
+                local keyword = tempIdentifier[i]
                 if onCreation.selfInteractions[keyword] then
                     for __, func in ipairs(onCreation.selfInteractions[keyword]) do
                         self.selfInteractions[func] = CreatePair(self, SELF_INTERACTION_ACTOR, func)
                     end
                     if self.actorClass then
-                        for i = 1, #onCreation.selfInteractions[keyword] do
-                            self.orderedSelfInteractions[#self.orderedSelfInteractions + 1] = onCreation.selfInteractions[keyword][i]
+                        for j = 1, #onCreation.selfInteractions[keyword] do
+                            self.orderedSelfInteractions[#self.orderedSelfInteractions + 1] = onCreation.selfInteractions[keyword][j]
                         end
                     end
                 end
@@ -1441,14 +1451,15 @@ do
 
             --Add additional self-interactions from onCreation hooks to onCreation identifiers.
             if onCreationIdentifiers then
-                for __, keyword in ipairs(onCreationIdentifiers) do
+                for i = 1, #onCreationIdentifiers do
+                    local keyword = onCreationIdentifiers[i]
                     if onCreation.selfInteractions[keyword] then
                         for __, func in ipairs(onCreation.selfInteractions[keyword]) do
                             self.selfInteractions[func] = CreatePair(self, SELF_INTERACTION_ACTOR, func)
                         end
                         if self.actorClass then
-                            for i = 1, #onCreation.selfInteractions[keyword] do
-                                self.orderedSelfInteractions[#self.orderedSelfInteractions + 1] = onCreation.selfInteractions[keyword][i]
+                            for j = 1, #onCreation.selfInteractions[keyword] do
+                                self.orderedSelfInteractions[#self.orderedSelfInteractions + 1] = onCreation.selfInteractions[keyword][j]
                             end
                         end
                     end
@@ -1565,7 +1576,10 @@ do
 
             --Pair with global actors or all actors if self is global.
             local selfFunc, actorFunc
-            for __, actor in ipairs(self.usesCells and celllessActorList or actorList) do
+            local list = self.usesCells and celllessActorList or actorList
+            local actor
+            for i = 1, #list do
+                actor = list[i]
                 selfFunc = GetInteractionFunc(self, actor)
                 actorFunc = GetInteractionFunc(actor, self)
                 if selfFunc and actorFunc then
@@ -1582,10 +1596,8 @@ do
             end
 
             --Create self-interactions.
-            if self.orderedSelfInteractions then
-                for __, func in ipairs(self.orderedSelfInteractions) do
-                    self.selfInteractions[func] = CreatePair(self, SELF_INTERACTION_ACTOR, func)
-                end
+            for __, func in ipairs(self.orderedSelfInteractions) do
+                self.selfInteractions[func] = CreatePair(self, SELF_INTERACTION_ACTOR, func)
             end
 
             --Set actor size and initialize cells and cell checks.
@@ -1684,8 +1696,8 @@ do
             actorList[#actorList] = nil
         end
         if not self.usesCells and not self.isAnonymous then
-            for i, actor in ipairs(celllessActorList) do
-                if self == actor then
+            for i = 1, #celllessActorList do
+                if self == celllessActorList[i] then
                     celllessActorList[i] = celllessActorList[#celllessActorList]
                     celllessActorList[#celllessActorList] = nil
                     break
@@ -1788,13 +1800,14 @@ do
         if actorOf[object].isActor then
             actorOf[object] = nil
         else
-            for j, v in ipairs(actorOf[object]) do
-                if self == v then
-                    table.remove(actorOf[object], j)
+            local actors = actorOf[object]
+            for j = 1, #actors do
+                if self == actors[j] then
+                    table.remove(actors, j)
                 end
             end
-            if #actorOf[object] == 1 then
-                actorOf[object] = actorOf[object][1]
+            if #actors == 1 then
+                actorOf[object] = actors[1]
             end
         end
         self.references[object] = nil
@@ -1957,13 +1970,34 @@ do
                 actorAlreadyChecked[key] = nil
             end
             actorAlreadyChecked[self] = true
-            for X = self.minX, self.maxX do
-                for Y = self.minY, self.maxY do
+
+            local oldMinX = self.minX
+            local oldMaxX = self.maxX
+            local oldMinY = self.minY
+            local oldMaxY = self.maxY
+
+            local x = self.x[self.anchor]
+            local y = self.y[self.anchor]
+            self.minX = min(NUM_CELLS_X, max(1, (NUM_CELLS_X*(x - self.halfWidth - MAP_MIN_X)/MAP_SIZE_X) // 1 + 1))
+            self.minY = min(NUM_CELLS_Y, max(1, (NUM_CELLS_Y*(y - self.halfHeight - MAP_MIN_Y)/MAP_SIZE_Y) // 1 + 1))
+            self.maxX = min(NUM_CELLS_X, max(1, (NUM_CELLS_X*(x + self.halfWidth - MAP_MIN_X)/MAP_SIZE_X) // 1 + 1))
+            self.maxY = min(NUM_CELLS_Y, max(1, (NUM_CELLS_Y*(y + self.halfHeight - MAP_MIN_Y)/MAP_SIZE_Y) // 1 + 1))
+
+            for X = oldMinX, oldMaxX do
+                for Y = oldMinY, oldMaxY do
                     LeaveCell(CELL_LIST[X][Y], self)
                 end
             end
 
-            InitCells(self)
+            for key, __ in next, actorAlreadyChecked do
+                actorAlreadyChecked[key] = nil
+            end
+            actorAlreadyChecked[self] = true
+            for X = self.minX, self.maxX do
+                for Y = self.minY, self.maxY do
+                    EnterCell(CELL_LIST[X][Y], self)
+                end
+            end
 
             if self.cellsVisualized then
                 RedrawCellVisualizers(self)
@@ -1971,7 +2005,10 @@ do
         end
 
         local selfFunc, actorFunc
-        for __, actor in ipairs(self.usesCells and celllessActorList or actorList) do
+        local list = self.usesCells and celllessActorList or actorList
+        local actor
+        for i = 1, #list do
+            actor = list[i]
             if not pairList[actor][self] and not pairList[self][actor] then
                 selfFunc = GetInteractionFunc(self, actor)
                 actorFunc = GetInteractionFunc(actor, self)
@@ -3100,6 +3137,10 @@ do
     end
 
     local function Interpolate()
+        if cycle.isHalted then
+            return
+        end
+
         interpolationCounter = interpolationCounter + 1
         if interpolationCounter == 1 then
             return
@@ -3153,7 +3194,7 @@ do
         local MAX_STEPS = MAX_STEPS
         local evalCounter = cycle.unboundCounter - (cycle.unboundCounter // 10)*10 + 1
         local startTime = os.clock()
-        local crashingPairOrCallback, crashingActorA, crashingActorB, success, err
+        local crashingPairOrCallback, success, err
 
         interpolationCounter = 0
         for i = 1, #interpolatedPairs do
@@ -3213,7 +3254,7 @@ do
 
         ALICE_Where = "callbacks"
 
-        if ALICE_Config.PROCTECTED_MODE then
+        if ALICE_Config.PROTECTED_MODE then
             while userCallbacks.first and userCallbacks.first.callCounter == cycle.unboundCounter do
                 if ALICE_Config.CRASH_DUMP then
                     CrashDump()
@@ -3263,7 +3304,7 @@ do
             for i = 1, 10 do
                 averageEvalTime = averageEvalTime + (debug.evaluationTime[i] or 0)/10
             end
-            Warning("eval time: |cffffcc00" .. string.format("\x25.2f", 1000*averageEvalTime) .. "ms|r, actors: " .. #actorList .. ", pairs: " .. numPairs[currentCounter] + numEveryStepPairs .. ", cell checks: " .. numCellChecks[currentCounter])
+            Warning("eval time: |cffffcc00" .. string.format("%.2f", 1000*averageEvalTime) .. "ms|r, actors: " .. #actorList .. ", pairs: " .. numPairs[currentCounter] + numEveryStepPairs .. ", cell checks: " .. numCellChecks[currentCounter])
         end
 
         if debug.enabled then
@@ -3276,7 +3317,7 @@ do
 
         --Every Step Cycle
         currentPair = firstEveryStepPair
-        if ALICE_Config.PROCTECTED_MODE then
+        if ALICE_Config.PROTECTED_MODE then
             local pairsToRemove
             for __ = 1, numEveryStepPairs do
                 currentPair = currentPair[0x5]
@@ -3290,8 +3331,6 @@ do
                     if not success then
                         if not crashingPairOrCallback then
                             crashingPairOrCallback = currentPair
-                            crashingActorA = currentPair[0x1]
-                            crashingActorB = currentPair[0x2]
                         end
                         pairsToRemove = pairsToRemove or {}
                         pairsToRemove[#pairsToRemove + 1] = currentPair
@@ -3301,7 +3340,9 @@ do
             if pairsToRemove then
                 for i = 1, #pairsToRemove do
                     RemovePairFromEveryStepList(pairsToRemove[i])
-                    if pairsToRemove[i][0x2] ~= SELF_INTERACTION_ACTOR then
+                    if pairsToRemove[i][0x2] == SELF_INTERACTION_ACTOR then
+                        pairsToRemove[i][0x1].selfInteractions[pairsToRemove[i][0x8]] = nil
+                    else
                         pairingExcluded[pairsToRemove[i]][0x1][0x2] = true
                         pairingExcluded[pairsToRemove[i]][0x2][0x1] = true
                     end
@@ -3326,7 +3367,7 @@ do
         --Variable Step Cycle
         local returnValue
         local pairsThisStep = whichPairs[currentCounter]
-        if ALICE_Config.PROCTECTED_MODE then
+        if ALICE_Config.PROTECTED_MODE then
             for i = 1, numPairs[currentCounter] do
                 currentPair = pairsThisStep[i]
                 if currentPair.destructionQueued then
@@ -3352,8 +3393,6 @@ do
                         err = returnValue
                         if not crashingPairOrCallback then
                             crashingPairOrCallback = currentPair
-                            crashingActorA = currentPair[0x1]
-                            crashingActorB = currentPair[0x2]
                         end
                         currentPair[0x5] = DO_NOT_EVALUATE
                     elseif returnValue then
@@ -3450,7 +3489,6 @@ do
 
         if crashingPairOrCallback then
             if not debug.errors[err] then
-                PrintCrashMessage(crashingPairOrCallback, crashingActorA, crashingActorB)
                 error(err, 0)
                 debug.errors[err] = true
             end
@@ -3616,7 +3654,7 @@ do
     end
 
     local function OnCtrlR()
-        Warning("Going to step " .. cycle.unboundCounter + 1 .. " |cffaaaaaa(" .. string.format("\x25.2f", config.MIN_INTERVAL*(cycle.unboundCounter + 1)) .. "s)|r.")
+        Warning("Going to step " .. cycle.unboundCounter + 1 .. " |cffaaaaaa(" .. string.format("%.2f", config.MIN_INTERVAL*(cycle.unboundCounter + 1)) .. "s)|r.")
         Main(true)
         if debug.gameIsPaused then
             ALICE_ForAllObjectsDo(function(unit) PauseUnit(unit, true) end, "unit")
@@ -3702,7 +3740,15 @@ do
 
         if not debug.enabled then
             debug.enabled = true
-            BlzLoadTOCFile("CustomTooltip.toc")
+            if not BlzLoadTOCFile("CustomTooltip.toc") then
+                if WSCodeConfig then
+                    if not BlzLoadTOCFile(WSCodeConfig.editor.ASSET_SUBFOLDER .. "\\CodeEditor.toc") then
+                        print("|cffff0000Warning:|r CustomTooltip.toc failed to load.")
+                    end
+                else
+                    print("|cffff0000Warning:|r CustomTooltip.toc failed to load.")
+                end
+            end
             debug.tooltip = BlzCreateFrame("CustomTooltip", BlzGetOriginFrame(ORIGIN_FRAME_WORLD_FRAME, 0), 0, 0)
             BlzFrameSetAbsPoint(debug.tooltip, FRAMEPOINT_BOTTOMRIGHT, 0.8, 0.165)
             BlzFrameSetSize(debug.tooltip, 0.32, 0.0)
@@ -4237,7 +4283,7 @@ do
         TriggerAddAction(trig, OnUnitDeath)
 
         local G = CreateGroup()
-        GroupEnumUnitsInRect(G, GetPlayableMapRect(), nil)
+        GroupEnumUnitsInRect(G, bj_mapInitialPlayableArea, nil)
         ForGroup(G, function()
             local u = GetEnumUnit()
             if CreateUnitActor(u) then
@@ -4382,6 +4428,13 @@ do
         ---@param enable boolean
         ShowUnit = function(whichUnit, enable)
             oldShowUnit(whichUnit, enable)
+            if not GetActor(whichUnit) then
+                if CreateUnitActor(whichUnit) then
+                    for __, func in ipairs(eventHooks.onUnitEnter) do
+                        func(whichUnit)
+                    end
+                end
+            end
             ALICE_Suspend(whichUnit, not enable)
         end
 
@@ -4482,6 +4535,10 @@ do
         end
 
         local oldCreateItem = CreateItem
+        ---@param itemid integer
+        ---@param x number
+        ---@param y number
+        ---@return item | Item
         CreateItem = function(itemid, x, y)
             local newItem = oldCreateItem(itemid, x, y)
             if CreateItemActor(newItem) then
@@ -4545,7 +4602,7 @@ do
     if OnInit then
         OnInit.final("ALICE", Init)
     else
-        --WSCode.InitFinal(Init)
+        WSCode.InitFinal(Init)
     end
     --#endregion
 
@@ -4566,7 +4623,6 @@ do
     -- - bindToBuff
     -- - bindToOrder
     -- - isStationary
-    -- - onActorDestroy
     -- - zOffset
     -- - cellCheckInterval
     -- - persistOnDeath
@@ -4775,6 +4831,9 @@ do
 
         if Debug and ALICE_Config.STORE_TRACEBACK_ON_CALLBACKS then
             new.traceback = Debug.traceback()
+            if new.traceback:find("ALICE traceback") then
+                new.traceback = new.traceback:sub(1, new.traceback:find("ALICE traceback") - 2)
+            end
         end
 
         AddUserCallback(new)
@@ -4805,6 +4864,9 @@ do
 
         if Debug and ALICE_Config.STORE_TRACEBACK_ON_CALLBACKS then
             new.traceback = Debug.traceback()
+            if new.traceback:find("ALICE traceback") then
+                new.traceback = new.traceback:sub(1, new.traceback:find("ALICE traceback") - 2)
+            end
         end
 
         AddUserCallback(new)
@@ -4821,6 +4883,9 @@ do
         if callback == nil then
             error("No callback function specified.")
         end
+        if not timers.MASTER then
+            error("Attempted to call ALICE function before ALICE has initialized.")
+        end
 
         local host = pack(...)
         host.callback = callback
@@ -4829,6 +4894,9 @@ do
 
         if Debug and ALICE_Config.STORE_TRACEBACK_ON_CALLBACKS then
             host.traceback = Debug.traceback()
+            if host.traceback:find("ALICE traceback") then
+                host.traceback = host.traceback:sub(1, host.traceback:find("ALICE traceback") - 2)
+            end
         end
 
         local actor = CreateStub(host)
@@ -4850,6 +4918,9 @@ do
         if howOften <= 0 then
             return nil
         end
+        if not timers.MASTER then
+            error("Attempted to call ALICE function before ALICE has initialized.")
+        end
 
         local host = pack(...)
         host.callback = callback
@@ -4860,12 +4931,45 @@ do
 
         if Debug and ALICE_Config.STORE_TRACEBACK_ON_CALLBACKS then
             host.traceback = Debug.traceback()
+            if host.traceback:find("ALICE traceback") then
+                host.traceback = host.traceback:sub(1, host.traceback:find("ALICE traceback") - 2)
+            end
         end
 
         local actor = CreateStub(host)
         actor.periodicPair = CreatePair(actor, SELF_INTERACTION_ACTOR, RepeatedWrapper)
 
         return host
+    end
+
+    ---@param callback function
+    ---@param enable boolean
+    ---@param persistOnHalt? boolean
+    function ALICE_CallExclusive(callback, enable, persistOnHalt)
+        if not timers.MASTER then
+            error("Attempted to call ALICE function before ALICE has initialized.")
+        end
+
+        if enable then
+            if not CALL_EXCLUSIVE_ACTOR.selfInteractions[callback] then
+                CALL_EXCLUSIVE_ACTOR.selfInteractions[callback] = CreatePair(CALL_EXCLUSIVE_ACTOR, SELF_INTERACTION_ACTOR, callback)
+                if persistOnHalt then
+                    cycle.persistingCallbacks[#cycle.persistingCallbacks + 1] = callback
+                    cycle.persistingCallbackCounter[callback] = 1
+                end
+            end
+        elseif CALL_EXCLUSIVE_ACTOR.selfInteractions[callback] then
+            AddDelayedCallback(DestroyPair, CALL_EXCLUSIVE_ACTOR.selfInteractions[callback])
+            CALL_EXCLUSIVE_ACTOR.selfInteractions[callback] = nil
+            if functionPersistOnHalt[callback] then
+                for i = 1, #cycle.persistingCallbacks do
+                    if cycle.persistingCallbacks[i] == callback then
+                        table.remove(cycle.persistingCallbacks, i)
+                    end
+                end
+            end
+        end
+        functionPersistOnHalt[callback] = persistOnHalt
     end
 
     ---Returns the remaining time until the first execution of a callback returned by ALICE_CallDelayed, ALICE_PairCallDelayed, ALICE_CallPeriodic, or ALICE_CallRepeated. Returns 0 if the callback has already been executed or is invalid.
@@ -4925,7 +5029,7 @@ do
                 end
                 return true
             else
-                if callback.callCounter == nil or callback.callCounter <= cycle.unboundCounter then
+                if callback.callCounter == nil or callback.callCounter < cycle.unboundCounter or (callback.callCounter == cycle.unboundCounter and callback == userCallbacks.first) then
                     return false
                 end
 
@@ -5020,6 +5124,8 @@ do
                     RemoveUserCallbackFromList(callback)
                 else
                     callback.callCounter = cycle.unboundCounter + callback.stepsRemaining
+                    callback.next = nil
+                    callback.previous = nil
                     AddUserCallback(callback)
                 end
                 return
@@ -5044,16 +5150,18 @@ do
     --Enum API
     --===========================================================================================================================================================
 
-    ---Enum functions return a table with all objects that have the specified identifier. Identifier can be a string or a table. If it is a table, the last entry must be MATCHING_TYPE_ANY or MATCHING_TYPE_ALL. Optional condition to specify an additional filter function, which takes the enumerated objects as an argument and returns a boolean. Additional arguments are passed into the filter function.
+---Enum functions return a table with all objects that have the specified identifier. Identifier can be a string or a table. If it is a table, the last entry must be MATCHING_TYPE_ANY or MATCHING_TYPE_ALL. Optional condition to specify an additional filter function, which takes the enumerated objects as an argument and returns a boolean. Additional arguments are passed into the filter function.
     ---@param identifier string | table
-    ---@param condition? function
+    ---@param condition? fun(enumObject: Object, vararg: any):boolean
     ---@vararg any
     ---@return Object[]
     function ALICE_EnumObjects(identifier, condition, ...)
         local returnTable = GetTable()
 
+        local actor
         if type(identifier) == "string" then
-            for __, actor in ipairs(actorList) do
+            for i = 1, #actorList do
+                actor = actorList[i]
                 if actor.identifier[identifier] and (condition == nil or condition(actor.host, ...)) then
                     if not actor.isSuspended or includeSuspended then
                         returnTable[#returnTable + 1] = actor.host
@@ -5061,7 +5169,8 @@ do
                 end
             end
         else
-            for __, actor in ipairs(actorList) do
+            for i = 1, #actorList do
+                actor = actorList[i]
                 if HasIdentifierFromTable(actor, identifier) and (condition == nil or condition(actor.host, ...)) then
                     if not actor.isSuspended or includeSuspended then
                         returnTable[#returnTable + 1] = actor.host
@@ -5076,12 +5185,12 @@ do
     ---Performs the action on all objects that have the specified identifier. Identifier can be a string or a table. If it is a table, the last entry must be MATCHING_TYPE_ANY or MATCHING_TYPE_ALL. Optional condition to specify an additional filter function, which takes the enumerated objects as an argument and returns a boolean.  Additional arguments are passed into both the filter and the action function.
     ---@param action function
     ---@param identifier string | table
-    ---@param condition function | nil
+    ---@param condition? fun(enumObject: Object, vararg: any):boolean
     ---@vararg any
     function ALICE_ForAllObjectsDo(action, identifier, condition, ...)
         local list = ALICE_EnumObjects(identifier, condition, ...)
-        for __, object in ipairs(list) do
-            action(object, ...)
+        for i = 1, #list do
+            action(list[i], ...)
         end
         ReturnTable(list)
     end
@@ -5091,7 +5200,7 @@ do
     ---@param y number
     ---@param range number
     ---@param identifier string | table
-    ---@param condition? function
+    ---@param condition? fun(enumObject: Object, vararg: any):boolean
     ---@vararg any
     ---@return Object[]
     function ALICE_EnumObjectsInRange(x, y, range, identifier, condition, ...)
@@ -5158,12 +5267,12 @@ do
     ---@param y number
     ---@param range number
     ---@param identifier string | table
-    ---@param condition? function
+    ---@param condition? fun(enumObject: Object, vararg: any):boolean
     ---@vararg any
     function ALICE_ForAllObjectsInRangeDo(action, x, y, range, identifier, condition, ...)
         local list = ALICE_EnumObjectsInRange(x, y, range, identifier, condition, ...)
-        for __, object in ipairs(list) do
-            action(object, ...)
+        for i = 1, #list do
+            action(list[i], ...)
         end
         ReturnTable(list)
     end
@@ -5174,7 +5283,7 @@ do
     ---@param maxx number
     ---@param maxy number
     ---@param identifier string | table
-    ---@param condition? function
+    ---@param condition? fun(enumObject: Object, vararg: any):boolean
     ---@vararg any
     ---@return Object[]
     function ALICE_EnumObjectsInRect(minx, miny, maxx, maxy, identifier, condition, ...)
@@ -5240,12 +5349,12 @@ do
     ---@param maxx number
     ---@param maxy number
     ---@param identifier string | table
-    ---@param condition? function
+    ---@param condition? fun(enumObject: Object, vararg: any):boolean
     ---@vararg any
     function ALICE_ForAllObjectsInRectDo(action, minx, miny, maxx, maxy, identifier, condition, ...)
         local list = ALICE_EnumObjectsInRect(minx, miny, maxx, maxy, identifier, condition, ...)
-        for __, object in ipairs(list) do
-            action(object, ...)
+        for i = 1, #list do
+            action(list[i], ...)
         end
         ReturnTable(list)
     end
@@ -5257,7 +5366,7 @@ do
     ---@param y2 number
     ---@param halfWidth number
     ---@param identifier string | table
-    ---@param condition? function
+    ---@param condition? fun(enumObject: Object, vararg: any):boolean
     ---@vararg any
     ---@return Object[]
     function ALICE_EnumObjectsInLineSegment(x1, y1, x2, y2, halfWidth, identifier, condition, ...)
@@ -5399,12 +5508,12 @@ do
     ---@param y2 number
     ---@param halfWidth number
     ---@param identifier string | table
-    ---@param condition? function
+    ---@param condition? fun(enumObject: Object, vararg: any):boolean
     ---@vararg any
     function ALICE_ForAllObjectsInLineSegmentDo(action, x1, y1, x2, y2, halfWidth, identifier, condition, ...)
         local list = ALICE_EnumObjectsInLineSegment(x1, y1, x2, y2, halfWidth, identifier, condition, ...)
-        for __, object in ipairs(list) do
-            action(object, ...)
+        for i = 1, #list do
+            action(list[i], ...)
         end
         ReturnTable(list)
     end
@@ -5412,7 +5521,7 @@ do
     ---Function for performant enumeration of objects within a region. The region does not use the native region type, but is represented by a rect, a rect array or a table or table array, where each table must hold the minX, minY, maxX, and maxY fields. Region data is cached on the first call and the region object must not change afterwards. Identifier can be a string or a table. If it is a table, the last entry must be MATCHING_TYPE_ANY or MATCHING_TYPE_ALL. Optional condition to specify an additional filter function, which takes the enumerated objects as an argument and returns a boolean. Additional arguments are passed into the filter function.
     ---@param whichRegion rect | rect[] | WonderRect | WonderRegion
     ---@param identifier string | table
-    ---@param condition? function
+    ---@param condition? fun(enumObject: Object, vararg: any):boolean
     ---@vararg any
     ---@return Object[]
     function ALICE_EnumObjectsInRegion(whichRegion, identifier, condition, ...)
@@ -5567,12 +5676,12 @@ do
     ---@param action function
     ---@param whichRegion rect[] | table[]
     ---@param identifier string | table
-    ---@param condition? function
+    ---@param condition? fun(enumObject: Object, vararg: any):boolean
     ---@vararg any
     function ALICE_ForAllObjectsInRegionDo(action, whichRegion, identifier, condition, ...)
         local list = ALICE_EnumObjectsInRegion(whichRegion, identifier, condition, ...)
-        for __, object in ipairs(list) do
-            action(object, ...)
+        for i = 1, #list do
+            action(list[i], ...)
         end
         ReturnTable(list)
     end
@@ -5595,7 +5704,7 @@ do
     ---@param y number
     ---@param identifier string | table
     ---@param cutOffDistance? number
-    ---@param condition? function
+    ---@param condition? fun(enumObject: Object, vararg: any):boolean
     ---@vararg any
     ---@return Object | nil
     function ALICE_GetClosestObject(x, y, identifier, cutOffDistance, condition, ...)
@@ -5821,7 +5930,7 @@ do
     ---@param identifier string | table
     ---@param maxAmount integer
     ---@param cutOffDistance? number
-    ---@param condition? function
+    ---@param condition? fun(enumObject: Object, vararg: any):boolean
     ---@vararg any
     ---@return Object[]
     function ALICE_GetNClosestObjects(x, y, identifier, maxAmount, cutOffDistance, condition, ...)
@@ -6162,7 +6271,7 @@ do
 
         for __, functionType in ipairs(sortedKeys) do
             if (100*functionCount[functionType]/countActivePairs) > 0.1 then
-                statistic = statistic .. "\n" .. string.format("\x25.2f", 100*functionCount[functionType]/countActivePairs) .. "\x25 |cffffcc00" .. Function2String(functionType) .. "|r |cffaaaaaa(" .. functionCount[functionType] .. ")|r"
+                statistic = statistic .. "\n" .. string.format("%.2f", 100*functionCount[functionType]/countActivePairs) .. "% |cffffcc00" .. Function2String(functionType) .. "|r |cffaaaaaa(" .. functionCount[functionType] .. ")|r"
             end
         end
 
@@ -7036,6 +7145,9 @@ do
     ---@param z? number
     ---@param useSetXY? boolean
     function ALICE_Teleport(object, x, y, z, useSetXY)
+        if object == nil then
+            return
+        end
         if type(object) == "table" then
             if object.anchor and object.anchor ~= object then
                 error("Attempted to teleport object that is anchored to another object.")
@@ -7133,6 +7245,14 @@ do
         end
 
         return false, false
+    end
+
+    ---@return Object | nil, Object | nil
+    function ALICE_GetCurrent()
+        if currentPair ~= OUTSIDE_OF_CYCLE then
+            return currentPair[0x3], currentPair[0x4]
+        end
+        return nil, nil
     end
 
     ---Access the pair for objects A and B and, if it exists, return the data table stored for that pair. If objectB is a function, returns the data of the self-interaction of objectA using the specified function.
