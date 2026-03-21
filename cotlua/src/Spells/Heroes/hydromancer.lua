@@ -205,7 +205,7 @@ OnInit.final("HydromancerSpells", function(Require)
             range = function(pid) local ablev = GetUnitAbilityLevel(Hero[pid], thistype.id) return 500. + 100. * ablev end,
         }
 
-        ---@type fun(pt: PlayerTimer)
+        ---@type fun(pt: PlayerTimer): boolean
         local function periodic(pt)
             local Ax = pt.x + 250. * math.cos(pt.angle + bj_PI * 5. / 8.)
             local Bx = pt.x + 250. * math.cos(pt.angle + bj_PI * 3. / 8.)
@@ -226,24 +226,22 @@ OnInit.final("HydromancerSpells", function(Require)
             pt.time = pt.time + FPS_32
 
             if pt.time <= FPS_32 then
-                SetUnitAnimation(pt.target, "stand")
+                BlzPlaySpecialEffect(pt.sfx, ANIM_TYPE_STAND)
             elseif pt.time >= 1. then
-                SetUnitTimeScale(pt.target, 0.)
+                BlzSetSpecialEffectTime(pt.sfx, 0.)
             end
 
             if pt.dist > 0. then
-                local ug = CreateGroup()
-                MakeGroupInRange(pt.pid, ug, pt.x, pt.y, 600., Condition(FilterEnemy))
+                MakeGroupInRange(pt.pid, pt.ug, pt.x, pt.y, 600., Condition(FilterEnemy))
 
                 pt.x = pt.x + 20 * math.cos(pt.angle)
                 pt.y = pt.y + 20 * math.sin(pt.angle)
-                SetUnitXBounded(pt.target, pt.x)
-                SetUnitYBounded(pt.target, pt.y)
+                BlzSetSpecialEffectPosition(pt.sfx, pt.x, pt.y, GetLocZ(pt.x, pt.y) + 50.)
 
                 local x = 0.
                 local y = 0.
 
-                for target in each(ug) do
+                for target in each(pt.ug) do
                     x = GetUnitX(target)
                     y = GetUnitY(target)
 
@@ -280,14 +278,12 @@ OnInit.final("HydromancerSpells", function(Require)
                     end
                 end
 
-                DestroyGroup(ug)
-
-                pt.timer:callDelayed(FPS_32, periodic, pt)
-            else
-                SetUnitTimeScale(pt.target, 2.)
-                SetUnitAnimation(pt.target, "death")
-                pt:destroy()
+                return true
             end
+
+            BlzPlaySpecialEffectWithTimeScale(pt.sfx, ANIM_TYPE_DEATH, 2.)
+
+            return false
         end
 
         function thistype:onCast()
@@ -295,10 +291,11 @@ OnInit.final("HydromancerSpells", function(Require)
 
             pt.angle = self.angle
             pt.dist = self.range * LBOOST[self.pid]
-            pt.target = Dummy.create(self.x, self.y, 0, 0).unit
+            pt.sfx = AddSpecialEffect("Abilities\\Spells\\Other\\CrushingWave\\CrushingWaveMissile.mdl", self.x, self.y)
             pt.x = self.x
             pt.y = self.y
             pt.infused = false
+            pt.ug = CreateGroup()
 
             local b = InfusedWaterBuff:get(nil, self.caster)
             if b then
@@ -306,12 +303,10 @@ OnInit.final("HydromancerSpells", function(Require)
                 pt.infused = true
             end
 
-            BlzSetUnitSkin(pt.target, FourCC('h04X'))
-            SetUnitAnimation(pt.target, "birth")
-            SetUnitScale(pt.target, 0.8, 0.8, 0.8)
-            BlzSetUnitFacingEx(pt.target, pt.angle * bj_RADTODEG)
+            BlzSetSpecialEffectScale(pt.sfx, 0.8)
+            BlzSetSpecialEffectYaw(pt.sfx, pt.angle)
 
-            pt.timer:callDelayed(FPS_32, periodic, pt)
+            pt:startLoop(FPS_32, periodic)
         end
     end
 
@@ -331,7 +326,7 @@ OnInit.final("HydromancerSpells", function(Require)
 
         local function on_hit(source, target)
             local pid = GetPlayerId(GetOwningPlayer(source)) + 1
-            local pt = TimerList[pid]:get(BLIZZARD.id, source)
+            local pt = TimerList[pid]:get(thistype.id, source)
 
             if pt then
                 local dmg = pt.dmg
@@ -343,7 +338,7 @@ OnInit.final("HydromancerSpells", function(Require)
         end
 
         function thistype:onCast()
-            local pt = TimerList[self.pid]:add()
+            local pt = TimerList[self.pid]:add(thistype.id)
             pt.dur = self.dur * LBOOST[self.pid]
 
             local dummy = Dummy.create(self.x, self.y, FourCC('A02O'), 1, pt.dur + 3.)
@@ -351,7 +346,6 @@ OnInit.final("HydromancerSpells", function(Require)
             pt.source = dummy.unit
             pt.aoe = self.aoe * LBOOST[self.pid]
             pt.dmg = self.dmg
-            pt.tag = thistype.id
             pt.infused = false
 
             BlzSetAbilityIntegerLevelField(BlzGetUnitAbility(pt.source, FourCC('A02O')), ABILITY_ILF_NUMBER_OF_WAVES, 0, pt.dur // 0.6)
@@ -369,7 +363,7 @@ OnInit.final("HydromancerSpells", function(Require)
             IssuePointOrder(pt.source, "blizzard", self.targetX, self.targetY)
             EVENT_DUMMY_ON_HIT:register_unit_action(pt.source, on_hit)
 
-            pt.timer:callDelayed(pt.dur, PlayerTimer.destroy, pt)
+            pt:after(pt.dur, nil)
         end
     end
 
@@ -385,9 +379,9 @@ OnInit.final("HydromancerSpells", function(Require)
             dmg = function(pid) return GetHeroInt(Hero[pid], true) * 0.5 end,
         }
 
-        ---@type fun(pt: PlayerTimer)
+        ---@type fun(pt: PlayerTimer): boolean
         local function periodic(pt)
-            pt.time = (pt.time + 0.01) * 1.1 --acceleration
+            pt.time = (pt.time + 0.01) * 1.1 -- acceleration
 
             if pt.time < 1. then
                 pt.curve:calcT(pt.time)
@@ -403,7 +397,7 @@ OnInit.final("HydromancerSpells", function(Require)
                     SetUnitFlyHeight(pt.source, GetUnitFlyHeight(pt.source) - pt.time * 40, 0.)
                 end
 
-                pt.timer:callDelayed(FPS_32, periodic, pt)
+                return true
             else
                 SetUnitXBounded(pt.source, GetUnitX(pt.target))
                 SetUnitYBounded(pt.source, GetUnitY(pt.target))
@@ -417,12 +411,13 @@ OnInit.final("HydromancerSpells", function(Require)
                 else
                     DamageTarget(Hero[pt.pid], pt.target, pt.dmg * BOOST[pt.pid], ATTACK_TYPE_NORMAL, MAGIC, thistype.tag)
                 end
-                pt:destroy()
+
+                return false
             end
         end
 
-        ---@type fun(pt: PlayerTimer)
-        function thistype.onSpawn(pt)
+        ---@type fun(pt: PlayerTimer): boolean
+        local function on_spawn(pt)
             pt.time = pt.time + 1
 
             if pt.time <= pt.dur then
@@ -441,16 +436,16 @@ OnInit.final("HydromancerSpells", function(Require)
                 SetUnitFlyHeight(pt2.source, 150.00, 0.00)
 
                 pt2.curve = BezierCurve.create()
-                --add bezier points
+                -- add bezier points
                 pt2.curve:addPoint(x + 100. * math.cos(angle), y + 100. * math.sin(angle))
                 pt2.curve:addPoint(x + 600. * math.cos(angle), y + 600. * math.sin(angle))
                 pt2.curve:addPoint(GetUnitX(pt.target), GetUnitY(pt.target))
 
-                pt.timer:callDelayed(0.05, thistype.onSpawn, pt)
-                pt2.timer:callDelayed(FPS_32, periodic, pt2)
-            else
-                pt:destroy()
+                pt2:startLoop(FPS_32, periodic)
+                return true
             end
+
+            return false
         end
 
         function thistype:onCast()
@@ -468,7 +463,8 @@ OnInit.final("HydromancerSpells", function(Require)
                 pt.infused = true
             end
 
-            pt.timer:callDelayed(0.05, thistype.onSpawn, pt)
+            pt:startLoop(0.05, on_spawn)
+            thistype.onSpawn(pt)
         end
     end
 end, Debug and Debug.getLine())
