@@ -10,6 +10,10 @@ OnInit.global("Helper", function(Require)
 
     local TQ = TimerQueue
 
+    local floor    = math.floor
+    local tostring = tostring
+    local sub      = string.sub
+    local concat   = table.concat
     local pack = string.pack
     local FPS_32 = FPS_32
 
@@ -1322,20 +1326,55 @@ function SelectGroupedRegion(groupnumber)
     return RegionCount[GetRandomInt(lowBound, highBound - 1)]
 end
 
---formats a number to a string with commas (no decimals), Lua handles string representation of numbers greater than integer limit
+-- formats a number to a string with commas (no decimals)
 ---@param value number
 ---@return string
 function RealToString(value)
+    -- let Lua handle giant values directly
     if value >= INT_32_LIMIT then
-        return tostring(tonumber(value))
+        return tostring(value)
     end
 
-    local s = tostring(math.floor(value + 0.5))
-    local _, _, minus, int = s:find("([-]?)(%d+)")
+    -- handle sign
+    local negative = false
+    if value < 0 then
+        negative = true
+        value = -value
+    end
 
-    int = int:reverse():gsub("(%d%d%d)", "%1,")
+    -- round to nearest int
+    local s = tostring(floor(value + 0.5))
+    local len = #s
 
-    return minus .. int:reverse():gsub("^,", "")
+    -- fast path: no commas needed
+    if len <= 3 then
+        return negative and ("-" .. s) or s
+    end
+
+    -- split "head" group and remaining 3-digit groups
+    local first = len % 3
+    if first == 0 then first = 3 end
+
+    local parts = {}
+    local idx = 1
+
+    -- first group (1–3 digits, no leading comma)
+    parts[idx] = sub(s, 1, first)
+    idx = idx + 1
+
+    -- remaining groups in chunks of 3 with commas
+    for i = first + 1, len, 3 do
+        parts[idx] = ","
+        parts[idx + 1] = sub(s, i, i + 2)
+        idx = idx + 2
+    end
+
+    local out = concat(parts)
+    if negative then
+        out = "-" .. out
+    end
+
+    return out
 end
 
 ---@type fun(pid: integer, prof: integer): boolean
@@ -1622,7 +1661,7 @@ function ParseItemTooltip(itm, s)
     local gmatch, gsub = string.gmatch, string.gsub
 
     -- store original tooltip
-    ItemData[itemid][ITEM_TOOLTIP] = orig
+    ItemData[itemid].tooltip = orig
 
     -- store original icon path
     ItemData[itemid].path = BlzGetItemIconPath(itm)
@@ -1721,11 +1760,30 @@ function ParseItemTooltip(itm, s)
 end
 
 local function finish_cast(u)
-    PauseUnit(u, false)
+    Unit[u]._casting = false
 end
 
----@type fun(u: unit, id: integer, dur: number, anim: integer, timescale: number)
-function CastSpell(u, id, dur, anim, timescale)
+local function finish_pause(u, pause_override)
+    if not pause_override then
+        PauseUnit(u, false)
+    end
+    TQ:callDelayed(3., finish_cast, u) -- internal spacing between boss spell casts
+end
+
+---@param whichRect rect
+---@return number x
+---@return number y
+function GetRandomXYInRect(whichRect)
+	return GetRandomReal(GetRectMinX(whichRect), GetRectMaxX(whichRect)), GetRandomReal(GetRectMinY(whichRect), GetRectMaxY(whichRect))
+end
+
+--- Helper for boss casting
+---@type fun(u: unit, id: integer, dur: number, anim: integer, timescale: number, pause_override: boolean?): boolean
+function CastSpell(u, id, dur, anim, timescale, pause_override)
+    if not BlzGetUnitAbilityCooldownRemaining(target, thistype.id) <= 0. or not UnitAlive(u) then
+        return false
+    end
+
     BlzStartUnitAbilityCooldown(u, id, BlzGetUnitAbilityCooldown(u, id, GetUnitAbilityLevel(u, id) - 1))
     DelayAnimation(BOSS_ID, u, dur, 0, 1., true)
     if anim ~= -1 then
@@ -1733,9 +1791,13 @@ function CastSpell(u, id, dur, anim, timescale)
         SetUnitAnimationByIndex(u, anim)
     end
 
-    Unit[u].cast_time = dur
-    PauseUnit(u, true)
-    TQ:callDelayed(dur, finish_cast, u)
+    Unit[u]._casting = true
+    if not pause_override then
+        PauseUnit(u, true)
+    end
+    TQ:callDelayed(dur, finish_pause, u, pause_override)
+
+    return true
 end
 
 ---@type fun(pid: integer, x: number, y: number)
@@ -1747,19 +1809,6 @@ function MoveHero(pid, x, y)
     BlzUnitClearOrders(Hero[pid], false)
 
     local r = GetRectFromCoords(x, y)
-
-    if r then
-        SetCamera(pid, r)
-    end
-end
-
----@type fun(pid: integer, loc: location)
-function MoveHeroLoc(pid, loc)
-    SetUnitPositionLoc(Hero[pid], loc)
-    SetUnitPositionLoc(HeroGrave[pid], loc)
-    BlzUnitClearOrders(Hero[pid], false)
-
-    local r = GetRectFromCoords(GetLocationX(loc), GetLocationY(loc))
 
     if r then
         SetCamera(pid, r)
