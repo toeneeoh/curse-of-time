@@ -193,41 +193,35 @@ OnInit.final("HeroSelect", function(Require)
                         BlzFrameSetText(name_label, hero.name)
                         BlzFrameSetModel(sprite_frame, hero.model, 1)
                         BlzFrameSetSpriteAnimate(sprite_frame, 2, 0)
-                    end
 
-                    -- populate stars
-                    for j = 1, 5 do
-                        local val = hero.stars[j]
-                        for k = 1, 3 do
-                            if val > k - 1 and val < k then
-                                if GetLocalPlayer() == p then
-                                    BlzFrameSetTexture(stars[j][k], "CharSelectStarHalf.dds", 0, true)
+                        -- populate stars
+                        for j = 1, 5 do
+                            local val = hero.stars[j]
+                            for k = 1, 3 do
+                                local tex
+                                if val > k - 1 and val < k then
+                                    tex = "CharSelectStarHalf.dds"
+                                elseif val >= k then
+                                    tex = "CharSelectStarWhole.dds"
+                                else
+                                    tex = "trans32.blp"
                                 end
-                            elseif val >= k then
-                                if GetLocalPlayer() == p then
-                                    BlzFrameSetTexture(stars[j][k], "CharSelectStarWhole.dds", 0, true)
-                                end
-                            else
-                                if GetLocalPlayer() == p then
-                                    BlzFrameSetTexture(stars[j][k], "trans32.blp", 0, true)
-                                end
+
+                                BlzFrameSetTexture(stars[j][k], tex, 0, true)
                             end
                         end
-                    end
 
-                    -- populate hero buttons
-                    for j = 1, 6 do
-                        if hero.skills[j] then
-                            local abil = FourCC(hero.skills[j])
-                            if GetLocalPlayer() == p then
+                        -- populate hero buttons
+                        for j = 1, 6 do
+                            if hero.skills[j] then
+                                local abil = FourCC(hero.skills[j])
+
                                 abilities[j]:visible(true)
                                 abilities[j]:icon(BlzGetAbilityIcon(abil))
                                 abilities[j]:setTooltipIcon(BlzGetAbilityIcon(abil))
                                 abilities[j]:setTooltipName(GetAbilityName(abil))
                                 abilities[j]:setTooltipText(Spells[abil]:getTooltip())
-                            end
-                        else
-                            if GetLocalPlayer() == p then
+                            else
                                 abilities[j]:visible(false)
                             end
                         end
