@@ -22,10 +22,10 @@ OnInit.final("Potion", function(Require)
     do
         ---@type fun(pot: Item)
         local potion_effect = function(pot)
-            local fheal = pot:getValue(ITEM_FLAT_HEAL, 0)
-            local fmana = pot:getValue(ITEM_FLAT_MANA, 0)
-            local pheal = pot:getValue(ITEM_PERCENT_HEAL, 0)
-            local pmana = pot:getValue(ITEM_PERCENT_MANA, 0)
+            local fheal = pot.cached_stats[ITEM_FLAT_HEAL]
+            local fmana = pot.cached_stats[ITEM_FLAT_MANA]
+            local pheal = pot.cached_stats[ITEM_PERCENT_HEAL]
+            local pmana = pot.cached_stats[ITEM_PERCENT_MANA]
 
             local heal = fheal + (0.01 * pheal * Unit[Hero[pot.pid]].hp)
             local mana = fmana + (0.01 * pmana * Unit[Hero[pot.pid]].mana)
@@ -155,7 +155,7 @@ OnInit.final("Potion", function(Require)
                     local pot = Profile[pid].hero.items[i]
 
                     if pot then
-                        pot.charges = pot:getValue(ITEM_CHARGES, 0)
+                        pot.charges = pot.cached_stats[ITEM_CHARGES]
                     end
                 end
                 INVENTORY.refresh(pid)
@@ -172,7 +172,7 @@ OnInit.final("Potion", function(Require)
             local pot = Profile[pid].hero.items[i]
 
             if pot then
-                price = price + ItemData[pot.id][ITEM_LEVEL_REQUIREMENT] ^ 2 + pot:getValue(ITEM_FLAT_HEAL, 0) * 0.5 + pot:getValue(ITEM_FLAT_MANA, 0) * 0.5
+                price = price + ItemData[pot.id][ITEM_LEVEL_REQUIREMENT] ^ 2 + pot.cached_stats[ITEM_FLAT_HEAL] * 0.5 + pot.cached_stats[ITEM_FLAT_MANA] * 0.5
             end
         end
 
