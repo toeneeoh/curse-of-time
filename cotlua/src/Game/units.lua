@@ -376,65 +376,65 @@ OnInit.final("Units", function(Require)
     -- prechaos bosses
 
     -- Minotaur
-    local boss = Boss.create(BOSS_TAUREN, Location(-11692., -12774.), 45., FourCC('O002'), "Minotaur", 75,
+    local boss = Boss.create(BOSS_TAUREN, -11692., -12774., 45., FourCC('O002'), "Minotaur", 75,
     0, 2000)
     -- Forgotten Mystic
-    boss = Boss.create(BOSS_MYSTIC, Location(-15435., -14354.), 270., FourCC('H045'), "Forgotten Mystic", 100,
+    boss = Boss.create(BOSS_MYSTIC, -15435., -14354., 270., FourCC('H045'), "Forgotten Mystic", 100,
     0, 2000)
     Unit[boss].mr = Unit[boss].mr * 0.5
     -- Hellfire Magi
-    boss = Boss.create(BOSS_HELLFIRE, GetRectCenter(gg_rct_Hell_Boss_Spawn), 315., FourCC('U00G'), "Hellfire Magi", 100,
+    boss = Boss.create(BOSS_HELLFIRE, GetRectCenterX(gg_rct_Hell_Boss_Spawn), GetRectCenterY(gg_rct_Hell_Boss_Spawn), 315., FourCC('U00G'), "Hellfire Magi", 100,
     0, 2000)
     Unit[boss].mr = Unit[boss].mr * 0.5
     -- Last Dwarf
-    boss = Boss.create(BOSS_DWARF, Location(11520., 15466.), 225., FourCC('H01V'), "Last Dwarf", 100,
+    boss = Boss.create(BOSS_DWARF, 11520., 15466., 225., FourCC('H01V'), "Last Dwarf", 100,
     0, 2000)
     Unit[boss].mr = Unit[boss].mr * 0.5
     -- Vengeful Test Paladin
-    boss = Boss.create(BOSS_PALADIN, GetRectCenter(gg_rct_Dark_Soul_Boss_Spawn), 270., FourCC('H02H'), "Vengeful Test Paladin", 140,
+    boss = Boss.create(BOSS_PALADIN, GetRectCenterX(gg_rct_Dark_Soul_Boss_Spawn), GetRectCenterY(gg_rct_Dark_Soul_Boss_Spawn), 270., FourCC('H02H'), "Vengeful Test Paladin", 140,
     0, 2000)
     Unit[boss].mr = Unit[boss].mr * 0.5
     -- Dragoon
-    boss = Boss.create(BOSS_DRAGOON, GetRectCenter(gg_rct_Thanatos_Boss_Spawn), 320., FourCC('O01B'), "Dragoon", 100,
+    boss = Boss.create(BOSS_DRAGOON, GetRectCenterX(gg_rct_Thanatos_Boss_Spawn), GetRectCenterY(gg_rct_Thanatos_Boss_Spawn), 320., FourCC('O01B'), "Dragoon", 100,
     0, 2000)
     Unit[boss].mr = Unit[boss].mr * 0.5
     -- Death Knight
-    boss = Boss.create(BOSS_DEATH_KNIGHT, Location(6932., -14177.), 0., FourCC('H040'), "Death Knight", 120,
+    boss = Boss.create(BOSS_DEATH_KNIGHT, 6932., -14177., 0., FourCC('H040'), "Death Knight", 120,
     0, 2000)
     -- Siren of the Tides
-    boss = Boss.create(BOSS_VASHJ, Location(-12375., -1181.), 0., FourCC('H020'), "Siren of the Tides", 75,
+    boss = Boss.create(BOSS_VASHJ, -12375., -1181., 0., FourCC('H020'), "Siren of the Tides", 75,
     0, 2000)
     Unit[boss].mr = Unit[boss].mr * 0.5
     -- Super Fun Happy Yeti
-    boss = Boss.create(BOSS_YETI, Location(15816., 6250.), 180., FourCC('n02H'), "Super Fun Happy Yeti", 0,
+    boss = Boss.create(BOSS_YETI, 15816., 6250., 180., FourCC('n02H'), "Super Fun Happy Yeti", 0,
     0, 2000)
     -- King of Ogres
-    boss = Boss.create(BOSS_OGRE, Location(-5242., -15630.), 135., FourCC('n03L'), "King of Ogres", 0,
+    boss = Boss.create(BOSS_OGRE, -5242., -15630., 135., FourCC('n03L'), "King of Ogres", 0,
     0, 2000)
     -- Nerubian Empress
-    boss = Boss.create(BOSS_NERUBIAN, GetRectCenter(gg_rct_Demon_Prince_Boss_Spawn), 315., FourCC('n02U'), "Nerubian Empress", 0,
+    boss = Boss.create(BOSS_NERUBIAN, GetRectCenterX(gg_rct_Demon_Prince_Boss_Spawn), GetRectCenterY(gg_rct_Demon_Prince_Boss_Spawn), 315., FourCC('n02U'), "Nerubian Empress", 0,
     0, 2000)
     -- Giant Polar Bear
-    boss = Boss.create(BOSS_POLAR_BEAR, Location(-16040., 6579.), 45., FourCC('n0pb'), "Giant Polar Bear", 0,
+    boss = Boss.create(BOSS_POLAR_BEAR, -16040., 6579., 45., FourCC('n0pb'), "Giant Polar Bear", 0,
     0, 2000)
     -- The Goddesses
-    boss = Boss.create(BOSS_LIFE, Location(-1840., -27400.), 230., FourCC('H04Q'), "The Goddesses", 180,
+    boss = Boss.create(BOSS_LIFE, -1840., -27400., 230., FourCC('H04Q'), "The Goddesses", 180,
     0, 2000)
     Unit[boss].mr = Unit[boss].mr * 0.5
     -- Hate
-    boss = Boss.create(BOSS_HATE, Location(-1977., -27116.), 230., FourCC('E00B'), "Hate", 180,
+    boss = Boss.create(BOSS_HATE, -1977., -27116., 230., FourCC('E00B'), "Hate", 180,
     0, 2000)
     Unit[boss].mr = Unit[boss].mr * 0.5
     -- Love
-    boss = Boss.create(BOSS_LOVE, Location(-1560., -27486.), 230., FourCC('E00D'), "Love", 180,
+    boss = Boss.create(BOSS_LOVE, -1560., -27486., 230., FourCC('E00D'), "Love", 180,
     0, 2000)
     Unit[boss].mr = Unit[boss].mr * 0.5
     -- Knowledge
-    boss = Boss.create(BOSS_KNOWLEDGE, Location(-1689., -27210.), 230., FourCC('E00C'), "Knowledge", 180,
+    boss = Boss.create(BOSS_KNOWLEDGE, -1689., -27210., 230., FourCC('E00C'), "Knowledge", 180,
     0, 2000)
     Unit[boss].mr = Unit[boss].mr * 0.5
     -- Arkaden
-    boss = Boss.create(BOSS_ARKADEN, Location(-1413., -15846.), 90., FourCC('H00O'), "Arkaden", 140,
+    boss = Boss.create(BOSS_ARKADEN, -1413., -15846., 90., FourCC('H00O'), "Arkaden", 140,
     0, 2000)
     Unit[boss].mr = Unit[boss].mr * 0.5
     local function arkaden_death()
