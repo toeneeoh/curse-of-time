@@ -250,7 +250,6 @@ ITEM_PERCENT_MANA                  = 0
 ITEM_CHARGES                       = 0
 ITEM_ABILITY                       = 0
 ITEM_ABILITY2                      = 0
-ITEM_TOOLTIP                       = 0
 ITEM_NOCRAFT                       = 0
 ITEM_TIER                          = 0
 ITEM_TYPE                          = 0
