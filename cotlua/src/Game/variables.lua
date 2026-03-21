@@ -79,6 +79,7 @@ OnInit.global("Variables", function()
         phys_damage  = 1.2,
         crit_chance  = 5.,
         crit_damage  = 100.,
+        mana_regen_max = 0,
         passive      = FourCC('A0HQ'),
         select       = FourCC('A07S'),
         armor        = 5,
@@ -101,6 +102,7 @@ OnInit.global("Variables", function()
         phys_damage  = 1.2,
         crit_chance  = 5.,
         crit_damage  = 100.,
+        mana_regen_max = 0,
         passive      = FourCC('A06N'),
         select       = FourCC('A07T'),
         armor        = 1,
@@ -123,6 +125,7 @@ OnInit.global("Variables", function()
         phys_damage  = 1.2,
         crit_chance  = 5.,
         crit_damage  = 100.,
+        mana_regen_max = 0,
         passive      = FourCC('A0I5'),
         select       = FourCC('A07U'),
         armor        = 7,
@@ -145,6 +148,7 @@ OnInit.global("Variables", function()
         phys_damage  = 1.2,
         crit_chance  = 5.,
         crit_damage  = 100.,
+        mana_regen_max = 0,
         passive      = FourCC('A0IE'),
         select       = FourCC('A07V'),
         armor        = 1,
@@ -167,6 +171,7 @@ OnInit.global("Variables", function()
         phys_damage  = 1.25,
         crit_chance  = 5.,
         crit_damage  = 100.,
+        mana_regen_max = 0,
         passive      = FourCC('A05E'),
         select       = FourCC('A029'),
         armor        = 2,
@@ -189,6 +194,7 @@ OnInit.global("Variables", function()
         phys_damage  = 1.2,
         crit_chance  = 5.,
         crit_damage  = 100.,
+        mana_regen_max = 0,
         passive      = FourCC('A0HW'),
         select       = FourCC('A07W'),
         armor        = 4,
@@ -211,6 +217,7 @@ OnInit.global("Variables", function()
         phys_damage  = 1.2,
         crit_chance  = 5.,
         crit_damage  = 100.,
+        mana_regen_max = 0,
         passive      = FourCC('A0DL'),
         select       = FourCC('A07Z'),
         armor        = 3,
@@ -233,6 +240,7 @@ OnInit.global("Variables", function()
         phys_damage  = 1.2,
         crit_chance  = 5.,
         crit_damage  = 100.,
+        mana_regen_max = 0,
         passive      = FourCC('A0I4'),
         select       = FourCC('A080'),
         armor        = 4,
@@ -255,6 +263,7 @@ OnInit.global("Variables", function()
         phys_damage  = 1.0,
         crit_chance  = 5.,
         crit_damage  = 100.,
+        mana_regen_max = 0,
         passive      = FourCC('A0EY'),
         select       = FourCC('A081'),
         armor        = 0,
@@ -277,6 +286,7 @@ OnInit.global("Variables", function()
         phys_damage  = 1.0,
         crit_chance  = 5.,
         crit_damage  = 100.,
+        mana_regen_max = 0,
         passive      = FourCC('A0I0'),
         select       = FourCC('A082'),
         armor        = 0,
@@ -299,6 +309,7 @@ OnInit.global("Variables", function()
         phys_damage  = 1.0,
         crit_chance  = 5.,
         crit_damage  = 100.,
+        mana_regen_max = 0,
         passive      = FourCC('A0HV'),
         select       = FourCC('A084'),
         armor        = 0,
@@ -321,6 +332,7 @@ OnInit.global("Variables", function()
         phys_damage  = 1.0,
         crit_chance  = 5.,
         crit_damage  = 100.,
+        mana_regen_max = 0,
         passive      = FourCC('A0EC'),
         select       = FourCC('A086'),
         armor        = 0,
@@ -343,6 +355,7 @@ OnInit.global("Variables", function()
         phys_damage  = 1.0,
         crit_chance  = 5.,
         crit_damage  = 100.,
+        mana_regen_max = 0,
         passive      = FourCC('A0I2'),
         select       = FourCC('A087'),
         armor        = 0,
@@ -365,6 +378,7 @@ OnInit.global("Variables", function()
         phys_damage  = 1.0,
         crit_chance  = 5.,
         crit_damage  = 100.,
+        mana_regen_max = 0,
         passive      = FourCC('A0I3'),
         select       = FourCC('A089'),
         armor        = 2,
@@ -387,8 +401,8 @@ OnInit.global("Variables", function()
         phys_damage    = 1.25,
         crit_chance    = 5.,
         crit_damage    = 100.,
-        passive        = FourCC('A01N'),
         mana_regen_max = 2,
+        passive        = FourCC('A01N'),
         select         = FourCC('A07J'),
         armor          = 0,
         str            = 8,
@@ -410,6 +424,7 @@ OnInit.global("Variables", function()
         phys_damage  = 1.25,
         crit_chance  = 5.,
         crit_damage  = 100.,
+        mana_regen_max = 0,
         passive      = FourCC('A039'),
         select       = FourCC('A01P'),
         armor        = 0,
@@ -432,6 +447,7 @@ OnInit.global("Variables", function()
         phys_damage  = 1.25,
         crit_chance  = 5.,
         crit_damage  = 100.,
+        mana_regen_max = 0,
         passive      = FourCC('A0I1'),
         select       = FourCC('A07L'),
         armor        = 0,
@@ -454,6 +470,7 @@ OnInit.global("Variables", function()
         phys_damage  = 1.3,
         crit_chance  = 5.,
         crit_damage  = 100.,
+        mana_regen_max = 0,
         passive      = FourCC('A070'),
         select       = FourCC('A07M'),
         armor        = -5,
@@ -476,6 +493,7 @@ OnInit.global("Variables", function()
         phys_damage  = 1.3,
         crit_chance  = 5.,
         crit_damage  = 100.,
+        mana_regen_max = 0,
         passive      = FourCC('A0I6'),
         select       = FourCC('A07N'),
         armor        = -3,
@@ -493,7 +511,7 @@ OnInit.global("Variables", function()
     }
 
     -- default stats for other units
-    local default_stats = {phys_resist = 1., magic_resist = 1., phys_damage = 1.}
+    local default_stats = {phys_resist = 1., magic_resist = 1., phys_damage = 1., crit_chance = 0., crit_damage = 100., mana_regen_max = 0.}
     setmetatable(HERO_STATS, { __index = function(tbl, key)
         return default_stats
     end})
@@ -535,7 +553,7 @@ OnInit.global("Variables", function()
     ITEM_MAX_LEVEL_VARIANCE            = 11
     QUALITY_SAVED                      = 7
 
-    enum(
+    TOTAL_STATS = enum(
         -- item stats
         "ITEM_LEVEL",
         "ITEM_HEALTH",
@@ -570,7 +588,6 @@ OnInit.global("Variables", function()
         -- end of item stats
         "ITEM_ABILITY2",
         -- not part of body
-        "ITEM_TOOLTIP",
         "ITEM_NOCRAFT",
         "ITEM_TIER",
         "ITEM_TYPE",
@@ -579,7 +596,11 @@ OnInit.global("Variables", function()
         "ITEM_LIMIT",
         "ITEM_COST",
         "ITEM_DISCOUNT",
-        "ITEM_STACK"
+        "ITEM_STACK",
+        "TOTAL_ATTACK_SPEED",
+        "XP_RATE",
+        "HERO_TIME",
+        "PLAYER_TIME"
     )
 
     CUSTOM_ITEM_OFFSET = FourCC('I000') ---@type integer 
@@ -618,8 +639,10 @@ OnInit.global("Variables", function()
     BOOST=__jarray(1) ---@type number[] 
     LBOOST=__jarray(1) ---@type number[] 
 
-    TOWN_CENTER = Location(-250., 160.) ---@type location 
-    STRUGGLE_CENTER = Location(28030., 4361.) ---@type location 
+    TOWN_CENTER_X = -250.
+    TOWN_CENTER_Y = 160.
+    STRUGGLE_CENTER_X = 28030.
+    STRUGGLE_CENTER_Y = 4361.
 
     DEFAULT_LIGHTING = "Environment\\DNC\\DNCAshenvale\\DNCAshenValeTerrain\\DNCAshenValeTerrain.mdx" ---@type string 
 
@@ -641,7 +664,7 @@ OnInit.global("Variables", function()
     INFO_STRING = {}
     INFO_STRING[0] = "Use -info # for see more info about your chosen catagory\n\n -info 1, Unit Respawning\n -info 2, Boss Respawning\n -info 3, Safezone\n -info 4, Hardcore\n -info 5, Perks\n -info 6, Proficiency"
     INFO_STRING[1] = "Units in the overworld will attempt to revive where they died 30 seconds after death. If a player hero/unit is within 800 range they will spawn frozen and invulnerable until no players are around."
-    INFO_STRING[2] = "Bosses respawn after 10 minutes and non-hero bosses respawn after 5 minutes, players may choose to fight a stronger version of the boss after defeating them once.\x25"
+    INFO_STRING[2] = "Bosses respawn after 10 minutes and non-hero bosses respawn after 5 minutes, players may choose to fight a stronger version of the boss after defeating them once.%"
     INFO_STRING[3] = "The town is protected from enemy invasion and any entering enemy will be teleported back to their original spawn."
     INFO_STRING[4] = [[Hardcore players that die without a reincarnation item/spell will be removed from the game and cannot save/load or start a new character. 
     A hardcore hero can only save every 30 minutes- the timer starts upon saving OR upon loading your hardcore hero. 
@@ -846,27 +869,26 @@ OnInit.global("Variables", function()
         [ITEM_INTELLIGENCE] = { tag = "|cff2255ffIntelligence|r", priority = 1, syntax = "int" },
         [ITEM_REGENERATION] = { tag = "|cffa00070Regeneration|r", priority = 1, syntax = "regen" },
         [ITEM_MANA_REGENERATION] = { tag = "|cff1144ddMana Regen|r", priority = 1, syntax = "manaregen" },
-        [ITEM_DAMAGE_RESIST] = { tag = "|cffff8040Damage Resist|r", alternate = "|cffff8040Physical Taken|r", priority = 1, suffix = "\x25", syntax = "dr" },
-        [ITEM_MAGIC_RESIST] = { tag = "|cff8000ffMagic Resist|r", alternate = "|cff8000ffMagical Taken|r", priority = 1, suffix = "\x25", syntax = "mr" },
-        [ITEM_DAMAGE_MULT] = { tag = "|cffff8040Physical Dealt|r", priority = 1, suffix = "\x25", syntax = "dm" },
-        [ITEM_MAGIC_MULT] = { tag = "|cff8000ffMagic Dealt|r", priority = 1, suffix = "\x25", syntax = "mm" },
+        [ITEM_DAMAGE_RESIST] = { tag = "|cffff8040Damage Resist|r", alternate = "|cffff8040Physical Taken|r", priority = 1, suffix = "%", syntax = "dr" },
+        [ITEM_MAGIC_RESIST] = { tag = "|cff8000ffMagic Resist|r", alternate = "|cff8000ffMagical Taken|r", priority = 1, suffix = "%", syntax = "mr" },
+        [ITEM_DAMAGE_MULT] = { tag = "|cffff8040Physical Dealt|r", priority = 1, suffix = "%", syntax = "dm" },
+        [ITEM_MAGIC_MULT] = { tag = "|cff8000ffMagic Dealt|r", priority = 1, suffix = "%", syntax = "mm" },
         [ITEM_MOVESPEED] = { tag = "|cff888888Movespeed|r", priority = 2, syntax = "ms" },
-        [ITEM_EVASION] = { tag = "|cff008080Evasion|r", priority = 2, suffix = "\x25", syntax = "evasion" },
-        [ITEM_SPELLBOOST] = { tag = "|cff80ffffSpellboost|r", priority = 1, suffix = "\x25", syntax = "spellboost" },
-        [ITEM_CRIT_CHANCE] = { tag = "|cffffcc00Critical Chance|r", priority = 1, suffix = "\x25", syntax = "cc" },
-        [ITEM_CRIT_DAMAGE] = { tag = "|cffffcc00Critical Damage|r", priority = 1, suffix = "\x25", syntax = "cd" },
-        [ITEM_CRIT_CHANCE_MULT] = { tag = "|cffffcc00Critical Chance Multiplier|r", priority = 4, suffix = "\x25", syntax = "cc_percent" },
-        [ITEM_CRIT_DAMAGE_MULT] = { tag = "|cffffcc00Critical Damage Multiplier|r", priority = 4, suffix = "\x25", syntax = "cd_percent" },
-        [ITEM_BASE_ATTACK_SPEED] = { tag = "|cff446600Base Attack Speed|r", priority = 1, item_suffix = "\x25", syntax = "bat" },
-        [ITEM_GOLD_GAIN] = { tag = "|cffffff00Gold Find|r", priority = 3, suffix = "\x25", syntax = "gold" },
+        [ITEM_EVASION] = { tag = "|cff008080Evasion|r", priority = 2, suffix = "%", syntax = "evasion" },
+        [ITEM_SPELLBOOST] = { tag = "|cff80ffffSpellboost|r", priority = 1, suffix = "%", syntax = "spellboost" },
+        [ITEM_CRIT_CHANCE] = { tag = "|cffffcc00Critical Chance|r", priority = 1, suffix = "%", syntax = "cc" },
+        [ITEM_CRIT_DAMAGE] = { tag = "|cffffcc00Critical Damage|r", priority = 1, suffix = "%", syntax = "cd" },
+        [ITEM_CRIT_CHANCE_MULT] = { tag = "|cffffcc00Critical Chance Multiplier|r", priority = 4, suffix = "%", syntax = "cc_percent" },
+        [ITEM_CRIT_DAMAGE_MULT] = { tag = "|cffffcc00Critical Damage Multiplier|r", priority = 4, suffix = "%", syntax = "cd_percent" },
+        [ITEM_BASE_ATTACK_SPEED] = { tag = "|cff446600Base Attack Speed|r", priority = 1, item_suffix = "%", syntax = "bat" },
+        [ITEM_GOLD_GAIN] = { tag = "|cffffff00Gold Find|r", priority = 3, suffix = "%", syntax = "gold" },
         [ITEM_FLAT_HEAL] = { tag = "|rHealth Restored", priority = 4, syntax = "fheal" },
-        [ITEM_PERCENT_HEAL] = { tag = "|rPercent Health Restored", priority = 4, syntax = "pheal", suffix = "\x25" },
+        [ITEM_PERCENT_HEAL] = { tag = "|rPercent Health Restored", priority = 4, syntax = "pheal", suffix = "%" },
         [ITEM_FLAT_MANA] = { tag = "|rMana Restored", priority = 4, syntax = "fmana" },
-        [ITEM_PERCENT_MANA] = { tag = "|rPercent Mana Restored", priority = 4, syntax = "pmana", suffix = "\x25" },
+        [ITEM_PERCENT_MANA] = { tag = "|rPercent Mana Restored", priority = 4, syntax = "pmana", suffix = "%" },
         [ITEM_CHARGES] = { tag = "|rCharges", priority = 4, syntax = "charges" },
         [ITEM_ABILITY] = { priority = 4, syntax = "abil" },
         [ITEM_ABILITY2] = { priority = 4, syntax = "abiltwo" },
-        [ITEM_TOOLTIP] = { priority = 4, syntax = "" },
         [ITEM_NOCRAFT] = { priority = 4, syntax = "nocraft" },
         [ITEM_TIER] = { priority = 4, syntax = "tier" },
         [ITEM_TYPE] = { priority = 4, syntax = "type" },
@@ -876,11 +898,106 @@ OnInit.global("Variables", function()
         [ITEM_COST] = { priority = 4, syntax = "cost" },
         [ITEM_DISCOUNT] = { priority = 4, syntax = "discount" },
         [ITEM_STACK] = { priority = 4, syntax = "stack" },
-        [ITEM_STACK + 1] = { tag = "|cff446600Total Attack Speed|r", priority = 1 },
-        [ITEM_STACK + 2] = { tag = "|cff808080Experience Rate|r", priority = 3, suffix = "\x25" },
-        [ITEM_STACK + 3] = { tag = "|cff808000Hero Time Played|r", priority = 3 },
-        [ITEM_STACK + 4] = { tag = "|cff808000Total Time Played|r", priority = 3 }
+        [TOTAL_ATTACK_SPEED] = { tag = "|cff446600Total Attack Speed|r", priority = 1 },
+        [XP_RATE] = { tag = "|cff808080Experience Rate|r", priority = 3, suffix = "%" },
+        [HERO_TIME] = { tag = "|cff808000Hero Time Played|r", priority = 3 },
+        [PLAYER_TIME] = { tag = "|cff808000Total Time Played|r", priority = 3 }
     }
+
+    local format = string.format
+
+    -- getters and breakdowns for stats
+    STAT_TAG[ITEM_LEVEL].breakdown = function(u)
+        local lvl = GetUnitLevel(u)
+        local s = ""
+        if IsUnitType(u, UNIT_TYPE_HERO) then
+            s = "XP: " .. GetHeroXP(u) .. "/" .. RequiredXP(lvl)
+        end
+        return s
+    end
+    STAT_TAG[ITEM_LEVEL].getter = function(u)
+        local lvl = GetUnitLevel(u)
+        local s = RealToString(lvl)
+        return s
+    end
+
+    STAT_TAG[ITEM_HEALTH].getter = function(u) return RealToString(GetWidgetLife(u)) .. " / " .. RealToString(Unit[u].hp) end
+    STAT_TAG[ITEM_MANA].getter = function(u) return RealToString(GetUnitState(u, UNIT_STATE_MANA)) .. " / " .. RealToString(GetUnitState(u, UNIT_STATE_MAX_MANA)) end
+    STAT_TAG[ITEM_DAMAGE].getter = function(u) return RealToString(Unit[u].damage + 1) end -- include dice
+    STAT_TAG[ITEM_DAMAGE].breakdown = function(u)
+        return "|cffffcc00Base Damage:|r " .. BlzGetUnitBaseDamage(u, 0) ..
+            "\n|cffffcc00Spell/Item Bonus:|r " .. Unit[u].bonus_damage ..
+            "\n|cffffcc00Percent Bonus:|r " .. format("%.3f", (Unit[u].damage_percent - 1.) * 100.) .. "%" .. " (" .. format("%.3f", Unit[u].damage - Unit[u].bonus_damage - BlzGetUnitBaseDamage(u, 0)) .. ")" ..
+            "\n|cffffcc00Total Damage:|r " .. (Unit[u].damage + 1)
+    end
+    STAT_TAG[ITEM_ARMOR].getter = function(u) return RealToString(BlzGetUnitArmor(u)) end
+    STAT_TAG[ITEM_STRENGTH].getter = function(u) return RealToString(GetHeroStr(u, true)) end
+    STAT_TAG[ITEM_AGILITY].getter = function(u) return RealToString(GetHeroAgi(u, true)) end
+    STAT_TAG[ITEM_INTELLIGENCE].getter = function(u) return RealToString(GetHeroInt(u, true)) end
+    STAT_TAG[ITEM_REGENERATION].getter = function(u) return RealToString(Unit[u].regen) end
+    STAT_TAG[ITEM_REGENERATION].breakdown = function(u)
+        return "|cffffcc00Flat Regeneration:|r " .. Unit[u].regen_flat ..
+            "\n|cffffcc00Percent Regeneration:|r " .. format("%.3f", Unit[u].regen_max) .. "%" .. " (" .. format("%.3f", Unit[u].regen_max * Unit[u].hp * 0.01) .. ")" ..
+            "\n|cffffcc00Healing Received:|r " .. format("%.3f", Unit[u].regen_percent * 100.) .. "%" ..
+            "\n|cffffcc00Total Regeneration:|r " .. Unit[u].regen
+    end
+    STAT_TAG[ITEM_MANA_REGENERATION].getter = function(u) return RealToString(Unit[u].mana_regen) end
+    STAT_TAG[ITEM_MANA_REGENERATION].breakdown = function(u)
+        return "|cffffcc00Flat Regeneration:|r " .. Unit[u].mana_regen_flat ..
+            "\n|cffffcc00Intelligence Regeneration:|r " .. GetHeroInt(u, true) * 0.05 ..
+            "\n|cffffcc00Percent Regeneration:|r " .. format("%.2f", Unit[u].mana_regen_max) .. "%" .. " (" .. Unit[u].mana_regen_max * Unit[u].mana * 0.01 .. ")" ..
+            "\n|cffffcc00Mana Received:|r " .. format("%.2f", Unit[u].mana_regen_percent * 100.) .. "%" ..
+            "\n|cffffcc00Total Regeneration:|r " .. Unit[u].mana_regen
+    end
+
+    STAT_TAG[ITEM_DAMAGE_RESIST].breakdown = function(u)
+        local dtype = BlzGetUnitIntegerField(u, UNIT_IF_DEFENSE_TYPE)
+        local chaos_reduc = (dtype == ARMOR_CHAOS or dtype == ARMOR_CHAOS_BOSS) and 0.03 or 1.
+        local chaos = (chaos_reduc == 0.03 and "\n|cffffcc00Chaos Reduction:|r " .. format("%.3f", (1. - chaos_reduc) * 100) .. "%" or "")
+        return "|cffffcc00Base Reduction:|r " .. format("%.3f", 100. - (HERO_STATS[GetType(u)].phys_resist) * 100.)  .. "%" ..
+            "\n|cffffcc00Spell/Item Reduction:|r " .. format("%.3f", 100. - (Unit[u].dr * Unit[u].pr) / HERO_STATS[GetType(u)].phys_resist * 100.)  .. "%" ..
+            "\n|cffffcc00Armor Reduction:|r " .. format("%.3f", ((0.05 * BlzGetUnitArmor(u)) / (1. + 0.05 * BlzGetUnitArmor(u))) * 100.)  .. "%" ..
+            chaos ..
+            "\n|cffffcc00Total Reduction:|r " .. format("%.3f", 100. - (Unit[u].dr * Unit[u].pr) * 100. * (1. - ((0.05 * BlzGetUnitArmor(u)) / (1. + 0.05 * BlzGetUnitArmor(u)))) * chaos_reduc) .. "%"
+    end
+
+    STAT_TAG[ITEM_DAMAGE_RESIST].getter = function(u)
+        local dtype = BlzGetUnitIntegerField(u, UNIT_IF_DEFENSE_TYPE)
+        local chaos_reduc = (dtype == ARMOR_CHAOS or dtype == ARMOR_CHAOS_BOSS) and 0.03 or 1.
+        return format("%.3f", (Unit[u].dr * Unit[u].pr) * 100. * (1. - ((0.05 * BlzGetUnitArmor(u)) / (1. + 0.05 * BlzGetUnitArmor(u)))) * chaos_reduc)
+    end
+
+    STAT_TAG[ITEM_MAGIC_RESIST].breakdown = function(u)
+        local dtype = BlzGetUnitIntegerField(u, UNIT_IF_DEFENSE_TYPE)
+        local chaos_reduc = (dtype == ARMOR_CHAOS or dtype == ARMOR_CHAOS_BOSS) and 0.03 or 1.
+        local chaos = (chaos_reduc == 0.03 and "\n|cffffcc00Chaos Reduction:|r " .. format("%.3f", (1. - chaos_reduc) * 100) .. "%" or "")
+        return "|cffffcc00Base Reduction:|r " .. format("%.3f", 100. - (HERO_STATS[GetType(u)].magic_resist) * 100.)  .. "%" ..
+            "\n|cffffcc00Spell/Item Reduction:|r " .. format("%.3f", 100. - (Unit[u].dr * Unit[u].mr) / HERO_STATS[GetType(u)].magic_resist * 100.)  .. "%" ..
+            chaos ..
+            "\n|cffffcc00Total Reduction:|r " .. format("%.3f", 100. - (Unit[u].dr * Unit[u].mr) * 100. * chaos_reduc) .. "%"
+    end
+
+    STAT_TAG[ITEM_MAGIC_RESIST].getter = function(u)
+        local dtype = BlzGetUnitIntegerField(u, UNIT_IF_DEFENSE_TYPE)
+        local chaos_reduc = (dtype == ARMOR_CHAOS or dtype == ARMOR_CHAOS_BOSS) and 0.03 or 1.
+        return format("%.3f", (Unit[u].dr * Unit[u].mr) * 100. * chaos_reduc)
+    end
+
+    STAT_TAG[ITEM_DAMAGE_MULT].getter = function(u) return format("%.3f", (Unit[u].dm * Unit[u].pm) * 100.) end
+    STAT_TAG[ITEM_MAGIC_MULT].getter = function(u) return format("%.3f", (Unit[u].dm * Unit[u].mm) * 100.) end
+    STAT_TAG[ITEM_MOVESPEED].getter = function(u) return RealToString(Unit[u].movespeed) end
+    STAT_TAG[ITEM_EVASION].getter = function(u) return math.min(100, (Unit[u].evasion)) end
+    STAT_TAG[ITEM_SPELLBOOST].getter = function(u) return format("%.3f", Unit[u].spellboost * 100.) end
+    STAT_TAG[ITEM_CRIT_CHANCE].getter = function(u) return format("%.2f", Unit[u].cc) end
+    STAT_TAG[ITEM_CRIT_DAMAGE].getter = function(u) return format("%.2f", Unit[u].cd) end
+    STAT_TAG[ITEM_CRIT_CHANCE_MULT].getter = function(u) return format("%.2f", Unit[u].cc) end
+    STAT_TAG[ITEM_CRIT_DAMAGE_MULT].getter = function(u) return format("%.2f", Unit[u].cd * 100.) end
+    STAT_TAG[ITEM_BASE_ATTACK_SPEED].getter = function(u) local as = BlzGetUnitWeaponBooleanField(u, UNIT_WEAPON_BF_ATTACKS_ENABLED, 0) and 1. / Unit[u].bat or 0 return format("%.2f", as) .. " attacks per second" end
+    STAT_TAG[ITEM_GOLD_GAIN].getter = function(u) return Unit[u].gold_rate end
+    STAT_TAG[TOTAL_ATTACK_SPEED].getter = function(u) local as = BlzGetUnitWeaponBooleanField(u, UNIT_WEAPON_BF_ATTACKS_ENABLED, 0) and (1. / Unit[u].bat) * (1 + math.min(GetHeroAgi(u, true), 400) * 0.01) or 0 return format("%.2f", as) .. " attacks per second" end
+    STAT_TAG[XP_RATE].getter = function(u) return format("%.2f", Unit[u].xp_rate) end
+    STAT_TAG[HERO_TIME].getter = function(u) local pid = GetPlayerId(GetOwningPlayer(u)) + 1 return (Profile[pid].hero.time // 60) .. " hours and " .. ModuloInteger(Profile[pid].hero.time, 60) .. " minutes" end
+    STAT_TAG[PLAYER_TIME].getter = function(u) local pid = GetPlayerId(GetOwningPlayer(u)) + 1 return (Profile[pid].total_time) // 60 .. " hours and " .. ModuloInteger(Profile[pid].total_time, 60) .. " minutes" end
 
     LIMIT_STRING = {
         "You can only wear one of this item.",
@@ -924,7 +1041,7 @@ OnInit.global("Variables", function()
         "|cffc0c0c0You can type|r |cff9966ff-hints|r or |cff9966ff-nohints|r |cffc0c0c0to toggle these messages on and off.|r",
         "|cffc0c0c0Once you challenge the gods you cannot flee.|r",
         "|cffc0c0c0Some artifacts remain frozen in ice, waiting to be recovered...|r",
-        "|cffc0c0c0Spellboost innately affects the damage of your spells by plus or minus 20\x25.|r",
+        "|cffc0c0c0Spellboost innately affects the damage of your spells by plus or minus 20%.|r",
         "|cffc0c0c0Critical strike items and spells can stack their effect, the multipliers are additive.|r",
         "|cffc0c0c0The settings menu (Q on your backpack) provides many useful features such as displaying allied hero portraits on the left.|r",
         "|cffc0c0c0You can toggle off your auto attacks with CTRL + A.|r",
