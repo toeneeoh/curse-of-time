@@ -43,6 +43,7 @@ OnInit.global("Profile", function(Require)
     Require('TimerQueue')
     Require('Hotkeys')
 
+    local cos, sin = math.cos, math.sin
     local SETUP_X = -690.
     local SETUP_Y = -238.
 
@@ -224,11 +225,6 @@ OnInit.global("Profile", function(Require)
                     DisplayTextToPlayer(p, 0, 0, "You can only repick in church, town or tavern.")
                     return
                 end
-            end
-
-            -- close stat window
-            if GetLocalPlayer() == p then
-                BlzFrameSetVisible(STAT_WINDOW.frame, false)
             end
 
             -- reset multiboard
@@ -644,23 +640,25 @@ OnInit.global("Profile", function(Require)
         end
     end
 
-    local function backpack_periodic(bp, pid)
-        if bp then
-            local x = GetUnitX(Hero[pid]) + 50 * math.cos((GetUnitFacing(Hero[pid]) - 45) * bj_DEGTORAD)
-            local y = GetUnitY(Hero[pid]) + 50 * math.sin((GetUnitFacing(Hero[pid]) - 45) * bj_DEGTORAD)
+    local function backpack_periodic(pt)
+        local pid = pt.pid
+        local hero = Hero[pid]
+        local bp = Backpack[pid]
+        local facing = GetUnitFacing(hero)
+        local x = GetUnitX(hero) + 50 * cos((facing - 45) * bj_DEGTORAD)
+        local y = GetUnitY(hero) + 50 * sin((facing - 45) * bj_DEGTORAD)
 
-            if IsUnitInRange(Hero[pid], bp, 1000.) == false then
-                SetUnitXBounded(bp, x)
-                SetUnitYBounded(bp, y)
-                BlzUnitClearOrders(bp, false)
-            elseif not Unit[bp].busy or IsUnitInRange(Hero[pid], bp, 800.) == false then
-                if IsUnitInRange(Hero[pid], bp, 50.) == false then
-                    IssuePointOrderById(bp, ORDER_ID_MOVE, x, y)
-                end
+        if not IsUnitInRange(hero, bp, 1000.) then
+            SetUnitXBounded(bp, x)
+            SetUnitYBounded(bp, y)
+            BlzUnitClearOrders(bp, false)
+        elseif not Unit[bp].busy or not IsUnitInRange(Hero[pid], bp, 800.) then
+            if IsUnitInRange(Hero[pid], bp, 50.) == false then
+                IssuePointOrderById(bp, ORDER_ID_MOVE, x, y)
             end
-
-            TimerQueue:callDelayed(0.35, backpack_periodic, bp, pid)
         end
+
+        return true
     end
 
     ---@class HeroData
@@ -736,7 +734,8 @@ OnInit.global("Profile", function(Require)
                 UnitAddAbility(backpack, FourCC('A04M'))
                 UnitAddAbility(backpack, FourCC('A00F')) -- settings
 
-                TimerQueue:callDelayed(0.01, backpack_periodic, backpack, pid)
+                local pt = TimerList[pid]:add()
+                pt:startLoop(0.35, backpack_periodic)
                 EVENT_ON_ORDER:register_unit_action(backpack, backpack_ai)
 
                 -- grave
