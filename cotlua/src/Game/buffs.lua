@@ -9,20 +9,23 @@ OnInit.global("Buffs", function(Require)
     Require('UnitTable')
     Require('SpellTools')
 
+    local Unit = Unit
+    local TQ = TimerQueue
     local FPS_32 = FPS_32
     local atan = math.atan
+    local valid_damage_target = VALID_DAMAGE_TARGET
     local valid_pull_target = VALID_PULL_TARGET
-    PHASED_MOVEMENT = FourCC('I0OE')
-
-    local mt = { __index = Buff }
+    local PHASED_MOVEMENT = FourCC('I0OE')
 
     ---@class Disarm : Buff
-    Disarm = setmetatable({}, mt)
+    Disarm = Buff.new()
     do
         local thistype = Disarm
-        thistype.RAWCODE         = FourCC('Adar') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_NEGATIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL ---@type integer 
+        thistype.NAME            = "Disarmed"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNEmptyHand.BLP"
+        thistype.DESC            = "This unit cannot attack"
+        thistype.DISPEL_TYPE     = BUFF_NEGATIVE
+        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
 
         function thistype:onRemove()
             Unit[self.target].attack = true
@@ -34,12 +37,14 @@ OnInit.global("Buffs", function(Require)
     end
 
     ---@class Silence : Buff
-    Silence = setmetatable({}, mt)
+    Silence = Buff.new()
     do
         local thistype = Silence
-        thistype.RAWCODE         = FourCC('Asil') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_NEGATIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL ---@type integer 
+        thistype.NAME            = "Silenced"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNSilence.blp"
+        thistype.DESC            = "This unit cannot cast spells"
+        thistype.DISPEL_TYPE     = BUFF_NEGATIVE
+        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
 
         function thistype:onRemove()
             DestroyEffect(self.sfx)
@@ -53,12 +58,14 @@ OnInit.global("Buffs", function(Require)
     end
 
     ---@class Fear : Buff
-    Fear = setmetatable({}, mt)
+    Fear = Buff.new()
     do
         local thistype = Fear
-        thistype.RAWCODE         = FourCC('Afea') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_NEGATIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL ---@type integer 
+        thistype.NAME            = "Feared"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNGuldanSkull.blp"
+        thistype.DESC            = "This unit is moving uncontrollably"
+        thistype.DISPEL_TYPE     = BUFF_NEGATIVE
+        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
 
         local function on_order(source, target, id)
             local b = Fear:get(nil, source)
@@ -92,12 +99,15 @@ OnInit.global("Buffs", function(Require)
     end
 
     ---@class Lava : Buff
-    Lava = setmetatable({}, mt)
+    Lava = Buff.new()
     do
         local thistype = Lava
-        thistype.RAWCODE         = FourCC('Lava')
-        thistype.DISPEL_TYPE     = BUFF_NEGATIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL ---@type integer 
+        thistype.NAME            = "Lava"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNLavaSpawn.blp"
+        thistype.DESC            = "This unit is burning"
+        thistype.AURA            = true
+        thistype.DISPEL_TYPE     = BUFF_NEGATIVE
+        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
 
         local function periodic(self)
             if not IsUnitInRegion(LAVA_REGION, self.target) then
@@ -109,185 +119,238 @@ OnInit.global("Buffs", function(Require)
                     DamageTarget(DUMMY_UNIT, self.target, dmg, ATTACK_TYPE_NORMAL, PURE, "Lava")
                 end
 
-                self.timer = Buff.timer:callDelayed(0.5, periodic, self)
+                self.timer = TQ:callDelayed(0.5, periodic, self)
             end
         end
 
         function thistype:onRemove()
-            Buff.timer:disableCallback(self.timer)
+            TQ:disableCallback(self.timer)
         end
 
         function thistype:onApply()
-            self.timer = Buff.timer:callDelayed(0.5, periodic, self)
+            self.timer = TQ:callDelayed(0.5, periodic, self)
         end
+    end
+
+    ---@class BurningDebuff : Buff
+    BurningDebuff = Buff.new()
+    do
+        local thistype = BurningDebuff
+        thistype.NAME            = "Burning"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNSearingArrows.blp"
+        thistype.DESC            = "This unit is afflicted by Searing Arrows"
+        thistype.DISPEL_TYPE     = BUFF_NEGATIVE
+        thistype.STACK_TYPE      = BUFF_STACK_NONE
     end
 
     ---@class IgniteDebuff : Buff
-    IgniteDebuff = setmetatable({}, mt)
+    IgniteDebuff = Buff.new()
     do
         local thistype = IgniteDebuff
-        thistype.RAWCODE         = FourCC('Aign') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_NEGATIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_NONE ---@type integer 
-    end
+        thistype.NAME            = "Ignited"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNWallOfFire.blp"
+        thistype.DESC            = "This unit is taking $dmg every second"
+        thistype.DISPEL_TYPE     = BUFF_NEGATIVE
+        thistype.STACK_TYPE      = BUFF_STACK_NONE
 
-    ---@class InfusedWaterBuff : Buff
-    InfusedWaterBuff = setmetatable({}, mt)
-    do
-        local thistype = InfusedWaterBuff
-        thistype.RAWCODE         = FourCC('Aiwa') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_POSITIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_NONE ---@type integer 
+        local function periodic(self)
+            DamageTarget(self.source, self.target, self.dmg * BOOST[self.pid], ATTACK_TYPE_NORMAL, MAGIC, SEARINGARROWS.tag)
+
+            self.callback = TQ:callDelayed(1., periodic, self)
+        end
 
         function thistype:onRemove()
-            Unit[self.target].ms_flat = Unit[self.target].ms_flat - 150
+            TQ:disableCallback(self.callback)
+
+            DestroyEffect(self.sfx)
         end
 
         function thistype:onApply()
-            Unit[self.target].ms_flat = Unit[self.target].ms_flat + 150
+            self.sfx = AddSpecialEffectTarget("war3mapImported\\Real Fire2.mdx", self.target, "origin")
+            self.dmg = SEARINGARROWS.dot(self.pid)
+
+            self.callback = TQ:callDelayed(0.5, periodic, self)
+        end
+    end
+
+    ---@class InfusedWaterBuff : Buff
+    InfusedWaterBuff = Buff.new()
+    do
+        local thistype = InfusedWaterBuff
+        thistype.NAME            = "Infused Water"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNInfusedWater2.blp"
+        thistype.DESC            = "This unit has +$ms movespeed and next spell cast is empowered"
+        thistype.DISPEL_TYPE     = BUFF_POSITIVE
+        thistype.STACK_TYPE      = BUFF_STACK_NONE
+
+        function thistype:onRemove()
+            Unit[self.target].ms_flat = Unit[self.target].ms_flat - self.ms
+        end
+
+        function thistype:onApply()
+            self.ms = 150
+            Unit[self.target].ms_flat = Unit[self.target].ms_flat + self.ms
         end
     end
 
     ---@class EmpyreanSongBuff : Buff
-    EmpyreanSongBuff = setmetatable({}, mt)
+    EmpyreanSongBuff = Buff.new()
     do
         local thistype = EmpyreanSongBuff
-        thistype.RAWCODE         = FourCC('Aeso') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_POSITIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL ---@type integer 
+        thistype.NAME            = "Empyrean Song"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNTribal Drum of War.blp"
+        thistype.DESC            = "This unit has +$ms movespeed"
+        thistype.AURA            = true
+        thistype.DISPEL_TYPE     = BUFF_POSITIVE
+        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
 
         function thistype:onRemove()
-            Unit[self.target].ms_flat = Unit[self.target].ms_flat - 150
+            Unit[self.target].ms_flat = Unit[self.target].ms_flat - self.ms
         end
 
         function thistype:onApply()
-            Unit[self.target].ms_flat = Unit[self.target].ms_flat + 150
+            self.ms = 150
+            Unit[self.target].ms_flat = Unit[self.target].ms_flat + self.ms
         end
     end
 
     ---@class BloodHornBuff : Buff
-    BloodHornBuff = setmetatable({}, mt)
+    BloodHornBuff = Buff.new()
     do
         local thistype = BloodHornBuff
-        thistype.RAWCODE         = FourCC('Aunh') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_POSITIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL ---@type integer 
+        thistype.NAME            = "Blood Horn"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNUnholyAura.blp"
+        thistype.DESC            = "This unit has +$ms movespeed"
+        thistype.AURA            = true
+        thistype.DISPEL_TYPE     = BUFF_POSITIVE
+        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
 
         function thistype:onRemove()
-            Unit[self.target].ms_flat = Unit[self.target].ms_flat - 75
+            Unit[self.target].ms_flat = Unit[self.target].ms_flat - self.ms
         end
 
         function thistype:onApply()
-            Unit[self.target].ms_flat = Unit[self.target].ms_flat + 75
+            self.ms = 75
+            Unit[self.target].ms_flat = Unit[self.target].ms_flat + self.ms
         end
     end
 
     ---@class ArcaneBarrageBuff : Buff
-    ArcaneBarrageBuff = setmetatable({}, mt)
+    ArcaneBarrageBuff = Buff.new()
     do
         local thistype = ArcaneBarrageBuff
-        thistype.RAWCODE         = FourCC('Aacb') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_POSITIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_NONE ---@type integer 
+        thistype.NAME            = "Arcane Barrage"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNArcaneStorm2.blp"
+        thistype.DESC            = "This unit has +$ms movespeed"
+        thistype.DISPEL_TYPE     = BUFF_POSITIVE
+        thistype.STACK_TYPE      = BUFF_STACK_NONE
 
         function thistype:onRemove()
-            Unit[self.target].ms_flat = Unit[self.target].ms_flat - 150
+            Unit[self.target].ms_flat = Unit[self.target].ms_flat - self.ms
         end
 
         function thistype:onApply()
-            Unit[self.target].ms_flat = Unit[self.target].ms_flat + 150
+            self.ms = 150
+            Unit[self.target].ms_flat = Unit[self.target].ms_flat + self.ms
         end
     end
 
     ---@class OmnislashBuff : Buff
-    OmnislashBuff = setmetatable({}, mt)
+    OmnislashBuff = Buff.new()
     do
         local thistype = OmnislashBuff
-        thistype.RAWCODE         = FourCC('Aomn') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_POSITIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_NONE ---@type integer 
+        thistype.NAME            = "Omnislash"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNOmnislash5.blp"
+        thistype.DESC            = "This unit has +^#dr% damage resist"
+        thistype.DISPEL_TYPE     = BUFF_POSITIVE
+        thistype.STACK_TYPE      = BUFF_STACK_NONE
+
+        local function periodic(self, override)
+            if self.charges > 0 then
+                self.charges = self.charges - 1
+                local x, y = GetUnitX(self.target), GetUnitY(self.target)
+                MakeGroupInRange(self.pid, self.ug, x, y, 600., Condition(FilterEnemy))
+
+                local target
+                if override then
+                    target = override
+                else
+                    target = FirstOfGroup(self.ug)
+                end
+
+                if target then
+                    local facing = GetUnitFacing(target)
+                    SetUnitAnimation(self.target, "Attack Slam")
+                    SetUnitXBounded(self.target, GetUnitX(target) + 60. * math.cos(bj_DEGTORAD * (facing - 180.)))
+                    SetUnitYBounded(self.target, GetUnitY(target) + 60. * math.sin(bj_DEGTORAD * (facing - 180.)))
+                    BlzSetUnitFacingEx(self.target, facing)
+                    DamageTarget(self.target, target, self.dmg * BOOST[self.pid], ATTACK_TYPE_NORMAL, MAGIC, OMNISLASH.tag)
+                    DestroyEffect(AddSpecialEffectTarget("Abilities\\Spells\\NightElf\\Blink\\BlinkCaster.mdl", self.target, "chest"))
+                    DestroyEffect(AddSpecialEffectTarget("Abilities\\Weapons\\Bolt\\BoltImpact.mdl", target, "chest"))
+                else
+                    self.charges = 0
+                end
+
+                UnitRefreshBuff(self.target, self)
+
+                if self.charges <= 0 then
+                    self:remove()
+                else
+                    self.callback = TQ:callDelayed(0.4, periodic, self)
+                end
+            end
+        end
 
         function thistype:onRemove()
-            Unit[self.target].dr = Unit[self.target].dr / 0.2
+            Unit[self.target].dr = Unit[self.target].dr / self.dr
+
+            TQ:disableCallback(self.callback)
+            DestroyGroup(self.ug)
+            reselect(self.target)
+            SetUnitVertexColor(self.target, 255, 255, 255, 255)
+            SetUnitTimeScale(self.target, 1.)
         end
 
         function thistype:onApply()
-            Unit[self.target].dr = Unit[self.target].dr * 0.2
+            self.dr = 0.2
+            self.ug = CreateGroup()
+            Unit[self.target].dr = Unit[self.target].dr * self.dr
+
+            periodic(self, self.override)
         end
     end
 
     ---@class InspireBuff : Buff
-    InspireBuff = setmetatable({}, mt)
+    InspireBuff = Buff.new()
     do
         local thistype = InspireBuff
-        thistype.RAWCODE         = FourCC('Ains') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_POSITIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL ---@type integer 
-        thistype.ablev         = 0 ---@type integer 
-
-        -- used in the instance that multiple players have inspire
-        function thistype:strongest(new)
-            if self.ablev < new then
-                Unit[self.target].spellboost = Unit[self.target].spellboost - self.spellboost
-
-                self.ablev = new
-                self.spellboost = math.max(0.91 - 0.01 * self.ablev, 0.85)
-                Unit[self.target].spellboost = Unit[self.target].spellboost + self.spellboost
-            end
-        end
-
-        -- mana cost per second
-        local function periodic(self)
-            local mana = GetUnitState(self.target, UNIT_STATE_MANA)
-            local cost = BlzGetUnitMaxMana(self.target) * 0.02
-            SetUnitState(self.target, UNIT_STATE_MANA, math.max(mana - cost, 0))
-            if mana - cost > 0 then
-                self.timer = Buff.timer:callDelayed(1., periodic, self)
-            else
-                self:remove()
-            end
-
-            -- keep reapplying buff (900 default aoe)
-            MakeGroupInRange(self.pid, self.ug, GetUnitX(self.source), GetUnitY(self.source), 900. * LBOOST[self.pid], Condition(FilterAlly))
-
-            for target in each(self.ug) do
-                thistype:add(self.source, target):duration(1.)
-                local b = thistype:get(nil, target)
-                b:strongest(math.max(b.ablev, GetUnitAbilityLevel(self.source, INSPIRE.id)))
-            end
-        end
+        thistype.NAME            = "Inspired"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNBearBlink.blp"
+        thistype.DESC            = "This unit has +^$spellboost% spellboost"
+        thistype.AURA            = true
+        thistype.DISPEL_TYPE     = BUFF_POSITIVE
+        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
 
         function thistype:onRemove()
             Unit[self.target].spellboost = Unit[self.target].spellboost - self.spellboost
-
-            if self.source == self.target then
-                -- unimmolation
-                Buff.timer:disableCallback(self.timer)
-                IssueImmediateOrderById(self.source, ORDER_ID_UNIMMOLATION)
-            end
-
-            DestroyGroup(self.ug)
         end
 
         function thistype:onApply()
-            self.ablev = GetUnitAbilityLevel(self.source, INSPIRE.id)
             self.spellboost = (0.08 + 0.02 * self.ablev)
-            self.ug = CreateGroup()
             Unit[self.target].spellboost = Unit[self.target].spellboost + self.spellboost
-
-            if self.source == self.target then
-                self.timer = Buff.timer:callDelayed(1., periodic, self)
-            end
         end
     end
 
     ---@class SongOfWarBuff : Buff
-    SongOfWarBuff = setmetatable({}, mt)
+    SongOfWarBuff = Buff.new()
     do
         local thistype = SongOfWarBuff
-        thistype.RAWCODE         = FourCC('Aswb') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_POSITIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_NONE ---@type integer 
+        thistype.NAME            = "Song of War"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNBardMusicSongOfWar.blp"
+        thistype.DESC            = "This unit has +^$attack% attack damage"
+        thistype.AURA            = true
+        thistype.DISPEL_TYPE     = BUFF_POSITIVE
+        thistype.STACK_TYPE      = BUFF_STACK_NONE
 
         function thistype:onRemove()
             Unit[self.target].damage_percent = Unit[self.target].damage_percent - self.attack
@@ -300,69 +363,80 @@ OnInit.global("Buffs", function(Require)
     end
 
     ---@class SongOfHarmonyBuff : Buff
-    SongOfHarmonyBuff = setmetatable({}, mt)
+    SongOfHarmonyBuff = Buff.new()
     do
         local thistype = SongOfHarmonyBuff
-        thistype.RAWCODE         = FourCC('Ashh') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_POSITIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL ---@type integer 
+        thistype.NAME            = "Song of Harmony"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNBardMusicSongOfHarmony.blp"
+        thistype.DESC            = "This unit has +$regen% max health regeneration"
+        thistype.AURA            = true
+        thistype.DISPEL_TYPE     = BUFF_POSITIVE
+        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
 
         function thistype:onRemove()
-            Unit[self.target].regen_max = Unit[self.target].regen_max - 1
+            Unit[self.target].regen_max = Unit[self.target].regen_max - self.regen
         end
 
         function thistype:onApply()
-            Unit[self.target].regen_max = Unit[self.target].regen_max + 1
+            self.regen = 1
+            Unit[self.target].regen_max = Unit[self.target].regen_max + self.regen
         end
     end
 
     ---@class SongOfPeaceBuff : Buff
-    SongOfPeaceBuff = setmetatable({}, mt)
+    SongOfPeaceBuff = Buff.new()
     do
         local thistype = SongOfPeaceBuff
-        thistype.RAWCODE         = FourCC('Aspm') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_POSITIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL ---@type integer 
+        thistype.NAME            = "Song of Peace"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNBardMusicSongOfPeace.blp"
+        thistype.DESC            = "This unit has +$regen% max mana regeneration"
+        thistype.AURA            = true
+        thistype.DISPEL_TYPE     = BUFF_POSITIVE
+        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
 
         function thistype:onRemove()
-            Unit[self.target].mana_regen_max = Unit[self.target].mana_regen_max - 1
+            Unit[self.target].mana_regen_max = Unit[self.target].mana_regen_max - self.regen
         end
 
         function thistype:onApply()
-            Unit[self.target].mana_regen_max = Unit[self.target].mana_regen_max + 1
+            self.regen = 1
+            Unit[self.target].mana_regen_max = Unit[self.target].mana_regen_max + self.regen
         end
     end
 
     ---@class SongOfPeaceEncoreBuff : Buff
-    SongOfPeaceEncoreBuff = setmetatable({}, mt)
+    SongOfPeaceEncoreBuff = Buff.new()
     do
         local thistype = SongOfPeaceEncoreBuff
-        thistype.RAWCODE         = FourCC('Aspc') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_POSITIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL ---@type integer 
+        thistype.NAME            = "Encore (Song of Peace)"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNBardMusicSongOfPeace.blp"
+        thistype.DESC            = "This unit has +^#dr% damage resist"
+        thistype.DISPEL_TYPE     = BUFF_POSITIVE
+        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
 
         function thistype:onRemove()
             DestroyEffect(self.sfx)
 
-            Unit[self.target].dr = Unit[self.target].dr / 0.8
+            Unit[self.target].dr = Unit[self.target].dr / self.dr
         end
 
         function thistype:onApply()
             self.sfx = AddSpecialEffectTarget("Abilities\\Spells\\Human\\DivineShield\\DivineShieldTarget.mdl", self.target, "origin")
+            self.dr = 0.8
 
-            Unit[self.target].dr = Unit[self.target].dr * 0.8
+            Unit[self.target].dr = Unit[self.target].dr * self.dr
         end
     end
 
     ---@class SongOfWarEncoreBuff : Buff
-    SongOfWarEncoreBuff = setmetatable({}, mt)
+    SongOfWarEncoreBuff = Buff.new()
     do
         local thistype = SongOfWarEncoreBuff
-        thistype.RAWCODE         = FourCC('Aswa') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_POSITIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_NONE ---@type integer 
-        thistype.count         = 10 ---@type integer 
-        thistype.dmg      = 0. ---@type number 
+        thistype.NAME            = "Encore (Song of War)"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNBardMusicSongOfWar.blp"
+        thistype.DESC            = "This unit deals $dmg extra magic damage on attacks"
+        thistype.DISPEL_TYPE     = BUFF_POSITIVE
+        thistype.STACK_TYPE      = BUFF_STACK_NONE
 
         local function on_hit(source, target)
             local self = SongOfWarEncoreBuff:get(nil, source)
@@ -385,23 +459,27 @@ OnInit.global("Buffs", function(Require)
         function thistype:onApply()
             EVENT_ON_HIT:register_unit_action(self.target, on_hit)
             self.dmg = (.25 + .25 * GetUnitAbilityLevel(self.source, ENCORE.id)) * GetHeroStat(MainStat(self.target), self.target, true)
+            self.count = 10
 
             self.sfx = AddSpecialEffectTarget("Abilities\\Spells\\Items\\VampiricPotion\\VampPotionCaster.mdl", self.target, "origin")
         end
     end
 
     ---@class MagneticStanceBuff : Buff
-    MagneticStanceBuff = setmetatable({}, mt)
+    MagneticStanceBuff = Buff.new()
     do
         local thistype = MagneticStanceBuff
-        thistype.RAWCODE         = FourCC('Amag') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_POSITIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL ---@type integer 
+        thistype.NAME            = "Magnetic Stance"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNChaosWave1.blp"
+        thistype.DESC            = "This unit has +^#dr% damage resist and deals -^#dm% total damage while pulling nearby enemies"
+        thistype.AURA            = true
+        thistype.DISPEL_TYPE     = BUFF_POSITIVE
+        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
 
         local function taunt(self, aoe)
             Taunt(self.target, aoe)
 
-            self.callback = Buff.timer:callDelayed(3., taunt, self, aoe)
+            self.callback = TQ:callDelayed(3., taunt, self, aoe)
         end
 
         local function pull_force(target, _, x, y)
@@ -417,26 +495,25 @@ OnInit.global("Buffs", function(Require)
 
         local function pull(self)
             local x, y = GetUnitX(self.target), GetUnitY(self.target)
-            ALICE_ForAllObjectsInRangeDo(pull_force, x, y, 800., "nonhero", valid_pull_target, GetOwningPlayer(self.target), x, y)
+            ALICE_ForAllObjectsInRangeDo(pull_force, x, y, 800., "nonhero", valid_pull_target, self.target, x, y)
 
-            self.pull = Buff.timer:callDelayed(FPS_32, pull, self)
+            self.pull = TQ:callDelayed(FPS_32, pull, self)
         end
 
         function thistype:onRemove()
-            Buff.timer:disableCallback(self.callback)
-            Buff.timer:disableCallback(self.pull)
+            TQ:disableCallback(self.callback)
+            TQ:disableCallback(self.pull)
             SetUnitVertexColor(self.target, 255, 255, 255, 255)
             Unit[self.target].dm = Unit[self.target].dm / self.dm
             Unit[self.target].dr = Unit[self.target].dr / self.dr
         end
 
         function thistype:onApply()
-
             SetUnitVertexColor(self.target, 255, 25, 25, 255)
             DestroyEffect(AddSpecialEffectTarget("war3mapImported\\Call of Dread Red.mdx", self.target, "chest"))
 
-            self.callback = Buff.timer:callDelayed(3., taunt, self, 800.)
-            self.pull = Buff.timer:callDelayed(FPS_32, pull, self)
+            self.callback = TQ:callDelayed(3., taunt, self, 800.)
+            pull(self)
 
             local ablev = GetUnitAbilityLevel(self.source, MAGNETICSTANCE.id)
             self.dr = (0.95 - 0.05 * ablev)
@@ -448,24 +525,28 @@ OnInit.global("Buffs", function(Require)
     end
 
     ---@class FlamingBowBuff : Buff
-    FlamingBowBuff = setmetatable({}, mt)
+    FlamingBowBuff = Buff.new()
     do
         local thistype = FlamingBowBuff
-        thistype.RAWCODE         = FourCC('Afbo') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_POSITIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL ---@type integer 
+        thistype.NAME            = "Flaming Bow"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNInnerFire.blp"
+        thistype.DESC            = "This unit has +^$attack% attack damage"
+        thistype.DISPEL_TYPE     = BUFF_POSITIVE
+        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
 
         local function on_hit(source, target)
             local self = FlamingBowBuff:get(nil, source)
-            local increase = 1
+            local increase = 0.01
 
             if self.attack < self.max then
                 if MULTISHOT.enabled[source] then
                     increase = increase / (1. + GetUnitAbilityLevel(self.target, MULTISHOT.id))
                 end
 
-                Unit[self.target].damage_percent = Unit[self.target].damage_percent + increase
-                self.attack = self.attack + increase
+                Unit[self.target].damage_percent = Unit[self.target].damage_percent - self.attack
+                self.attack = math.min(self.attack + increase, self.max)
+                Unit[self.target].damage_percent = Unit[self.target].damage_percent + self.attack
+                UnitRefreshBuff(source, self)
             end
         end
 
@@ -479,7 +560,7 @@ OnInit.global("Buffs", function(Require)
         function thistype:onApply()
             EVENT_ON_HIT:register_unit_action(self.target, on_hit)
             self.attack = 0.5
-            self.max = 80 + 2 * GetUnitAbilityLevel(self.target, FLAMINGBOW.id)
+            self.max = 0.8 + 0.02 * GetUnitAbilityLevel(self.target, FLAMINGBOW.id)
 
             Unit[self.target].damage_percent = Unit[self.target].damage_percent + self.attack
             self.sfx = AddSpecialEffectTarget("Environment\\SmallBuildingspeffect\\SmallBuildingspeffect2.mdl", self.target, "weapon")
@@ -488,12 +569,15 @@ OnInit.global("Buffs", function(Require)
     end
 
     ---@class StasisFieldDebuff : Buff
-    StasisFieldDebuff = setmetatable({}, mt)
+    StasisFieldDebuff = Buff.new()
     do
         local thistype = StasisFieldDebuff
-        thistype.RAWCODE         = FourCC('Asfi') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_NEGATIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL ---@type integer 
+        thistype.NAME            = "Stasis Field"
+        thistype.DESC            = "This unit cannot move"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNArcaneBarrier2.blp"
+        thistype.AURA            = true
+        thistype.DISPEL_TYPE     = BUFF_NEGATIVE
+        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
 
         function thistype:onRemove()
             SetUnitPropWindow(self.target, bj_DEGTORAD * 60.)
@@ -506,12 +590,15 @@ OnInit.global("Buffs", function(Require)
     end
 
     ---@class ArcanosphereDebuff : Buff
-    ArcanosphereDebuff = setmetatable({}, mt)
+    ArcanosphereDebuff = Buff.new()
     do
         local thistype = ArcanosphereDebuff
-        thistype.RAWCODE         = FourCC('Aarc') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_NEGATIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL ---@type integer 
+        thistype.NAME            = "Arcanosphere"
+        thistype.DESC            = "This unit has -^$ms% movespeed"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNSpaceTimeWarp.blp"
+        thistype.AURA            = true
+        thistype.DISPEL_TYPE     = BUFF_NEGATIVE
+        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
 
         function thistype:onRemove()
             Unit[self.target].ms_percent = Unit[self.target].ms_percent + self.ms
@@ -524,12 +611,16 @@ OnInit.global("Buffs", function(Require)
         end
     end
 
-    EarthquakeDebuff = setmetatable({}, mt)
+    ---@class EarthquakeDebuff : Buff
+    EarthquakeDebuff = Buff.new()
     do
         local thistype = EarthquakeDebuff
-        thistype.RAWCODE         = FourCC('Aequ') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_NEGATIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL ---@type integer 
+        thistype.NAME            = "Earthquake"
+        thistype.DESC            = "This unit has -^$ms% movespeed and -^$regen% regeneration"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNEarthquake.blp"
+        thistype.AURA            = true
+        thistype.DISPEL_TYPE     = BUFF_NEGATIVE
+        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
 
         function thistype:onRemove()
             DestroyEffect(self.sfx)
@@ -547,30 +638,141 @@ OnInit.global("Buffs", function(Require)
         end
     end
 
+    ---@class DefensiveBubbleBuff : Buff
+    DefensiveBubbleBuff = Buff.new()
+    do
+        local thistype = DefensiveBubbleBuff
+        thistype.NAME            = "Defensive Bubble"
+        thistype.DESC            = "This unit has +^#dr% damage resist"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNLightningShield.blp"
+        thistype.AURA            = true
+        thistype.DISPEL_TYPE     = BUFF_POSITIVE
+        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
+
+        function thistype:onRemove()
+            Unit[self.target].dr = Unit[self.target].dr / self.dr
+        end
+
+        function thistype:onApply()
+            self.dr = 0.7
+            Unit[self.target].dr = Unit[self.target].dr * self.dr
+        end
+    end
+
+    ---@class AttributeExpertBuff : Buff
+    AttributeExpertBuff = Buff.new()
+    do
+        local thistype = AttributeExpertBuff
+        thistype.NAME            = "Attribute Expert"
+        thistype.DESC            = "This unit has +$bonus bonus $stat"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNStatUp.blp"
+        thistype.AURA            = true
+        thistype.DISPEL_TYPE     = BUFF_POSITIVE
+        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
+
+        function thistype:onRemove()
+            Unit[self.target]["bonus_"..self.main] = Unit[self.target]["bonus_"..self.main] - self.bonus
+        end
+
+        function thistype:onApply()
+            self.main = HighestStatName(self.target)
+            self.bonus = 0.75 * Unit[self.target][self.main]
+            self.stat = HighestStatName(self.target, true)
+
+            Unit[self.target]["bonus_"..self.main] = Unit[self.target]["bonus_"..self.main] + self.bonus
+        end
+    end
+
+    ---@class SpeedDemonBuff : Buff
+    SpeedDemonBuff = Buff.new()
+    do
+        local thistype = SpeedDemonBuff
+        thistype.NAME            = "Speed Demon"
+        thistype.DESC            = "This unit always has $ms movespeed"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNBootsOfSpeed.blp"
+        thistype.AURA            = true
+        thistype.DISPEL_TYPE     = BUFF_POSITIVE
+        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
+
+        local function periodic(self)
+            Unit[self.target].overmovespeed = self.ms
+            self.timer = TQ:callDelayed(1., periodic, self)
+        end
+
+        function thistype:onRemove()
+            Unit[self.target].overmovespeed = nil
+            TQ:disableCallback(self.timer)
+        end
+
+        function thistype:onApply()
+            self.ms = 600
+            periodic(self)
+        end
+    end
+
+    ---@class RadianceBuff : Buff
+    RadianceBuff = Buff.new()
+    do
+        local thistype = RadianceBuff
+        thistype.NAME            = "Radiance"
+        thistype.DESC            = "This unit deals $dmg magic damage every second in a 900 AoE"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNTransmute.blp"
+        thistype.AURA            = true
+        thistype.DISPEL_TYPE     = BUFF_POSITIVE
+        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
+
+        local function damage_target(target, source, dmg)
+            DamageTarget(source, target, dmg, ATTACK_TYPE_NORMAL, MAGIC, "Radiance")
+        end
+
+        local function periodic(self)
+            local x, y = GetUnitX(self.target), GetUnitY(self.target)
+            self.dmg = GetHeroStat(HighestStat(self.target, true), self.target, true)
+            ALICE_ForAllObjectsInRangeDo(damage_target, x, y, 900., "unit", valid_damage_target, self.target, self.dmg)
+            self.callback = TQ:callDelayed(1., periodic, self)
+        end
+
+        function thistype:onRemove()
+            DestroyEffect(self.sfx)
+            TQ:disableCallback(self.callback)
+        end
+
+        function thistype:onApply()
+            self.sfx = AddSpecialEffectTarget("spinning fire.mdl", self.target, "origin")
+            periodic(self)
+        end
+    end
+
     ---@class ArcanosphereBuff : Buff
-    ArcanosphereBuff = setmetatable({}, mt)
+    ArcanosphereBuff = Buff.new()
     do
         local thistype = ArcanosphereBuff
-        thistype.RAWCODE         = FourCC('Aaca') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_POSITIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL ---@type integer 
+        thistype.NAME            = "Arcanosphere"
+        thistype.DESC            = "This unit always has $ms movespeed"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNSpaceTimeWarp.blp"
+        thistype.AURA            = true
+        thistype.DISPEL_TYPE     = BUFF_POSITIVE
+        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
 
         function thistype:onRemove()
             Unit[self.target].overmovespeed = nil
         end
 
         function thistype:onApply()
-            Unit[self.target].overmovespeed = 1000
+            self.ms = 1000
+            Unit[self.target].overmovespeed = self.ms
         end
     end
 
     ---@class MarkedForDeathDebuff : Buff
-    MarkedForDeathDebuff = setmetatable({}, mt)
+    MarkedForDeathDebuff = Buff.new()
     do
         local thistype = MarkedForDeathDebuff
-        thistype.RAWCODE         = FourCC('Amar') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_NEGATIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL ---@type integer 
+        thistype.NAME            = "Marked for Death"
+        thistype.DESC            = "This unit has -^$ms% movespeed"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNSacrificialSkull.blp"
+        thistype.DISPEL_TYPE     = BUFF_NEGATIVE
+        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
 
         function thistype:onRemove()
             SetUnitPathing(self.target, true)
@@ -585,23 +787,53 @@ OnInit.global("Buffs", function(Require)
             SetUnitPathing(self.target, false)
 
             self.ms = 0.5 * (math.min(1, Unit[self.target].ms_percent))
+            self.sfx = AddSpecialEffectTarget("Abilities\\Spells\\Human\\Banish\\BanishTarget.mdl", self.target, "chest")
 
             Unit[self.target].ms_percent = Unit[self.target].ms_percent - self.ms
+        end
+    end
 
-            self.sfx = AddSpecialEffectTarget("Abilities\\Spells\\Human\\Banish\\BanishTarget.mdl", self.target, "chest")
+    ---@class FightMeBuff : Buff
+    FightMeBuff = Buff.new()
+    do
+        local thistype = FightMeBuff
+        thistype.NAME            = "Fight Me"
+        thistype.DESC            = "This unit is immune to damage"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNWarCry.blp"
+        thistype.AURA            = true
+        thistype.DISPEL_TYPE     = BUFF_POSITIVE
+        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
+
+        local function on_hit(target, source, amount_ref)
+            local pid = GetPlayerId(GetOwningPlayer(target)) + 1
+
+            if target == Hero[pid] then
+                amount_ref.value = 0.
+            end
+        end
+
+        function thistype:onRemove()
+            EVENT_ON_STRUCK_MULTIPLIER:unregister_unit_action(self.target, on_hit)
+        end
+
+        function thistype:onApply()
+            EVENT_ON_STRUCK_MULTIPLIER:register_unit_action(self.target, on_hit)
         end
     end
 
     ---@class FightMeCasterBuff : Buff
-    FightMeCasterBuff = setmetatable({}, mt)
+    FightMeCasterBuff = Buff.new()
     do
         local thistype = FightMeCasterBuff
-        thistype.RAWCODE         = FourCC('Afmc') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_POSITIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL ---@type integer 
+        thistype.NAME            = "Fight Me"
+        thistype.DESC            = "This unit gives nearby allies damage immunity"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNWarCry.blp"
+        thistype.AURA            = true
+        thistype.DISPEL_TYPE     = BUFF_POSITIVE
+        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
 
         function thistype:onRemove()
-            Buff.timer:disableCallback(self.timer)
+            TQ:disableCallback(self.timer)
             DestroyEffect(self.sfx)
             DestroyGroup(self.ug)
         end
@@ -615,28 +847,29 @@ OnInit.global("Buffs", function(Require)
                 end
             end
 
-            self.timer = Buff.timer:callDelayed(1., periodic, self)
+            self.timer = TQ:callDelayed(1., periodic, self)
         end
 
         function thistype:onApply()
             self.sfx = AddSpecialEffectTarget("Abilities\\Spells\\Orc\\Voodoo\\VoodooAura.mdl", self.target, "origin")
             self.ug = CreateGroup()
 
-            self.timer = Buff.timer:callDelayed(1., periodic, self)
+            periodic(self)
         end
     end
 
     ---@class RoyalPlateBuff : Buff
-    RoyalPlateBuff = setmetatable({}, mt)
+    RoyalPlateBuff = Buff.new()
     do
         local thistype = RoyalPlateBuff
-        thistype.RAWCODE         = FourCC('Aroy') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_POSITIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL ---@type integer 
-        thistype.armor      = 0. ---@type number 
+        thistype.NAME            = "Royal Plate"
+        thistype.DESC            = "This unit has +$armor armor"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNArmor Gold.blp"
+        thistype.DISPEL_TYPE     = BUFF_POSITIVE
+        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
 
         function thistype:onRemove()
-            UnitAddBonus(self.target, BONUS_ARMOR, -self.armor)
+            Unit[self.target].bonus_armor = Unit[self.target].bonus_armor - self.armor
         end
 
         function thistype:onApply()
@@ -646,108 +879,86 @@ OnInit.global("Buffs", function(Require)
                 self.armor = self.armor * 1.3
             end
 
-            UnitAddBonus(self.target, BONUS_ARMOR, self.armor)
+            Unit[self.target].bonus_armor = Unit[self.target].bonus_armor + self.armor
         end
     end
 
     ---@class ProvokeDebuff : Buff
-    ProvokeDebuff = setmetatable({}, mt)
+    ProvokeDebuff = Buff.new()
     do
         local thistype = ProvokeDebuff
-        thistype.RAWCODE         = FourCC('Apvk') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_NEGATIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL ---@type integer 
+        thistype.NAME            = "Provoked"
+        thistype.DESC            = "This unit deals -^#dm% total damage"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNInnerFire.blp"
+        thistype.DISPEL_TYPE     = BUFF_NEGATIVE
+        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
 
         function thistype:onRemove()
             Unit[self.target].dm = Unit[self.target].dm / self.dm
         end
 
         function thistype:onApply()
-            self.dm = (1. - 0.25)
+            self.dm = 0.75
             Unit[self.target].dm = Unit[self.target].dm * self.dm
         end
     end
 
     ---@class DemonicSacrificeBuff : Buff
-    DemonicSacrificeBuff = setmetatable({}, mt)
+    DemonicSacrificeBuff = Buff.new()
     do
         local thistype = DemonicSacrificeBuff
-        thistype.RAWCODE         = FourCC('Adsa') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_POSITIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL ---@type integer 
+        thistype.NAME            = "Demonic Sacrifice"
+        thistype.DESC            = "This unit has +^$spellboost% spellboost"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNTurnUndead.blp"
+        thistype.DISPEL_TYPE     = BUFF_POSITIVE
+        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
 
         function thistype:onRemove()
-            Unit[self.target].spellboost = Unit[self.target].spellboost - 0.15
+            Unit[self.target].spellboost = Unit[self.target].spellboost - self.spellboost
         end
 
         function thistype:onApply()
-            Unit[self.target].spellboost = Unit[self.target].spellboost + 0.15
+            self.spellboost = 0.15
+            Unit[self.target].spellboost = Unit[self.target].spellboost + self.spellboost
         end
     end
 
     ---@class JusticeAuraBuff : Buff
-    JusticeAuraBuff = setmetatable({}, mt)
+    JusticeAuraBuff = Buff.new()
     do
         local thistype = JusticeAuraBuff
-        thistype.RAWCODE         = FourCC('Ajap') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_POSITIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL ---@type integer 
-        thistype.ablev         = 0 ---@type integer 
-
-        function thistype:strongest(new)
-            if self.ablev < new then
-                Unit[self.target].pr = Unit[self.target].pr / self.pr
-
-                self.ablev = new
-                self.pr = math.max(0.91 - 0.01 * self.ablev, 0.85)
-                Unit[self.target].pr = Unit[self.target].pr * self.pr
-            end
-        end
+        thistype.NAME            = "Aura of Justice"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNDevotionAura2.blp"
+        thistype.DESC            = "This unit has +^#pr% physical resistance"
+        thistype.AURA            = true
+        thistype.DISPEL_TYPE     = BUFF_POSITIVE
+        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
 
         function thistype:onRemove()
             Unit[self.target].pr = Unit[self.target].pr / self.pr
-            Buff.timer:disableCallback(self.timer)
-            DestroyGroup(self.ug)
-        end
-
-        local function periodic(self)
-            MakeGroupInRange(self.pid, self.ug, GetUnitX(self.source), GetUnitY(self.source), 900. * LBOOST[self.pid], Condition(FilterAlly))
-
-            for target in each(self.ug) do
-                thistype:add(self.source, target):duration(2.)
-                local b = thistype:get(nil, target)
-                b:strongest(math.max(b.ablev, GetUnitAbilityLevel(self.source, AURAOFJUSTICE.id)))
-            end
-
-            self.timer = Buff.timer:callDelayed(1., periodic, self)
         end
 
         function thistype:onApply()
-            self.ablev = GetUnitAbilityLevel(self.source, AURAOFJUSTICE.id)
             self.pr = math.max(0.91 - 0.01 * self.ablev, 0.85)
-            self.ug = CreateGroup()
 
             Unit[self.target].pr = Unit[self.target].pr * self.pr
-
-            self.timer = Buff.timer:callDelayed(1., periodic, self)
         end
     end
 
     ---@class SoulLinkBuff : Buff
-    SoulLinkBuff = setmetatable({}, mt)
+    SoulLinkBuff = Buff.new()
     do
         local thistype = SoulLinkBuff
-        thistype.RAWCODE         = FourCC('Asli') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_POSITIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL ---@type integer 
-        thistype.hp   = 0. ---@type number 
-        thistype.mana = 0. ---@type number 
-        thistype.lfx  = nil ---@type lightning 
+        thistype.NAME            = "Soul Link"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNSpiritLink.blp"
+        thistype.DESC            = "This unit's health and mana will be restored"
+        thistype.DISPEL_TYPE     = BUFF_POSITIVE
+        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
 
         function thistype:onRemove()
             EVENT_ON_FATAL_DAMAGE:unregister_unit_action(self.target, SOULLINK.onHit)
             FadeSFX(self.sfx, true)
-            Buff.timer:callDelayed(2., HideEffect, self.sfx)
+            TQ:callDelayed(2., HideEffect, self.sfx)
             DestroyLightning(self.lfx)
 
             HP(self.source, self.target, math.max(0., self.hp - GetWidgetLife(self.target)), SOULLINK.tag)
@@ -755,13 +966,13 @@ OnInit.global("Buffs", function(Require)
                 MP(self.target, math.max(0., self.mana - GetUnitState(self.target, UNIT_STATE_MANA)))
             end
 
-            Buff.timer:disableCallback(self.timer)
+            TQ:disableCallback(self.timer)
         end
 
         local function periodic(self, x, y)
             MoveLightningEx(self.lfx, false, x, y, BlzGetUnitZ(self.target) + 75., GetUnitX(self.target), GetUnitY(self.target), BlzGetUnitZ(self.target) + 75.)
 
-            self.timer = Buff.timer:callDelayed(FPS_32, periodic, self, x, y)
+            self.timer = TQ:callDelayed(FPS_32, periodic, self, x, y)
         end
 
         function thistype:onApply()
@@ -785,19 +996,19 @@ OnInit.global("Buffs", function(Require)
             BlzSetSpecialEffectColor(self.sfx, 255, 255, 0)
             BlzSetSpecialEffectAlpha(self.sfx, 100)
 
-            self.timer = Buff.timer:callDelayed(FPS_32, periodic, self, x, y)
+            self.timer = TQ:callDelayed(FPS_32, periodic, self, x, y)
         end
     end
 
     ---@class LawOfMightBuff : Buff
-    LawOfMightBuff = setmetatable({}, mt)
+    LawOfMightBuff = Buff.new()
     do
         local thistype = LawOfMightBuff
-        thistype.RAWCODE         = FourCC('Almi') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_POSITIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL ---@type integer 
-        thistype.main         = 0 ---@type integer 
-        thistype.bonus         = 0 ---@type integer 
+        thistype.NAME            = "Law of Might"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNArcaneMight2.blp"
+        thistype.DESC            = "This unit has +$bonus $attr"
+        thistype.DISPEL_TYPE     = BUFF_POSITIVE
+        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
 
         function thistype:onRemove()
             DestroyEffect(self.sfx)
@@ -806,7 +1017,8 @@ OnInit.global("Buffs", function(Require)
         end
 
         function thistype:onApply()
-            self.main = HighestStat(self.target)
+            self.main = HighestStat(self.target, true)
+            self.attr = HighestStatName(self.target, true, true)
 
             self.bonus = R2I(GetHeroStat(self.main, self.target, true) * LAWOFMIGHT.pbonus(self.pid) * 0.01 * LBOOST[self.pid] + LAWOFMIGHT.fbonus(self.pid) * BOOST[self.pid])
             UnitAddBonus(self.target, self.main + 2, self.bonus)
@@ -816,14 +1028,14 @@ OnInit.global("Buffs", function(Require)
     end
 
     ---@class LawOfValorBuff : Buff
-    LawOfValorBuff = setmetatable({}, mt)
+    LawOfValorBuff = Buff.new()
     do
         local thistype = LawOfValorBuff
-        thistype.RAWCODE         = FourCC('Alva') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_POSITIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL ---@type integer 
-        thistype.regen      = 0. ---@type number 
-        thistype.percent         = 0 ---@type integer 
+        thistype.NAME            = "Law of Valor"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTN_CR_Favor.blp"
+        thistype.DESC            = "This unit has +$regen regeneration and +$percent% healing"
+        thistype.DISPEL_TYPE     = BUFF_POSITIVE
+        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
 
         function thistype:onRemove()
             DestroyEffect(self.sfx)
@@ -844,13 +1056,14 @@ OnInit.global("Buffs", function(Require)
     end
 
     ---@class LawOfResonanceBuff : Buff
-    LawOfResonanceBuff = setmetatable({}, mt)
+    LawOfResonanceBuff = Buff.new()
     do
         local thistype = LawOfResonanceBuff
-        thistype.RAWCODE         = FourCC('Alre') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_POSITIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL ---@type integer 
-        thistype.multiplier      = 0. ---@type number 
+        thistype.NAME            = "Law of Resonance"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNDuality.blp"
+        thistype.DESC            = "This unit's attacks are echoed for ^$multiplier% damage"
+        thistype.DISPEL_TYPE     = BUFF_POSITIVE
+        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
 
         local function on_hit(source, target, amount, amount_after_red, damage_type)
             local self = thistype:get(nil, source)
@@ -876,12 +1089,15 @@ OnInit.global("Buffs", function(Require)
     end
 
     ---@class OverloadBuff : Buff
-    OverloadBuff = setmetatable({}, mt)
+    OverloadBuff = Buff.new()
     do
         local thistype = OverloadBuff
-        thistype.RAWCODE         = FourCC('Aove') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_POSITIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL ---@type integer 
+        thistype.NAME            = "Overload"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNOverloadOn1.blp"
+        thistype.DESC            = "This unit has +^#mm% magic damage while draining mana"
+        thistype.AURA            = true
+        thistype.DISPEL_TYPE     = BUFF_POSITIVE
+        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
 
         local function periodic(self)
             local mana = GetUnitState(self.target, UNIT_STATE_MANA) ---@type number 
@@ -889,7 +1105,7 @@ OnInit.global("Buffs", function(Require)
 
             if UnitAlive(self.target) and mana >= maxmana then
                 SetUnitState(self.target, UNIT_STATE_MANA, mana - maxmana)
-                self.timer = Buff.timer:callDelayed(1., periodic, self)
+                self.timer = TQ:callDelayed(1., periodic, self)
             else
                 self.timer = nil
                 self:remove()
@@ -902,7 +1118,7 @@ OnInit.global("Buffs", function(Require)
             DestroyEffect(self.sfx)
 
             if self.timer then
-                Buff.timer:disableCallback(self.timer)
+                TQ:disableCallback(self.timer)
             end
         end
 
@@ -911,17 +1127,20 @@ OnInit.global("Buffs", function(Require)
             self.mm = OVERLOAD.mult(self.pid)
             Unit[self.target].mm = Unit[self.target].mm * self.mm
 
-            self.timer = Buff.timer:callDelayed(1., periodic, self)
+            self.timer = TQ:callDelayed(1., periodic, self)
         end
     end
 
     ---@class BloodMistBuff : Buff
-    BloodMistBuff = setmetatable({}, mt)
+    BloodMistBuff = Buff.new()
     do
         local thistype = BloodMistBuff
-        thistype.RAWCODE         = FourCC('Abmi') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_POSITIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL ---@type integer 
+        thistype.NAME            = "Blood Mist"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNBloodOffering.blp"
+        thistype.DESC            = "This unit has +$ms movespeed and is rapidly healing"
+        thistype.AURA            = true
+        thistype.DISPEL_TYPE     = BUFF_POSITIVE
+        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
 
         local function periodic(self)
             local blood = BLOODBANK.get(self.tpid)
@@ -942,7 +1161,7 @@ OnInit.global("Buffs", function(Require)
                 BlzSetSpecialEffectColor(self.sfx, 0, 0, 0)
             end
 
-            self.timer = Buff.timer:callDelayed(0.5, periodic, self)
+            self.timer = TQ:callDelayed(0.5, periodic, self)
         end
 
         function thistype:onRemove()
@@ -951,7 +1170,7 @@ OnInit.global("Buffs", function(Require)
             Unit[self.target].ms_flat = Unit[self.target].ms_flat - self.ms
             UnitRemoveAbility(self.target, FourCC('B02Q'))
 
-            Buff.timer:disableCallback(self.timer)
+            TQ:disableCallback(self.timer)
         end
 
         function thistype:onApply()
@@ -965,19 +1184,19 @@ OnInit.global("Buffs", function(Require)
 
             self.sfx = AddSpecialEffectTarget("war3mapImported\\Chumpool.mdx", self.target, "origin")
 
-            self.timer = Buff.timer:callDelayed(0.5, periodic, self)
+            self.timer = TQ:callDelayed(0.5, periodic, self)
         end
     end
 
     ---@class BloodLordBuff : Buff
-    BloodLordBuff = setmetatable({}, mt)
+    BloodLordBuff = Buff.new()
     do
         local thistype = BloodLordBuff
-        thistype.RAWCODE         = FourCC('Ablr') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_POSITIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL ---@type integer 
-        thistype.agi      = 0. ---@type number 
-        thistype.str      = 0. ---@type number 
+        thistype.NAME            = "Blood Lord"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNDarkHarvest.blp"
+        thistype.DESC            = "This unit has +^#bat% base attack speed, +$bonus $stat, and deals extra magic damage on attacks"
+        thistype.DISPEL_TYPE     = BUFF_POSITIVE
+        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
 
         local function on_hit(source, target)
             local pid = GetPlayerId(GetOwningPlayer(source)) + 1
@@ -1000,48 +1219,52 @@ OnInit.global("Buffs", function(Require)
                 dummy:attack(self.source)
             end
 
-            self.timer = Buff.timer:callDelayed(1., periodic, self)
+            self.timer = TQ:callDelayed(1., periodic, self)
         end
 
         function thistype:onRemove()
             DestroyGroup(self.ug)
             EVENT_ON_HIT:unregister_unit_action(self.source, on_hit)
 
-            Unit[self.target].bonus_bat = Unit[self.target].bonus_bat / 0.7
+            Unit[self.target].bonus_bat = Unit[self.target].bonus_bat / self.bat
             Unit[self.source].bonus_agi = Unit[self.source].bonus_agi - self.agi
             Unit[self.source].bonus_str = Unit[self.source].bonus_str - self.str
-
-            self.agi = 0.
-            self.str = 0.
 
             if self.timer then
                 UnitDisableAbility(self.source, BLOODLEECH.id, false)
                 UnitDisableAbility(self.source, BLOODDOMAIN.id, false)
-                Buff.timer:disableCallback(self.timer)
+                TQ:disableCallback(self.timer)
             end
         end
 
         function thistype:onApply()
+            self.agi = 0
+            self.str = 0
             EVENT_ON_HIT:register_unit_action(self.source, on_hit)
 
             if GetHeroAgi(self.source, true) > GetHeroStr(self.source, true) then
+                self.stat = "Agility"
                 UnitDisableAbility(self.source, BLOODLEECH.id, true)
                 BlzUnitHideAbility(self.source, BLOODLEECH.id, false)
                 UnitDisableAbility(self.source, BLOODDOMAIN.id, true)
                 BlzUnitHideAbility(self.source, BLOODDOMAIN.id, false)
 
-                --blood leech aoe
+                -- blood leech aoe
                 self.ug = CreateGroup()
-                self.timer = Buff.timer:callDelayed(1., periodic, self)
+                self.timer = TQ:callDelayed(1., periodic, self)
                 self.agi = BLOODLORD.bonus(self.pid)
-                Unit[self.source].bonus_str = Unit[self.source].bonus_str + self.str
+                Unit[self.source].bonus_agi = Unit[self.source].bonus_agi + self.agi
+                self.bonus = self.agi
             else
+                self.stat = "Strength"
                 self.str = BLOODLORD.bonus(self.pid)
                 Unit[self.source].bonus_str = Unit[self.source].bonus_str + self.str
+                self.bonus = self.str
             end
 
-            Unit[self.target].bonus_bat = Unit[self.target].bonus_bat * 0.7
-            Buff.timer:callDelayed(BLOODLORD.dur(self.pid) * LBOOST[self.pid], DestroyEffect, AddSpecialEffectTarget("war3mapImported\\Burning Rage Red.mdx", self.source, "overhead"))
+            self.bat = 0.7
+            Unit[self.target].bonus_bat = Unit[self.target].bonus_bat * self.bat
+            TQ:callDelayed(BLOODLORD.dur(self.pid) * LBOOST[self.pid], DestroyEffect, AddSpecialEffectTarget("war3mapImported\\Burning Rage Red.mdx", self.source, "overhead"))
             SetUnitAnimationByIndex(self.source, 3)
 
             BLOODBANK.set(self.tpid, 0)
@@ -1049,16 +1272,19 @@ OnInit.global("Buffs", function(Require)
     end
 
     ---@class ManaDrainDebuff : Buff
-    ManaDrainDebuff = setmetatable({}, mt)
+    ManaDrainDebuff = Buff.new()
     do
         local thistype = ManaDrainDebuff
-        thistype.RAWCODE         = FourCC('Amdr') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_NEGATIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL ---@type integer 
+        thistype.NAME            = "Mana Drain"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNManaDrain.blp"
+        thistype.DESC            = "This unit is having their mana drained"
+        thistype.AURA            = true
+        thistype.DISPEL_TYPE     = BUFF_NEGATIVE
+        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
 
         local function periodic(self)
             MoveLightningEx(self.lfx, false, GetUnitX(self.source), GetUnitY(self.source), BlzGetUnitZ(self.source) + 50., GetUnitX(self.target), GetUnitY(self.target), BlzGetUnitZ(self.target) + 50.)
-            self.timer = Buff.timer:callDelayed(FPS_32, periodic, self)
+            self.timer = TQ:callDelayed(FPS_32, periodic, self)
         end
 
         local function drain(self, x, y)
@@ -1076,13 +1302,13 @@ OnInit.global("Buffs", function(Require)
             if DistanceCoords(x, y, GetUnitX(self.target), GetUnitY(self.target)) > 800. or not UnitAlive(self.source) then
                 self:remove()
             else
-                Buff.timer:callDelayed(1., drain, self, x, y)
+                TQ:callDelayed(1., drain, self, x, y)
             end
         end
 
         function thistype:onRemove()
             DestroyLightning(self.lfx)
-            Buff.timer:disableCallback(self.timer)
+            TQ:disableCallback(self.timer)
         end
 
         function thistype:onApply()
@@ -1090,19 +1316,41 @@ OnInit.global("Buffs", function(Require)
 
             MoveLightningEx(self.lfx, false, GetUnitX(self.source), GetUnitY(self.source), BlzGetUnitZ(self.source) + 50., GetUnitX(self.target), GetUnitY(self.target), BlzGetUnitZ(self.target) + 50.)
 
-            Buff.timer:callDelayed(1., drain, self, GetUnitX(self.source), GetUnitY(self.source))
-            self.timer = Buff.timer:callDelayed(FPS_32, periodic, self)
+            TQ:callDelayed(1., drain, self, GetUnitX(self.source), GetUnitY(self.source))
+            self.timer = TQ:callDelayed(FPS_32, periodic, self)
+        end
+    end
+
+    ---@class SpinDashBuff : Buff
+    SpinDashBuff = Buff.new()
+    do
+        local thistype = SpinDashBuff
+        thistype.NAME            = "Spin Dash"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNComed Fall.blp"
+        thistype.DESC            = "This unit may recast Spin Dash"
+        thistype.DISPEL_TYPE     = BUFF_POSITIVE
+        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
+
+        function thistype:onRemove()
+            BlzStartUnitAbilityCooldown(self.source, SPINDASH.id, 3. + self:remaining())
+            BlzSetAbilityIntegerLevelField(BlzGetUnitAbility(self.source, SPINDASH.id), ABILITY_ILF_TARGET_TYPE, GetUnitAbilityLevel(self.source, SPINDASH.id) - 1, 2)
+        end
+
+        function thistype:onApply()
+            self.x = GetUnitX(self.target)
+            self.y = GetUnitY(self.target)
         end
     end
 
     ---@class SpinDashDebuff : Buff
-    SpinDashDebuff = setmetatable({}, mt)
+    SpinDashDebuff = Buff.new()
     do
         local thistype = SpinDashDebuff
-        thistype.RAWCODE         = FourCC('Asda') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_NEGATIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL ---@type integer 
-        thistype.as              = 1.25 ---@type number 
+        thistype.NAME            = "Spin Dash"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNComed Fall.blp"
+        thistype.DESC            = "This unit has -^#as% attack speed"
+        thistype.DISPEL_TYPE     = BUFF_NEGATIVE
+        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
 
         function thistype:onRemove()
             DestroyEffect(self.sfx)
@@ -1110,6 +1358,7 @@ OnInit.global("Buffs", function(Require)
         end
 
         function thistype:onApply()
+            self.as = 1.25
             Unit[self.target].bonus_bat = Unit[self.target].bonus_bat * self.as
 
             self.sfx = AddSpecialEffectTarget("Abilities\\Spells\\Orc\\StasisTrap\\StasisTotemTarget.mdl", self.target, "overhead")
@@ -1117,13 +1366,14 @@ OnInit.global("Buffs", function(Require)
     end
 
     ---@class ParryBuff : Buff
-    ParryBuff = setmetatable({}, mt)
+    ParryBuff = Buff.new()
     do
         local thistype = ParryBuff
-        thistype.RAWCODE         = FourCC('Apar') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_POSITIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL ---@type integer 
-        thistype.soundPlayed         = false ---@type boolean 
+        thistype.NAME            = "Parry"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNReflex.blp"
+        thistype.DESC            = "This unit is immune to damage"
+        thistype.DISPEL_TYPE     = BUFF_POSITIVE
+        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
 
         local function on_hit(target, source, amount_ref)
             local self = ParryBuff:get(target, target)
@@ -1133,7 +1383,7 @@ OnInit.global("Buffs", function(Require)
                 amount_ref.value = 0.00
                 self:playSound()
 
-                DamageTarget(target, source, PARRY.dmg(pid) * (((LIMITBREAK.flag[pid] & 0x1) > 0 and 2.) or 1.), ATTACK_TYPE_NORMAL, MAGIC, PARRY.tag)
+                DamageTarget(target, source, PARRY.dmg(pid) * (((LIMITBREAK.flag[pid] & 0x1) > 0 and 2.) or 1.) * BOOST[pid], ATTACK_TYPE_NORMAL, MAGIC, PARRY.tag)
             end
         end
 
@@ -1164,13 +1414,14 @@ OnInit.global("Buffs", function(Require)
     end
 
     ---@class IntimidatingShoutBuff : Buff
-    IntimidatingShoutBuff = setmetatable({}, mt)
+    IntimidatingShoutBuff = Buff.new()
     do
         local thistype = IntimidatingShoutBuff
-        thistype.RAWCODE         = FourCC('Ainb') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_POSITIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL ---@type integer 
-        thistype.dmg      = 0. ---@type number 
+        thistype.NAME            = "Intimidating Shout"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNBattleShout.blp"
+        thistype.DESC            = "This unit has +^$dmg% attack damage"
+        thistype.DISPEL_TYPE     = BUFF_POSITIVE
+        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
 
         function thistype:onRemove()
             DestroyEffect(self.sfx)
@@ -1187,18 +1438,20 @@ OnInit.global("Buffs", function(Require)
     end
 
     ---@class IntimidatingShoutDebuff : Buff
-    IntimidatingShoutDebuff = setmetatable({}, mt)
+    IntimidatingShoutDebuff = Buff.new()
     do
         local thistype = IntimidatingShoutDebuff
-        thistype.RAWCODE         = FourCC('Aint') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_NEGATIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL ---@type integer 
+        thistype.NAME            = "Intimidating Shout"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNBattleShout.blp"
+        thistype.DESC            = "This unit has -^#dmg% attack damage"
+        thistype.DISPEL_TYPE     = BUFF_NEGATIVE
+        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
 
         function thistype:onRemove()
             Unit[self.target].mr = Unit[self.target].mr / self.mr
             DestroyEffect(self.sfx)
 
-            Unit[self.target].damage_percent = Unit[self.target].damage_percent - self.dmg
+            Unit[self.target].damage_percent = Unit[self.target].damage_percent + self.dmg
         end
 
         function thistype:onApply()
@@ -1209,19 +1462,36 @@ OnInit.global("Buffs", function(Require)
 
             self.sfx = AddSpecialEffectTarget("Abilities\\Spells\\Other\\HowlOfTerror\\HowlTarget.mdl", self.target, "overhead")
 
-            Unit[self.target].damage_percent = Unit[self.target].damage_percent + self.dmg
+            Unit[self.target].damage_percent = Unit[self.target].damage_percent - self.dmg
+        end
+    end
+
+    ---@class AdaptiveStrikeBuff : Buff
+    AdaptiveStrikeBuff = Buff.new()
+    do
+        local thistype = AdaptiveStrikeBuff
+        thistype.NAME            = "Adaptive Strike"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNGhostOrb.blp"
+        thistype.DESC            = "This spell is on cooldown"
+        thistype.DISPEL_TYPE     = BUFF_NEGATIVE
+        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
+
+        function thistype:onRemove()
+        end
+
+        function thistype:onApply()
         end
     end
 
     ---@class UndyingRageBuff : Buff
-    UndyingRageBuff = setmetatable({}, mt)
+    UndyingRageBuff = Buff.new()
     do
         local thistype = UndyingRageBuff
-        thistype.RAWCODE         = FourCC('Arag') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_POSITIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL ---@type integer 
-        thistype.totalRegen      = 0. ---@type number 
-        thistype.text         = nil ---@type texttag 
+        thistype.NAME            = "Undying Rage"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNtaur.blp"
+        thistype.DESC            = "This unit cannot die"
+        thistype.DISPEL_TYPE     = BUFF_POSITIVE
+        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
 
         ---@param dmg number
         function thistype:addRegen(dmg)
@@ -1229,8 +1499,6 @@ OnInit.global("Buffs", function(Require)
         end
 
         function thistype:onRemove()
-            EVENT_ON_STRUCK_FINAL:unregister_unit_action(self.target, UNDYINGRAGE.onHit)
-
             DestroyEffect(self.sfx)
             DestroyTextTag(self.text)
 
@@ -1241,12 +1509,12 @@ OnInit.global("Buffs", function(Require)
             end
 
             Unit[self.target].hidehp = false
-            Buff.timer:disableCallback(self.timer)
+            TQ:disableCallback(self.timer)
         end
 
         local function periodic(self)
-            SetTextTagText(self.text, (R2I(self.totalRegen)) .. "\x25", 0.025)
-            local red, green, blue = HealthGradient(self.totalRegen, false) ---@type integer, integer, integer
+            SetTextTagText(self.text, (R2I(self.totalRegen)) .. "%", 0.025)
+            local red, green, blue = HealthGradient(self.totalRegen, false)
             SetTextTagColor(self.text, red, green, blue, 255)
             SetTextTagPosUnit(self.text, self.target, -200.)
 
@@ -1254,127 +1522,140 @@ OnInit.global("Buffs", function(Require)
             self:addRegen(Unit[self.target].regen * FPS_32)
 
             SetWidgetLife(self.target, math.max(10., BlzGetUnitMaxHP(self.target) * 0.0001))
-            self.timer = Buff.timer:callDelayed(FPS_32, periodic, self)
+            self.timer = TQ:callDelayed(FPS_32, periodic, self)
         end
 
         function thistype:onApply()
-            EVENT_ON_STRUCK_FINAL:register_unit_action(self.target, UNDYINGRAGE.onHit)
             self.text = CreateTextTag()
             self.totalRegen = 0.
-            SetTextTagText(self.text, (R2I(self.totalRegen)) .. "\x25", 0.025)
+            SetTextTagText(self.text, (R2I(self.totalRegen)) .. "%", 0.025)
             SetTextTagColor(self.text, R2I(Pow(100 - self.totalRegen, 1.1)), R2I(SquareRoot(math.max(0, self.totalRegen) * 500)), 0, 255)
 
             Unit[self.target].hidehp = true
 
             self.sfx = AddSpecialEffectTarget("war3mapImported\\DemonicAdornment.mdx", self.target, "head")
 
-            self.timer = Buff.timer:callDelayed(FPS_32, periodic, self)
+            self.timer = TQ:callDelayed(FPS_32, periodic, self)
         end
     end
 
     ---@class RampageBuff : Buff
-    RampageBuff = setmetatable({}, mt)
+    RampageBuff = Buff.new()
     do
         local thistype = RampageBuff
-        thistype.RAWCODE         = FourCC('Aram') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_POSITIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_NONE ---@type integer 
+        thistype.NAME            = "Rampage"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNBloodRampage5.blp"
+        thistype.DESC            = "This unit has +$ms movespeed, +$pen% armor penetration, and is draining health"
+        thistype.DISPEL_TYPE     = BUFF_POSITIVE
+        thistype.STACK_TYPE      = BUFF_STACK_NONE
 
         function thistype:onRemove()
-            Unit[self.target].ms_flat = Unit[self.target].ms_flat - 100
+            Unit[self.target].ms_flat = Unit[self.target].ms_flat - self.ms
             Unit[self.target].armor_pen_percent = Unit[self.target].armor_pen_percent - self.pen
 
-            Buff.timer:disableCallback(self.timer)
+            TQ:disableCallback(self.timer)
             DestroyEffect(self.sfx)
         end
 
         local function periodic(self)
             DamageTarget(self.source, self.source, 0.08 * GetWidgetLife(self.source), ATTACK_TYPE_NORMAL, PURE, "Rampage")
-            self.timer = Buff.timer:callDelayed(1., periodic, self)
+            self.timer = TQ:callDelayed(1., periodic, self)
         end
 
         function thistype:onApply()
             self.pen = RAMPAGE.pen(self.tpid)
+            self.ms = 100
             Unit[self.target].armor_pen_percent = Unit[self.target].armor_pen_percent + self.pen
-            Unit[self.target].ms_flat = Unit[self.target].ms_flat + 100
+            Unit[self.target].ms_flat = Unit[self.target].ms_flat + self.ms
 
             self.sfx = AddSpecialEffectTarget("war3mapImported\\Windwalk Blood.mdx", self.source, "origin")
-            self.timer = Buff.timer:callDelayed(0., periodic, self)
+            periodic(self)
         end
     end
 
     ---@class FrostArmorDebuff : Buff
-    FrostArmorDebuff = setmetatable({}, mt)
+    FrostArmorDebuff = Buff.new()
     do
         local thistype = FrostArmorDebuff
-        thistype.RAWCODE         = FourCC('Afde') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_NEGATIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL ---@type integer 
+        thistype.NAME            = "Frost Armor"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNFrostArmor.blp"
+        thistype.DESC            = "This unit has -^$ms% movespeed and -^#bat% attack speed"
+        thistype.DISPEL_TYPE     = BUFF_NEGATIVE
+        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
 
         function thistype:onRemove()
             Unit[self.target].ms_percent = Unit[self.target].ms_percent + self.ms
-            Unit[self.target].bonus_bat = Unit[self.target].bonus_bat / 1.25
+            Unit[self.target].bonus_bat = Unit[self.target].bonus_bat / self.bat
         end
 
         function thistype:onApply()
             self.ms = 0.25 * (math.min(1, Unit[self.target].ms_percent))
+            self.bat = 1.25
 
             Unit[self.target].ms_percent = Unit[self.target].ms_percent - self.ms
-            Unit[self.target].bonus_bat = Unit[self.target].bonus_bat * 1.25
+            Unit[self.target].bonus_bat = Unit[self.target].bonus_bat * self.bat
         end
     end
 
     ---@class FrostArmorBuff : Buff
-    FrostArmorBuff = setmetatable({}, mt)
+    FrostArmorBuff = Buff.new()
     do
         local thistype = FrostArmorBuff
-        thistype.RAWCODE         = FourCC('Afar') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_POSITIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_NONE ---@type integer 
+        thistype.NAME            = "Frost Armor"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNFrostArmor.blp"
+        thistype.DESC            = "This unit has +$armor armor"
+        thistype.DISPEL_TYPE     = BUFF_POSITIVE
+        thistype.STACK_TYPE      = BUFF_STACK_NONE
 
         local function on_hit(target, source)
             FrostArmorDebuff:add(target, source):duration(3.)
         end
 
         function thistype:onRemove()
-            EVENT_ON_HIT:unregister_unit_action(self.target, on_hit)
-            UnitAddBonus(self.source, BONUS_ARMOR, -100.)
+            EVENT_ON_STRUCK:unregister_unit_action(self.target, on_hit)
+            Unit[self.target].bonus_armor = Unit[self.target].bonus_armor - self.armor
 
             DestroyEffect(self.sfx)
         end
 
         function thistype:onApply()
-            EVENT_ON_HIT:register_unit_action(self.target, on_hit)
+            self.armor = 100
+            EVENT_ON_STRUCK:register_unit_action(self.target, on_hit)
             self.sfx = AddSpecialEffectTarget("Abilities\\Spells\\Undead\\FrostArmor\\FrostArmorTarget.mdl", self.source, "chest")
 
-            UnitAddBonus(self.source, BONUS_ARMOR, 100.)
+            Unit[self.target].bonus_armor = Unit[self.target].bonus_armor + self.armor
         end
     end
 
     ---@class MagneticStrikeDebuff : Buff
-    MagneticStrikeDebuff = setmetatable({}, mt)
+    MagneticStrikeDebuff = Buff.new()
     do
         local thistype = MagneticStrikeDebuff
-        thistype.RAWCODE         = FourCC('Amsd') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_NEGATIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL ---@type integer 
+        thistype.NAME            = "Magnetic Strike"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNInfernalImpact.blp"
+        thistype.DESC            = "This unit has -^#dr% damage resist"
+        thistype.DISPEL_TYPE     = BUFF_NEGATIVE
+        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
 
         function thistype:onRemove()
-            Unit[self.target].dr = Unit[self.target].dr / 1.15
+            Unit[self.target].dr = Unit[self.target].dr / self.dr
         end
 
         function thistype:onApply()
-            Unit[self.target].dr = Unit[self.target].dr * 1.15
+            self.dr = 1.15
+            Unit[self.target].dr = Unit[self.target].dr * self.dr
         end
     end
 
     ---@class MagneticStrikeBuff : Buff
-    MagneticStrikeBuff = setmetatable({}, mt)
+    MagneticStrikeBuff = Buff.new()
     do
         local thistype = MagneticStrikeBuff
-        thistype.RAWCODE         = FourCC('Amst') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_POSITIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL ---@type integer 
+        thistype.NAME            = "Magnetic Strike"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNInfernalImpact.blp"
+        thistype.DESC            = "This unit's next attack will trigger Magnetic Strike"
+        thistype.DISPEL_TYPE     = BUFF_POSITIVE
+        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
 
         local function on_hit(source, target)
             local pid = GetPlayerId(GetOwningPlayer(source)) + 1
@@ -1384,7 +1665,7 @@ OnInit.global("Buffs", function(Require)
                 BlzSetAbilityIcon(BODYOFFIRE.id, "ReplaceableTextures\\CommandButtons\\BTNBodyOfFire" .. (BODYOFFIRE.charges[pid]) .. ".blp")
             end
 
-            --disable casting at 0 charges
+            -- disable casting at 0 charges
             if BODYOFFIRE.charges[pid] <= 0 then
                 UnitDisableAbility(source, INFERNALSTRIKE.id, true)
                 BlzUnitHideAbility(source, INFERNALSTRIKE.id, false)
@@ -1392,15 +1673,10 @@ OnInit.global("Buffs", function(Require)
                 BlzUnitHideAbility(source, MAGNETICSTRIKE.id, false)
             end
 
-            --refresh charge timer
-            local pt = TimerList[pid]:get(BODYOFFIRE.id, source, nil)
-            if not pt then
-                pt = TimerList[pid]:add()
-                pt.source = source
-                pt.tag = BODYOFFIRE.id
-
+            -- refresh charge timer
+            if not BODYOFFIRE.callback[pid] then
+                BODYOFFIRE.callback[pid] = TQ:callDelayed(5., BODYOFFIRE.cooldown, pid, source)
                 BlzStartUnitAbilityCooldown(source, BODYOFFIRE.id, 5.)
-                pt.timer:callDelayed(5., BODYOFFIRE.cooldown, pt)
             end
             MagneticStrikeBuff:dispel(source, source)
 
@@ -1427,12 +1703,14 @@ OnInit.global("Buffs", function(Require)
     end
 
     ---@class InfernalStrikeBuff : Buff
-    InfernalStrikeBuff = setmetatable({}, mt)
+    InfernalStrikeBuff = Buff.new()
     do
         local thistype = InfernalStrikeBuff
-        thistype.RAWCODE         = FourCC('Aist') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_POSITIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL ---@type integer 
+        thistype.NAME            = "Infernal Strike"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNFireImpact.blp"
+        thistype.DESC            = "This unit's next attack will trigger Infernal Strike"
+        thistype.DISPEL_TYPE     = BUFF_POSITIVE
+        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
 
         local function on_hit(source, target, amount_ref)
             local pid = GetPlayerId(GetOwningPlayer(source)) + 1
@@ -1442,7 +1720,7 @@ OnInit.global("Buffs", function(Require)
                 BlzSetAbilityIcon(BODYOFFIRE.id, "ReplaceableTextures\\CommandButtons\\BTNBodyOfFire" .. (BODYOFFIRE.charges[pid]) .. ".blp")
             end
 
-            --disable casting at 0 charges
+            -- disable casting at 0 charges
             if BODYOFFIRE.charges[pid] <= 0 then
                 UnitDisableAbility(source, INFERNALSTRIKE.id, true)
                 BlzUnitHideAbility(source, INFERNALSTRIKE.id, false)
@@ -1450,15 +1728,10 @@ OnInit.global("Buffs", function(Require)
                 BlzUnitHideAbility(source, MAGNETICSTRIKE.id, false)
             end
 
-            --refresh charge timer
-            local pt = TimerList[pid]:get(BODYOFFIRE.id, source, nil)
-            if not pt then
-                pt = TimerList[pid]:add()
-                pt.source = source
-                pt.tag = BODYOFFIRE.id
-
+            -- refresh charge timer
+            if not BODYOFFIRE.callback[pid] then
+                BODYOFFIRE.callback[pid] = TQ:callDelayed(5., BODYOFFIRE.cooldown, pid, source)
                 BlzStartUnitAbilityCooldown(source, BODYOFFIRE.id, 5.)
-                pt.timer:callDelayed(5., BODYOFFIRE.cooldown, pt)
             end
 
             InfernalStrikeBuff:dispel(source, source)
@@ -1476,7 +1749,7 @@ OnInit.global("Buffs", function(Require)
                 end
                 local dtype = BlzGetUnitIntegerField(target, UNIT_IF_DEFENSE_TYPE)
 
-                if dtype == 1 or dtype == 7 then --boss
+                if dtype == 1 or dtype == 7 then -- boss
                     DamageTarget(source, u, ((GetHeroStr(source, true) * ablev) + GetWidgetLife(u) * (0.25 + 0.05 * ablev)) * 0.5 * LBOOST[pid], ATTACK_TYPE_NORMAL, PHYSICAL, INFERNALSTRIKE.tag)
                 else
                     DamageTarget(source, u, ((GetHeroStr(source, true) * ablev) + GetWidgetLife(u) * (0.25 + 0.05 * ablev)) * LBOOST[pid], ATTACK_TYPE_NORMAL, PHYSICAL, INFERNALSTRIKE.tag)
@@ -1502,12 +1775,14 @@ OnInit.global("Buffs", function(Require)
     end
 
     ---@class PiercingStrikeBuff : Buff
-    PiercingStrikeBuff = setmetatable({}, mt)
+    PiercingStrikeBuff = Buff.new()
     do
         local thistype = PiercingStrikeBuff
-        thistype.RAWCODE         = FourCC('Apie') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_POSITIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL ---@type integer 
+        thistype.NAME            = "Piercing Strike"
+        thistype.ICON            = "ReplaceableTextures\\PassiveButtons\\PASShieldBreakGreen.tga"
+        thistype.DESC            = "This unit has +$pen% armor penetration"
+        thistype.DISPEL_TYPE     = BUFF_POSITIVE
+        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
 
         function thistype:onRemove()
             Unit[self.target].armor_pen_percent = Unit[self.target].armor_pen_percent - self.pen
@@ -1519,40 +1794,15 @@ OnInit.global("Buffs", function(Require)
         end
     end
 
-    ---@class FightMeBuff : Buff
-    FightMeBuff = setmetatable({}, mt)
-    do
-        local thistype = FightMeBuff
-        thistype.RAWCODE         = FourCC('Aftm') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_POSITIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL ---@type integer 
-
-        local function on_hit(target, source, amount_ref)
-            local pid = GetPlayerId(GetOwningPlayer(target)) + 1
-
-            if target == Hero[pid] then
-                amount_ref.value = 0.
-            end
-        end
-
-        function thistype:onRemove()
-            EVENT_ON_STRUCK_MULTIPLIER:unregister_unit_action(self.target, on_hit)
-        end
-
-        function thistype:onApply()
-            EVENT_ON_STRUCK_MULTIPLIER:register_unit_action(self.target, on_hit)
-        end
-    end
-
     ---@class RighteousMightBuff : Buff
-    RighteousMightBuff = setmetatable({}, mt)
+    RighteousMightBuff = Buff.new()
     do
         local thistype = RighteousMightBuff
-        thistype.RAWCODE         = FourCC('Armi') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_POSITIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL ---@type integer 
-        thistype.dmg = 0
-        thistype.armor = 0
+        thistype.NAME            = "Righteous Might"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNHolyAngel.blp"
+        thistype.DESC            = "This unit has +^$dmg% attack damage, +^#mr% magic resist, and +^$armor% armor"
+        thistype.DISPEL_TYPE     = BUFF_POSITIVE
+        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
 
         local function grow(self, size, dur)
             size = size + 0.008
@@ -1560,87 +1810,91 @@ OnInit.global("Buffs", function(Require)
             dur = dur - 1
 
             if dur > 0 then
-                self.timer = Buff.timer:callDelayed(FPS_32, grow, self, size, dur)
+                self.timer = TQ:callDelayed(FPS_32, grow, self, size, dur)
             else
                 self.timer = nil
             end
         end
 
         function thistype:onRemove()
-            UnitAddBonus(self.target, BONUS_ARMOR, -self.armor)
-
             SetUnitScale(self.target, BlzGetUnitRealField(self.target, UNIT_RF_SCALING_VALUE), BlzGetUnitRealField(self.target, UNIT_RF_SCALING_VALUE), BlzGetUnitRealField(self.target, UNIT_RF_SCALING_VALUE))
-            Unit[self.target].mr = Unit[self.target].mr / 0.2
+            Unit[self.target].mr = Unit[self.target].mr / self.mr
             Unit[self.target].damage_percent = Unit[self.target].damage_percent - self.dmg
+            Unit[self.target].armor_percent = Unit[self.target].armor_percent - self.armor
 
             if self.timer then
-                Buff.timer:disableCallback(self.timer)
+                TQ:disableCallback(self.timer)
             end
         end
 
         function thistype:onApply()
             local size = BlzGetUnitRealField(self.target, UNIT_RF_SCALING_VALUE)
 
-            UnitAddBonus(self.target, BONUS_ARMOR, self.armor)
+            self.timer = TQ:callDelayed(FPS_32, grow, self, size, 60)
+            self.mr = 0.2
 
-            self.timer = Buff.timer:callDelayed(FPS_32, grow, self, size, 60)
-
-            Unit[self.target].mr = Unit[self.target].mr * 0.2
+            Unit[self.target].mr = Unit[self.target].mr * self.mr
             Unit[self.target].damage_percent = Unit[self.target].damage_percent + self.dmg
+            Unit[self.target].armor_percent = Unit[self.target].armor_percent + self.armor
         end
     end
 
     ---@class BloodFrenzyBuff : Buff
-    BloodFrenzyBuff = setmetatable({}, mt)
+    BloodFrenzyBuff = Buff.new()
     do
         local thistype = BloodFrenzyBuff
-        thistype.RAWCODE         = FourCC('A07E') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_POSITIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL ---@type integer 
+        thistype.NAME            = "Blood Frenzy"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNBloodFrenzy3.blp"
+        thistype.DESC            = "This unit has +^#bat% base attack speed"
+        thistype.DISPEL_TYPE     = BUFF_POSITIVE
+        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
 
         function thistype:onRemove()
-            Unit[self.target].bonus_bat = Unit[self.target].bonus_bat * 1.5
+            Unit[self.target].bonus_bat = Unit[self.target].bonus_bat * self.bat
             DestroyEffect(self.sfx)
         end
 
         function thistype:onApply()
             self.sfx = AddSpecialEffectTarget("Abilities\\Spells\\Orc\\Bloodlust\\BloodlustTarget.mdl", self.target, "chest")
+            self.bat = 1.5
 
-            Unit[self.target].bonus_bat = Unit[self.target].bonus_bat / 1.5
+            Unit[self.target].bonus_bat = Unit[self.target].bonus_bat / self.bat
             DamageTarget(self.source, self.source, 0.15 * BlzGetUnitMaxHP(self.source), ATTACK_TYPE_NORMAL, PURE, BLOODFRENZY.tag)
         end
     end
 
     ---@class EarthDebuff : Buff
-    EarthDebuff = setmetatable({}, mt)
+    EarthDebuff = Buff.new()
     do
         local thistype = EarthDebuff
-        thistype.RAWCODE         = FourCC('Aese') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_NEGATIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL ---@type integer 
-
-        function thistype:refresh()
-            self:onRemove()
-            self:onApply()
-        end
+        thistype.NAME            = "Earth"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNEarthSphere.blp"
+        thistype.DESC            = "This unit has -^#dr% damage resist"
+        thistype.DISPEL_TYPE     = BUFF_NEGATIVE
+        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
 
         function thistype:onRemove()
             Unit[self.target].dr = Unit[self.target].dr / self.dr
         end
 
         function thistype:onApply()
-            self.dr = (1. + 0.04 * GetUnitAbilityLevel(self.target, thistype.RAWCODE))
+            self.level = self.level or 1
+            self.charges = self.level
+            self.dr = (1. + 0.04 * self.level)
             Unit[self.target].dr = Unit[self.target].dr * self.dr
         end
     end
 
     ---@class HardHatBuff : Buff
-    HardHatBuff = setmetatable({}, mt)
+    HardHatBuff = Buff.new()
     do
         local thistype = HardHatBuff
-        thistype.RAWCODE         = FourCC('FMIN') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_POSITIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL ---@type integer 
+        thistype.NAME            = "Hard Hat"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNHelmOfValor.blp"
+        thistype.DESC            = "This unit has +^#mult% damage resist"
+        thistype.DESC_FACTION    = "After standing still for 3 seconds gain |cffffcc0015%|r damage reduction."
+        thistype.DISPEL_TYPE     = BUFF_POSITIVE
+        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
         thistype.CANNOT_PURGE    = true
 
        local function periodic(self)
@@ -1659,100 +1913,51 @@ OnInit.global("Buffs", function(Require)
                 self.mult = 1.
                 self.count = 0
             end
-            self.timer = Buff.timer:callDelayed(1, periodic, self)
+            self.timer = TQ:callDelayed(1, periodic, self)
+            UnitRefreshBuff(self.target, self)
         end
 
         function thistype:onRemove()
             Unit[self.target].dr = Unit[self.target].dr / self.mult
-            Buff.timer:disableCallback(self.timer)
+            TQ:disableCallback(self.timer)
         end
 
         function thistype:onApply()
             self.mult = 1.
             self.count = 0
-            self.timer = Buff.timer:callDelayed(1, periodic, self)
+            self.timer = TQ:callDelayed(1, periodic, self)
         end
     end
 
     ---@class SteedChargeBuff : Buff
-    SteedChargeBuff = setmetatable({}, mt)
+    SteedChargeBuff = Buff.new()
     do
         local thistype = SteedChargeBuff
-        thistype.RAWCODE         = FourCC('Astc') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_POSITIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL ---@type integer 
+        thistype.NAME            = "Steed Charge"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNSteedCharge.dds"
+        thistype.DESC            = "This unit has +$ms movespeed"
+        thistype.DISPEL_TYPE     = BUFF_POSITIVE
+        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
 
         function thistype:onRemove()
-            Unit[self.target].ms_flat = Unit[self.target].ms_flat - 100
+            Unit[self.target].ms_flat = Unit[self.target].ms_flat - self.ms
         end
 
         function thistype:onApply()
-            Unit[self.target].ms_flat = Unit[self.target].ms_flat + 100
-        end
-    end
-
-    ---@class SteedChargeStun : Buff
-    SteedChargeStun = setmetatable({}, mt)
-    do
-        local thistype = SteedChargeStun
-        thistype.RAWCODE         = FourCC('AIDK') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_NEGATIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL ---@type integer 
-
-        function thistype:onRemove()
-            Buff.timer:disableCallback(self.timer)
-        end
-
-        local function periodic(self, dur, angle, x, y)
-            local dist = DistanceCoords(x, y, GetUnitX(self.target), GetUnitY(self.target)) ---@type number 
-
-            if dur > 0 and dist < 250 then
-                dur = dur - 1
-
-                if GetUnitMoveSpeed(self.target) > 0 then
-                    SetUnitXBounded(self.target, GetUnitX(self.target) + (5 + dist) * 0.1 * math.cos(angle))
-                    SetUnitYBounded(self.target, GetUnitY(self.target) + (5 + dist) * 0.1 * math.sin(angle))
-                end
-
-                self.timer = Buff.timer:callDelayed(FPS_32, periodic, self, 33, angle, x, y)
-            end
-        end
-
-        function thistype:onApply()
-            if IsUnitType(self.target, UNIT_TYPE_HERO) == false then
-                local startangle = GetUnitFacing(self.source) * bj_DEGTORAD
-                local enemyangle = atan(GetUnitY(self.target) - GetUnitY(self.source), GetUnitX(self.target) - GetUnitX(self.source))
-                local endangle = startangle - bj_PI
-                local angle = GetUnitFacing(self.source) * bj_DEGTORAD - bj_PI * 0.5
-
-                if endangle < 0 then
-                    endangle = endangle + 2. * bj_PI
-                end
-                if endangle > startangle then
-                    if enemyangle > startangle and enemyangle < endangle then
-                        angle = GetUnitFacing(self.source) * bj_DEGTORAD + bj_PI * 0.5
-                    end
-                else
-                    if enemyangle < endangle or enemyangle > startangle then
-                        angle = GetUnitFacing(self.source) * bj_DEGTORAD + bj_PI * 0.5
-                    end
-                end
-
-                local x = GetUnitX(self.target) + 200. * math.cos(angle)
-                local y = GetUnitY(self.target) + 200. * math.sin(angle)
-
-                self.timer = Buff.timer:callDelayed(FPS_32, periodic, self, 33, angle, x, y)
-            end
+            self.ms = 100
+            Unit[self.target].ms_flat = Unit[self.target].ms_flat + self.ms
         end
     end
 
     ---@class SingleShotDebuff : Buff
-    SingleShotDebuff = setmetatable({}, mt)
+    SingleShotDebuff = Buff.new()
     do
         local thistype = SingleShotDebuff
-        thistype.RAWCODE         = FourCC('A950') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_NEGATIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL ---@type integer 
+        thistype.NAME            = "Crippled"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNGunHD.blp"
+        thistype.DESC            = "This unit has -^$ms% movespeed"
+        thistype.DISPEL_TYPE     = BUFF_NEGATIVE
+        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
 
         function thistype:onRemove()
             Unit[self.target].ms_percent = Unit[self.target].ms_percent + self.ms
@@ -1768,12 +1973,14 @@ OnInit.global("Buffs", function(Require)
     end
 
     ---@class FreezingBlastDebuff : Buff
-    FreezingBlastDebuff = setmetatable({}, mt)
+    FreezingBlastDebuff = Buff.new()
     do
         local thistype = FreezingBlastDebuff
-        thistype.RAWCODE         = FourCC('A01O') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_NEGATIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL ---@type integer 
+        thistype.NAME            = "Freezing Blast"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNFreezingBlast2.blp"
+        thistype.DESC            = "This unit has -^$ms% movespeed"
+        thistype.DISPEL_TYPE     = BUFF_NEGATIVE
+        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
 
         function thistype:onRemove()
             Unit[self.target].ms_percent = Unit[self.target].ms_percent + self.ms
@@ -1787,88 +1994,117 @@ OnInit.global("Buffs", function(Require)
     end
 
     ---@class ProtectedBuff : Buff
-    ProtectedBuff = setmetatable({}, mt)
+    ProtectedBuff = Buff.new()
     do
         local thistype = ProtectedBuff
-        thistype.RAWCODE         = FourCC('A09I') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_POSITIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL ---@type integer 
+        thistype.NAME            = "Protected"
+        thistype.ICON            = "ReplaceableTextures\\PassiveButtons\\PASShield.blp"
+        thistype.DESC            = "This unit has +^#dr% damage resist"
+        thistype.AURA            = true
+        thistype.DISPEL_TYPE     = BUFF_POSITIVE
+        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
 
         function thistype:onRemove()
             Unit[self.target].dr = Unit[self.target].dr / self.dr
         end
 
         function thistype:onApply()
-            self.dr = (0.93 - 0.02 * GetUnitAbilityLevel(self.source, PROTECTOR.id))
+            self.dr = (0.93 - 0.02 * self.ablev)
 
             Unit[self.target].dr = Unit[self.target].dr * self.dr
         end
     end
 
     ---@class AstralShieldBuff : Buff
-    AstralShieldBuff = setmetatable({}, mt)
+    AstralShieldBuff = Buff.new()
     do
         local thistype = AstralShieldBuff
-        thistype.RAWCODE         = FourCC('Azas') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_POSITIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL ---@type integer 
+        thistype.NAME            = "Astral Shield"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNSnakeShield.blp"
+        thistype.DESC            = "This unit has +^#mr% magic resist"
+        thistype.DISPEL_TYPE     = BUFF_POSITIVE
+        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
 
         function thistype:onRemove()
-            Unit[self.target].mr = Unit[self.target].mr / 0.333
+            Unit[self.target].mr = Unit[self.target].mr / self.mr
             DestroyEffect(self.sfx)
         end
 
         function thistype:onApply()
-            Unit[self.target].mr = Unit[self.target].mr * 0.333
+            self.mr = 0.333
+            Unit[self.target].mr = Unit[self.target].mr * self.mr
             self.sfx = AddSpecialEffectTarget("war3mapImported\\DemonShieldTarget3A.mdx", self.target, "origin")
         end
     end
 
     ---@class ProtectedExistenceBuff : Buff
-    ProtectedExistenceBuff = setmetatable({}, mt)
+    ProtectedExistenceBuff = Buff.new()
     do
         local thistype = ProtectedExistenceBuff
-        thistype.RAWCODE         = FourCC('Aexi') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_POSITIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL ---@type integer 
+        thistype.NAME            = "Protected Existence"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNSnakeShield.blp"
+        thistype.DESC            = "This unit has +^#mr% magic resist"
+        thistype.DISPEL_TYPE     = BUFF_POSITIVE
+        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
 
         function thistype:onRemove()
-            Unit[self.target].mr = Unit[self.target].mr / 0.666
+            Unit[self.target].mr = Unit[self.target].mr / self.mr
             DestroyEffect(self.sfx)
         end
 
         function thistype:onApply()
-            Unit[self.target].mr = Unit[self.target].mr * 0.666
+            self.mr = 0.666
+            Unit[self.target].mr = Unit[self.target].mr * self.mr
             self.sfx = AddSpecialEffectTarget("war3mapImported\\DemonShieldTarget3A.mdx", self.target, "origin")
         end
     end
 
     ---@class ProtectionBuff : Buff
-    ProtectionBuff = setmetatable({}, mt)
+    ProtectionBuff = Buff.new()
     do
         local thistype = ProtectionBuff
-        thistype.RAWCODE         = FourCC('Apro') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_POSITIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL ---@type integer 
-        thistype.as      = 1.1 ---@type number 
+        thistype.NAME            = "Protection"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNHolybird.blp"
+        thistype.DESC            = "This unit has +^#as% base attack speed"
+        thistype.DISPEL_TYPE     = BUFF_POSITIVE
+        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
+
+        local function on_expire(source)
+            thistype:dispel(nil, source)
+        end
+
+        local function on_extend(source, amount, dur)
+            local buff = thistype:get(nil, source)
+
+            buff:duration(math.max(buff:remaining(), dur))
+        end
 
         function thistype:onRemove()
             Unit[self.target].bonus_bat = Unit[self.target].bonus_bat * self.as
+
+            EVENT_ON_SHIELD_APPLY:unregister_unit_action(self.target, on_extend)
+            EVENT_ON_SHIELD_EXPIRE:unregister_unit_action(self.target, on_expire)
         end
 
         function thistype:onApply()
+            self.as = 1.1
             Unit[self.target].bonus_bat = Unit[self.target].bonus_bat / self.as
+
+            EVENT_ON_SHIELD_APPLY:register_unit_action(self.target, on_extend)
+            EVENT_ON_SHIELD_EXPIRE:register_unit_action(self.target, on_expire)
         end
     end
 
     ---@class SanctifiedGroundDebuff : Buff
-    SanctifiedGroundDebuff = setmetatable({}, mt)
+    SanctifiedGroundDebuff = Buff.new()
     do
         local thistype = SanctifiedGroundDebuff
-        thistype.RAWCODE         = FourCC('Asan') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_NEGATIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL ---@type integer 
-        thistype.regen      = 0. ---@type number 
+        thistype.NAME            = "Sanctified Ground"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNHolyShock3.blp"
+        thistype.DESC            = "This unit has -^$ms% movespeed and -^$regen% healing"
+        thistype.AURA            = true
+        thistype.DISPEL_TYPE     = BUFF_NEGATIVE
+        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
 
         function thistype:onRemove()
             Unit[self.target].regen_percent = Unit[self.target].regen_percent + self.regen
@@ -1877,19 +2113,22 @@ OnInit.global("Buffs", function(Require)
 
         function thistype:onApply()
             self.ms = SANCTIFIEDGROUND.ms * 0.01 * (math.min(1, Unit[self.target].ms_percent))
-            Unit[self.target].ms_percent = Unit[self.target].ms_percent - self.ms
             self.regen = (IsBoss(self.target) and 0.5) or 1
+
+            Unit[self.target].ms_percent = Unit[self.target].ms_percent - self.ms
             Unit[self.target].regen_percent = Unit[self.target].regen_percent - self.regen
         end
     end
 
     ---@class DivineLightBuff : Buff
-    DivineLightBuff = setmetatable({}, mt)
+    DivineLightBuff = Buff.new()
     do
         local thistype = DivineLightBuff
-        thistype.RAWCODE         = FourCC('Adiv') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_POSITIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL ---@type integer 
+        thistype.NAME            = "Divine Light"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNDivineLight5.blp"
+        thistype.DESC            = "This unit has +$ms movespeed"
+        thistype.DISPEL_TYPE     = BUFF_POSITIVE
+        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
 
         function thistype:onRemove()
             Unit[self.target].ms_flat = Unit[self.target].ms_flat - self.ms
@@ -1903,42 +2142,50 @@ OnInit.global("Buffs", function(Require)
     end
 
     ---@class ResurgenceBuff : Buff
-    ResurgenceBuff = setmetatable({}, mt)
+    ResurgenceBuff = Buff.new()
     do
         local thistype = ResurgenceBuff
-        thistype.RAWCODE         = FourCC('Ares') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_POSITIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL ---@type integer 
+        thistype.NAME            = "Resurgence"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNDarkShield.blp"
+        thistype.DESC            = "This unit has +!$regen% max health regeneration"
+        thistype.AURA            = true
+        thistype.DISPEL_TYPE     = BUFF_POSITIVE
+        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
 
         local function periodic(self)
             local max_hp = Unit[self.target].hp
             local hp = math.min(5, (((max_hp - GetWidgetLife(self.target)) / max_hp) * 100.) // 15.)
 
             Unit[self.target].regen_max = Unit[self.target].regen_max - self.regen
-            self.regen = self.item:getValue(ITEM_ABILITY, 0) * hp
+            self.regen = self.item.cached_stats[ITEM_ABILITY] * hp
+            self.charges = R2I(hp)
             Unit[self.target].regen_max = Unit[self.target].regen_max + self.regen
-            self.timer = Buff.timer:callDelayed(0.5, periodic, self)
+            self.timer = TQ:callDelayed(0.5, periodic, self)
+            UnitRefreshBuff(self.target, self)
         end
 
         function thistype:onRemove()
             Unit[self.target].regen_max = Unit[self.target].regen_max - (self.regen or 0)
-            Buff.timer:disableCallback(self.timer)
+            TQ:disableCallback(self.timer)
         end
 
         function thistype:onApply()
             self.regen = 0
-            self.timer = Buff.timer:callDelayed(0., periodic, self)
+            self.hp = 0
+            periodic(self)
         end
     end
 
     ---@class SmokebombBuff : Buff
-    SmokebombBuff = setmetatable({}, mt)
+    SmokebombBuff = Buff.new()
     do
         local thistype = SmokebombBuff
-        thistype.RAWCODE         = FourCC('Asmk') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_POSITIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL ---@type integer 
-        thistype.evasion = 0.
+        thistype.NAME            = "Smoke Bomb"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNSmokeBomb1.blp"
+        thistype.DESC            = "This unit has +$evasion% evasion"
+        thistype.AURA            = true
+        thistype.DISPEL_TYPE     = BUFF_POSITIVE
+        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
 
         function thistype:onRemove()
             Unit[self.target].evasion = Unit[self.target].evasion - self.evasion
@@ -1956,12 +2203,14 @@ OnInit.global("Buffs", function(Require)
     end
 
     ---@class SmokebombDebuff : Buff
-    SmokebombDebuff = setmetatable({}, mt)
+    SmokebombDebuff = Buff.new()
     do
         local thistype = SmokebombDebuff
-        thistype.RAWCODE         = FourCC('A03S') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_NEGATIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL ---@type integer 
+        thistype.NAME            = "Smoke Bomb"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNSmokeBomb1.blp"
+        thistype.DESC            = "This unit has -^$ms% movespeed"
+        thistype.DISPEL_TYPE     = BUFF_NEGATIVE
+        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
 
         function thistype:onRemove()
             Unit[self.target].ms_percent = Unit[self.target].ms_percent + self.ms
@@ -1975,161 +2224,180 @@ OnInit.global("Buffs", function(Require)
     end
 
     ---@class AzazothHammerStomp : Buff
-    AzazothHammerStomp = setmetatable({}, mt)
+    AzazothHammerStomp = Buff.new()
     do
         local thistype = AzazothHammerStomp
-        thistype.RAWCODE         = FourCC('A00C') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_NEGATIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL ---@type integer 
+        thistype.NAME            = "Stomp"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNThunderclap.blp"
+        thistype.DESC            = "This unit has -^$as% attack speed"
+        thistype.DISPEL_TYPE     = BUFF_NEGATIVE
+        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
 
         function thistype:onRemove()
-            UnitAddBonus(self.target, BONUS_ATTACK_SPEED, .35)
+            UnitAddBonus(self.target, BONUS_ATTACK_SPEED, self.as)
             DestroyEffect(self.sfx)
         end
 
         function thistype:onApply()
+            self.as = 0.35
             self.sfx = AddSpecialEffectTarget("Abilities\\Spells\\Orc\\StasisTrap\\StasisTotemTarget.mdl", self.target, "overhead")
 
-            UnitAddBonus(self.target, BONUS_ATTACK_SPEED, -.35)
+            UnitAddBonus(self.target, BONUS_ATTACK_SPEED, - self.as)
         end
     end
 
     ---@class BloodCurdlingScreamDebuff : Buff
-    BloodCurdlingScreamDebuff = setmetatable({}, mt)
+    BloodCurdlingScreamDebuff = Buff.new()
     do
         local thistype = BloodCurdlingScreamDebuff
-        thistype.RAWCODE         = FourCC('Ascr') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_NEGATIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL ---@type integer 
-        thistype.armor         = 0 ---@type integer 
+        thistype.NAME            = "Blood Curdling Scream"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNBlood-CurdlingScream2.blp"
+        thistype.DESC            = "This unit has -^$armor% armor"
+        thistype.DISPEL_TYPE     = BUFF_NEGATIVE
+        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
+        thistype.armor         = 0
 
         function thistype:onRemove()
-            UnitAddBonus(self.target, BONUS_ARMOR, self.armor)
+            Unit[self.target].armor_percent = Unit[self.target].armor_percent + self.armor
             DestroyEffect(self.sfx)
         end
 
         function thistype:onApply()
-            self.armor = IMaxBJ(0, R2I(BlzGetUnitArmor(self.target) * (0.12 + 0.02 * GetUnitAbilityLevel(self.source, FourCC('A06H'))) + 0.5))
+            self.armor = 0.12 + 0.02 * GetUnitAbilityLevel(self.source, FourCC('A06H'))
             self.sfx = AddSpecialEffectTarget("Abilities\\Spells\\Other\\HowlOfTerror\\HowlTarget.mdl", self.target, "chest")
 
-            UnitAddBonus(self.target, BONUS_ARMOR, -self.armor)
+            Unit[self.target].armor_percent = Unit[self.target].armor_percent - self.armor
         end
     end
 
     ---@class NerveGasDebuff : Buff
-    NerveGasDebuff = setmetatable({}, mt)
+    NerveGasDebuff = Buff.new()
     do
         local thistype = NerveGasDebuff
-        thistype.RAWCODE         = FourCC('Agas') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_NEGATIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL ---@type integer 
-        thistype.armor         = 0 ---@type integer 
+        thistype.NAME            = "Nerve Gas"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNAcidBomb.blp"
+        thistype.DESC            = "This unit has -^$ms% movespeed, -^$as% attack speed, and -^$armor% armor"
+        thistype.DISPEL_TYPE     = BUFF_NEGATIVE
+        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
 
         local function periodic(self)
             local dmg = NERVEGAS.dmg(self.pid) * BOOST[self.pid] / (NERVEGAS.dur * LBOOST[self.pid] * 2.)
 
             DamageTarget(self.source, self.target, dmg, ATTACK_TYPE_NORMAL, MAGIC, "Nerve Gas")
 
-            self.timer = Buff.timer:callDelayed(0.5, periodic, self)
+            self.timer = TQ:callDelayed(0.5, periodic, self)
         end
 
         function thistype:onRemove()
-            UnitAddBonus(self.target, BONUS_ATTACK_SPEED, .3)
+            UnitAddBonus(self.target, BONUS_ATTACK_SPEED, self.as)
             Unit[self.target].ms_percent = Unit[self.target].ms_percent + self.ms
-            UnitAddBonus(self.target, BONUS_ARMOR, self.armor)
+            Unit[self.target].armor_percent = Unit[self.target].armor_percent + self.armor
             DestroyEffect(self.sfx)
-            Buff.timer:disableCallback(self.timer)
+            TQ:disableCallback(self.timer)
         end
 
         function thistype:onApply()
             self.ms = 0.3 * (math.min(1, Unit[self.target].ms_percent))
+            self.as = 0.3
+            self.armor = 0.2
 
+            UnitAddBonus(self.target, BONUS_ATTACK_SPEED, - self.as)
             Unit[self.target].ms_percent = Unit[self.target].ms_percent - self.ms
-            self.armor = R2I(BlzGetUnitArmor(self.target) * 0.2)
+            Unit[self.target].armor_percent = Unit[self.target].armor_percent - self.armor
             self.sfx = AddSpecialEffectTarget("Abilities\\Spells\\Other\\AcidBomb\\BottleImpact.mdl", self.target, "chest")
 
-            UnitAddBonus(self.target, BONUS_ATTACK_SPEED, -.3)
-            UnitAddBonus(self.target, BONUS_ARMOR, -self.armor)
-
-            self.timer = Buff.timer:callDelayed(0.25, periodic, self)
+            self.timer = TQ:callDelayed(0.25, periodic, self)
         end
     end
 
     ---@class DemonPrinceBloodlust : Buff
-    DemonPrinceBloodlust = setmetatable({}, mt)
+    DemonPrinceBloodlust = Buff.new()
     do
         local thistype = DemonPrinceBloodlust
-        thistype.RAWCODE         = FourCC('Ablo') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_POSITIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL ---@type integer 
+        thistype.NAME            = "Bloodlust"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNBloodLust.blp"
+        thistype.DESC            = "This unit has +^$ms% movespeed and +^$as% attack speed"
+        thistype.DISPEL_TYPE     = BUFF_POSITIVE
+        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
 
         function thistype:onRemove()
-            UnitAddBonus(self.target, BONUS_ATTACK_SPEED, -.75)
+            UnitAddBonus(self.target, BONUS_ATTACK_SPEED, - self.as)
             Unit[self.target].ms_percent = Unit[self.target].ms_percent - self.ms
         end
 
         function thistype:onApply()
+            self.as = 0.75
             self.ms = 0.5 * (math.min(1, Unit[self.target].ms_percent))
 
+            UnitAddBonus(self.target, BONUS_ATTACK_SPEED, self.as)
             Unit[self.target].ms_percent = Unit[self.target].ms_percent + self.ms
-
-            UnitAddBonus(self.target, BONUS_ATTACK_SPEED, .75)
         end
     end
 
     ---@class FireElementBuff : Buff
-    FireElementBuff = setmetatable({}, mt)
+    FireElementBuff = Buff.new()
     do
         local thistype = FireElementBuff
-        thistype.RAWCODE         = FourCC('Aefr') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_POSITIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_NONE ---@type integer 
+        thistype.NAME            = "Fire"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNFireSwirl.blp"
+        thistype.DESC            = "This unit has +^$spellboost% spellboost"
+        thistype.AURA            = true
+        thistype.DISPEL_TYPE     = BUFF_POSITIVE
+        thistype.STACK_TYPE      = BUFF_STACK_NONE
 
         function thistype:onRemove()
             masterElement[self.tpid] = 0
             DestroyEffect(self.sfx)
             DestroyEffect(self.sfx2)
-            Unit[self.target].spellboost = Unit[self.target].spellboost - 0.15
+            Unit[self.target].spellboost = Unit[self.target].spellboost - self.spellboost
         end
 
         function thistype:onApply()
+            self.spellboost = 0.15
             masterElement[self.tpid] = ELEMENTFIRE.value
             self.sfx = AddSpecialEffectTarget("war3mapImported\\Fire Uber.mdx", self.target, "right hand")
             self.sfx2 = AddSpecialEffectTarget("war3mapImported\\Fire Uber.mdx", self.target, "left hand")
-            Unit[self.target].spellboost = Unit[self.target].spellboost + 0.15
+            Unit[self.target].spellboost = Unit[self.target].spellboost + self.spellboost
         end
     end
 
     ---@class IceElementBuff : Buff
-    IceElementBuff = setmetatable({}, mt)
+    IceElementBuff = Buff.new()
     do
         local thistype = IceElementBuff
-        thistype.RAWCODE         = FourCC('Aeic') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_POSITIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_NONE ---@type integer 
+        thistype.NAME            = "Ice"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNIceBlast.blp"
+        thistype.DESC            = "This unit has +!$regen% max mana regeneration and slows nearby enemies"
+        thistype.AURA            = true
+        thistype.DISPEL_TYPE     = BUFF_POSITIVE
+        thistype.STACK_TYPE      = BUFF_STACK_NONE
 
         function thistype:onRemove()
             masterElement[self.tpid] = 0
-            Unit[self.target].mana_regen_max = Unit[self.target].mana_regen_max - 1.5
+            Unit[self.target].mana_regen_max = Unit[self.target].mana_regen_max - self.regen
             DestroyEffect(self.sfx)
             DestroyEffect(self.sfx2)
         end
 
         function thistype:onApply()
+            self.regen = 1.5
             masterElement[self.tpid] = ELEMENTICE.value
-            Unit[self.target].mana_regen_max = Unit[self.target].mana_regen_max + 1.5
+            Unit[self.target].mana_regen_max = Unit[self.target].mana_regen_max + self.regen
             self.sfx = AddSpecialEffectTarget("war3mapImported\\Water High.mdx", self.target, "right hand")
             self.sfx2 = AddSpecialEffectTarget("war3mapImported\\Water High.mdx", self.target, "left hand")
         end
     end
 
     ---@class LightningElementBuff : Buff
-    LightningElementBuff = setmetatable({}, mt)
+    LightningElementBuff = Buff.new()
     do
         local thistype = LightningElementBuff
-        thistype.RAWCODE         = FourCC('Alig') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_POSITIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_NONE ---@type integer 
+        thistype.NAME            = "Lightning"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNLightningOrb.blp"
+        thistype.DESC            = "This unit has +^$ms% movespeed and shocks nearby enemies"
+        thistype.AURA            = true
+        thistype.DISPEL_TYPE     = BUFF_POSITIVE
+        thistype.STACK_TYPE      = BUFF_STACK_NONE
 
         local function on_hit(source, target)
             DamageTarget(source, target, GetWidgetLife(target) * 0.005, ATTACK_TYPE_NORMAL, PURE, ELEMENTLIGHTNING.tag)
@@ -2152,7 +2420,7 @@ OnInit.global("Buffs", function(Require)
                 DestroyGroup(ug)
             end
 
-            self.timer = Buff.timer:callDelayed(5., periodic, self)
+            self.timer = TQ:callDelayed(5., periodic, self)
         end
 
         function thistype:onRemove()
@@ -2161,7 +2429,7 @@ OnInit.global("Buffs", function(Require)
             DestroyEffect(self.sfx2)
             Unit[self.target].ms_percent = Unit[self.target].ms_percent - self.ms
 
-            Buff.timer:disableCallback(self.timer)
+            TQ:disableCallback(self.timer)
         end
 
         function thistype:onApply()
@@ -2171,196 +2439,293 @@ OnInit.global("Buffs", function(Require)
             self.ms = 0.4 * (math.min(1, Unit[self.target].ms_percent))
             Unit[self.target].ms_percent = Unit[self.target].ms_percent + self.ms
 
-            self.timer = Buff.timer:callDelayed(5., periodic, self)
+            self.timer = TQ:callDelayed(5., periodic, self)
         end
     end
 
     ---@class EarthElementBuff : Buff
-    EarthElementBuff = setmetatable({}, mt)
+    EarthElementBuff = Buff.new()
     do
         local thistype = EarthElementBuff
-        thistype.RAWCODE         = FourCC('Aeea') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_POSITIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_NONE ---@type integer 
+        thistype.NAME            = "Earth"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNEarthSphere.blp"
+        thistype.DESC            = "This unit has +^#dr% damage resist"
+        thistype.AURA            = true
+        thistype.DISPEL_TYPE     = BUFF_POSITIVE
+        thistype.STACK_TYPE      = BUFF_STACK_NONE
 
         function thistype:onRemove()
             masterElement[self.tpid] = 0
             DestroyEffect(self.sfx)
             DestroyEffect(self.sfx2)
-            Unit[self.target].dr = Unit[self.target].dr / 0.75
+            Unit[self.target].dr = Unit[self.target].dr / self.dr
         end
 
         function thistype:onApply()
+            self.dr = 0.75
             masterElement[self.tpid] = ELEMENTEARTH.value
             self.sfx = AddSpecialEffectTarget("war3mapImported\\Earth High.mdx", self.target, "right hand")
             self.sfx2 = AddSpecialEffectTarget("war3mapImported\\Earth High.mdx", self.target, "left hand")
-            Unit[self.target].dr = Unit[self.target].dr * 0.75
+            Unit[self.target].dr = Unit[self.target].dr * self.dr
         end
     end
 
-    ---@class IceElementSlow : Buff
-    IceElementSlow = setmetatable({}, mt)
+    ---@class GaiaArmorBuff : Buff
+    GaiaArmorBuff = Buff.new()
     do
-        local thistype = IceElementSlow
-        thistype.RAWCODE         = FourCC('Aice') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_NEGATIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL ---@type integer 
+        local thistype = GaiaArmorBuff
+        thistype.NAME            = "Gaia Armor"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNMantleOfForestDefender.blp"
+        thistype.DESC            = "This unit is protected from a fatal blow"
+        thistype.AURA            = true
+        thistype.DISPEL_TYPE     = BUFF_POSITIVE
+        thistype.STACK_TYPE      = BUFF_STACK_NONE
+        thistype.callback        = {}
+
+        local on_hit
+
+        local function on_cleanup(pid)
+            TQ:disableCallback(thistype.callback[pid])
+        end
+
+        local function fatal_cooldown(self)
+            if GetUnitAbilityLevel(self.target, GAIAARMOR.id) >= 1 then
+                thistype:add(self.target, self.target)
+                EVENT_ON_FATAL_DAMAGE:register_unit_action(self.target, on_hit)
+            end
+
+            EVENT_ON_CLEANUP:unregister_action(self.pid, on_cleanup)
+        end
+
+        on_hit = function(target, source, amount, damage_type)
+            local buff = thistype:get(nil, target) ---@type Buff
+
+            if buff then
+                buff:remove()
+                amount.value = 0
+                HP(target, target, BlzGetUnitMaxHP(target) * 0.2 * GetUnitAbilityLevel(target, GAIAARMOR.id), GAIAARMOR.tag)
+                MP(target, BlzGetUnitMaxMana(target) * 0.2 * GetUnitAbilityLevel(target, GAIAARMOR.id))
+                DestroyEffect(AddSpecialEffectTarget("Abilities\\Spells\\Other\\Doom\\DoomDeath.mdl", target, "origin"))
+
+                local x = GetUnitX(target)
+                local y = GetUnitY(target)
+                local ug = CreateGroup()
+                MakeGroupInRange(buff.pid, ug, x, y, 400., Condition(FilterEnemy))
+
+                for u in each(ug) do
+                    Stun:add(target, u):duration(4.)
+
+                    local x2 = GetUnitX(u)
+                    local y2 = GetUnitY(u)
+                    local angle = atan(y2 - y, x2 - x)
+
+                    CAT_Knockback(u, 1200. * math.cos(angle), 1200. * math.sin(angle), 0.)
+                    CAT_UnitEnableFriction(u, true)
+                    TQ:callDelayed(1., CAT_UnitEnableFriction, u, false)
+                end
+
+                DestroyGroup(ug)
+
+                thistype.callback[buff.pid] = TQ:callDelayed(120., fatal_cooldown, buff)
+                EVENT_ON_CLEANUP:register_action(buff.pid, on_cleanup)
+            end
+
+            EVENT_ON_FATAL_DAMAGE:unregister_unit_action(target, on_hit)
+        end
 
         function thistype:onRemove()
-            UnitAddBonus(self.target, BONUS_ATTACK_SPEED, .25)
+            EVENT_ON_FATAL_DAMAGE:unregister_unit_action(self.target, on_hit)
+        end
+
+        function thistype:onApply()
+            EVENT_ON_FATAL_DAMAGE:register_unit_action(self.target, on_hit)
+        end
+    end
+
+    ---@class IceElementDebuff : Buff
+    IceElementDebuff = Buff.new()
+    do
+        local thistype = IceElementDebuff
+        thistype.NAME            = "Ice"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNIceBlast.blp"
+        thistype.DESC            = "This unit has -^$ms% movespeed and -^$as% attack speed"
+        thistype.AURA            = true
+        thistype.DISPEL_TYPE     = BUFF_NEGATIVE
+        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
+
+        function thistype:onRemove()
+            UnitAddBonus(self.target, BONUS_ATTACK_SPEED, self.as)
             Unit[self.target].ms_percent = Unit[self.target].ms_percent + self.ms
             DestroyEffect(self.sfx)
         end
 
         function thistype:onApply()
+            self.as = 0.25
             self.ms = 0.35 * (math.min(1, Unit[self.target].ms_percent))
 
             Unit[self.target].ms_percent = Unit[self.target].ms_percent - self.ms
             self.sfx = AddSpecialEffectTarget("Abilities\\Spells\\Other\\FrostDamage\\FrostDamage.mdl", self.target, "chest")
 
-            UnitAddBonus(self.target, BONUS_ATTACK_SPEED, -.25)
+            UnitAddBonus(self.target, BONUS_ATTACK_SPEED, - self.as)
         end
     end
 
     ---@class TidalWaveDebuff : Buff
-    TidalWaveDebuff = setmetatable({}, mt)
+    TidalWaveDebuff = Buff.new()
     do
         local thistype = TidalWaveDebuff
-        thistype.RAWCODE         = FourCC('Atdw') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_NEGATIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL ---@type integer 
-        thistype.percent         = .15 ---@type number 
+        thistype.NAME            = "Tidal Wave"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNTidalWave4.blp"
+        thistype.DESC            = "This unit has -^$percent% damage resist"
+        thistype.DISPEL_TYPE     = BUFF_NEGATIVE
+        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
 
         function thistype:onRemove()
             Unit[self.target].dr = Unit[self.target].dr / (1 + self.percent)
         end
         function thistype:onApply()
+            self.percent = self.percent or .15
             Unit[self.target].dr = Unit[self.target].dr * (1 + self.percent)
         end
 
     end
 
     ---@class SoakedDebuff : Buff
-    SoakedDebuff = setmetatable({}, mt)
+    SoakedDebuff = Buff.new()
     do
         local thistype = SoakedDebuff
-        thistype.RAWCODE         = FourCC('A01G') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_NEGATIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL ---@type integer 
+        thistype.NAME            = "Soaked"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNCrushingWave.blp"
+        thistype.DESC            = "This unit has -^$ms% movespeed and -^$as% attack speed"
+        thistype.DISPEL_TYPE     = BUFF_NEGATIVE
+        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
 
         function thistype:onRemove()
-            UnitAddBonus(self.target, BONUS_ATTACK_SPEED, .3)
+            UnitAddBonus(self.target, BONUS_ATTACK_SPEED, self.as)
             Unit[self.target].ms_percent = Unit[self.target].ms_percent + self.ms
             DestroyEffect(self.sfx)
         end
 
         function thistype:onApply()
+            self.as = 0.3
             self.ms = 0.5 * (math.min(1, Unit[self.target].ms_percent))
-
-            Unit[self.target].ms_percent = Unit[self.target].ms_percent - self.ms
             self.sfx = AddSpecialEffectTarget("Abilities\\Spells\\Other\\FrostDamage\\FrostDamage.mdl", self.target, "chest")
 
-            UnitAddBonus(self.target, BONUS_ATTACK_SPEED, -.3)
+            UnitAddBonus(self.target, BONUS_ATTACK_SPEED, - self.as)
+            Unit[self.target].ms_percent = Unit[self.target].ms_percent - self.ms
         end
     end
 
     ---@class SongOfFatigueSlow : Buff
-    SongOfFatigueSlow = setmetatable({}, mt)
+    SongOfFatigueSlow = Buff.new()
     do
         local thistype = SongOfFatigueSlow
-        thistype.RAWCODE         = FourCC('A00X') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_NEGATIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL ---@type integer 
+        thistype.NAME            = "Song of Fatigue"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNBardMusicSongOfSleep.blp"
+        thistype.DESC            = "This unit has -^$ms% movespeed and -^$as% attack speed"
+        thistype.AURA            = true
+        thistype.DISPEL_TYPE     = BUFF_NEGATIVE
+        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
 
         function thistype:onRemove()
-            UnitAddBonus(self.target, BONUS_ATTACK_SPEED, .3)
+            UnitAddBonus(self.target, BONUS_ATTACK_SPEED, self.as)
             Unit[self.target].ms_percent = Unit[self.target].ms_percent + self.ms
             DestroyEffect(self.sfx)
         end
 
         function thistype:onApply()
+            self.as = 0.3
             self.ms = 0.3 * (math.min(1, Unit[self.target].ms_percent))
-
-            Unit[self.target].ms_percent = Unit[self.target].ms_percent - self.ms
             self.sfx = AddSpecialEffectTarget("Abilities\\Spells\\Human\\slow\\slowtarget.mdl", self.target, "origin")
 
-            UnitAddBonus(self.target, BONUS_ATTACK_SPEED, -.3)
+            UnitAddBonus(self.target, BONUS_ATTACK_SPEED, - self.as)
+            Unit[self.target].ms_percent = Unit[self.target].ms_percent - self.ms
         end
     end
 
     ---@class MeatGolemThunderClap : Buff
-    MeatGolemThunderClap = setmetatable({}, mt)
+    MeatGolemThunderClap = Buff.new()
     do
         local thistype = MeatGolemThunderClap
-        thistype.RAWCODE         = FourCC('A00C') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_NEGATIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL ---@type integer 
+        thistype.NAME            = "Thunder Clap"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNThunderclap.blp"
+        thistype.DESC            = "This unit has -^$ms% movespeed and -^$as% attack speed"
+        thistype.DISPEL_TYPE     = BUFF_NEGATIVE
+        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
 
         function thistype:onRemove()
-            UnitAddBonus(self.target, BONUS_ATTACK_SPEED, .3)
+            UnitAddBonus(self.target, BONUS_ATTACK_SPEED, self.as)
             Unit[self.target].ms_percent = Unit[self.target].ms_percent + self.ms
             DestroyEffect(self.sfx)
         end
 
         function thistype:onApply()
+            self.as = 0.3
             self.ms = 0.3 * (math.min(1, Unit[self.target].ms_percent))
-
-            Unit[self.target].ms_percent = Unit[self.target].ms_percent - self.ms
             self.sfx = AddSpecialEffectTarget("Abilities\\Spells\\Orc\\StasisTrap\\StasisTotemTarget.mdl", self.target, "overhead")
 
-            UnitAddBonus(self.target, BONUS_ATTACK_SPEED, -.3)
+            Unit[self.target].ms_percent = Unit[self.target].ms_percent - self.ms
+            UnitAddBonus(self.target, BONUS_ATTACK_SPEED, - self.as)
         end
     end
 
     ---@class SaviorThunderClap : Buff
-    SaviorThunderClap = setmetatable({}, mt)
+    SaviorThunderClap = Buff.new()
     do
         local thistype = SaviorThunderClap
-        thistype.RAWCODE         = FourCC('A013') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_NEGATIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL ---@type integer 
+        thistype.NAME            = "Thunder Clap"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNHoly Might.blp"
+        thistype.DESC            = "This unit has -^$ms% movespeed and -^$as% attack speed"
+        thistype.DISPEL_TYPE     = BUFF_NEGATIVE
+        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
 
         function thistype:onRemove()
-            UnitAddBonus(self.target, BONUS_ATTACK_SPEED, .35)
+            UnitAddBonus(self.target, BONUS_ATTACK_SPEED, self. as)
             Unit[self.target].ms_percent = Unit[self.target].ms_percent + self.ms
             DestroyEffect(self.sfx)
         end
 
         function thistype:onApply()
+            self.as = 0.35
             self.ms = 0.35 * (math.min(1, Unit[self.target].ms_percent))
-
-            Unit[self.target].ms_percent = Unit[self.target].ms_percent - self.ms
             self.sfx = AddSpecialEffectTarget("Abilities\\Spells\\Orc\\StasisTrap\\StasisTotemTarget.mdl", self.target, "overhead")
 
-            UnitAddBonus(self.target, BONUS_ATTACK_SPEED, -.35)
+            UnitAddBonus(self.target, BONUS_ATTACK_SPEED, - self.as)
+            Unit[self.target].ms_percent = Unit[self.target].ms_percent - self.ms
         end
     end
 
     ---@class BlinkStrikeBuff : Buff
-    BlinkStrikeBuff = setmetatable({}, mt)
+    BlinkStrikeBuff = Buff.new()
     do
         local thistype = BlinkStrikeBuff
-        thistype.RAWCODE         = FourCC('A03Y') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_POSITIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL ---@type integer 
+        thistype.NAME            = "Blink Strike"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNBlinkStrike1.blp"
+        thistype.DESC            = "This unit has +$evasion% evasion"
+        thistype.DISPEL_TYPE     = BUFF_POSITIVE
+        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
 
         function thistype:onRemove()
             DestroyEffect(self.sfx)
+            Unit[self.target].evasion = Unit[self.target].evasion - self.evasion
         end
 
         function thistype:onApply()
+            self.evasion = 30
             self.sfx = AddSpecialEffectTarget("war3mapImported\\Windwalk.mdx", self.target, "origin")
+            Unit[self.target].evasion = Unit[self.target].evasion + self.evasion
         end
     end
 
     ---@class NagaThorns : Buff
-    NagaThorns = setmetatable({}, mt)
+    NagaThorns = Buff.new()
     do
         local thistype = NagaThorns
-
-        thistype.RAWCODE         = FourCC('A04S') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_POSITIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_NONE ---@type integer 
+        thistype.NAME            = "Thorns"
+        thistype.ICON            = "ReplaceableTextures\\PassiveButtons\\PASBTNThorns.blp"
+        thistype.DESC            = "This unit returns massive damage when attacked"
+        thistype.DISPEL_TYPE     = BUFF_POSITIVE
+        thistype.STACK_TYPE      = BUFF_STACK_NONE
 
         local function onStruck(target, source, damage_type)
             if damage_type == PHYSICAL then
@@ -2370,42 +2735,47 @@ OnInit.global("Buffs", function(Require)
 
         function thistype:onRemove()
             EVENT_ON_STRUCK:unregister_unit_action(self.target, onStruck)
+            DestroyEffect(self.sfx)
         end
 
         function thistype:onApply()
+            self.sfx = AddSpecialEffectTarget("Abilities\\Spells\\Undead\\ThornyShield\\ThornyShieldTargetChestLeft.mdl", self.target, "chest")
             EVENT_ON_STRUCK:register_unit_action(self.target, onStruck)
 
-            Buff.timer:callDelayed(6.5, DestroyEffect, AddSpecialEffectTarget("Abilities\\Spells\\Undead\\ThornyShield\\ThornyShieldTargetChestLeft.mdl", self.target, "chest"))
-            Buff.timer:callDelayed(2.5, DestroyEffect, AddSpecialEffectTarget("Abilities\\Spells\\NightElf\\ThornsAura\\ThornsAura.mdl", self.target, "origin"))
+            TQ:callDelayed(2.5, DestroyEffect, AddSpecialEffectTarget("Abilities\\Spells\\NightElf\\ThornsAura\\ThornsAura.mdl", self.target, "origin"))
         end
     end
 
     ---@class NagaBerserkBuff : Buff
-    NagaBerserkBuff = setmetatable({}, mt)
+    NagaBerserkBuff = Buff.new()
     do
         local thistype = NagaBerserkBuff
-
-        thistype.RAWCODE         = FourCC('A04L') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_POSITIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_NONE ---@type integer 
+        thistype.NAME            = "Berserk"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNBerserkForTrolls.blp"
+        thistype.DESC            = "This unit has +^$as% attack speed"
+        thistype.DISPEL_TYPE     = BUFF_POSITIVE
+        thistype.STACK_TYPE      = BUFF_STACK_NONE
 
         function thistype:onRemove()
-            UnitAddBonus(self.target, BONUS_ATTACK_SPEED, -8.)
+            UnitAddBonus(self.target, BONUS_ATTACK_SPEED, - self.as)
         end
 
         function thistype:onApply()
-            UnitAddBonus(self.target, BONUS_ATTACK_SPEED, 8.)
+            self.as = 8
+            UnitAddBonus(self.target, BONUS_ATTACK_SPEED, self.as)
             DestroyEffect(AddSpecialEffectTarget("Abilities\\Spells\\NightElf\\BattleRoar\\RoarCaster.mdl", self.target, "chest"))
         end
     end
 
     ---@class SpiritCallSlow : Buff
-    SpiritCallSlow = setmetatable({}, mt)
+    SpiritCallSlow = Buff.new()
     do
         local thistype = SpiritCallSlow
-        thistype.RAWCODE         = FourCC('A05M') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_NEGATIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_NONE ---@type integer 
+        thistype.NAME            = "Spirit Call"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNWisp.blp"
+        thistype.DESC            = "This unit has -^%ms% movespeed"
+        thistype.DISPEL_TYPE     = BUFF_NEGATIVE
+        thistype.STACK_TYPE      = BUFF_STACK_NONE
 
         function thistype:onRemove()
             Unit[self.target].ms_percent = Unit[self.target].ms_percent + self.ms
@@ -2419,68 +2789,94 @@ OnInit.global("Buffs", function(Require)
     end
 
     ---@class LightSealBuff : Buff
-    LightSealBuff = setmetatable({}, mt)
+    LightSealBuff = Buff.new()
     do
         local thistype = LightSealBuff
-        thistype.RAWCODE         = FourCC('Alse') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_POSITIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL ---@type integer 
+        thistype.NAME            = "Perserverance"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNCircleOfPower2.blp"
+        thistype.DESC            = "This unit has +$strength strength and +^$armor% armor"
+        thistype.DISPEL_TYPE     = BUFF_POSITIVE
+        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
 
-        ---@param i integer
-        function thistype:addStack(i)
-            -- prevent hp decay from losing all stacks
-            local hp = GetWidgetLife(self.source)
-            Unit[self.source].bonus_str = Unit[self.source].bonus_str - self.strength
-            UnitAddBonus(self.source, BONUS_ARMOR, -self.armor)
+        local function stack_expire(self)
+            if self.charges > 0 then
+                -- remove current contribution
+                Unit[self.source].bonus_str     = Unit[self.source].bonus_str - self.strength
+                Unit[self.source].armor_percent = Unit[self.source].armor_percent - self.armor
 
-            self.stacks = IMinBJ(self.stacks + i, GetUnitAbilityLevel(self.source, LIGHTSEAL.id) * 10)
-            self.strength = R2I(GetHeroStr(self.source, true) * 0.01 * self.stacks)
-            self.armor = R2I(BlzGetUnitArmor(self.source) * 0.01 * self.stacks)
+                self.charges = math.max(0, self.charges - 1)
 
-            Unit[self.source].bonus_str = Unit[self.source].bonus_str + self.strength
-            UnitAddBonus(self.source, BONUS_ARMOR, self.armor)
-            SetWidgetLife(self.source, hp)
-        end
+                -- recompute bonuses
+                self.strength = R2I(GetHeroStr(self.source, true) * 0.01 * self.charges)
+                self.armor    = 0.01 * self.charges
 
-        function thistype:onRemove()
-            Buff.timer:disableCallback(self.timer)
-        end
+                -- reapply new contribution (if any)
+                Unit[self.source].bonus_str     = Unit[self.source].bonus_str + self.strength
+                Unit[self.source].armor_percent = Unit[self.source].armor_percent + self.armor
+                UnitRefreshBuff(self.source, self)
 
-        ---@type fun(self: LightSealBuff)
-        local function LightSealStackExpire(self)
-            if self.stacks <= 0 then
-                self:remove()
-            else
-                self.stacks = IMaxBJ(0, self.stacks - 1)
-
-                Unit[self.source].bonus_str = Unit[self.source].bonus_str - self.strength
-                UnitAddBonus(self.source, BONUS_ARMOR, -self.armor)
-
-                self.strength = R2I(GetHeroStr(self.source, true) * 0.01 * self.stacks)
-                self.armor = R2I(BlzGetUnitArmor(self.source) * 0.01 * self.stacks)
-
-                Unit[self.source].bonus_str = Unit[self.source].bonus_str + self.strength
-                UnitAddBonus(self.source, BONUS_ARMOR, self.armor)
-                self.timer = Buff.timer:callDelayed(5., LightSealStackExpire, self)
+                if self.charges > 0 then
+                    self.timer = TQ:callDelayed(5., stack_expire, self)
+                    self:duration(5.05)
+                else
+                    self.timer = false
+                    self:duration()
+                end
             end
         end
 
+        function thistype:addStack(u)
+            local i = IsBoss(u) and 5 or 1
+
+            local hp = GetWidgetLife(self.source)
+
+            -- remove old contribution
+            Unit[self.source].bonus_str     = Unit[self.source].bonus_str - self.strength
+            Unit[self.source].armor_percent = Unit[self.source].armor_percent - self.armor
+
+            self.charges  = math.min(self.charges + i, GetUnitAbilityLevel(self.source, LIGHTSEAL.id) * 10)
+
+            -- recompute bonuses
+            self.strength = R2I(GetHeroStr(self.source, true) * 0.01 * self.charges)
+            self.armor    = 0.01 * self.charges -- +1% per charge
+
+            -- apply new contribution
+            Unit[self.source].bonus_str     = Unit[self.source].bonus_str + self.strength
+            Unit[self.source].armor_percent = Unit[self.source].armor_percent + self.armor
+
+            SetWidgetLife(self.source, hp)
+            UnitRefreshBuff(self.source, self)
+
+            if not self.timer then
+                self.timer = TQ:callDelayed(5., stack_expire, self)
+                self:duration(5.05)
+            end
+        end
+
+        function thistype:onRemove()
+            TQ:disableCallback(self.timer)
+
+            Unit[self.source].bonus_str     = Unit[self.source].bonus_str - self.strength
+            Unit[self.source].armor_percent = Unit[self.source].armor_percent - self.armor
+        end
+
         function thistype:onApply()
-            self.stacks = 0
+            self.charges = 0
             self.strength = 0
             self.armor = 0
-
-            self.timer = Buff.timer:callDelayed(5., LightSealStackExpire, self)
         end
     end
 
     ---@class DarkSealDebuff : Buff
-    DarkSealDebuff = setmetatable({}, mt)
+    DarkSealDebuff = Buff.new()
     do
         local thistype = DarkSealDebuff
-        thistype.RAWCODE         = FourCC('A06W') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_NEGATIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_NONE ---@type integer 
+        thistype.NAME            = "Dark Seal"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNCircleOfPower.BLP"
+        thistype.DESC            = "This unit is under a Dark Seal"
+        thistype.AURA            = true
+        thistype.DISPEL_TYPE     = BUFF_NEGATIVE
+        thistype.STACK_TYPE      = BUFF_STACK_NONE
     end
 
     ---@class DarkSealBuff : Buff
@@ -2488,76 +2884,77 @@ OnInit.global("Buffs", function(Require)
     ---@field y number
     ---@field count number
     ---@field sfx unit
-    DarkSealBuff = setmetatable({}, mt)
+    DarkSealBuff = Buff.new()
     do
         local thistype = DarkSealBuff
-        thistype.RAWCODE         = FourCC('Adsb') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_POSITIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_NONE ---@type integer 
+        thistype.NAME            = "Dark Seal"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNCircleOfPower.BLP"
+        thistype.DESC            = "This unit has +$charges% spellboost and base attack speed"
+        thistype.DISPEL_TYPE     = BUFF_POSITIVE
+        thistype.STACK_TYPE      = BUFF_STACK_NONE
 
-        local function periodic(self)
-            MakeGroupInRange(self.tpid, self.ug, self.x, self.y, 450. * LBOOST[self.pid], Condition(FilterEnemy))
-
-            --count units in seal
-            self.count = 0.
-            for target in each(self.ug) do
-                self.count = self.count + ((IsUnitType(target, UNIT_TYPE_HERO) and 10) or 1)
-                DarkSealDebuff:add(self.source, target):duration(1.)
-            end
-            self.count = math.min(5. + GetHeroLevel(self.source) // 100 * 10, self.count)
-
-            self:refresh()
-            self.timer = Buff.timer:callDelayed(0.5, periodic, self)
+        local function count(object, target, self)
+            self.charges = self.charges + ((IsUnitType(object, UNIT_TYPE_HERO) and 10) or 1)
+            DarkSealDebuff:add(target, object):duration(1.)
         end
 
-        --reapplies spellboost and bat bonus
+        local function periodic(self)
+            self.charges = 0
+
+            -- count units in seal
+            ALICE_ForAllObjectsInRangeDo(count, self.x, self.y, 450. * LBOOST[self.pid], "unit", valid_damage_target, self.target, self)
+
+            self.charges = math.min(5 + (GetHeroLevel(self.source) // 100) * 10, self.charges)
+
+            self:refresh()
+            self.callback = TQ:callDelayed(0.5, periodic, self)
+        end
+
+        -- reapplies spellboost and bat bonus
         function thistype:refresh()
             Unit[self.target].spellboost = Unit[self.target].spellboost - self.spellboost
             Unit[self.target].bonus_bat = Unit[self.target].bonus_bat * self.bat
 
-            self.spellboost = self.count * 0.01
-            self.bat = (1. + self.count * 0.01)
+            self.spellboost = self.charges * 0.01
+            self.bat = (1. + self.charges * 0.01)
             Unit[self.target].spellboost = Unit[self.target].spellboost + self.spellboost
             Unit[self.target].bonus_bat = Unit[self.target].bonus_bat / self.bat
+            UnitRefreshBuff(self.target, self)
         end
 
         function thistype:onRemove()
             Unit[self.target].spellboost = Unit[self.target].spellboost - self.spellboost
             Unit[self.target].bonus_bat = Unit[self.target].bonus_bat * self.bat
 
-            Dummy[self.sfx]:recycle()
+            HideEffect(self.sfx)
 
-            DestroyGroup(self.ug)
-            Buff.timer:disableCallback(self.timer)
+            TQ:disableCallback(self.callback)
         end
 
         function thistype:onApply()
             self.spellboost = 0
             self.bat = 1
-            self.ug = CreateGroup()
-            self.count = 0.
+            self.charges = 0
 
-            self.sfx = Dummy.create(0, 0, 0, 0, 0).unit
+            self.sfx = AddSpecialEffect("war3mapImported\\newrunetest.mdl", self.x, self.y)
+            BlzSetSpecialEffectZ(self.sfx, GetLocZ(self.x, self.y))
+            BlzSetSpecialEffectScale(self.sfx, 6.1)
+            BlzSetSpecialEffectYaw(self.sfx, 270. * bj_DEGTORAD)
+            BlzSetSpecialEffectTimeScale(self.sfx, 0.8)
 
-            BlzSetUnitSkin(self.sfx, FourCC('h03X'))
-            UnitDisableAbility(self.sfx, FourCC('Amov'), true)
-            SetUnitScale(self.sfx, 6.1, 6.1, 6.1)
-            BlzSetUnitFacingEx(self.sfx, 270)
-            SetUnitAnimation(self.sfx, "birth")
-            SetUnitTimeScale(self.sfx, 0.8)
-            DelayAnimation(self.tpid, self.sfx, 1., 0, 1., false)
-
-            self.timer = Buff.timer:callDelayed(0.01, periodic, self)
+            periodic(self)
         end
     end
 
     ---@class MetamorphosisBuff : Buff
-    MetamorphosisBuff = setmetatable({}, mt)
+    MetamorphosisBuff = Buff.new()
     do
         local thistype = MetamorphosisBuff
-        thistype.RAWCODE         = FourCC('Amet') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_NONE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_NONE ---@type integer 
+        thistype.NAME            = "Metamorphosis"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNMetamorphasis3.blp"
+        thistype.DESC            = "This unit has $range attack range, splash attacks, !$bat base attack time, and +^#dm% total damage"
+        thistype.DISPEL_TYPE     = BUFF_POSITIVE
+        thistype.STACK_TYPE      = BUFF_STACK_NONE
 
         function thistype:onRemove()
             Unit[self.target].dm = Unit[self.target].dm / self.dm
@@ -2565,25 +2962,29 @@ OnInit.global("Buffs", function(Require)
         end
 
         function thistype:onApply()
+            self.range = 900
+            self.bat = 0.8
             local hp = GetWidgetLife(self.target) * 0.5 ---@type number 
 
             SetWidgetLife(self.target, hp)
             self.dm = 1 + math.max(0.01, hp / (BlzGetUnitMaxHP(self.target) * 1.))
             Unit[self.target].dm = Unit[self.target].dm * self.dm
-            Unit[self.target].base_bat = 0.8
+            Unit[self.target].base_bat = self.bat
         end
     end
 
     ---@class KnockUp : Buff
-    KnockUp = setmetatable({}, mt)
+    KnockUp = Buff.new()
     do
         local thistype = KnockUp
-        thistype.RAWCODE         = FourCC('Akno') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_NEGATIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL ---@type integer 
-        thistype.SPEED       = 1500. ---@type number 
-        thistype.DEBUFF_TIME = 1. ---@type number 
-        thistype.time        = 0. ---@type number 
+        thistype.NAME            = "Mid-air"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNStun.blp"
+        thistype.DESC            = "This unit cannot move, attack, or cast spells"
+        thistype.DISPEL_TYPE     = BUFF_NEGATIVE
+        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
+
+        local SPEED = 1500.
+        local DEBUFF_TIME = 1.
 
         ---@param deltaTime number
         ---@return number
@@ -2593,11 +2994,11 @@ OnInit.global("Buffs", function(Require)
 
             deltaTime = deltaTime * 1.2
 
-            if deltaTime <= thistype.DEBUFF_TIME * 0.5 then
-                h = thistype.SPEED * deltaTime - 0.5 * g * deltaTime * deltaTime
+            if deltaTime <= DEBUFF_TIME * 0.5 then
+                h = SPEED * deltaTime - 0.5 * g * deltaTime * deltaTime
             else
                 deltaTime = deltaTime * 1.2
-                h = thistype.SPEED * (thistype.DEBUFF_TIME - deltaTime) - 0.5 * g * (thistype.DEBUFF_TIME - deltaTime) * (thistype.DEBUFF_TIME - deltaTime)
+                h = SPEED * (DEBUFF_TIME - deltaTime) - 0.5 * g * (DEBUFF_TIME - deltaTime) * (DEBUFF_TIME - deltaTime)
             end
 
             return math.max(0, h)
@@ -2607,17 +3008,17 @@ OnInit.global("Buffs", function(Require)
             self.time = self.time + FPS_32
             SetUnitFlyHeight(self.target, calcHeight(self.time), 0.)
 
-            if self.time > thistype.DEBUFF_TIME then
+            if self.time > DEBUFF_TIME then
                 self:remove()
             else
-                self.timer = Buff.timer:callDelayed(FPS_32, periodic, self)
+                self.timer = TQ:callDelayed(FPS_32, periodic, self)
             end
         end
 
         function thistype:onRemove()
             BlzPauseUnitEx(self.target, false)
             SetUnitFlyHeight(self.target, 0., 0.)
-            Buff.timer:disableCallback(self.timer)
+            TQ:disableCallback(self.timer)
         end
 
         function thistype:onApply()
@@ -2628,23 +3029,22 @@ OnInit.global("Buffs", function(Require)
             end
 
             self.time = 0
-            self.timer = Buff.timer:callDelayed(FPS_32, periodic, self)
+            self.timer = TQ:callDelayed(FPS_32, periodic, self)
         end
     end
 
     ---@class Freeze : Buff
-    Freeze = setmetatable({}, mt)
+    Freeze = Buff.new()
     do
         local thistype = Freeze
-        thistype.RAWCODE         = FourCC('A01D') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_NEGATIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL ---@type integer 
+        thistype.NAME            = "Frozen"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNGlacier.blp"
+        thistype.DESC            = "This unit cannot move, attack, or cast spells"
+        thistype.DISPEL_TYPE     = BUFF_NEGATIVE
+        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
 
         function thistype:onRemove()
             BlzPauseUnitEx(self.target, false)
-            if GetUnitTypeId(self.source) == HERO_DARK_SAVIOR or GetUnitTypeId(self.source) == HERO_DARK_SAVIOR_DEMON then
-                FreezingBlastDebuff:add(self.source, self.target):duration(FREEZINGBLAST.freeze * LBOOST[self.pid])
-            end
             DestroyEffect(self.sfx)
         end
 
@@ -2655,12 +3055,14 @@ OnInit.global("Buffs", function(Require)
     end
 
     ---@class Stun : Buff
-    Stun = setmetatable({}, mt)
+    Stun = Buff.new()
     do
         local thistype = Stun
-        thistype.RAWCODE         = FourCC('A08J') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_NEGATIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL ---@type integer 
+        thistype.NAME            = "Stunned"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNStun.blp"
+        thistype.DESC            = "This unit cannot move, attack, or cast spells"
+        thistype.DISPEL_TYPE     = BUFF_NEGATIVE
+        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
 
         function thistype:onRemove()
             BlzPauseUnitEx(self.target, false)
@@ -2674,12 +3076,14 @@ OnInit.global("Buffs", function(Require)
     end
 
     ---@class InstillFearDebuff : Buff
-    InstillFearDebuff = setmetatable({}, mt)
+    InstillFearDebuff = Buff.new()
     do
         local thistype = InstillFearDebuff
-        thistype.RAWCODE         = FourCC('Aisf') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_NEGATIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL ---@type integer 
+        thistype.NAME            = "Instill Fear"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNDagger.blp"
+        thistype.DESC            = "This unit takes +^$dm% total damage from the afflicter"
+        thistype.DISPEL_TYPE     = BUFF_NEGATIVE
+        thistype.STACK_TYPE      = BUFF_STACK_FULL
 
         local function onStruck(target, source, amount, amount_after_red, damage_type)
             if thistype:has(source, target) then
@@ -2694,6 +3098,7 @@ OnInit.global("Buffs", function(Require)
         end
 
         function thistype:onApply()
+            self.dm = 0.15
             self.sfx = AddSpecialEffectTarget("Abilities\\Spells\\NightElf\\shadowstrike\\shadowstrike.mdl", self.target, "overhead")
 
             EVENT_ON_STRUCK_MULTIPLIER:register_unit_action(self.target, onStruck)
@@ -2701,50 +3106,58 @@ OnInit.global("Buffs", function(Require)
     end
 
     ---@class DarkestOfDarknessBuff : Buff
-    DarkestOfDarknessBuff = setmetatable({}, mt)
+    DarkestOfDarknessBuff = Buff.new()
     do
         local thistype = DarkestOfDarknessBuff
-        thistype.RAWCODE         = FourCC('A056') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_POSITIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_NONE ---@type integer 
+        thistype.NAME            = "Darkest of Darkness"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNEradication.blp"
+        thistype.DESC            = "This unit has +^#dr% damage resist"
+        thistype.DISPEL_TYPE     = BUFF_POSITIVE
+        thistype.STACK_TYPE      = BUFF_STACK_NONE
 
         function thistype:onRemove()
             DestroyEffect(self.sfx)
 
-            Unit[self.target].dr = Unit[self.target].dr / 0.7
+            Unit[self.target].dr = Unit[self.target].dr / self.dr
         end
 
         function thistype:onApply()
+            self.dr = 0.7
             self.sfx = AddSpecialEffectTarget("war3mapImported\\SoulArmor.mdx", self.target, "chest")
 
-            Unit[self.target].dr = Unit[self.target].dr * 0.7
+            Unit[self.target].dr = Unit[self.target].dr * self.dr
         end
     end
 
     ---@class HolyBlessing : Buff
-    HolyBlessing = setmetatable({}, mt)
+    HolyBlessing = Buff.new()
     do
         local thistype = HolyBlessing
-        thistype.RAWCODE         = FourCC('A08K') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_POSITIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_NONE ---@type integer 
+        thistype.NAME            = "Holy Blessing"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNBerserkForTrolls.blp"
+        thistype.DESC            = "This unit has +^$as% base attack speed"
+        thistype.DISPEL_TYPE     = BUFF_POSITIVE
+        thistype.STACK_TYPE      = BUFF_STACK_NONE
 
         function thistype:onRemove()
-            Unit[self.target].bonus_bat = Unit[self.target].bonus_bat * 2.
+            Unit[self.target].bonus_bat = Unit[self.target].bonus_bat * self.as
         end
 
         function thistype:onApply()
-            Unit[self.target].bonus_bat = Unit[self.target].bonus_bat / 2.
+            self.as = 2.
+            Unit[self.target].bonus_bat = Unit[self.target].bonus_bat / self.as
         end
     end
 
     ---@class VampiricPotion : Buff
-    VampiricPotion = setmetatable({}, mt)
+    VampiricPotion = Buff.new()
     do
         local thistype = VampiricPotion
-        thistype.RAWCODE         = FourCC('A05O') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_POSITIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL ---@type integer 
+        thistype.NAME            = "Vampiric Potion"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNPotionOfVampirism.blp"
+        thistype.DESC            = "This unit restores +^$leech% of damage dealt as health"
+        thistype.DISPEL_TYPE     = BUFF_POSITIVE
+        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
 
         local function on_hit(source, target, amount, amount_after_red)
             HP(source, source, amount_after_red * 0.05, "Vampiric Potion")
@@ -2757,103 +3170,58 @@ OnInit.global("Buffs", function(Require)
         end
 
         function thistype:onApply()
+            self.leech = 0.05
             EVENT_ON_HIT_AFTER_REDUCTIONS:register_unit_action(self.target, on_hit)
             self.sfx = AddSpecialEffectTarget("Abilities\\Spells\\Items\\VampiricPotion\\VampPotionCaster.mdl", self.target, "origin")
         end
     end
 
     ---@class IntenseFocusBuff : Buff
-    IntenseFocusBuff = setmetatable({}, mt)
+    IntenseFocusBuff = Buff.new()
     do
         local thistype = IntenseFocusBuff
-        thistype.RAWCODE         = FourCC('Aifc') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_POSITIVE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL ---@type integer 
+        thistype.NAME            = "Intense Focus"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNTrueShot.blp"
+        thistype.DESC            = "This unit has +^#mult% total damage"
+        thistype.AURA            = true
+        thistype.DISPEL_TYPE     = BUFF_POSITIVE
+        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
 
        local function periodic(self)
             if UnitAlive(self.target) and
                 Unit[self.target].x == GetUnitX(self.target) and
                 Unit[self.target].y == GetUnitY(self.target)
             then
+                self.charges = math.min(10, self.charges + 1)
                 Unit[self.target].dm = Unit[self.target].dm / self.mult
-                self.mult = math.min(1.1, self.mult + 0.01)
+                self.mult = 1. + self.charges * 0.01
                 Unit[self.target].dm = Unit[self.target].dm * self.mult
             else
                 Unit[self.target].dm = Unit[self.target].dm / self.mult
                 self.mult = 1.
+                self.charges = 0
             end
-            self.timer = Buff.timer:callDelayed(1, periodic, self)
+            UnitRefreshBuff(self.target, self)
+            self.timer = TQ:callDelayed(1, periodic, self)
         end
 
         function thistype:onRemove()
             Unit[self.target].dm = Unit[self.target].dm / self.mult
-            self.timer:destroy()
-            Buff.timer:disableCallback(self.timer)
+            TQ:disableCallback(self.timer)
         end
 
         function thistype:onApply()
+            self.charges = 0
             self.mult = 1.
-            self.timer = Buff.timer:callDelayed(1, periodic, self)
+            self.timer = TQ:callDelayed(1, periodic, self)
         end
     end
 
     ---@class WeatherBuff : Buff
-    ---@field player_fog boolean[]
-    WeatherBuff = setmetatable({}, mt)
+    WeatherBuff = Buff.new()
     do
         local thistype = WeatherBuff
-        thistype.RAWCODE         = FourCC('Weat') ---@type integer 
-        thistype.DISPEL_TYPE     = BUFF_NONE ---@type integer 
-        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL ---@type integer 
-        thistype.player_fog      = {} ---@type boolean[]
-
-        function thistype:onRemove()
-            if thistype.player_fog[self.tpid] and GetLocalPlayer() == GetOwningPlayer(self.target) and self.target == Hero[self.tpid] then
-                thistype.player_fog[self.tpid] = false
-                SetCineFilterTexture("ReplaceableTextures\\CameraMasks\\HazeAndFogFilter_Mask.blp")
-                SetCineFilterStartColor(171, 174, WeatherTable[self.weather].blue, WeatherTable[self.weather].fog)
-                SetCineFilterEndColor(171, 174, WeatherTable[self.weather].blue, 0)
-                SetCineFilterBlendMode(BLEND_MODE_BLEND)
-                SetCineFilterDuration(4.)
-                DisplayCineFilter(true)
-            end
-
-            UnitRemoveAbility(self.target, WeatherTable[self.weather].abil)
-            UnitRemoveAbility(self.target, WeatherTable[self.weather].buff)
-            Unit[self.target].damage_percent = Unit[self.target].damage_percent - self.atk * 0.01
-            Unit[self.target].bonus_bat = Unit[self.target].bonus_bat * self.as
-            Unit[self.target].spellboost = Unit[self.target].spellboost - self.spellboost
-            Unit[self.target].dr = Unit[self.target].dr / self.dr
-            Unit[self.target].ms_percent = Unit[self.target].ms_percent + self.ms
-        end
-
-        function thistype:onApply()
-            self.weather = CURRENT_WEATHER
-            self.as = 1. - WeatherTable[self.weather].as * 0.01
-            self.atk = WeatherTable[self.weather].atk
-            self.spellboost = WeatherTable[self.weather].boost * 0.01
-            self.dr = (1. - WeatherTable[self.weather].dr * 0.01)
-
-            if GetLocalPlayer() == GetOwningPlayer(self.target) and WeatherTable[self.weather].fog > 0 and self.target == Hero[self.tpid] then
-                thistype.player_fog[self.tpid] = true
-                SetCineFilterTexture("ReplaceableTextures\\CameraMasks\\HazeAndFogFilter_Mask.blp")
-                SetCineFilterStartColor(171, 174, WeatherTable[self.weather].blue, 0)
-                SetCineFilterEndColor(171, 174, WeatherTable[self.weather].blue, WeatherTable[self.weather].fog)
-                SetCineFilterBlendMode(BLEND_MODE_BLEND)
-                SetCineFilterDuration(5.)
-                DisplayCineFilter(true)
-            end
-
-            UnitAddAbility(self.target, WeatherTable[self.weather].abil)
-            UnitMakeAbilityPermanent(self.target, true, WeatherTable[self.weather].abil)
-            UnitAddAbility(self.target, WeatherTable[self.weather].buff)
-            Unit[self.target].damage_percent = Unit[self.target].damage_percent + self.atk * 0.01
-            Unit[self.target].bonus_bat = Unit[self.target].bonus_bat / self.as
-            Unit[self.target].spellboost = Unit[self.target].spellboost + self.spellboost
-            Unit[self.target].dr = Unit[self.target].dr * self.dr
-
-            self.ms = WeatherTable[self.weather].ms * 0.01 * (math.min(1, Unit[self.target].ms_percent))
-            Unit[self.target].ms_percent = Unit[self.target].ms_percent - self.ms
-        end
+        thistype.DISPEL_TYPE     = BUFF_NONE
+        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
     end
 end, Debug and Debug.getLine())
