@@ -215,7 +215,8 @@ OnInit.final("RoyalGuardianSpells", function(Require)
         end
 
         local function periodic(pt)
-            local x, y = GetUnitX(pt.source), GetUnitY(pt.source)
+            local source = pt.source
+            local x, y = GetUnitX(source), GetUnitY(source)
             ALICE_ForAllObjectsInRangeDo(buff, x, y, 900. * LBOOST[pt.pid], "unit", valid_ally, pt.source, pt.ablev)
 
             return true
