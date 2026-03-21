@@ -2,6 +2,7 @@ OnInit.final("AssassinSpells", function(Require)
     Require('Spells')
     Require('SpellTools')
 
+    local TQ = TimerQueue
     local FPS_32 = FPS_32
     local atan = math.atan
     local distance = MISSILE_DISTANCE
@@ -86,8 +87,10 @@ OnInit.final("AssassinSpells", function(Require)
             ALICE_Create(missile)
         end
 
-        local manacost = function(u)
-            BlzSetUnitAbilityManaCost(u, thistype.id, GetUnitAbilityLevel(u, thistype.id) - 1, R2I(BlzGetUnitMaxMana(u) * 0.05))
+        local manacost = function(u, key)
+            if key == "int" or key == "bonus_mana" or key == "bonus_int" then
+                BlzSetUnitAbilityManaCost(u, thistype.id, GetUnitAbilityLevel(u, thistype.id) - 1, R2I(BlzGetUnitMaxMana(u) * 0.05))
+            end
         end
 
         function thistype.onLearn(source, ablev, pid)
@@ -143,8 +146,10 @@ OnInit.final("AssassinSpells", function(Require)
             DestroyGroup(ug)
         end
 
-        local manacost = function(u)
-            BlzSetUnitAbilityManaCost(u, thistype.id, GetUnitAbilityLevel(u, thistype.id) - 1, R2I(BlzGetUnitMaxMana(u) * 0.15))
+        local manacost = function(u, key)
+            if key == "int" or key == "bonus_mana" or key == "bonus_int" then
+                BlzSetUnitAbilityManaCost(u, thistype.id, GetUnitAbilityLevel(u, thistype.id) - 1, R2I(BlzGetUnitMaxMana(u) * 0.15))
+            end
         end
 
         function thistype.onLearn(source, ablev, pid)
@@ -164,15 +169,14 @@ OnInit.final("AssassinSpells", function(Require)
             dur = 8.,
         }
 
-        ---@type fun(pt: PlayerTimer)
+        ---@type fun(pt: PlayerTimer): boolean
         local function periodic(pt)
             pt.dur = pt.dur - 0.5
 
             if pt.dur > 0. then
-                local ug = CreateGroup()
-                MakeGroupInRange(pt.pid, ug, pt.x, pt.y, pt.aoe, Condition(isalive))
+                MakeGroupInRange(pt.pid, pt.ug, pt.x, pt.y, pt.aoe, Condition(isalive))
 
-                for target in each(ug) do
+                for target in each(pt.ug) do
                     if IsUnitAlly(target, Player(pt.pid - 1)) then
                         SmokebombBuff:add(Hero[pt.pid], target):duration(1.)
                     else
@@ -180,12 +184,10 @@ OnInit.final("AssassinSpells", function(Require)
                     end
                 end
 
-                DestroyGroup(ug)
-
-                pt.timer:callDelayed(0.5, periodic, pt)
-            else
-                pt:destroy()
+                return true
             end
+
+            return false
         end
 
         function thistype:onCast()
@@ -198,14 +200,17 @@ OnInit.final("AssassinSpells", function(Require)
             pt.y = self.targetY
             pt.aoe = self.aoe * LBOOST[self.pid]
             pt.dur = self.dur * LBOOST[self.pid]
+            pt.ug = CreateGroup()
 
             pt.sfx = AddSpecialEffect("war3mapImported\\GreySmoke.mdx", self.targetX, self.targetY)
             BlzSetSpecialEffectScale(pt.sfx, LBOOST[self.pid])
-            pt.timer:callDelayed(0.5, periodic, pt)
+            pt:startLoop(0.5, periodic)
         end
 
-        local manacost = function(u)
-            BlzSetUnitAbilityManaCost(u, thistype.id, GetUnitAbilityLevel(u, thistype.id) - 1, R2I(BlzGetUnitMaxMana(u) * 0.2))
+        local manacost = function(u, key)
+            if key == "int" or key == "bonus_mana" or key == "bonus_int" then
+                BlzSetUnitAbilityManaCost(u, thistype.id, GetUnitAbilityLevel(u, thistype.id) - 1, R2I(BlzGetUnitMaxMana(u) * 0.2))
+            end
         end
 
         function thistype.onLearn(source, ablev, pid)
@@ -272,7 +277,7 @@ OnInit.final("AssassinSpells", function(Require)
                     ALICE_Create(missile)
                 end
 
-                TimerQueue:callDelayed(FPS_32, periodic, self)
+                TQ:callDelayed(FPS_32, periodic, self)
             end
         end
 
@@ -286,8 +291,10 @@ OnInit.final("AssassinSpells", function(Require)
             periodic(self)
         end
 
-        local manacost = function(u)
-            BlzSetUnitAbilityManaCost(u, thistype.id, GetUnitAbilityLevel(u, thistype.id) - 1, R2I(BlzGetUnitMaxMana(u) * 0.25))
+        local manacost = function(u, key)
+            if key == "int" or key == "bonus_mana" or key == "bonus_int" then
+                BlzSetUnitAbilityManaCost(u, thistype.id, GetUnitAbilityLevel(u, thistype.id) - 1, R2I(BlzGetUnitMaxMana(u) * 0.25))
+            end
         end
 
         function thistype.onLearn(source, ablev, pid)
@@ -379,8 +386,10 @@ OnInit.final("AssassinSpells", function(Require)
             end
         end
 
-        local manacost = function(u)
-            BlzSetUnitAbilityManaCost(u, thistype.id, GetUnitAbilityLevel(u, thistype.id) - 1, R2I(BlzGetUnitMaxMana(u) * 0.075))
+        local manacost = function(u, key)
+            if key == "int" or key == "bonus_mana" or key == "bonus_int" then
+                BlzSetUnitAbilityManaCost(u, thistype.id, GetUnitAbilityLevel(u, thistype.id) - 1, R2I(BlzGetUnitMaxMana(u) * 0.075))
+            end
         end
 
         function thistype.onSetup(u)
@@ -389,7 +398,7 @@ OnInit.final("AssassinSpells", function(Require)
             EVENT_ON_ORDER:register_unit_action(u, on_order)
             EVENT_STAT_CHANGE:register_unit_action(u, manacost)
 
-            TimerQueue:callDelayed(0.01, UnitRemoveAbility, u, thistype.id)
+            TQ:callDelayed(0.01, UnitRemoveAbility, u, thistype.id)
         end
     end
 
@@ -405,21 +414,17 @@ OnInit.final("AssassinSpells", function(Require)
             dmg = function(pid) local ablev = GetUnitAbilityLevel(Hero[pid], thistype.id) return GetHeroAgi(Hero[pid], true) * 1.5 * ablev end,
         }
 
-        ---@type fun(pt: PlayerTimer)
+        ---@type fun(pt: PlayerTimer): boolean
         local function periodic(pt)
-            local x = GetUnitX(pt.source) ---@type number 
-            local y = GetUnitY(pt.source) ---@type number 
+            local x = GetUnitX(pt.source) + pt.speed * math.cos(pt.angle)
+            local y = GetUnitY(pt.source) + pt.speed * math.sin(pt.angle)
 
             pt.dur = pt.dur - pt.speed
 
-            if pt.dur > 0. then
-                --movement
-                if IsTerrainWalkable(x + pt.speed * math.cos(pt.angle), y + pt.speed * math.sin(pt.angle)) then
-                    SetUnitXBounded(pt.source, x + pt.speed * math.cos(pt.angle))
-                    SetUnitYBounded(pt.source, y + pt.speed * math.sin(pt.angle))
-                else
-                    pt.dur = 0.
-                end
+            if pt.dur > 0. and IsTerrainWalkable(x, y) then
+                -- movement
+                SetUnitXBounded(pt.source, x)
+                SetUnitYBounded(pt.source, y)
 
                 local ug = CreateGroup()
                 MakeGroupInRange(pt.pid, ug, x, y, 200., Condition(FilterEnemy))
@@ -434,10 +439,10 @@ OnInit.final("AssassinSpells", function(Require)
 
                 DestroyGroup(ug)
 
-                pt.timer:callDelayed(FPS_32, periodic, pt)
-            else
-                pt:destroy()
+                return true
             end
+
+            return false
         end
 
         local function onRemove(self)
@@ -466,8 +471,8 @@ OnInit.final("AssassinSpells", function(Require)
             pt.ug = CreateGroup()
             pt.onRemove = onRemove
 
-            TimerQueue:callDelayed(FPS_32, IssueImmediateOrderById, pt.source, ORDER_ID_UNIMMOLATION)
-            pt.timer:callDelayed(FPS_32, periodic, pt)
+            TQ:callDelayed(FPS_32, IssueImmediateOrderById, pt.source, ORDER_ID_UNIMMOLATION)
+            pt:startLoop(FPS_32, periodic)
 
             SetUnitTimeScale(self.caster, 1.5)
             SetUnitAnimationByIndex(self.caster, 5)
@@ -477,7 +482,7 @@ OnInit.final("AssassinSpells", function(Require)
             BlzSetSpecialEffectColorByPlayer(sfx, Player(self.pid - 1))
             BlzSetSpecialEffectYaw(sfx, pt.angle)
             FadeSFX(sfx, true)
-            TimerQueue:callDelayed(2., HideEffect, sfx)
+            TQ:callDelayed(2., HideEffect, sfx)
             BlzPlaySpecialEffectWithTimeScale(sfx, ANIM_TYPE_ATTACK, 1.5)
         end
 
@@ -498,9 +503,11 @@ OnInit.final("AssassinSpells", function(Require)
             end
         end
 
-        local manacost = function(u)
-            local ablev = GetUnitAbilityLevel(u, thistype.id)
-            BlzSetUnitAbilityManaCost(u, thistype.id, ablev - 1, R2I(BlzGetUnitMaxMana(u) * (.1 - 0.025 * ablev)))
+        local manacost = function(u, key)
+            if key == "int" or key == "bonus_mana" or key == "bonus_int" then
+                local ablev = GetUnitAbilityLevel(u, thistype.id)
+                BlzSetUnitAbilityManaCost(u, thistype.id, ablev - 1, R2I(BlzGetUnitMaxMana(u) * (.1 - 0.025 * ablev)))
+            end
         end
 
         function thistype.onLearn(source, ablev, pid)
