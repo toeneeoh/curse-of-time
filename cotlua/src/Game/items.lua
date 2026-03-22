@@ -681,17 +681,17 @@ OnInit.final("Items", function(Require)
             end
         end
 
-        local function refresh_item_abilities(self, holder)
+        local function refresh_item_abilities(self, dropped, holder)
             if self.abilities then
                 for i = ITEM_ABILITY, ITEM_ABILITY2 do
                     local abil = self.abilities[i]
 
-                    if abil and (not backpack_allowed[abil.id]) then
+                    if abil and (not backpack_allowed[abil.id] or dropped) then
                         -- trigger unequip event
-                        Spells[abil.id].onUnequip(self, abil.id)
+                        Spells[abil.id].onUnequip(self, abil.id, i, holder)
 
                         -- remove ability after cooldown expires
-                        TimerQueue:callDelayed(BlzGetUnitAbilityCooldownRemaining(holder and holder or self.holder, abil.id), remove_item_ability, self, abil, i)
+                        TimerQueue:callDelayed(BlzGetUnitAbilityCooldownRemaining(holder, abil.id), remove_item_ability, self, abil, i)
                     end
                 end
             end
@@ -786,68 +786,74 @@ OnInit.final("Items", function(Require)
             -- determine the slot
             slot = slot or find_empty_slot(self)
 
-            local orig_holder = self.holder
-            local valid, err = false, nil
-
             -- validate it (level check, limited check)
+            local valid, err = false, nil
             if slot then
                 valid, err = ValidateItemSlot(self, slot)
-                self.holder = (slot <= 6 and Hero[self.pid]) or Backpack[self.pid]
             end
 
             if err then
                 DisplayTimedTextToPlayer(Player(self.pid - 1), 0, 0, 15., err)
             end
 
-            if self.holder and valid then
-                local items = Profile[self.pid].hero.items
-
-                -- if item is stackable
-                local stack = self.cached_stats[ITEM_STACK]
-                if stack > 1 then
-                    self:stack(self.pid, stack)
-                end
-
-                -- make sure item is not occupying previous space
-                if self.index and items[self.index] == self then
-                    items[self.index] = nil
-                end
-
-                add_item_abilities(self)
-
-                -- determine whether to add or remove stats
-                if not self.equipped and slot <= 6 then
-                    self.equipped = true
-
-                    -- bind item
-                    if SAVE_TABLE.KEY_ITEMS[self.id] then
-                        self.owner = Player(self.pid - 1)
-                    end
-
-                    apply_item_stats(self, 1)
-                elseif self.equipped and slot > 6 then
-                    self.equipped = false
-
-                    refresh_item_abilities(self, orig_holder) -- backpack abilities are not removed
-                    apply_item_stats(self, -1)
-                end
-
-                -- set index
-                items[slot] = self
-                self.index = slot
-
-                SetItemPosition(self.obj, 30000., 30000.)
-                SetItemVisible(self.obj, false)
-
-                INVENTORY.refresh(self.pid)
-
-                -- TODO: use item equipped event
-                Shop.refresh(self.pid)
-
-                return true
+            -- cannot move item to new slot
+            if not valid then
+                return false
             end
 
-            return false
+            local items = Profile[self.pid].hero.items
+            local orig_holder = self.holder
+            local orig_index = self.index
+            local was_equipped = self.equipped
+            -- new holder needs to be set before applying stats
+            self.holder = (slot <= 6 and Hero[self.pid]) or Backpack[self.pid]
+
+            -- if item is stackable
+            local stack = self.cached_stats[ITEM_STACK]
+            if stack > 1 then
+                self:stack(self.pid, stack)
+            end
+
+            -- make sure item is not occupying previous space
+            if orig_index and items[orig_index] == self then
+                items[orig_index] = nil
+            end
+
+            -- from equipped to backpack
+            if was_equipped and slot > 6 then
+                refresh_item_abilities(self, false, orig_holder) -- backpack abilities are not removed
+                apply_item_stats(self, -1)
+
+                self.equipped = false
+            end
+
+            -- newly equipped
+            if not was_equipped and slot <= 6 then
+                self.equipped = true
+
+                -- bind item
+                if SAVE_TABLE.KEY_ITEMS[self.id] then
+                    self.owner = Player(self.pid - 1)
+                end
+
+                apply_item_stats(self, 1)
+            end
+
+            -- set index
+            items[slot] = self
+            self.index = slot
+
+            add_item_abilities(self)
+
+            SetItemPosition(self.obj, 30000., 30000.)
+            SetItemVisible(self.obj, false)
+
+            INVENTORY.refresh(self.pid)
+
+            -- TODO: use item equipped event
+            Shop.refresh(self.pid)
+
+            return true
         end
 
         local parse_item_stat = {
@@ -1024,7 +1030,7 @@ OnInit.final("Items", function(Require)
                 return
             end
 
-            refresh_item_abilities(self)
+            refresh_item_abilities(self, true, self.holder)
 
             if self.equipped then
                 self.equipped = false
