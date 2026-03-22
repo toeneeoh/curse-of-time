@@ -2166,12 +2166,13 @@ OnInit.final("UnitSpells", function(Require)
         end
 
         local function onStruck(target, source)
-            if TimerList[BOSS_ID]:has(FourCC('tpin')) == false and IsUnitInRange(target, source, 800.) then
-                CastSpell(target, thistype.id, 0.5, 12, 1.)
-                TQ:callDelayed(2, DestroyEffect, AddSpecialEffect("Abilities\\Spells\\Orc\\MirrorImage\\MirrorImageCaster.mdl", GetUnitX(target), GetUnitY(target)))
-                Boss[BOSS_LEGION].loc_x = GetUnitX(source)
-                Boss[BOSS_LEGION].loc_y = GetUnitY(source)
-                TQ:callDelayed(0.5, spawn, target)
+            if IsUnitInRange(target, source, 800.) then
+                if CastSpell(target, thistype.id, 0.5, 12, 1.) then
+                    TQ:callDelayed(2, DestroyEffect, AddSpecialEffect("Abilities\\Spells\\Orc\\MirrorImage\\MirrorImageCaster.mdl", GetUnitX(target), GetUnitY(target)))
+                    Boss[BOSS_LEGION].loc_x = GetUnitX(source)
+                    Boss[BOSS_LEGION].loc_y = GetUnitY(source)
+                    TQ:callDelayed(0.5, spawn, target)
+                end
             end
         end
 
@@ -2203,15 +2204,16 @@ OnInit.final("UnitSpells", function(Require)
         end
 
         local function onStruck(target, source)
-            if random(0, 99) < 10 and BlzGetUnitAbilityCooldownRemaining(target, thistype.id) <= 0 and UnitDistance(source, target) > 250. then
-                CastSpell(target, thistype.id, 0, -1, 1)
-                local pt = TimerList[BOSS_ID]:add(target)
-                pt.x = GetUnitX(source)
-                pt.y = GetUnitY(source)
-                pt.source = target
-                pt.spell = 1
-                pt:after(1.5, expire)
-                FloatingTextUnit(thistype.tag, target, 1, 70, 0, 10, 255, 255, 255, 0, true)
+            if random(0, 99) < 10 and UnitDistance(source, target) > 250. then
+                if CastSpell(target, thistype.id, 0, -1, 1) then
+                    local pt = TimerList[BOSS_ID]:add(target)
+                    pt.x = GetUnitX(source)
+                    pt.y = GetUnitY(source)
+                    pt.source = target
+                    pt.spell = 1
+                    pt:after(1.5, expire)
+                    FloatingTextUnit(thistype.tag, target, 1, 70, 0, 10, 255, 255, 255, 0, true)
+                end
             end
         end
 
@@ -2265,16 +2267,16 @@ OnInit.final("UnitSpells", function(Require)
         end
 
         local function onStruck(target, source)
-            if random(0, 99) < 10 and BlzGetUnitAbilityCooldownRemaining(target, thistype.id) <= 0 then
-                CastSpell(target, thistype.id, 2., 12, 1.)
-
-                local pt = TimerList[BOSS_ID]:add(target)
-                pt.x = GetUnitX(target)
-                pt.y = GetUnitY(target)
-                pt.source = target
-                pt:after(2.5, expire)
-                DestroyEffect(AddSpecialEffectTarget("Abilities\\Spells\\Other\\Charm\\CharmTarget.mdl", target, "origin"))
-                FloatingTextUnit(thistype.tag, target, 2, 70, 0, 10, 255, 255, 255, 0, true)
+            if random(0, 99) < 10 then
+                if CastSpell(target, thistype.id, 2., 12, 1.) then
+                    local pt = TimerList[BOSS_ID]:add(target)
+                    pt.x = GetUnitX(target)
+                    pt.y = GetUnitY(target)
+                    pt.source = target
+                    pt:after(2.5, expire)
+                    DestroyEffect(AddSpecialEffectTarget("Abilities\\Spells\\Other\\Charm\\CharmTarget.mdl", target, "origin"))
+                    FloatingTextUnit(thistype.tag, target, 2, 70, 0, 10, 255, 255, 255, 0, true)
+                end
             end
         end
 
@@ -2306,29 +2308,27 @@ OnInit.final("UnitSpells", function(Require)
         end
 
         local function onStruck(target, source)
-            if BlzGetUnitAbilityCooldownRemaining(target, FourCC('A07F')) <= 0. then
-                local rand = 0
-                repeat
-                    rand = random(1, 3)
-                    if rand == 1 then
-                        FloatingTextUnit("Extermination", target, 3, 70, 0, 12, 255, 255, 255, 0, true)
-                    elseif rand == 2 and UnitDistance(source, target) <= 400 then
-                        FloatingTextUnit("Implosion", target, 3, 70, 0, 12, 68, 68, 255, 0, true)
-                    elseif rand == 3 and UnitDistance(source, target) >= 400 then
-                        FloatingTextUnit("Explosion", target, 3, 70, 0, 12, 255, 100, 50, 0, true)
-                    else
-                        rand = 0
-                    end
-                until rand ~= 0
+            if CastSpell(target, thistype.id, 1.5, 4, 1.5) then
+                local rand = random(1, 3)
+
+                if rand == 1 then
+                    FloatingTextUnit("Extermination", target, 3, 70, 0, 12, 255, 255, 255, 0, true)
+                elseif rand == 2 and UnitDistance(source, target) <= 400 then
+                    FloatingTextUnit("Implosion", target, 3, 70, 0, 12, 68, 68, 255, 0, true)
+                elseif rand == 3 and UnitDistance(source, target) >= 400 then
+                    FloatingTextUnit("Explosion", target, 3, 70, 0, 12, 255, 100, 50, 0, true)
+                end
 
                 local pt = TimerList[BOSS_ID]:add()
                 pt.source = target
                 pt.dur = 6
                 pt.spell = rand
-                CastSpell(target, FourCC('A07F'), 0., -1, 1., true)
-                CastSpell(target, FourCC('A07Q'), 0., -1, 1., true)
-                CastSpell(target, FourCC('A073'), 0., -1, 1., true)
-                CastSpell(target, FourCC('A072'), 1.5, 4, 1.5)
+
+                local id = FourCC('A07Q')
+                local shared_cooldown = 10
+                BlzStartUnitAbilityCooldown(target, id, shared_cooldown)
+                id = FourCC('A073')
+                BlzStartUnitAbilityCooldown(target, id, shared_cooldown)
                 pt:startLoop(0.5, expire)
             end
         end
@@ -2342,8 +2342,7 @@ OnInit.final("UnitSpells", function(Require)
     do
         local thistype = PROTECTED_EXISTENCE
         local function onStruck(target, source)
-            if BlzGetUnitAbilityCooldownRemaining(target, thistype.id) <= 0. then
-                CastSpell(target, thistype.id, 1.5, 4, 1.5)
+            if CastSpell(target, thistype.id, 1.5, 4, 1.5) then
                 FloatingTextUnit(thistype.tag, target, 3, 70, 0, 12, 100, 255, 100, 0, true)
                 ProtectedExistenceBuff:add(target, target):duration(10.)
             end
@@ -2364,13 +2363,14 @@ OnInit.final("UnitSpells", function(Require)
         end
 
         local function onStruck(target, source)
-            if BlzGetUnitAbilityCooldownRemaining(target, thistype.id) <= 0 and GetWidgetLife(target) <= BlzGetUnitMaxHP(target) * 0.5 then
-                CastSpell(target, thistype.id, 0., 3, 1.)
-                FloatingTextUnit(thistype.tag, target, 1.75, 100, 0, 12, 255, 0, 0, 0, true)
-                local angle, x, y = GetUnitFacing(target), GetUnitX(target), GetUnitY(target)
-                DestroyEffect(AddSpecialEffect("Abilities\\Spells\\Demon\\DarkPortal\\DarkPortalTarget.mdl", x + 400. * math.cos((angle + 90) * bj_DEGTORAD), y + 400. * math.sin((angle + 90) * bj_DEGTORAD)))
-                DestroyEffect(AddSpecialEffect("Abilities\\Spells\\Demon\\DarkPortal\\DarkPortalTarget.mdl", x + 400. * math.cos((angle - 90) * bj_DEGTORAD), y + 400. * math.sin((angle - 90) * bj_DEGTORAD)))
-                TQ:callDelayed(2., summon, angle, x, y)
+            if GetWidgetLife(target) <= BlzGetUnitMaxHP(target) * 0.5 then
+                if CastSpell(target, thistype.id, 0., 3, 1.) then
+                    FloatingTextUnit(thistype.tag, target, 1.75, 100, 0, 12, 255, 0, 0, 0, true)
+                    local angle, x, y = GetUnitFacing(target), GetUnitX(target), GetUnitY(target)
+                    DestroyEffect(AddSpecialEffect("Abilities\\Spells\\Demon\\DarkPortal\\DarkPortalTarget.mdl", x + 400. * math.cos((angle + 90) * bj_DEGTORAD), y + 400. * math.sin((angle + 90) * bj_DEGTORAD)))
+                    DestroyEffect(AddSpecialEffect("Abilities\\Spells\\Demon\\DarkPortal\\DarkPortalTarget.mdl", x + 400. * math.cos((angle - 90) * bj_DEGTORAD), y + 400. * math.sin((angle - 90) * bj_DEGTORAD)))
+                    TQ:callDelayed(2., summon, angle, x, y)
+                end
             end
         end
 
@@ -2419,13 +2419,11 @@ OnInit.final("UnitSpells", function(Require)
         end
 
         local function onStruck(target, source)
-            if BlzGetUnitAbilityCooldownRemaining(target, thistype.id) <= 0 then
-                local ug = CreateGroup()
-                GroupEnumUnitsInRange(ug, GetUnitX(target), GetUnitY(target), 1500., Condition(isplayerAlly))
+            local ug = CreateGroup()
+            GroupEnumUnitsInRange(ug, GetUnitX(target), GetUnitY(target), 1500., Condition(isplayerAlly))
 
-                if BlzGroupGetSize(ug) > 0 then
-                    PauseUnit(target, true)
-                    CastSpell(target, thistype.id, 2.5, 1, 1.)
+            if BlzGroupGetSize(ug) > 0 then
+                if CastSpell(target, thistype.id, 2.5, 1, 1.) then
                     FloatingTextUnit(thistype.tag, target, 1.75, 100, 0, 12, 255, 0, 0, 0, true)
                     local u = BlzGroupUnitAt(ug, GetRandomInt(0, BlzGroupGetSize(ug) - 1))
                     local dummy = Dummy.create(GetUnitX(u), GetUnitY(u), 0, 0, 4.).unit
@@ -2442,9 +2440,9 @@ OnInit.final("UnitSpells", function(Require)
                     BlzSetUnitFacingEx(target, pt.angle * bj_RADTODEG)
                     TQ:callDelayed(2.5, pt.startLoop, pt, FPS_32, periodic)
                 end
-
-                DestroyGroup(ug)
             end
+
+            DestroyGroup(ug)
         end
 
         function thistype.onSetup(u)
@@ -2486,27 +2484,28 @@ OnInit.final("UnitSpells", function(Require)
 
                 local size = BlzGroupGetSize(pt.ug)
 
-                if size > 0 and BlzGetUnitAbilityCooldownRemaining(pt.source, FourCC('A02V')) <= 0 then
-                    CastSpell(pt.source, FourCC('A02V'), 0.75, 5, 1.)
-                    local target = BlzGroupUnitAt(pt.ug, GetRandomInt(0, size - 1))
-                    local x2, y2 = GetUnitX(target), GetUnitY(target)
-                    local angle = math.atan(y2 - y, x2 - x)
-                    local dist = DistanceCoords(x2, y2, x, y) + 500.
+                if size > 0 then
+                    if CastSpell(pt.source, FourCC('A02V'), 0.75, 5, 1.) then
+                        local target = BlzGroupUnitAt(pt.ug, GetRandomInt(0, size - 1))
+                        local x2, y2 = GetUnitX(target), GetUnitY(target)
+                        local angle = math.atan(y2 - y, x2 - x)
+                        local dist = DistanceCoords(x2, y2, x, y) + 500.
 
-                    local missile = setmetatable({}, missile_template)
-                    missile.x = x
-                    missile.y = y
-                    missile.visual = AddSpecialEffect("Abilities\\Weapons\\RedDragonBreath\\RedDragonMissile.mdl", x, y)
-                    BlzSetSpecialEffectScale(missile.visual, 1.8)
-                    missile.speed = 225.
-                    missile.vx = missile.speed * math.cos(angle)
-                    missile.vy = missile.speed * math.sin(angle)
-                    missile.source = pt.source
-                    missile.owner = PLAYER_BOSS
-                    missile.damage = 3000000.
-                    missile.dist = dist
+                        local missile = setmetatable({}, missile_template)
+                        missile.x = x
+                        missile.y = y
+                        missile.visual = AddSpecialEffect("Abilities\\Weapons\\RedDragonBreath\\RedDragonMissile.mdl", x, y)
+                        BlzSetSpecialEffectScale(missile.visual, 1.8)
+                        missile.speed = 225.
+                        missile.vx = missile.speed * math.cos(angle)
+                        missile.vy = missile.speed * math.sin(angle)
+                        missile.source = pt.source
+                        missile.owner = PLAYER_BOSS
+                        missile.damage = 3000000.
+                        missile.dist = dist
 
-                    ALICE_Create(missile)
+                        ALICE_Create(missile)
+                    end
                 end
 
                 return true
@@ -2554,9 +2553,7 @@ OnInit.final("UnitSpells", function(Require)
                         pt.time = pt.time + FPS_32
                         MoveLightningEx(pt.lfx, false, x, y, BlzGetUnitZ(pt.source) + GetUnitFlyHeight(pt.source) + 50., GetUnitX(pt.target), GetUnitY(pt.target), BlzGetUnitZ(pt.target) + 50.)
 
-                        if BlzGetUnitAbilityCooldownRemaining(pt.source, FourCC('A02G')) <= 0. then
-                            CastSpell(pt.source, FourCC('A02G'), 5., 0, 1.)
-                        end
+                        CastSpell(pt.source, FourCC('A02G'), 5., 0, 1.)
 
                         if pt.time >= 5 then
                             DamageTarget(pt.source, pt.target, 0.001, ATTACK_TYPE_NORMAL, PHYSICAL, "Focus Fire")
@@ -2601,14 +2598,15 @@ OnInit.final("UnitSpells", function(Require)
         end
 
         local function onStruck(target, source)
-            if BlzGetUnitAbilityCooldownRemaining(target, thistype.id) <= 0. and GetWidgetLife(target) <= BlzGetUnitMaxHP(target) * 0.9 then
-                CastSpell(target, thistype.id, 0., 3, 1.)
-                spawn_archer(12349., -15307., 770.)
-                spawn_archer(13500., -12300., 575.)
-                spawn_archer(14079., -11550., 575.)
-                spawn_mage(14315., -12863., 770.)
-                spawn_mage(11788., -14279., 575.)
-                spawn_mage(11214., -15133., 575.)
+            if GetWidgetLife(target) <= BlzGetUnitMaxHP(target) * 0.9 then
+                if CastSpell(target, thistype.id, 0., 3, 1.) then
+                    spawn_archer(12349., -15307., 770.)
+                    spawn_archer(13500., -12300., 575.)
+                    spawn_archer(14079., -11550., 575.)
+                    spawn_mage(14315., -12863., 770.)
+                    spawn_mage(11788., -14279., 575.)
+                    spawn_mage(11214., -15133., 575.)
+                end
             end
         end
 
