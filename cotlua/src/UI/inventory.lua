@@ -696,11 +696,14 @@ OnInit.final("Inventory", function(Require)
                 local itm = hero.items[context[pid]]
                 local itm2 = hero.items[target[pid]]
                 local slot = get_hovered_slot() -- not sync safe
-                local valid = false
+                local valid, err = false, nil
 
                 -- async visual swap
                 if itm and slot > 0 then
-                    valid = ValidateItemSlot(itm, slot)
+                    valid, err = ValidateItemSlot(itm, slot)
+                    if err then
+                        DisplayTimedTextToPlayer(Player(pid - 1), 0, 0, 15., err)
+                    end
                     if itm2 and valid then
                         valid = ValidateItemSlot(itm2, context[pid])
                     end
@@ -730,7 +733,7 @@ OnInit.final("Inventory", function(Require)
                         end
                     elseif slot > 0 then
                         -- validate slots again (synced)
-                        valid = ValidateItemSlot(itm, slot)
+                        valid, err = ValidateItemSlot(itm, slot)
                         if itm2 and valid then
                             valid = ValidateItemSlot(itm2, context[pid])
                         end
