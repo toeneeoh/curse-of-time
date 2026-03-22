@@ -1780,7 +1780,7 @@ end
 --- Helper for boss casting
 ---@type fun(u: unit, id: integer, dur: number, anim: integer, timescale: number, pause_override: boolean?): boolean
 function CastSpell(u, id, dur, anim, timescale, pause_override)
-    if Unit[u]._casting or not BlzGetUnitAbilityCooldownRemaining(u, id) <= 0. or not UnitAlive(u) then
+    if Unit[u]._casting or BlzGetUnitAbilityCooldownRemaining(u, id) > 0. or not UnitAlive(u) then
         return false
     end
 
