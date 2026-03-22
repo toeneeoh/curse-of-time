@@ -1780,10 +1780,11 @@ end
 --- Helper for boss casting
 ---@type fun(u: unit, id: integer, dur: number, anim: integer, timescale: number, pause_override: boolean?): boolean
 function CastSpell(u, id, dur, anim, timescale, pause_override)
-    if not BlzGetUnitAbilityCooldownRemaining(target, thistype.id) <= 0. or not UnitAlive(u) then
+    if Unit[u]._casting or not BlzGetUnitAbilityCooldownRemaining(u, id) <= 0. or not UnitAlive(u) then
         return false
     end
 
+    Unit[u]._casting = true
     BlzStartUnitAbilityCooldown(u, id, BlzGetUnitAbilityCooldown(u, id, GetUnitAbilityLevel(u, id) - 1))
     DelayAnimation(BOSS_ID, u, dur, 0, 1., true)
     if anim ~= -1 then
@@ -1791,7 +1792,6 @@ function CastSpell(u, id, dur, anim, timescale, pause_override)
         SetUnitAnimationByIndex(u, anim)
     end
 
-    Unit[u]._casting = true
     if not pause_override then
         PauseUnit(u, true)
     end
