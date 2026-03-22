@@ -681,12 +681,12 @@ OnInit.final("Items", function(Require)
             end
         end
 
-        local function refresh_item_abilities(self, dropped, holder)
+        local function refresh_item_abilities(self, holder)
             if self.abilities then
                 for i = ITEM_ABILITY, ITEM_ABILITY2 do
                     local abil = self.abilities[i]
 
-                    if abil and (not backpack_allowed[abil.id] or dropped) then
+                    if abil and (not backpack_allowed[abil.id]) then
                         -- trigger unequip event
                         Spells[abil.id].onUnequip(self, abil.id)
 
@@ -823,10 +823,12 @@ OnInit.final("Items", function(Require)
                     if SAVE_TABLE.KEY_ITEMS[self.id] then
                         self.owner = Player(self.pid - 1)
                     end
+
+                    apply_item_stats(self, 1)
                 elseif self.equipped and slot > 6 then
                     self.equipped = false
 
-                    refresh_item_abilities(self, false, orig_holder) -- backpack abilities are not removed
+                    refresh_item_abilities(self, orig_holder) -- backpack abilities are not removed
                     apply_item_stats(self, -1)
                 end
 
@@ -909,13 +911,13 @@ OnInit.final("Items", function(Require)
                     local valuestr = tostring(value)
                     local posneg = "+ |cffffcc00"
 
-                    --handle negative values
+                    -- handle negative values
                     if value < 0 then
                         valuestr = tostring(-value)
                         posneg = "- |cffcc0000"
                     end
 
-                    --alt tooltip
+                    -- alt tooltip
                     local range = ItemData[self.id][index .. "range"]
                     if parse_item_stat[index] then
                         alt_new = alt_new .. parse_item_stat[index](self, index, value, lower, upper, valuestr, range)
@@ -923,7 +925,7 @@ OnInit.final("Items", function(Require)
                         alt_new = alt_new .. parse_item_stat.default(self, index, value, lower, upper, valuestr, range, posneg)
                     end
 
-                    --normal tooltip
+                    -- normal tooltip
                     if index == ITEM_ABILITY or index == ITEM_ABILITY2 then
                         norm_new = norm_new .. parse_item_stat[index](self, index, value, 0, 0)
                     else
@@ -1022,7 +1024,7 @@ OnInit.final("Items", function(Require)
                 return
             end
 
-            refresh_item_abilities(self, true)
+            refresh_item_abilities(self)
 
             if self.equipped then
                 self.equipped = false
