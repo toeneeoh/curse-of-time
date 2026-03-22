@@ -45,8 +45,8 @@ OnInit.final("ItemSpells", function(Require)
             end
         end
 
-        function thistype.onUnequip(itm, id, index)
-            EVENT_ON_STRUCK_MULTIPLIER:unregister_unit_action(itm.holder, shield_variations[id])
+        function thistype.onUnequip(itm, id, index, orig_holder)
+            EVENT_ON_STRUCK_MULTIPLIER:unregister_unit_action(orig_holder, shield_variations[id])
         end
 
         function thistype.onEquip(itm, id, index)
@@ -132,8 +132,8 @@ OnInit.final("ItemSpells", function(Require)
     do
         local thistype = MANA_FLOW
 
-        function thistype.onUnequip(itm, id, index)
-            Unit[itm.holder].mana_regen_percent = Unit[itm.holder].mana_regen_percent - 2
+        function thistype.onUnequip(itm, id, index, orig_holder)
+            Unit[itm.holder].mana_regen_percent = Unit[orig_holder].mana_regen_percent - 2
         end
 
         function thistype.onEquip(itm, id, index)
@@ -146,8 +146,8 @@ OnInit.final("ItemSpells", function(Require)
     do
         local thistype = HORSE_BOOST
 
-        function thistype.onUnequip(itm, id, index)
-            Unit[itm.holder].mana_regen_max = Unit[itm.holder].mana_regen_max - 0.7
+        function thistype.onUnequip(itm, id, index, orig_holder)
+            Unit[itm.holder].mana_regen_max = Unit[orig_holder].mana_regen_max - 0.7
         end
 
         function thistype.onEquip(itm, id, index)
@@ -160,8 +160,8 @@ OnInit.final("ItemSpells", function(Require)
     do
         local thistype = RESURGENCE
 
-        function thistype.onUnequip(itm, id, index)
-            local b = ResurgenceBuff:get(itm.holder, itm.holder)
+        function thistype.onUnequip(itm, id, index, orig_holder)
+            local b = ResurgenceBuff:get(orig_holder, orig_holder)
             b:remove()
         end
 
@@ -182,8 +182,8 @@ OnInit.final("ItemSpells", function(Require)
             DamageTarget(source, target, GetAbilityField(source, thistype.id, 0), ATTACK_TYPE_NORMAL, MAGIC, thistype.tag)
         end
 
-        function thistype.onUnequip(itm, id, index)
-            EVENT_ON_HIT:unregister_unit_action(itm.holder, onHit)
+        function thistype.onUnequip(itm, id, index, orig_holder)
+            EVENT_ON_HIT:unregister_unit_action(orig_holder, onHit)
         end
 
         function thistype.onEquip(itm, id, index)
@@ -238,9 +238,9 @@ OnInit.final("ItemSpells", function(Require)
             end
         end
 
-        function thistype.onUnequip(itm, id, index)
-            EVENT_ON_HIT:unregister_unit_action(itm.holder, onHit)
-            EVENT_ON_STRUCK_MULTIPLIER:unregister_unit_action(itm.holder, onStruck)
+        function thistype.onUnequip(itm, id, index, orig_holder)
+            EVENT_ON_HIT:unregister_unit_action(orig_holder, onHit)
+            EVENT_ON_STRUCK_MULTIPLIER:unregister_unit_action(orig_holder, onStruck)
             for _, v in ipairs(PLAYER_SUMMONS) do
                 if itm.owner == GetOwningPlayer(v) then
                     EVENT_ON_HIT:unregister_unit_action(v, onHit)
@@ -284,7 +284,7 @@ OnInit.final("ItemSpells", function(Require)
             end
         end
 
-        function thistype.onUnequip(itm, id, index)
+        function thistype.onUnequip(itm, id, index, orig_holder)
             DestroyEffect(itm.sfx)
         end
 
@@ -346,7 +346,7 @@ OnInit.final("ItemSpells", function(Require)
             end
         end
 
-        function thistype.onUnequip(itm, id, index)
+        function thistype.onUnequip(itm, id, index, orig_holder)
             DestroyEffect(itm.sfx)
             DestroyEffect(itm.sfx2)
         end
@@ -507,8 +507,8 @@ OnInit.final("ItemSpells", function(Require)
     do
         local thistype = INTENSE_FOCUS
 
-        function thistype.onUnequip(itm, id, index)
-            IntenseFocusBuff:dispel(itm.holder, itm.holder)
+        function thistype.onUnequip(itm, id, index, orig_holder)
+            IntenseFocusBuff:dispel(orig_holder, orig_holder)
         end
 
         function thistype.onEquip(itm, id, index)

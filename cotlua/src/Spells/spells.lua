@@ -278,7 +278,7 @@ OnInit.final("Spells", function(Require)
         -- Stub methods
         function thistype.preCast(pid, tpid, caster, target, x, y, targetX, targetY) end
         function thistype.onCast() end
-        function thistype.onUnequip(itm, id, index) end
+        function thistype.onUnequip(itm, id, index, orig_holder) end
         function thistype.onEquip(itm, id, index) end
         --function thistype.onLearn(source, ablev, pid) end
         --function thistype.onSetup(source) end
