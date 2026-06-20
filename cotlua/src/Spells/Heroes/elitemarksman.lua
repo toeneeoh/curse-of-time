@@ -8,24 +8,10 @@ OnInit.final("MarksmanSpells", function(Require)
 
     ---@class SNIPERSTANCE : Spell
     ---@field enabled boolean[]
-    SNIPERSTANCE = Spell.define("A049")
+    SNIPERSTANCE = Spell.define("A002")
     do
         local thistype = SNIPERSTANCE
         thistype.enabled = {}
-
-        ---@type fun(self: SNIPERSTANCE)
-        local function delay(self)
-            UnitRemoveAbility(self.caster, FourCC('Avul'))
-            UnitRemoveAbility(self.caster, FourCC('A03C'))
-            UnitAddAbility(self.caster, FourCC('A03C'))
-
-            local enabled = thistype.enabled[self.pid]
-            local u = Unit[self.caster]
-            u.overmovespeed = (enabled and 100) or nil
-            u.cc_percent = (enabled and u.cc_percent + 1.) or u.cc_percent - 1.
-            u.cd_percent = (enabled and u.cd_percent + 1.) or u.cd_percent - 1.
-            u.base_bat = (enabled and u.base_bat * 2.) or u.base_bat * 0.5
-        end
 
         local function toggle(pid, caster)
             local cooldown = 3.
@@ -47,8 +33,14 @@ OnInit.final("MarksmanSpells", function(Require)
         function thistype:onCast()
             toggle(self.pid, self.caster)
 
-            UnitAddAbility(self.caster, FourCC('Avul'))
-            TQ:callDelayed(FPS_32, delay, self)
+            local enabled = thistype.enabled[self.pid]
+            local u = Unit[self.caster]
+            u.overmovespeed = (enabled and 100) or nil
+            u.cc_percent = (enabled and u.cc_percent + 1.) or u.cc_percent - 1.
+            u.cd_percent = (enabled and u.cd_percent + 1.) or u.cd_percent - 1.
+            u.base_bat = (enabled and u.base_bat * 2.) or u.base_bat * 0.5
+            u.range = (enabled and 1150) or 650
+
             DestroyEffect(AddSpecialEffectTarget("Abilities\\Spells\\Human\\Defend\\DefendCaster.mdl", self.caster, "origin"))
         end
 
