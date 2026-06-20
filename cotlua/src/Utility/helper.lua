@@ -817,7 +817,6 @@ local similar_units = {
     [FourCC('n03T')] = FourCC('n026'), --dimensional
 
     [HERO_DARK_SAVIOR_DEMON] = HERO_DARK_SAVIOR,
-    [HERO_MARKSMAN_SNIPER] = HERO_MARKSMAN,
 }
 
 ---unifies different unit types together
@@ -1163,8 +1162,6 @@ function PlayerCleanup(pid)
         end
     end
 
-    TimerList[pid]:stopAllTimers()
-
     PLAYER_SELECTED_UNIT[pid] = nil
 
     -- cleanup bound items
@@ -1172,6 +1169,8 @@ function PlayerCleanup(pid)
 
     -- TODO: Use this more
     EVENT_ON_CLEANUP:trigger(pid)
+
+    TimerList[pid]:stopAllTimers()
 
     RemovePlayerUnits(pid)
     SetCameraLocked(pid, false)
