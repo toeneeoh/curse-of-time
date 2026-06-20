@@ -83,7 +83,6 @@ OnInit.global("Shield", function(Require)
         thistype.shieldheight = {
             HERO_ELEMENTALIST = 200,
             HERO_MARKSMAN = 220,
-            HERO_MARKSMAN_SNIPER = 220,
             HERO_ROYAL_GUARDIAN = 230,
             HERO_MASTER_ROGUE = 230,
             HERO_ASSASSIN = 230,
