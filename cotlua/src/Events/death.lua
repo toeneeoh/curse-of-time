@@ -65,31 +65,6 @@ OnInit.final("Death", function(Require)
         end
     end
 
-    ---@param pid integer
-    function DeathHandler(pid)
-        CleanupSummons(pid)
-        EVENT_GRAVE_DEATH:trigger(Hero[pid])
-
-        -- flag to avoid normal death sequence
-        if Unit[Hero[pid]].death_exception then
-            Unit[Hero[pid]].death_exception = false
-            return
-        end
-
-        -- hardcore death
-        if Profile[pid].hero.hardcore > 0 then
-            DisplayTextToPlayer(Player(pid - 1), 0, 0, "You have died on Hardcore mode, you cannot revive. However, you may -repick to begin a new character in a new character save slot.")
-
-            PlayerCleanup(pid)
-        -- softcore death
-        else
-            ChargeNetworth(Player(pid - 1), 0, 0.02, 50 * GetHeroLevel(Hero[pid]), "Dying has cost you")
-
-            RevivePlayer(pid, TOWN_CENTER_X, TOWN_CENTER_Y, 1, 1)
-            SetCamera(pid, MAIN_MAP.rect)
-        end
-    end
-
     ---@type fun(pt: PlayerTimer)
     local function grave_expire(pt)
         local pid  = pt.pid
@@ -112,7 +87,28 @@ OnInit.final("Death", function(Require)
                 Spells[itm.abil]:onCast(itm)
             -- actually died
             else
-                DeathHandler(pid)
+                CleanupSummons(pid)
+                EVENT_GRAVE_DEATH:trigger(Hero[pid])
+
+                -- flag to avoid normal death sequence
+                if Unit[Hero[pid]].death_exception then
+                    Unit[Hero[pid]].death_exception = false
+                    return
+                end
+
+                -- hardcore death
+                if Profile[pid].hero.hardcore > 0 then
+                    DisplayTextToPlayer(Player(pid - 1), 0, 0, "You have died on Hardcore mode, you cannot revive. However, you may -repick to begin a new character in a new character save slot.")
+
+                    PlayerCleanup(pid)
+                    pt.autoDestroy = false -- current timer will be destroyed already
+                -- softcore death
+                else
+                    ChargeNetworth(Player(pid - 1), 0, 0.02, 50 * GetHeroLevel(Hero[pid]), "Dying has cost you")
+
+                    RevivePlayer(pid, TOWN_CENTER_X, TOWN_CENTER_Y, 1, 1)
+                    SetCamera(pid, MAIN_MAP.rect)
+                end
             end
 
             -- cleanup
