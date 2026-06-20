@@ -51,7 +51,7 @@ OnInit.final("Commands", function(Require)
         end,
         ["-proficiency"] = function(p, pid, args)
             for i, _ in ipairs(PROF) do
-                DisplayTimedTextToPlayer(p, 0, 0, 30, TYPE_NAME[i] .. ((HasProficiency(pid, PROF[i]) and " - |cffFF0909Y|r") or " - |cff00ff33X|r"))
+                DisplayTimedTextToPlayer(p, 0, 0, 30, TYPE_NAME[i] .. ((HasProficiency(pid, PROF[i]) and " - |cff00ff33Y|r") or " - |cffFF0909X|r"))
             end
         end,
         ["-tome"] = function(p, pid, args)
