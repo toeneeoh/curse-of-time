@@ -50,7 +50,6 @@ OnInit.global("Variables", function()
     HERO_WARRIOR                       = FourCC('H012')
     HERO_DRUID                         = FourCC('O018')
     HERO_DARK_SAVIOR_DEMON             = FourCC('E01M')
-    HERO_MARKSMAN_SNIPER               = FourCC('E00F')
     HERO_VAMPIRE                       = FourCC('U003')
     HERO_TOTAL                         = 19
     SUMMON_DESTROYER                   = FourCC('E014')
@@ -482,7 +481,7 @@ OnInit.global("Variables", function()
         int_gain     = 0.5,
         main         = "agi",
         range        = "650",
-        skills       = {"A049", "A06I", "A06U", "A05D", "A0J4", "A06V"},
+        skills       = {"A002", "A06I", "A06U", "A05D", "A0J4", "A06V"},
         stars        = {0, 3, 2, 0, 0}
         },
         [HERO_PHOENIX_RANGER] = {
