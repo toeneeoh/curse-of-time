@@ -303,6 +303,13 @@ OnInit.final("UnitTable", function(Require)
                     BlzFrameSetVisible(HIDE_HEALTH_FRAME, val)
                 end
             end,
+            range = function(tbl, val)
+                local current_range = BlzGetUnitWeaponRealField(tbl.unit, UNIT_WEAPON_RF_ATTACK_RANGE, 0) -- index is correct, returned range is correct.
+                local current_range_second = BlzGetUnitWeaponRealField(tbl.unit, UNIT_WEAPON_RF_ATTACK_RANGE, 1) -- yes, we should get the 2nd attack range and count it too
+                BlzSetUnitWeaponRealField(tbl.unit, UNIT_WEAPON_RF_ATTACK_RANGE, 1, val - current_range + current_range_second)
+                rawset(tbl.proxy, "range", val)
+                BlzSetUnitRealField(tbl.unit, UNIT_RF_ACQUISITION_RANGE, val + 50)
+            end,
         }
 
         local mt = {
