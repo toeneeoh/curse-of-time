@@ -146,8 +146,8 @@ OnInit.final("Quests", function(Require)
                     PingMinimap(12577, -15801, 4)
                     PingMinimap(15645, -12309, 4)
 
-                    --orc setup
-                    SetUnitPosition(kroresh, 14500, -15200)
+                    -- orc setup
+                    SetUnitPosition(kroresh, 16100, -16050)
                     BlzSetUnitFacingEx(kroresh, 135.)
                     UnitAddAbility(kroresh, FourCC('Avul'))
 
