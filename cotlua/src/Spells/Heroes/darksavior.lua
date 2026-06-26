@@ -4,26 +4,6 @@ OnInit.final("DarkSaviorSpells", function(Require)
 
     local TQ = TimerQueue
 
-    ---@class SOULSTEAL : Spell
-    SOULSTEAL = Spell.define("A08Z")
-    do
-        local thistype = SOULSTEAL
-
-        local function on_death(pid, killed, killer)
-            local U = User.first
-            while U do
-                if UnitAlive(Hero[U.id]) and IsUnitInRange(Hero[U.id], killed, 1000. * LBOOST[U.id]) and GetUnitAbilityLevel(Hero[U.id], thistype.id) > 0 then
-                    HP(Hero[U.id], Hero[U.id], BlzGetUnitMaxHP(Hero[U.id]) * 0.04, thistype.tag)
-                    MP(Hero[U.id], BlzGetUnitMaxMana(Hero[U.id]) * 0.04)
-                end
-                U = U.next
-            end
-        end
-
-        EVENT_ON_DEATH:register_action(BOSS_ID, on_death)
-        EVENT_ON_DEATH:register_action(CREEP_ID, on_death)
-    end
-
     ---@class DARKSEAL : Spell
     ---@field dur number
     DARKSEAL = Spell.define("A0GO")
@@ -51,6 +31,23 @@ OnInit.final("DarkSaviorSpells", function(Require)
 
         function thistype.onLearn(source, ablev, pid)
             EVENT_STAT_CHANGE:register_unit_action(source, manacost)
+        end
+    end
+
+    ---@class DARKBLADE : Spell
+    ---@field dmg function
+    ---@field cost function
+    DARKBLADE = Spell.define("A013")
+    do
+        local thistype = DARKBLADE
+
+        thistype.values = {
+            dmg = function(pid) return 1.5 * GetHeroInt(Hero[pid], true) end,
+            dur = function(pid) return 10. end,
+        }
+
+        function thistype:onCast()
+            DarkBladeBuff:add(self.caster, self.caster):duration(self.dur * LBOOST[self.pid])
         end
     end
 
@@ -216,57 +213,62 @@ OnInit.final("DarkSaviorSpells", function(Require)
         end
     end
 
-    ---@class DARKBLADE : Spell
-    ---@field dmg function
-    ---@field cost function
-    DARKBLADE = Spell.define("AEim")
+    ---@class DARKSHIELD : Spell
+    DARKSHIELD = Spell.define("A00A")
     do
-        local thistype = DARKBLADE
+        local thistype = DARKSHIELD
 
         thistype.values = {
-            dmg = function(pid) local ablev = GetUnitAbilityLevel(Hero[pid], thistype.id) return (0.6 + 0.1 * ablev) * GetHeroInt(Hero[pid], true) end,
         }
 
-        local function on_hit(source, target)
-            if GetUnitAbilityLevel(source, FourCC('B01A')) > 0 then
-                local pid = GetPlayerId(GetOwningPlayer(source)) + 1
-                local maxmp = BlzGetUnitMaxMana(source)
-                local pmana = GetUnitState(source, UNIT_STATE_MANA) / maxmp * 100.
-                local pgain = (MetamorphosisBuff:has(source, source) and 0.5) or -1.0
+        local function on_order(source, target, id)
+            if id == ORDER_ID_MANA_SHIELD and GetUnitAbilityLevel(source, thistype.id) > 0 then
+                UnitDisableAbility(source, thistype.id, true)
+                UnitDisableAbility(source, thistype.id, false)
+                BlzStartUnitAbilityCooldown(source, thistype.id, 2.)
 
-                if pmana >= 0.5 or pgain > 0 then
-                    SetUnitState(source, UNIT_STATE_MANA, (pmana + pgain) * maxmp * 0.01)
-                    DamageTarget(source, target, thistype.dmg(pid) * BOOST[pid], ATTACK_TYPE_NORMAL, MAGIC, thistype.tag)
+                local buff = DarkShieldBuff:get(nil, source)
+
+                if buff then
+                    DarkShieldBuff:dispel(nil, source)
+                    if GetLocalPlayer() == GetOwningPlayer(source) then
+                        BlzSetAbilityIcon(thistype.id, "ReplaceableTextures\\CommandButtons\\BTNShieldOfDark.dds")
+                    end
                 else
-                    IssueImmediateOrder(source, "unimmolation")
+                    DarkShieldBuff:add(source, source)
+                    if GetLocalPlayer() == GetOwningPlayer(source) then
+                        BlzSetAbilityIcon(thistype.id, "ReplaceableTextures\\CommandButtons\\BTNShieldOfDarkOn.dds")
+                    end
                 end
             end
         end
 
-        function thistype.onLearn(source, ablev, pid)
-            EVENT_ON_HIT:register_unit_action(source, on_hit)
+        function thistype.onLearn(source)
+            EVENT_ON_ORDER:register_unit_action(source, on_order)
         end
     end
 
-    ---@class METAMORPHOSIS : Spell
+    ---@class DARKASCENSION : Spell
     ---@field dur function
-    METAMORPHOSIS = Spell.define("A02S")
+    DARKASCENSION = Spell.define("A00C")
     do
-        local thistype = METAMORPHOSIS
+        local thistype = DARKASCENSION
 
         thistype.values = {
             dur = function(pid) local ablev = GetUnitAbilityLevel(Hero[pid], thistype.id) return 5. + 5. * ablev end,
         }
 
-        function thistype.preCast(pid, tpid, caster, target, x, y, targetX, targetY)
-            local ablev = GetUnitAbilityLevel(caster, thistype.id)
-            BlzSetAbilityRealLevelField(BlzGetUnitAbility(caster, METAMORPHOSIS.id), ABILITY_RLF_DURATION_HERO, ablev - 1, thistype.dur(pid) * LBOOST[pid])
+        local function delay(self)
+            DarkAscensionBuff:add(self.caster, self.caster):duration(self.dur * LBOOST[self.pid])
+        end
+
+        function thistype.preCast(pid, tpid, caster)
+            DestroyEffect(AddSpecialEffectTarget("Blood Wing.mdx", caster, "chest"))
+            SoundHandler("Units\\NightElf\\HeroDemonHunter\\DemonHunterMorph1.flac", true, nil, caster)
         end
 
         function thistype:onCast()
-            if GetUnitTypeId(self.caster) == HERO_DARK_SAVIOR then
-                MetamorphosisBuff:add(self.caster, self.caster):duration(self.dur * LBOOST[self.pid])
-            end
+            TQ:callDelayed(0.5, delay, self)
         end
     end
 end, Debug and Debug.getLine())
