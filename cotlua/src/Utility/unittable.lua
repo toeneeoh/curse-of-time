@@ -457,6 +457,78 @@ OnInit.final("UnitTable", function(Require)
             end
         end
 
+        function Unit:addEffect(model, attachPoint, attachPointAlternate)
+            self.effects = self.effects or {}
+
+            local data = {
+                model = model,
+                attach = attachPoint,
+                effect = AddSpecialEffectTarget(model, self.unit, self.morphed and attachPointAlternate or attachPoint),
+                attach_alternate = attachPointAlternate,
+                morphed = false
+            }
+
+            self.effects[#self.effects + 1] = data
+
+            return data
+        end
+
+        function Unit:destroyEffects()
+            if not self.effects then
+                return
+            end
+
+            for _, sfx in ipairs(self.effects) do
+                if sfx.effect then
+                    DestroyEffect(sfx.effect)
+                    sfx.effect = nil
+                end
+            end
+        end
+
+        function Unit:applyEffects()
+            if not self.effects then
+                return
+            end
+
+            for _, sfx in ipairs(self.effects) do
+                if not sfx.effect then
+                    local effect = self.morphed and sfx.attach_alternate or sfx.attach
+                    sfx.effect = AddSpecialEffectTarget(sfx.model, self.unit, effect)
+                end
+            end
+        end
+
+        function Unit:removeEffect(entry)
+            local effects = self.effects
+
+            if not effects then
+                return
+            end
+
+            if entry.effect then
+                DestroyEffect(entry.effect)
+                entry.effect = nil
+            end
+
+            for i = 1, #effects do
+                if effects[i] == entry then
+                    effects[i] = effects[#effects]
+                    effects[#effects] = nil
+                    break
+                end
+            end
+        end
+
+        function Unit:morph(skin)
+            self:destroyEffects()
+
+            BlzSetUnitSkin(self.unit, skin)
+            self.morphed = not self.morphed
+
+            TQ:callDelayed(0., Unit.applyEffects, self)
+        end
+
         function thistype:destroy()
             if self.taunted then
                 DestroyGroup(self.taunted)
