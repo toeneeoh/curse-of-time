@@ -91,7 +91,6 @@ OnInit.final("Damage", function(Require)
     local blz_get_event_damage_target = BlzGetEventDamageTarget
     local get_event_damage = GetEventDamage
     local blz_get_event_damage_type = BlzGetEventDamageType
-    local get_player_id = GetPlayerId
     local get_owning_player = GetOwningPlayer
     local blz_set_event_damage = BlzSetEventDamage
 
@@ -119,8 +118,6 @@ OnInit.final("Damage", function(Require)
         local target      = blz_get_event_damage_target()
         local amount      = { value = get_event_damage() }
         local damage_type = blz_get_event_damage_type()
-        local pid         = get_player_id(get_owning_player(source)) + 1
-        local tpid        = get_player_id(get_owning_player(target)) + 1
         local crit        = 1.
         local tag         = GetDamageTag()
         local source_tbl  = Unit[source]
