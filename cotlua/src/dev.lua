@@ -912,7 +912,16 @@ modifiers:
     local setup = function(x, y)
         local pid = 1
         local p = Player(0)
-        dev_cmds["go"](p, pid, {"go", "warrior"})
+
+        if not Profile[pid] then
+            Profile[pid] = Profile.create(pid)
+            Profile[pid].brand_new = true
+            Profile[pid].new_char = true
+
+            SetupDefaultHotkeys(pid)
+        end
+
+        dev_cmds["go"](p, pid, {"go", "dark savior"})
 
         SetUnitXBounded(Hero[pid], x)
         SetUnitYBounded(Hero[pid], y)
@@ -920,6 +929,6 @@ modifiers:
     end
 
     --- start somewhere
-    TimerQueue:callDelayed(0.5, setup, 0, 0)
+    TimerQueue:callDelayed(1., setup, 0, 0)
 
 end, Debug and Debug.getLine())
