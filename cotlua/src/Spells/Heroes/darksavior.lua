@@ -231,14 +231,8 @@ OnInit.final("DarkSaviorSpells", function(Require)
 
                 if buff then
                     DarkShieldBuff:dispel(nil, source)
-                    if GetLocalPlayer() == GetOwningPlayer(source) then
-                        BlzSetAbilityIcon(thistype.id, "ReplaceableTextures\\CommandButtons\\BTNShieldOfDark.dds")
-                    end
                 else
                     DarkShieldBuff:add(source, source)
-                    if GetLocalPlayer() == GetOwningPlayer(source) then
-                        BlzSetAbilityIcon(thistype.id, "ReplaceableTextures\\CommandButtons\\BTNShieldOfDarkOn.dds")
-                    end
                 end
             end
         end

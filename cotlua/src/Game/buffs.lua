@@ -3103,6 +3103,10 @@ OnInit.global("Buffs", function(Require)
 
             u:removeEffect(self.sfx)
 
+            if GetLocalPlayer() == u.owner then
+                BlzSetAbilityIcon(DARKSHIELD.id, "ReplaceableTextures\\CommandButtons\\BTNShieldOfDark.dds")
+            end
+
             u.dr = u.dr / self.dr
 
             EVENT_ON_STRUCK_FINAL:unregister_unit_action(self.target, on_struck)
@@ -3115,6 +3119,10 @@ OnInit.global("Buffs", function(Require)
             self.sfx = u:addEffect("DarkShield2.mdx", "right hand", "left hand")
 
             u.dr = u.dr * self.dr
+
+            if GetLocalPlayer() == u.owner then
+                BlzSetAbilityIcon(DARKSHIELD.id, "ReplaceableTextures\\CommandButtons\\BTNShieldOfDarkOn.dds")
+            end
 
             EVENT_ON_STRUCK_FINAL:register_unit_action(self.target, on_struck)
         end
