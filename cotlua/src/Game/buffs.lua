@@ -2946,30 +2946,177 @@ OnInit.global("Buffs", function(Require)
         end
     end
 
-    ---@class MetamorphosisBuff : Buff
-    MetamorphosisBuff = Buff.new()
+    ---@class DarkAscensionBuff : Buff
+    DarkAscensionBuff = Buff.new()
     do
-        local thistype = MetamorphosisBuff
-        thistype.NAME            = "Metamorphosis"
-        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNMetamorphasis3.blp"
-        thistype.DESC            = "This unit has $range attack range, splash attacks, !$bat base attack time, and +^#dm% total damage"
+        local thistype = DarkAscensionBuff
+        thistype.NAME            = "Dark Ascension"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNhelmofdomination.blp"
+        thistype.DESC            = "This unit has splash attacks, !$bat base attack time, and +^#dm% total damage"
         thistype.DISPEL_TYPE     = BUFF_POSITIVE
         thistype.STACK_TYPE      = BUFF_STACK_NONE
 
+        local DB = DARKBLADE
+
+        local function damage(target, source, _, amount)
+            DamageTarget(source, target, amount, ATTACK_TYPE_NORMAL, PHYSICAL, DARKASCENSION.tag)
+        end
+
+        local function valid_target(object, self, orig_target)
+            if type(self) == "table" then
+                self = self.owner
+            else
+                self = GetOwningPlayer(self)
+            end
+
+            return UnitAlive(object) and IsUnitEnemy(object, self) and object ~= orig_target
+        end
+
+        local function on_hit(source, orig_target, amount_ref)
+            ALICE_ForAllObjectsInRangeDo(damage, GetUnitX(orig_target), GetUnitY(orig_target), 300., "unit", valid_target, source, orig_target, amount_ref.value)
+        end
+
         function thistype:onRemove()
-            Unit[self.target].dm = Unit[self.target].dm / self.dm
-            Unit[self.target].base_bat = 2.222
+            local u = Unit[self.target]
+
+            u:morph(HERO_DARK_SAVIOR)
+            u.dm = u.dm / self.dm
+            u.base_bat = 2.0
+
+            UnitDisableAbility(self.target, DB.id, false)
+
+            EVENT_ON_HIT_MULTIPLIER:unregister_unit_action(self.target, on_hit)
         end
 
         function thistype:onApply()
-            self.range = 900
-            self.bat = 0.8
+            self.bat = 1.0
             local hp = GetWidgetLife(self.target) * 0.5 ---@type number 
+            local u = Unit[self.target]
 
+            u:morph(HERO_DARK_SAVIOR_DEMON)
             SetWidgetLife(self.target, hp)
             self.dm = 1 + math.max(0.01, hp / (BlzGetUnitMaxHP(self.target) * 1.))
-            Unit[self.target].dm = Unit[self.target].dm * self.dm
-            Unit[self.target].base_bat = self.bat
+            u.dm = u.dm * self.dm
+            u.base_bat = self.bat
+
+            UnitDisableAbility(self.target, DB.id, true)
+            BlzUnitHideAbility(self.target, DB.id, false)
+            DarkBladeBuff:add(self.target, self.target):duration(DARKASCENSION.dur(self.pid) * LBOOST[self.pid])
+
+            -- splash attack
+            EVENT_ON_HIT_MULTIPLIER:register_unit_action(self.target, on_hit)
+        end
+    end
+
+    ---@class DarkBladeBuff : Buff
+    DarkBladeBuff = Buff.new()
+    do
+        local thistype = DarkBladeBuff
+        thistype.NAME            = "Dark Blade"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNSoulBlade.blp"
+        thistype.DESC            = "This unit deals $int extra magic damage, restores !$maxmana% max mana on attacks, and has +$str strength"
+        thistype.DISPEL_TYPE     = BUFF_POSITIVE
+        thistype.STACK_TYPE      = BUFF_STACK_NONE
+
+        local DB = DARKBLADE
+        local GetWidgetLife, SetWidgetLife, SetUnitState, GetUnitState, BlzGetUnitMaxMana = GetWidgetLife, SetWidgetLife, SetUnitState, GetUnitState, BlzGetUnitMaxMana
+        local GetHeroStr, DamageTarget, UnitRefreshBuff = GetHeroStr, DamageTarget, UnitRefreshBuff
+
+        local function on_hit(source, target)
+            local maxmp = BlzGetUnitMaxMana(source)
+            local buff = thistype:get(nil, source)
+            local u = Unit[source]
+
+            if buff then
+                local prev_hp = GetWidgetLife(source)
+                u.bonus_str = u.bonus_str - buff.str
+                buff.charges = buff.charges + 1
+                local bonus = GetHeroStr(source, true) * 0.02
+                buff.str = buff.charges * bonus
+                u.bonus_str = u.bonus_str + buff.str
+                -- "heal"
+                SetWidgetLife(source, prev_hp + bonus * 25)
+
+                UnitRefreshBuff(source, buff)
+            end
+
+            SetUnitState(source, UNIT_STATE_MANA, GetUnitState(source, UNIT_STATE_MANA) + maxmp * 0.005)
+            DamageTarget(source, target, DB.dmg(u.pid) * BOOST[u.pid], ATTACK_TYPE_NORMAL, MAGIC, DB.tag)
+        end
+
+        function thistype:onRemove()
+            local u = Unit[self.target]
+            u:removeEffect(self.sfx)
+            TQ:disableCallback(self.timer)
+
+            -- keep health gains
+            local hp = GetWidgetLife(self.target)
+            u.bonus_str = u.bonus_str - self.str
+            SetWidgetLife(self.target, hp)
+
+            EVENT_ON_HIT:unregister_unit_action(self.target, on_hit)
+        end
+
+        local function periodic(self)
+            self.int = DB.dmg(self.pid)
+
+            self.timer = TQ:callDelayed(1., periodic, self)
+
+            UnitRefreshBuff(self.target, self)
+        end
+
+        function thistype:onApply()
+            self.int = DB.dmg(self.pid)
+            self.maxmana = 0.5
+            self.str = 0
+            self.charges = 0
+
+            self.timer = TQ:callDelayed(1., periodic, self)
+            self.sfx = Unit[self.target]:addEffect("DarkSword.mdx", "weapon")
+
+            EVENT_ON_HIT:register_unit_action(self.target, on_hit)
+        end
+    end
+
+    ---@class DarkShieldBuff : Buff
+    DarkShieldBuff = Buff.new()
+    do
+        local thistype = DarkShieldBuff
+        thistype.NAME            = "Dark Shield"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNShieldOfDarkOn.dds"
+        thistype.DESC            = "This unit has +^#dr% damage resist and drains |cffffcc002|r mana per |cffffcc001|r damage taken"
+        thistype.DISPEL_TYPE     = BUFF_POSITIVE
+        thistype.STACK_TYPE      = BUFF_STACK_NONE
+
+        local function on_struck(target, source, amount, amount_after_red, damage_type)
+            local mana = GetUnitState(target, UNIT_STATE_MANA) - amount_after_red * 2
+
+            SetUnitState(target, UNIT_STATE_MANA, math.max(0, mana))
+
+            if mana < 2 then
+                thistype:dispel(nil, target)
+            end
+        end
+
+        function thistype:onRemove()
+            local u = Unit[self.target]
+
+            u:removeEffect(self.sfx)
+
+            u.dr = u.dr / self.dr
+
+            EVENT_ON_STRUCK_FINAL:unregister_unit_action(self.target, on_struck)
+        end
+
+        function thistype:onApply()
+            local u = Unit[self.target]
+
+            self.dr = (0.45 - 0.05 * self.ablev)
+            self.sfx = u:addEffect("DarkShield2.mdx", "right hand", "left hand")
+
+            u.dr = u.dr * self.dr
+
+            EVENT_ON_STRUCK_FINAL:register_unit_action(self.target, on_struck)
         end
     end
 
