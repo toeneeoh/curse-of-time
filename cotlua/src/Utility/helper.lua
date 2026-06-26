@@ -815,8 +815,6 @@ local similar_units = {
     [FourCC('n01X')] = FourCC('n03J'), --existence
     [FourCC('n01V')] = FourCC('n03M'), --astral
     [FourCC('n03T')] = FourCC('n026'), --dimensional
-
-    [HERO_DARK_SAVIOR_DEMON] = HERO_DARK_SAVIOR,
 }
 
 ---unifies different unit types together
@@ -1561,37 +1559,26 @@ function LineContainsRect(x, y, x2, y2, minX, minY, maxX, maxY)
     return (leftSide ~= nil or rightSide ~= nil or bottomSide ~= nil or topSide ~= nil)
 end
 
----@param u unit
----@return boolean
-function InCombat(u)
-    local ug = CreateGroup()
-
-    GroupEnumUnitsInRange(ug, GetUnitX(u), GetUnitY(u), 900., Condition(ishostile))
-
-    for target in each(ug) do
-        if Unit[target].target == u then
-            DestroyGroup(ug)
-            return true
-        end
-    end
-
-    DestroyGroup(ug)
-    return false
-end
-
 ---@param pid integer
 function ToggleAutoAttack(pid)
+    local u = Unit[Hero[pid]]
+
     if IS_AUTO_ATTACK_OFF[pid] then
         IS_AUTO_ATTACK_OFF[pid] = false
-        DisplayTimedTextToPlayer(Player(pid - 1), 0, 0, 10, "Toggled Auto Attacking on.")
-        if Unit[Hero[pid]].can_attack then
-            BlzSetUnitWeaponBooleanField(Hero[pid], UNIT_WEAPON_BF_ATTACKS_ENABLED, 0, true)
-        end
+        DisplayTimedTextToPlayer(u.owner, 0, 0, 10, "Toggled Auto Attacking on.")
     else
         IS_AUTO_ATTACK_OFF[pid] = true
-        DisplayTimedTextToPlayer(Player(pid - 1), 0, 0, 10, "Toggled Auto Attacking off.")
-        BlzSetUnitWeaponBooleanField(Hero[pid], UNIT_WEAPON_BF_ATTACKS_ENABLED, 0, false)
+        DisplayTimedTextToPlayer(u.owner, 0, 0, 10, "Toggled Auto Attacking off.")
     end
+end
+
+function ToggleTaunting(pid)
+    if IS_TAUNT_DISABLED[pid] then
+        DisplayTimedTextToForce(FORCE_PLAYING, 10, User[pid].nameColored + " toggled their taunts on.")
+    else
+        DisplayTimedTextToForce(FORCE_PLAYING, 10, User[pid].nameColored + " toggled their taunts off.")
+    end
+    IS_TAUNT_DISABLED[pid] = not IS_TAUNT_DISABLED[pid]
 end
 
 local VALID_TREES = {
@@ -2654,8 +2641,13 @@ end
 
 ---@type fun(hero: unit, aoe: number)
 function Taunt(hero, aoe)
-    local ug = CreateGroup()
     local pid = GetPlayerId(GetOwningPlayer(hero)) + 1
+
+    if IS_TAUNT_DISABLED[pid] then
+        return
+    end
+
+    local ug = CreateGroup()
 
     MakeGroupInRange(pid, ug, GetUnitX(hero), GetUnitY(hero), aoe, Condition(FilterEnemy))
 
