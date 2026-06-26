@@ -228,7 +228,7 @@ OnInit.global("Variables", function()
         int_gain     = 2.5,
         main         = "int",
         range        = "Melee",
-        skills       = {"A0GO", "A08Z", "A019", "A074", "AEim", "A02S"},
+        skills       = {"A0GO", "A08Z", "A019", "A074", "A013", "A00C"},
         stars        = {1, 3, 3, 1, 1}
         },
         [HERO_CRUSADER] = {
