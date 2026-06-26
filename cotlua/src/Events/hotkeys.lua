@@ -173,6 +173,12 @@ OnInit.final("Hotkeys", function(Require)
         end
     end
 
+    local function toggle_taunt(pid, is_down)
+        if is_down then
+            ToggleTaunting(pid)
+        end
+    end
+
     local function clear_text(pid, is_down)
         if is_down then
             if Player(pid - 1) == GetLocalPlayer() then
@@ -350,6 +356,10 @@ OnInit.final("Hotkeys", function(Require)
             func = toggle_auto_attack,
         },
         {
+            name = "Toggle Ability Taunt",
+            func = toggle_taunt,
+        },
+        {
             name = "View Inventory",
             func = open_inventory,
         },
@@ -440,6 +450,7 @@ OnInit.final("Hotkeys", function(Require)
         register_key_binding(pid, 'ESC', clear_text)
         register_key_binding(pid, 'W', second_spell_special_cast)
         register_key_binding(pid, 'CTRL+A', toggle_auto_attack)
+        register_key_binding(pid, 'CTRL+T', toggle_taunt)
 
         for _, v in ipairs(default_extension) do
             register_key_binding(pid, v.default, v.func)
