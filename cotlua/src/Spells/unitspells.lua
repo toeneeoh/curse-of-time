@@ -1636,9 +1636,9 @@ OnInit.final("UnitSpells", function(Require)
         end
     end
 
-    local METAMORPHOSIS = Spell.define("A065")
+    local DARKASCENSION = Spell.define("A065")
     do
-        local thistype = METAMORPHOSIS
+        local thistype = DARKASCENSION
 
         local function onStruck(target, source)
             if GetWidgetLife(target) < BlzGetUnitMaxHP(target) * 0.5 then
