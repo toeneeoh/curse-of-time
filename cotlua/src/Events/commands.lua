@@ -17,6 +17,7 @@ OnInit.final("Commands", function(Require)
 
     IS_AUTO_ATTACK_OFF = {} ---@type boolean[] 
     IS_BASE_DESTROYED  = {} ---@type boolean[] 
+    IS_TAUNT_DISABLED  = {} ---@type boolean[]
 
     local VOTING_TYPE = 0
     local I_VOTED     = {} ---@type boolean[] 
