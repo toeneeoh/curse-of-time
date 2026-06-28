@@ -14,6 +14,21 @@ OnInit.final("Timers", function(Require)
     Require('Buffs')
     Require('Frames')
 
+    local TQ = TimerQueue
+    local GetRandomInt, DisplayTimedTextToForce = GetRandomInt, DisplayTimedTextToForce
+    local SetCameraField, SetCameraQuickPosition = SetCameraField, SetCameraQuickPosition
+    local GetPlayerId, GetLocalPlayer = GetPlayerId, GetLocalPlayer
+    local GetUnitX, GetUnitY = GetUnitX, GetUnitY
+    local GetWidgetLife, SetWidgetLife = GetWidgetLife, SetWidgetLife
+    local GetUnitState, SetUnitState = GetUnitState, SetUnitState
+    local BlzGetUnitMaxHP, BlzGetUnitMaxMana = BlzGetUnitMaxHP, BlzGetUnitMaxMana
+    local AddSpecialEffectTarget, DestroyEffect = AddSpecialEffectTarget, DestroyEffect
+
+    local User, Profile, Hero, Backpack, Unit = User, Profile, Hero, Backpack, Unit
+    local BOOST, LBOOST, ZOOM = BOOST, LBOOST, ZOOM
+    local UNIT_STATE_MANA, UNIT_STATE_MAX_MANA = UNIT_STATE_MANA, UNIT_STATE_MAX_MANA
+    local CAMERA_FIELD_TARGET_DISTANCE = CAMERA_FIELD_TARGET_DISTANCE
+
     local function DisplayHint()
         local rand = GetRandomInt(2, #HINT_TOOLTIP) ---@type integer 
 
@@ -41,9 +56,7 @@ OnInit.final("Timers", function(Require)
     local zoom = ZOOM
 
     function SetCameraLocked(pid, lock)
-        if not is_camera_locked[pid] then
-            is_camera_locked[pid] = lock
-        end
+        is_camera_locked[pid] = lock
     end
 
     local function Periodic()
@@ -70,16 +83,19 @@ OnInit.final("Timers", function(Require)
     end
 
     local fountain = function(u)
-        local hp, mp = GetWidgetLife(u), GetUnitState(u, UNIT_STATE_MANA)
+        local maxhp = BlzGetUnitMaxHP(u)
+        local maxmp = BlzGetUnitMaxMana(u)
+        local hp = GetWidgetLife(u)
+        local mp = GetUnitState(u, UNIT_STATE_MANA)
 
-        if hp < BlzGetUnitMaxHP(u) * 0.99 then
+        if hp < maxhp * 0.99 then
             DestroyEffect(AddSpecialEffectTarget("Abilities\\Spells\\Undead\\VampiricAura\\VampiricAuraTarget.mdl", u, "origin"))
-            SetWidgetLife(u, hp + BlzGetUnitMaxHP(u))
+            SetWidgetLife(u, hp + maxhp)
         end
 
-        if mp < BlzGetUnitMaxMana(u) * 0.99 and Unit[u].nomanaregen == false then
+        if mp < maxmp * 0.99 and Unit[u].nomanaregen == false then
             DestroyEffect(AddSpecialEffectTarget("Abilities\\Spells\\Items\\AIma\\AImaTarget.mdl", u, "origin"))
-            SetUnitState(u, UNIT_STATE_MANA, mp + BlzGetUnitMaxMana(u))
+            SetUnitState(u, UNIT_STATE_MANA, mp + maxmp)
         end
     end
 
@@ -87,26 +103,31 @@ OnInit.final("Timers", function(Require)
         local U = User.first
 
         while U do
-            if Profile[U.id] and Profile[U.id].playing then
-                local hero = Hero[U.id]
+            local uid = U.id
+            local profile = Profile[uid]
+
+            if profile and profile.playing then
+                local hero = Hero[uid]
+                local unit = Unit[hero]
+                local backpack = Backpack[uid]
                 local x, y = GetUnitX(hero), GetUnitY(hero)
 
                 -- update boost variance every second
-                BOOST[U.id] = 1. + Unit[hero].spellboost + GetRandomReal(-0.2, 0.2)
-                LBOOST[U.id] = 1. + 0.5 * Unit[hero].spellboost
+                BOOST[uid] = 1. + unit.spellboost + SpellboostVariance()
+                LBOOST[uid] = 1. + 0.5 * unit.spellboost
 
                 -- keep track of hero positions
-                Unit[hero].proxy.x = x
-                Unit[hero].proxy.y = y
+                unit.proxy.x = x
+                unit.proxy.y = y
 
                 local hp = GetWidgetLife(hero) / BlzGetUnitMaxHP(hero)
 
                 -- backpack hp/mp percentage and movespeed
                 if hp >= 0.01 then
-                    SetWidgetLife(Backpack[U.id], BlzGetUnitMaxHP(Backpack[U.id]) * hp)
+                    SetWidgetLife(backpack, BlzGetUnitMaxHP(backpack) * hp)
+
                     local mp = GetUnitState(hero, UNIT_STATE_MANA) / GetUnitState(hero, UNIT_STATE_MAX_MANA)
-                    SetUnitState(Backpack[U.id], UNIT_STATE_MANA, GetUnitState(Backpack[U.id], UNIT_STATE_MAX_MANA) * mp)
-                    --SetUnitMoveSpeed(Backpack[U.id], Unit[hero].ms_flat * Unit[hero].ms_percent)
+                    SetUnitState(backpack, UNIT_STATE_MANA, GetUnitState(backpack, UNIT_STATE_MAX_MANA) * mp)
                 end
             end
 
@@ -125,10 +146,10 @@ OnInit.final("Timers", function(Require)
         RefreshHeroes()
     end
 
-    TimerQueue:callPeriodically(0.35, nil, Periodic)
-    TimerQueue:callPeriodically(1.0, nil, OneSecond)
-    TimerQueue:callPeriodically(60., nil, OneMinute)
-    TimerQueue:callPeriodically(240., nil, DisplayHint)
+    TQ:callPeriodically(0.35, nil, Periodic)
+    TQ:callPeriodically(1.0, nil, OneSecond)
+    TQ:callPeriodically(60., nil, OneMinute)
+    TQ:callPeriodically(240., nil, DisplayHint)
 
-    HUNT_TIMER = TimerQueue:callDelayed(2040. - (User.AmountPlaying * 240), ShadowStepExpire)
+    HUNT_TIMER = TQ:callDelayed(2040. - (User.AmountPlaying * 240), ShadowStepExpire)
 end, Debug and Debug.getLine())
