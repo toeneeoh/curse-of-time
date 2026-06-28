@@ -313,15 +313,14 @@ OnInit.final("ElementalistSpells", function(Require)
 
         local function on_expire(source)
             local pid = GetPlayerId(GetOwningPlayer(source)) + 1
-            DestroyEffect(thistype.sfx[pid])
+            Unit[source]:removeEffect(thistype.sfx[pid])
             EVENT_ON_SHIELD_EXPIRE:unregister_unit_action(source, on_expire)
         end
 
         function thistype:onCast()
             DestroyEffect(thistype.sfx[self.pid])
-            thistype.sfx[self.pid] = AddSpecialEffectTarget("war3mapImported\\Archnathid Armor.mdx", self.caster, "chest")
-
-            BlzSetSpecialEffectColor(thistype.sfx[self.pid], 160, 255, 160)
+            thistype.sfx[self.pid] = Unit[self.caster]:addEffect("war3mapImported\\Archnathid Armor.mdx", "chest")
+            thistype.sfx[self.pid].color = {160, 255, 160}
 
             if masterElement[self.pid] == ELEMENTEARTH.value then -- earth element bonus
                 Shield.add(self.caster, self.shield * 2.5 * BOOST[self.pid], 31.)
