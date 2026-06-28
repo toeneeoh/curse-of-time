@@ -9,13 +9,14 @@ OnInit.global("Helper", function(Require)
     Require('TimerQueue')
 
     local TQ = TimerQueue
-
-    local floor    = math.floor
-    local tostring = tostring
-    local sub      = string.sub
-    local concat   = table.concat
-    local pack = string.pack
     local FPS_32 = FPS_32
+    local floor, fmod, sin, cos, min, max, random = math.floor, math.fmod, math.sin, math.cos, math.min, math.max, math.random
+    local tostring, type, sub, concat, pack = tostring, type, string.sub, table.concat, string.pack
+    local Player, FourCC, GetFilterUnit, GetOwningPlayer, GetUnitTypeId, UnitAlive = Player, FourCC, GetFilterUnit, GetOwningPlayer, GetUnitTypeId, UnitAlive
+    local GetUnitX, GetUnitY, BlzGetUnitMaxHP, IsUnitAlly, GetUnitAbilityLevel, GetLocalPlayer = GetUnitX, GetUnitY, BlzGetUnitMaxHP, IsUnitAlly, GetUnitAbilityLevel, GetLocalPlayer
+    local CreateTextTag, SetTextTagPermanent, SetTextTagColor, SetTextTagLifespan, SetTextTagFadepoint, SetTextTagText, SetTextTagPos = CreateTextTag, SetTextTagPermanent, SetTextTagColor, SetTextTagLifespan, SetTextTagFadepoint, SetTextTagText, SetTextTagPos
+    local ABIL_AVUL = ABIL_AVUL
+    local ABIL_ALOC = ABIL_ALOC
 
     ---@class CircularArrayList
     ---@field iterator function
@@ -41,7 +42,7 @@ OnInit.global("Helper", function(Require)
             return function()
                 if count < self.count then
                     local value = self.data[index]
-                    index = math.fmod(index + 1, self.MAXSIZE)
+                    index = fmod(index + 1, self.MAXSIZE)
                     count = count + 1
                     return value
                 end
@@ -65,19 +66,19 @@ OnInit.global("Helper", function(Require)
         ---@param value any
         function thistype:add(value)
             self.data[self.END] = value
-            self.END = math.fmod((self.END + 1), self.MAXSIZE)
+            self.END = fmod((self.END + 1), self.MAXSIZE)
 
             if self.count < self.MAXSIZE then
                 self.count = self.count + 1
             else
                 -- Free up the last slot
-                self.START = math.fmod((self.START + 1), self.MAXSIZE)
+                self.START = fmod((self.START + 1), self.MAXSIZE)
             end
         end
 
         local function remove(self)
             if self.count > 0 then
-                self.START = math.fmod((self.START + 1), self.MAXSIZE)
+                self.START = fmod((self.START + 1), self.MAXSIZE)
                 self.count = self.count - 1
             end
         end
@@ -204,6 +205,59 @@ function GetMainSelectedUnit(...)
     return GetMainSelectedUnit(...) --return the product of the newly-declared function.
 end
 
+-- formats a number to a string with commas (no decimals)
+---@param value number
+---@return string
+local function RealToString(value)
+    -- let Lua handle giant values directly
+    if value >= INT_32_LIMIT then
+        return tostring(value)
+    end
+
+    -- handle sign
+    local negative = false
+    if value < 0 then
+        negative = true
+        value = -value
+    end
+
+    -- round to nearest int
+    local s = tostring(floor(value + 0.5))
+    local len = #s
+
+    -- fast path: no commas needed
+    if len <= 3 then
+        return negative and ("-" .. s) or s
+    end
+
+    -- split "head" group and remaining 3-digit groups
+    local first = len % 3
+    if first == 0 then first = 3 end
+
+    local parts = {}
+    local idx = 1
+
+    -- first group (1–3 digits, no leading comma)
+    parts[idx] = sub(s, 1, first)
+    idx = idx + 1
+
+    -- remaining groups in chunks of 3 with commas
+    for i = first + 1, len, 3 do
+        parts[idx] = ","
+        parts[idx + 1] = sub(s, i, i + 2)
+        idx = idx + 2
+    end
+
+    local out = concat(parts)
+    if negative then
+        out = "-" .. out
+    end
+
+    return out
+end
+
+RealToString = RealToString
+
 --[[Damage number pop-up text]]
 do
     local SIZE_MIN                = 0.009          ---@type number -- Minimum size of text
@@ -236,7 +290,7 @@ do
 
             while i <= #instances do
                 local self = instances[i]
-                local p = math.sin(bj_PI * (self.time / self.timeScale))
+                local p = sin(bj_PI * (self.time / self.timeScale))
                 self.time = self.time - FPS_32
                 self.x = self.x + self.ac
                 self.y = self.y + self.as
@@ -262,22 +316,22 @@ do
 
             if type(text) == "number" then
                 local hp = text / BlzGetUnitMaxHP(u)
-                size = size + math.min(hp * 2., 2.)
-                duration = duration + math.min(hp, 1.25)
+                size = size + min(hp * 2., 2.)
+                duration = duration + min(hp, 1.25)
                 text = RealToString(text)
             end
 
-            local a = GetRandomReal(0, 2 * bj_PI) ---@type number 
+            local a = random() * 2 * bj_PI
             ---@diagnostic disable-next-line: missing-fields
             local self = { ---@type ArcingTextTag
                 scale = size,
-                timeScale = math.max(duration, 0.001),
+                timeScale = max(duration, 0.001),
                 text = text,
                 x = GetUnitX(u),
                 y = GetUnitY(u),
                 time = TIME_LIFE,
-                as = math.sin(a) * VELOCITY,
-                ac = math.cos(a) * VELOCITY,
+                as = sin(a) * VELOCITY,
+                ac = cos(a) * VELOCITY,
             }
 
             local pid = GetPlayerId(GetLocalPlayer()) + 1 ---@type integer 
@@ -545,7 +599,7 @@ function pickN(n, t)
     local seen = {}
     local out = {}
     while #out < n do
-        local r = math.random(1, #t)
+        local r = random(1, #t)
         if not seen[r] then
             seen[r] = true
             out[#out + 1] = t[r]
@@ -587,7 +641,7 @@ end
 ---@return integer|string, integer|nil, integer|nil
 function HealthGradient(position, returnHex)
     -- Ensure the position is within the valid range [1, 100]
-    position = math.min(100, math.max(1, position))
+    position = min(100, max(1, position))
 
     -- Define color stops and their corresponding positions
     local colorStops = {
@@ -717,7 +771,7 @@ end
 ---@return string
 function RemainingTimeString(time)
     local minutes = time // 60
-    local seconds = math.fmod(R2I(time), 60)
+    local seconds = fmod(R2I(time), 60)
 
     return (minutes > 0 and (minutes) .. " minutes") or (seconds) .. " seconds"
 end
@@ -740,7 +794,7 @@ end
 function ishostile()
     local i =GetPlayerId(GetOwningPlayer(GetFilterUnit())) ---@type integer 
 
-    return (UnitAlive(GetFilterUnit()) and GetUnitAbilityLevel(GetFilterUnit(),FourCC('Avul')) == 0 and (i ==10 or i ==11 or i ==PLAYER_NEUTRAL_AGGRESSIVE))
+    return (UnitAlive(GetFilterUnit()) and GetUnitAbilityLevel(GetFilterUnit(),ABIL_AVUL) == 0 and (i ==10 or i ==11 or i ==PLAYER_NEUTRAL_AGGRESSIVE))
 end
 
 ---@return boolean
@@ -759,7 +813,7 @@ end
 function isplayerunit()
     local u = GetFilterUnit()
 
-    return (UnitAlive(u) and GetPlayerId(GetOwningPlayer(u)) <= PLAYER_CAP and GetUnitAbilityLevel(u, FourCC('Avul')) == 0 and not IsDummy(u))
+    return (UnitAlive(u) and GetPlayerId(GetOwningPlayer(u)) <= PLAYER_CAP and GetUnitAbilityLevel(u, ABIL_AVUL) == 0 and not IsDummy(u))
 end
 
 ---@return boolean
@@ -769,7 +823,7 @@ function ishostileEnemy()
 
     return
     (UnitAlive(u) and
-    GetUnitAbilityLevel(u, FourCC('Avul')) == 0 and
+    GetUnitAbilityLevel(u, ABIL_AVUL) == 0 and
     i <= PLAYER_CAP and
     not IsDummy(u))
 end
@@ -780,7 +834,7 @@ function isalive()
 
     return
     (UnitAlive(u) and
-    GetUnitAbilityLevel(u, FourCC('Avul')) == 0
+    GetUnitAbilityLevel(u, ABIL_AVUL) == 0
     and not IsDummy(u))
 end
 
@@ -954,7 +1008,7 @@ function NearbyRect(r, x, y)
     local angle = math.atan(GetRectCenterY(r) - y, GetRectCenterX(r) - x) ---@type number 
 
     for i = 5, 50, 5 do
-        if RectContainsCoords(r, x + i * math.cos(angle), y + math.sin(angle) * i) then
+        if RectContainsCoords(r, x + i * cos(angle), y + sin(angle) * i) then
             return true
         end
     end
@@ -1323,57 +1377,6 @@ function SelectGroupedRegion(groupnumber)
     return RegionCount[GetRandomInt(lowBound, highBound - 1)]
 end
 
--- formats a number to a string with commas (no decimals)
----@param value number
----@return string
-function RealToString(value)
-    -- let Lua handle giant values directly
-    if value >= INT_32_LIMIT then
-        return tostring(value)
-    end
-
-    -- handle sign
-    local negative = false
-    if value < 0 then
-        negative = true
-        value = -value
-    end
-
-    -- round to nearest int
-    local s = tostring(floor(value + 0.5))
-    local len = #s
-
-    -- fast path: no commas needed
-    if len <= 3 then
-        return negative and ("-" .. s) or s
-    end
-
-    -- split "head" group and remaining 3-digit groups
-    local first = len % 3
-    if first == 0 then first = 3 end
-
-    local parts = {}
-    local idx = 1
-
-    -- first group (1–3 digits, no leading comma)
-    parts[idx] = sub(s, 1, first)
-    idx = idx + 1
-
-    -- remaining groups in chunks of 3 with commas
-    for i = first + 1, len, 3 do
-        parts[idx] = ","
-        parts[idx + 1] = sub(s, i, i + 2)
-        idx = idx + 2
-    end
-
-    local out = concat(parts)
-    if negative then
-        out = "-" .. out
-    end
-
-    return out
-end
-
 ---@type fun(pid: integer, prof: integer): boolean
 function HasProficiency(pid, prof)
     local id = HeroID[pid]
@@ -1574,11 +1577,18 @@ end
 
 function ToggleTaunting(pid)
     if IS_TAUNT_DISABLED[pid] then
-        DisplayTimedTextToForce(FORCE_PLAYING, 10, User[pid].nameColored + " toggled their taunts on.")
+        DisplayTimedTextToForce(FORCE_PLAYING, 10, User[pid - 1].nameColored .. " toggled their taunts on.")
     else
-        DisplayTimedTextToForce(FORCE_PLAYING, 10, User[pid].nameColored + " toggled their taunts off.")
+        DisplayTimedTextToForce(FORCE_PLAYING, 10, User[pid - 1].nameColored .. " toggled their taunts off.")
     end
     IS_TAUNT_DISABLED[pid] = not IS_TAUNT_DISABLED[pid]
+end
+
+local MAX_SPELLBOOST_VARIANCE = MAX_SPELLBOOST_VARIANCE
+local MIN_SPELLBOOST_VARIANCE = MIN_SPELLBOOST_VARIANCE
+
+function SpellboostVariance()
+    return random() * (MAX_SPELLBOOST_VARIANCE * 2) + MIN_SPELLBOOST_VARIANCE
 end
 
 local VALID_TREES = {
@@ -1805,7 +1815,7 @@ end
 function ExperienceControl(pid)
     local level = GetHeroLevel(Hero[pid]) ---@type integer 
 
-    Unit[Hero[pid]].xp_rate = math.max(0, BASE_XP_RATE[level])
+    Unit[Hero[pid]].xp_rate = max(0, BASE_XP_RATE[level])
 end
 
 ---@type fun(pid: integer, texture: string)
@@ -1830,7 +1840,7 @@ function ConversionEffect(pid)
             for j = 1, i * 4 do
                 local dist = i * 40
                 local angle = 2. * bj_PI / (i * 4) * j
-                local sfx = AddSpecialEffect("Abilities\\Spells\\Items\\ResourceItems\\ResourceEffectTarget.mdl", x + dist * math.cos(angle), y + dist * math.sin(angle))
+                local sfx = AddSpecialEffect("Abilities\\Spells\\Items\\ResourceItems\\ResourceEffectTarget.mdl", x + dist * cos(angle), y + dist * sin(angle))
                 BlzSetSpecialEffectColor(sfx, 50, 50, 255)
                 DestroyEffect(sfx)
             end
@@ -1995,9 +2005,9 @@ local function apply_fade(u, dur, fade, amount)
     amount = amount + (255 / (dur * 32))
 
     if fade then
-        SetUnitVertexColor(u, r, g, b, math.floor(math.max(255 - amount, 0)))
+        SetUnitVertexColor(u, r, g, b, math.floor(max(255 - amount, 0)))
     else
-        SetUnitVertexColor(u, r, g, b, math.floor(math.min(255, amount)))
+        SetUnitVertexColor(u, r, g, b, math.floor(min(255, amount)))
     end
 
     if amount < 255 and UnitAlive(u) then
@@ -2141,8 +2151,8 @@ end
 ---@param pid integer
 function RecallSummons(pid)
     local p = Player(pid - 1) 
-    local x = GetUnitX(Hero[pid]) + 200 * math.cos(bj_DEGTORAD * GetUnitFacing(Hero[pid])) ---@type number 
-    local y = GetUnitY(Hero[pid]) + 200 * math.sin(bj_DEGTORAD * GetUnitFacing(Hero[pid])) ---@type number 
+    local x = GetUnitX(Hero[pid]) + 200 * cos(bj_DEGTORAD * GetUnitFacing(Hero[pid])) ---@type number 
+    local y = GetUnitY(Hero[pid]) + 200 * sin(bj_DEGTORAD * GetUnitFacing(Hero[pid])) ---@type number 
 
     for i = 1, #PLAYER_SUMMONS do
         local target = PLAYER_SUMMONS[i]
@@ -2178,8 +2188,8 @@ end
 function FilterEnemyDead()
     local u = GetFilterUnit()
 
-    return GetUnitAbilityLevel(u, FourCC('Avul')) == 0 and
-    GetUnitAbilityLevel(u, FourCC('Aloc')) == 0 and
+    return GetUnitAbilityLevel(u, ABIL_AVUL) == 0 and
+    GetUnitAbilityLevel(u, ABIL_ALOC) == 0 and
     not IsDummy(u) and
     IsUnitAlly(u, Player(passedValue[#passedValue] - 1)) == false
 end
@@ -2190,8 +2200,8 @@ function FilterEnemy()
 
     return UnitAlive(u) and
     IsUnitEnemy(u, Player(passedValue[#passedValue] - 1)) and
-    GetUnitAbilityLevel(u, FourCC('Avul')) == 0 and
-    GetUnitAbilityLevel(u, FourCC('Aloc')) == 0 and
+    GetUnitAbilityLevel(u, ABIL_AVUL) == 0 and
+    GetUnitAbilityLevel(u, ABIL_ALOC) == 0 and
     not IsDummy(u)
 end
 
@@ -2202,8 +2212,8 @@ function FilterAllyHero()
     return UnitAlive(u) and
     IsUnitAlly(u, Player(passedValue[#passedValue] - 1)) == true and
     IsUnitType(u, UNIT_TYPE_HERO) == true and
-    GetUnitAbilityLevel(u, FourCC('Avul')) == 0 and
-    GetUnitAbilityLevel(u, FourCC('Aloc')) == 0 and
+    GetUnitAbilityLevel(u, ABIL_AVUL) == 0 and
+    GetUnitAbilityLevel(u, ABIL_ALOC) == 0 and
     not IsDummy(u)
 end
 
@@ -2212,8 +2222,8 @@ function FilterAlly()
     local u = GetFilterUnit()
 
     return UnitAlive(u) and
-    GetUnitAbilityLevel(u, FourCC('Avul')) == 0 and
-    GetUnitAbilityLevel(u, FourCC('Aloc')) == 0 and
+    GetUnitAbilityLevel(u, ABIL_AVUL) == 0 and
+    GetUnitAbilityLevel(u, ABIL_ALOC) == 0 and
     not IsDummy(u) and
     IsUnitAlly(u, Player(passedValue[#passedValue] - 1)) == true
 end
@@ -2223,8 +2233,8 @@ function FilterEnemyAwake()
     local u = GetFilterUnit()
 
     return UnitAlive(u) and
-    GetUnitAbilityLevel(u, FourCC('Avul')) == 0 and
-    GetUnitAbilityLevel(u, FourCC('Aloc')) == 0 and
+    GetUnitAbilityLevel(u, ABIL_AVUL) == 0 and
+    GetUnitAbilityLevel(u, ABIL_ALOC) == 0 and
     not IsDummy(u) and
     IsUnitAlly(u, Player(passedValue[#passedValue] - 1)) == false and
     UnitIsSleeping(u) == false
@@ -2235,8 +2245,8 @@ function FilterNotIllusion()
     local u = GetFilterUnit()
 
     return UnitAlive(u) and
-    GetUnitAbilityLevel(u, FourCC('Avul')) == 0 and
-    GetUnitAbilityLevel(u, FourCC('Aloc')) == 0 and
+    GetUnitAbilityLevel(u, ABIL_AVUL) == 0 and
+    GetUnitAbilityLevel(u, ABIL_ALOC) == 0 and
     not IsDummy(u) and
     IsUnitIllusion(u) == false
 end
@@ -2246,14 +2256,14 @@ function FilterAlive()
     local u = GetFilterUnit()
 
     return UnitAlive(u) and
-    GetUnitAbilityLevel(u, FourCC('Avul')) == 0 and
-    GetUnitAbilityLevel(u, FourCC('Aloc')) == 0 and
+    GetUnitAbilityLevel(u, ABIL_AVUL) == 0 and
+    GetUnitAbilityLevel(u, ABIL_ALOC) == 0 and
     not IsDummy(u)
 end
 
 ---@type fun(enemy: unit, player: player): boolean
 function IsHittable(enemy, player)
-    return UnitAlive(enemy) and GetUnitAbilityLevel(enemy, FourCC('Avul')) == 0 and IsUnitEnemy(enemy, player)
+    return UnitAlive(enemy) and GetUnitAbilityLevel(enemy, ABIL_AVUL) == 0 and IsUnitEnemy(enemy, player)
 end
 
 ---@type fun(frame: framehandle, title: string, text: string, simple: boolean, point1: framepointtype|nil, point2: framepointtype|nil, x: number|nil, y: number|nil, margin: number|nil): table
