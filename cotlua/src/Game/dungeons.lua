@@ -425,8 +425,8 @@ OnInit.final("Dungeons", function(Require)
             end
 
             local pcount  = #thistype.players ---@type integer 
-            local plat    = math.random(22, 25) + pcount * 3 ---@type integer 
-            local crystal = math.random(12, 15) + pcount * 3 ---@type integer 
+            local plat    = 130 + pcount * 10 ---@type integer 
+            local crystal = 40 + pcount * 5 ---@type integer 
 
             DisplayTimedTextToTable(thistype.players, 7.5, "|cffffcc00You have been rewarded:|r \n|cffe3e2e2" .. (plat) .. " Platinum|r \n|cff6969FF" .. (crystal) .. " Crystals|r")
 
