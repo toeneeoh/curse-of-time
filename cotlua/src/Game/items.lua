@@ -541,44 +541,43 @@ OnInit.final("Items", function(Require)
                         itm.abilities = {}
                     end
 
-                    -- generate item spell dummy
+                    local dummy
+                    local desc = ParseItemAbilityTooltip(itm, index, itm.cached_stats[index])
+
+                    -- if no item spell dummy, generate it
                     if not itm.abilities[index] then
-                        local dummy
-                        local desc = ParseItemAbilityTooltip(itm, index, itm.cached_stats[index])
-                        if backpack_allowed[abilid] then
-                            dummy = MakeDummyCastItem(Backpack[itm.pid])
-                            desc = desc .. "\n|cffffcc00This ability may be used from your backpack.|r"
-                        else
-                            dummy = MakeDummyCastItem(Hero[itm.pid])
+                        dummy = MakeDummyCastItem(backpack_allowed[abilid] and Backpack[itm.pid] or Hero[itm.pid])
+                        itm.abilities[index] = {obj = dummy, id = abilid}
+                    else
+                        dummy = itm.abilities[index].obj
+                    end
+
+                    -- append tooltip if useable from backpack
+                    if backpack_allowed[abilid] then
+                        desc = desc .. "\n|cffffcc00This ability may be used from your backpack.|r"
+                    end
+
+                    -- dummy may be nil if no spell inventory space remaining
+                    if dummy then
+                        if Spells[abilid].ACTIVE then
+                            BlzItemAddAbility(dummy, abilid)
                         end
+                        BlzSetItemIconPath(dummy, BlzGetAbilityIcon(abilid))
+                        --BlzSetItemDescription(dummy, desc)
+                        BlzSetItemExtendedTooltip(dummy, desc)
+                        BlzSetItemName(dummy, GetObjectName(abilid))
 
-                        -- spell inventory is full if dummy is nil
-                        if dummy then
-                            if Spells[abilid].ACTIVE then
-                                BlzItemAddAbility(dummy, abilid)
-                            end
-                            BlzSetItemIconPath(dummy, BlzGetAbilityIcon(abilid))
-                            --BlzSetItemDescription(dummy, desc)
-                            BlzSetItemExtendedTooltip(dummy, desc)
-                            BlzSetItemName(dummy, GetObjectName(abilid))
-                            itm.abilities[index] = {obj = dummy, id = abilid}
-
-                            -- if onequip returns true, dont allocate real fields
-                            if not Spells[abilid].onEquip(itm, abilid, index) then
-                                local ab = BlzGetItemAbility(dummy, abilid)
-                                BlzSetAbilityRealLevelField(ab, SPELL_FIELD[0], 0, itm.cached_stats[index])
-                                for i = 1, SPELL_FIELD_TOTAL do
-                                    local v = ItemData[itm.id][index .. "data" .. i]
-                                    if v ~= 0 then
-                                        BlzSetAbilityRealLevelField(ab, SPELL_FIELD[i], 0, v)
-                                    end
+                        -- if onequip returns true, dont allocate real fields
+                        if not Spells[abilid].onEquip(itm, abilid, index) then
+                            local ab = BlzGetItemAbility(dummy, abilid)
+                            BlzSetAbilityRealLevelField(ab, SPELL_FIELD[0], 0, itm.cached_stats[index])
+                            for i = 1, SPELL_FIELD_TOTAL do
+                                local v = ItemData[itm.id][index .. "data" .. i]
+                                if v ~= 0 then
+                                    BlzSetAbilityRealLevelField(ab, SPELL_FIELD[i], 0, v)
                                 end
                             end
                         end
-
-                        --TODO: Unnecessary?
-                        --IncUnitAbilityLevel(itm.holder, abilid)
-                        --DecUnitAbilityLevel(itm.holder, abilid)
                     end
                 end
             end
