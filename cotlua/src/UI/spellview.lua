@@ -658,7 +658,7 @@ OnInit.final("SpellView", function(Require)
             this.TimerIdData = CreateTimer()
             TimerStart(this.TimerIdData, 20, true, ClearDeadSpells)
 
-            local alocSkill = FourCC('Aloc')
+            local alocSkill = ABIL_ALOC
             local function unitFilt(unit)
                 if not BlzIsUnitSelectable(unit)
                  or IsUnitHidden(unit)
