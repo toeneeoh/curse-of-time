@@ -51,9 +51,9 @@ OnInit.final("PrecomputedHeightMap", function(Require)
     --If set to false, GetTerrainZ will be less accurate around cliffs, but slightly faster.
     local STORE_WATER_DATA                  = false
     --Set to true if you have water cliffs and have STORE_CLIFF_DATA enabled.
-    local WRITE_HEIGHT_MAP                  = false
+    local WRITE_HEIGHT_MAP                  = WRITE_HEIGHT_MAP
     --Write height map to file?
-    local VALIDATE_HEIGHT_MAP               = false
+    local VALIDATE_HEIGHT_MAP               = VALIDATE_HEIGHT_MAP
     --Check if height map read from string is accurate.
     local VISUALIZE_HEIGHT_MAP              = false
     --Create a special effect at each grid point to double-check if the height map is correct.
