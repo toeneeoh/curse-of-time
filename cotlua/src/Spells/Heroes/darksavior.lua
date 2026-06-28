@@ -79,7 +79,7 @@ OnInit.final("DarkSaviorSpells", function(Require)
             local y = GetUnitY(pt.source) ---@type number 
 
             pt.dur = pt.dur - 1
-            DestroyEffect(pt.sfx)
+            Unit[pt.source]:removeEffect(pt.sfx)
 
             if pt.dur >= 0 then
                 MakeGroupInRange(pt.pid, pt.ug, x, y, pt.aoe, Condition(FilterEnemy))
@@ -116,9 +116,9 @@ OnInit.final("DarkSaviorSpells", function(Require)
                 end
 
                 if pt.dur > 0. then
-                    pt.sfx = AddSpecialEffectTarget("war3mapImported\\LightningShield" .. IMinBJ(3, R2I(pt.dur)) .. ".mdx", Hero[pt.pid], "origin")
-                    BlzSetSpecialEffectTimeScale(pt.sfx, 1.5)
-                    BlzPlaySpecialEffect(pt.sfx, ANIM_TYPE_STAND)
+                    pt.sfx = Unit[pt.source]:addEffect("war3mapImported\\LightningShield" .. IMinBJ(3, R2I(pt.dur)) .. ".mdx", "origin")
+                    pt.sfx.timescale = 1.5
+                    pt.sfx.anim = ANIM_TYPE_STAND
                 end
 
                 return true
@@ -133,10 +133,10 @@ OnInit.final("DarkSaviorSpells", function(Require)
             pt.time = R2I(self.targets * LBOOST[self.pid])
             pt.aoe = self.aoe * LBOOST[self.pid]
             pt.dur = self.dur * LBOOST[self.pid]
-            pt.sfx = AddSpecialEffectTarget("Abilities\\Spells\\Orc\\LightningShield\\LightningShieldTarget.mdl", self.caster, "origin")
+            pt.sfx = Unit[self.caster]:addEffect("Abilities\\Spells\\Orc\\LightningShield\\LightningShieldTarget.mdl", "origin")
+            pt.sfx.timescale = 1.5
             pt.source = self.caster
             pt.ug = CreateGroup()
-            BlzSetSpecialEffectTimeScale(pt.sfx, 1.5)
 
             pt:startLoop(1., periodic)
         end
