@@ -131,6 +131,7 @@ BlzLoadTOCFile("war3mapImported\\FDF.toc")
 dofile('debugutils.lua')
 dofile('ingameconsole.lua')
 dofile('TotalInitialization.lua')
+dofile('environment.lua')
 dofile('dev.lua')
 dofile('mapsetup.lua')
 
