@@ -171,8 +171,8 @@ OnInit.final("Regions", function(Require)
         local u = GetFilterUnit()
 
         if UnitAlive(u) and
-            GetUnitAbilityLevel(u, FourCC('Avul')) == 0 and
-            GetUnitAbilityLevel(u, FourCC('Aloc')) == 0 and
+            GetUnitAbilityLevel(u, ABIL_AVUL) == 0 and
+            GetUnitAbilityLevel(u, ABIL_ALOC) == 0 and
             not IsDummy(u) then
             Lava:add(u, u)
         end

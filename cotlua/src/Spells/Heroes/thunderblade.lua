@@ -98,7 +98,7 @@ OnInit.final("ThunderbladeSpells", function(Require)
                     DamageTarget(self.source, target, self.damage, ATTACK_TYPE_NORMAL, MAGIC, THUNDERDASH.tag)
                 end
 
-                UnitRemoveAbility(self.source, FourCC('Avul'))
+                UnitRemoveAbility(self.source, ABIL_AVUL)
                 ShowUnit(self.source, true)
                 reselect(self.source)
                 SetUnitPathing(self.source, true)
@@ -116,7 +116,7 @@ OnInit.final("ThunderbladeSpells", function(Require)
             OmnislashBuff:dispel(self.caster, self.caster)
 
             ShowUnit(self.caster, false)
-            UnitAddAbility(self.caster, FourCC('Avul'))
+            UnitAddAbility(self.caster, ABIL_AVUL)
             DestroyEffect(AddSpecialEffectTarget("Abilities\\Weapons\\FarseerMissile\\FarseerMissile.mdl", self.caster, "chest"))
 
             local range = self.range * LBOOST[self.pid]
@@ -312,8 +312,8 @@ OnInit.final("ThunderbladeSpells", function(Require)
                 --laser shot
                 local dummy = Dummy.create(x, y, 0, 0).unit
                 SetUnitFlyHeight(dummy, 135., 0.)
-                UnitRemoveAbility(dummy, FourCC('Avul'))
-                UnitRemoveAbility(dummy, FourCC('Aloc'))
+                UnitRemoveAbility(dummy, ABIL_AVUL)
+                UnitRemoveAbility(dummy, ABIL_ALOC)
                 local dummy2 = Dummy.create(GetUnitX(pt.target), GetUnitY(pt.target), FourCC('A010'), 1)
                 SetUnitFlyHeight(dummy2.unit, 135., 0.)
                 dummy2:attack(dummy)

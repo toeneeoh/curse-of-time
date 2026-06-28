@@ -14,7 +14,7 @@ OnInit.final("Threat", function(Require)
 
     ---@return boolean
     local function proximity_filter(object)
-        return GetUnitAbilityLevel(object, FourCC('Avul')) == 0 and GetPlayerId(GetOwningPlayer(object)) < PLAYER_CAP
+        return GetUnitAbilityLevel(object, ABIL_AVUL) == 0 and GetPlayerId(GetOwningPlayer(object)) < PLAYER_CAP
     end
 
     ---@type fun(source: unit, dist: number)

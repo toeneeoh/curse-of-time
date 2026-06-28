@@ -23,20 +23,20 @@ OnInit.final("Chaos", function(Require)
 
     function GoddessOfLife()
         PauseUnit(Boss[BOSS_LIFE].unit, false)
-        UnitRemoveAbility(Boss[BOSS_LIFE].unit, FourCC('Avul'))
+        UnitRemoveAbility(Boss[BOSS_LIFE].unit, ABIL_AVUL)
     end
 
     function SpawnGods()
         PauseUnit(Boss[BOSS_HATE].unit, false)
-        UnitRemoveAbility(Boss[BOSS_HATE].unit, FourCC('Avul'))
+        UnitRemoveAbility(Boss[BOSS_HATE].unit, ABIL_AVUL)
         PauseUnit(Boss[BOSS_LOVE].unit, false)
-        UnitRemoveAbility(Boss[BOSS_LOVE].unit, FourCC('Avul'))
+        UnitRemoveAbility(Boss[BOSS_LOVE].unit, ABIL_AVUL)
         PauseUnit(Boss[BOSS_KNOWLEDGE].unit, false)
-        UnitRemoveAbility(Boss[BOSS_KNOWLEDGE].unit, FourCC('Avul'))
+        UnitRemoveAbility(Boss[BOSS_KNOWLEDGE].unit, ABIL_AVUL)
     end
 
     function ZeknenExpire()
-        UnitRemoveAbility(zeknen, FourCC('Avul'))
+        UnitRemoveAbility(zeknen, ABIL_AVUL)
         PauseUnit(zeknen, false)
         SetCinematicScene(GetUnitTypeId(zeknen), GetPlayerColor(PLAYER_BOSS), "Zeknen", "Very well.", 5, 4)
     end
@@ -47,7 +47,7 @@ OnInit.final("Chaos", function(Require)
 
         if (u ~= PUNCHING_BAG and
         UnitAlive(u) and
-        GetUnitAbilityLevel(u, FourCC('Avul')) == 0 and
+        GetUnitAbilityLevel(u, ABIL_AVUL) == 0 and
         (i == 10 or i == 11 or i == PLAYER_NEUTRAL_AGGRESSIVE) and
         RectContainsUnit(gg_rct_Colosseum, u) == false and
         RectContainsUnit(gg_rct_Infinite_Struggle, u) == false) and

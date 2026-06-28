@@ -179,7 +179,7 @@ OnInit.final("Boss", function(Require)
                     DestroyEffect(AddSpecialEffect("Abilities\\Spells\\Human\\Resurrect\\ResurrectTarget.mdl", GetUnitX(Boss[BOSS_LIFE].unit), GetUnitY(Boss[BOSS_LIFE].unit)))
                     ShowUnit(Boss[BOSS_LIFE].unit, true)
                     PauseUnit(Boss[BOSS_LIFE].unit, true)
-                    UnitAddAbility(Boss[BOSS_LIFE].unit, FourCC('Avul'))
+                    UnitAddAbility(Boss[BOSS_LIFE].unit, ABIL_AVUL)
                     UnitAddAbility(Boss[BOSS_LIFE].unit, FourCC('A08L')) --life aura
                     TQ:callDelayed(6., GoddessOfLife)
                 end
@@ -351,8 +351,8 @@ OnInit.final("Boss", function(Require)
 
             return pid <= PLAYER_CAP and
             UnitAlive(u) and
-            GetUnitAbilityLevel(u, FourCC('Avul')) == 0 and
-            GetUnitAbilityLevel(u, FourCC('Aloc')) == 0
+            GetUnitAbilityLevel(u, ABIL_AVUL) == 0 and
+            GetUnitAbilityLevel(u, ABIL_ALOC) == 0
         end
 
         function thistype:switch_target(unit, delay)

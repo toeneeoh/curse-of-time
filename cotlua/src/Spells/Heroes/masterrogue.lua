@@ -85,7 +85,7 @@ OnInit.final("RogueSpells", function(Require)
             PlayerAddItemById(pt.pid, FourCC('I0OW'))
             SetUnitVertexColor(pt.source, 255, 255, 255, 255)
             ToggleCommandCard(pt.source, true)
-            UnitRemoveAbility(pt.source, FourCC('Avul'))
+            UnitRemoveAbility(pt.source, ABIL_AVUL)
             Unit[pt.source].attack = true
         end
 
@@ -101,7 +101,7 @@ OnInit.final("RogueSpells", function(Require)
             TimerQueue:callDelayed(2., DestroyEffect, sfx)
 
             UnitRemoveAbility(self.caster, FourCC('BOwk'))
-            UnitAddAbility(self.caster, FourCC('Avul'))
+            UnitAddAbility(self.caster, ABIL_AVUL)
             ToggleCommandCard(self.caster, false)
             SetUnitVertexColor(self.caster, 50, 50, 50, 50)
             Unit[self.caster].attack = false

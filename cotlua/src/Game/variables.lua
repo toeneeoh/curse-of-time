@@ -5,6 +5,8 @@
 ]]
 
 OnInit.global("Variables", function()
+    local FourCC = FourCC
+
     DEV_ENABLED         = false
     MAP_NAME            = "CoT Nevermore"
     SAVE_LOAD_VERSION   = 1
@@ -503,7 +505,7 @@ OnInit.global("Variables", function()
         agi_gain     = 2.5,
         int_gain     = 0.5,
         main         = "agi",
-        range        = "650",
+        range        = "700",
         skills       = {"A05T", "A05R", "A0FT", "A0IB", "A090", "A0F6"},
         stars        = {0, 3, 2, 0, 0}
         },
@@ -626,17 +628,23 @@ OnInit.global("Variables", function()
     CHAOS_MODE = false ---@type boolean 
     CHAOS_LOADING = false ---@type boolean 
 
+    ABIL_AVUL = FourCC('Avul')
+    ABIL_ALOC = FourCC('Aloc')
+
+    MIN_SPELLBOOST_VARIANCE = -0.1
+    MAX_SPELLBOOST_VARIANCE = 0.1
+
     ItemData = array2d(0) ---@type table
 
     ZOOM = __jarray(0) ---@type integer[]
 
-    Hero={} ---@type unit[] 
-    HeroGrave={} ---@type unit[] 
-    Backpack={} ---@type unit[] 
-    HeroID=__jarray(0) ---@type integer[] 
+    Hero = {} ---@type unit[] 
+    HeroGrave = {} ---@type unit[] 
+    Backpack = {} ---@type unit[] 
+    HeroID = __jarray(0) ---@type integer[] 
 
-    BOOST=__jarray(1) ---@type number[] 
-    LBOOST=__jarray(1) ---@type number[] 
+    BOOST = __jarray(1) ---@type number[] 
+    LBOOST = __jarray(1) ---@type number[] 
 
     TOWN_CENTER_X = -250.
     TOWN_CENTER_Y = 160.
@@ -1040,7 +1048,7 @@ OnInit.global("Variables", function()
         "|cffc0c0c0You can type|r |cff9966ff-hints|r or |cff9966ff-nohints|r |cffc0c0c0to toggle these messages on and off.|r",
         "|cffc0c0c0Once you challenge the gods you cannot flee.|r",
         "|cffc0c0c0Some artifacts remain frozen in ice, waiting to be recovered...|r",
-        "|cffc0c0c0Spellboost innately affects the damage of your spells by plus or minus 20%.|r",
+        "|cffc0c0c0Spellboost innately affects the damage of your spells by plus or minus 10%.|r",
         "|cffc0c0c0Critical strike items and spells can stack their effect, the multipliers are additive.|r",
         "|cffc0c0c0The settings menu (Q on your backpack) provides many useful features such as displaying allied hero portraits on the left.|r",
         "|cffc0c0c0You can toggle off your auto attacks with CTRL + A.|r",

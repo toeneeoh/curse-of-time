@@ -71,7 +71,7 @@ OnInit.final("PVP", function(Require)
     ---@type fun(pid: integer)
     local function unpause_arena(pid)
         PauseUnit(Hero[pid], false)
-        UnitRemoveAbility(Hero[pid], FourCC('Avul'))
+        UnitRemoveAbility(Hero[pid], ABIL_AVUL)
     end
 
     ---@type fun(pid: integer, tpid: integer, time: integer)
@@ -103,7 +103,7 @@ OnInit.final("PVP", function(Require)
         UnitRemoveBuffs(killed, true, true)
         Buff.dispelAll(killed)
         DisplayTextToForce(FORCE_PLAYING, User[pid - 1].nameColored .. " has been slain by " .. User[kpid - 1].nameColored .. "!")
-        UnitAddAbility(killed, FourCC('Avul'))
+        UnitAddAbility(killed, ABIL_AVUL)
         SetUnitAnimation(killed, "death")
         PauseUnit(killed, true)
         DestroyEffect(AddSpecialEffectTarget("Abilities\\Spells\\Items\\AIem\\AIemTarget.mdl", killer, "origin"))
@@ -121,7 +121,7 @@ OnInit.final("PVP", function(Require)
         while U do
             if TableHas(Arena[arena], U.id) then
                 PauseUnit(Hero[U.id], false)
-                UnitRemoveAbility(Hero[U.id], FourCC('Avul'))
+                UnitRemoveAbility(Hero[U.id], ABIL_AVUL)
                 SetUnitAnimation(Hero[U.id], "stand")
                 MoveHero(U.id, TOWN_CENTER_X, TOWN_CENTER_Y)
             end
@@ -252,7 +252,7 @@ OnInit.final("PVP", function(Require)
             EVENT_ON_FATAL_DAMAGE:unregister_unit_action(killed, on_death)
         else
             PauseUnit(killer, true)
-            UnitAddAbility(killer, FourCC('Avul'))
+            UnitAddAbility(killer, ABIL_AVUL)
             SetPlayerAllianceStateBJ(p, p2, bj_ALLIANCE_ALLIED_VISION)
             SetPlayerAllianceStateBJ(p2, p, bj_ALLIANCE_ALLIED_VISION)
             if IS_HERO_PANEL_ON[pid * PLAYER_CAP + (tpid - 1)] then

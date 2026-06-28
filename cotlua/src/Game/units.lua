@@ -22,7 +22,7 @@ OnInit.final("Units", function(Require)
             UnitAlive(u) and
             GetUnitTypeId(u) ~= BACKPACK and
             not IsDummy(u) and
-            GetUnitAbilityLevel(u, FourCC('Aloc')) == 0 and
+            GetUnitAbilityLevel(u, ABIL_ALOC) == 0 and
             GetPlayerId(GetOwningPlayer(u)) <= PLAYER_CAP
     end
 
@@ -30,7 +30,7 @@ OnInit.final("Units", function(Require)
     local function revive_ghost(u)
         HideEffect(Unit[u].ghost)
         PauseUnit(u, false)
-        UnitRemoveAbility(u, FourCC('Avul'))
+        UnitRemoveAbility(u, ABIL_AVUL)
         ShowUnit(u, true)
         Unit[u].original_x = GetUnitX(u)
         Unit[u].original_y = GetUnitY(u)
@@ -65,7 +65,7 @@ OnInit.final("Units", function(Require)
                 local sfx = AddSpecialEffect(BlzGetItemStringField(PATH_ITEM, ITEM_SF_MODEL_USED), x, y)
                 GHOST_UNITS[#GHOST_UNITS + 1] = creep
                 PauseUnit(creep, true)
-                UnitAddAbility(creep, FourCC('Avul'))
+                UnitAddAbility(creep, ABIL_AVUL)
                 ShowUnit(creep, false)
                 BlzSetItemSkin(PATH_ITEM, BlzGetUnitSkin(DUMMY_UNIT))
                 BlzSetSpecialEffectColorByPlayer(sfx, PLAYER_CREEP)
@@ -196,7 +196,7 @@ OnInit.final("Units", function(Require)
     zeknen = CreateUnit(PLAYER_BOSS, FourCC('O01A'), -1886., -27549., 225.)
     SetHeroLevel(zeknen, 150, false)
     PauseUnit(zeknen, true)
-    UnitAddAbility(zeknen, FourCC('Avul'))
+    UnitAddAbility(zeknen, ABIL_AVUL)
     EVENT_ON_UNIT_DEATH:register_unit_action(zeknen, function()
         SetCinematicScene(Boss[BOSS_LIFE].id, GetPlayerColor(Player(PLAYER_NEUTRAL_PASSIVE)), "Goddess of Life", "You are foolish to challenge us in our realm. Prepare yourself.", 9, 7)
 
@@ -215,9 +215,9 @@ OnInit.final("Units", function(Require)
         PauseUnit(Boss[BOSS_HATE].unit, true)
         PauseUnit(Boss[BOSS_LOVE].unit, true)
         PauseUnit(Boss[BOSS_KNOWLEDGE].unit, true)
-        UnitAddAbility(Boss[BOSS_HATE].unit, FourCC('Avul'))
-        UnitAddAbility(Boss[BOSS_LOVE].unit, FourCC('Avul'))
-        UnitAddAbility(Boss[BOSS_KNOWLEDGE].unit, FourCC('Avul'))
+        UnitAddAbility(Boss[BOSS_HATE].unit, ABIL_AVUL)
+        UnitAddAbility(Boss[BOSS_LOVE].unit, ABIL_AVUL)
+        UnitAddAbility(Boss[BOSS_KNOWLEDGE].unit, ABIL_AVUL)
         TimerQueue:callDelayed(7., SpawnGods)
     end)
 

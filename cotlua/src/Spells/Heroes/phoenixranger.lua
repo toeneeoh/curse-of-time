@@ -125,7 +125,7 @@ OnInit.final("PhoenixRangerSpells", function(Require)
             },
             destroy = function(self)
                 DestroyEffect(self.visual)
-                UnitRemoveAbility(self.source, FourCC('Avul'))
+                UnitRemoveAbility(self.source, ABIL_AVUL)
                 SetUnitXBounded(self.source, self.x)
                 SetUnitYBounded(self.source, self.y)
                 ShowUnit(self.source, true)
@@ -153,7 +153,7 @@ OnInit.final("PhoenixRangerSpells", function(Require)
             BlzSetSpecialEffectTimeScale(missile.visual, 2.)
             BlzPlaySpecialEffect(missile.visual, ANIM_TYPE_BIRTH)
 
-            UnitAddAbility(self.caster, FourCC('Avul'))
+            UnitAddAbility(self.caster, ABIL_AVUL)
             ShowUnit(self.caster, false)
 
             ALICE_Create(missile)

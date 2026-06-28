@@ -81,8 +81,8 @@ OnInit.final("Quests", function(Require)
                 local ug = CreateGroup()
                 GroupEnumUnitsOfPlayer(ug, PLAYER_BOSS, Filter(is_orc))
 
-                if BlzGroupGetSize(ug) == 0 and UnitAlive(kroresh) and GetUnitAbilityLevel(kroresh, FourCC('Avul')) > 0 then
-                    UnitRemoveAbility(kroresh, FourCC('Avul'))
+                if BlzGroupGetSize(ug) == 0 and UnitAlive(kroresh) and GetUnitAbilityLevel(kroresh, ABIL_AVUL) > 0 then
+                    UnitRemoveAbility(kroresh, ABIL_AVUL)
                     PingMinimap(14500., -15180., 3)
                     SetCinematicScene(GetUnitTypeId(kroresh), GetPlayerColor(PLAYER_BOSS), "Kroresh Foretooth", "You dare slaughter my men? Damn you!", 5, 4)
                     EVENT_ON_UNIT_DEATH:register_unit_action(kroresh, kroresh_death)
@@ -98,7 +98,7 @@ OnInit.final("Quests", function(Require)
 
                 GroupEnumUnitsOfPlayer(ug, PLAYER_BOSS, Filter(is_orc))
 
-                if GetUnitAbilityLevel(kroresh, FourCC('Avul')) > 0 and BlzGroupGetSize(ug) < 32 then
+                if GetUnitAbilityLevel(kroresh, ABIL_AVUL) > 0 and BlzGroupGetSize(ug) < 32 then
                     --bottom side
                     local u = CreateUnit(PLAYER_BOSS, FourCC('o01I'), 12687, -15414, 45)
                     IssuePointOrder(u, "patrol", 668, -2146)
@@ -127,7 +127,7 @@ OnInit.final("Quests", function(Require)
                     EVENT_ON_UNIT_DEATH:register_unit_action(u, orc_death)
 
                     if UnitAlive(kroresh) then
-                        UnitAddAbility(kroresh, FourCC('Avul'))
+                        UnitAddAbility(kroresh, ABIL_AVUL)
                     end
                 end
 
@@ -149,7 +149,7 @@ OnInit.final("Quests", function(Require)
                     -- orc setup
                     SetUnitPosition(kroresh, 16100, -16050)
                     BlzSetUnitFacingEx(kroresh, 135.)
-                    UnitAddAbility(kroresh, FourCC('Avul'))
+                    UnitAddAbility(kroresh, ABIL_AVUL)
 
                     spawn_orcs()
                 elseif IsQuestCompleted(Defeat_The_Horde_Quest) == false then

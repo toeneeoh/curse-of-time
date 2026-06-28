@@ -721,10 +721,10 @@ OnInit.global("Profile", function(Require)
                 SetUnitOwner(backpack, Player(pid - 1), false)
 
                 -- locust trick (disable directly clicking)
-                UnitAddAbility(backpack, FourCC('Aloc'))
+                UnitAddAbility(backpack, ABIL_ALOC)
                 ShowUnit(backpack, false)
                 ShowUnit(backpack, true)
-                UnitRemoveAbility(backpack, FourCC('Aloc'))
+                UnitRemoveAbility(backpack, ABIL_ALOC)
 
                 SetUnitAnimation(backpack, "stand")
                 SuspendHeroXP(backpack, true)

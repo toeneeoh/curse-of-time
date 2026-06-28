@@ -925,7 +925,7 @@ OnInit.final("UnitSpells", function(Require)
 
         local function beetle_ai(source, target)
             PauseUnit(source, false)
-            UnitRemoveAbility(source, FourCC('Avul'))
+            UnitRemoveAbility(source, ABIL_AVUL)
             IssueTargetOrder(source, "attack", target)
             UnitApplyTimedLife(source, FourCC('BTLF'), 6.5)
             EVENT_ON_HIT_EVADE:register_unit_action(source, beetle_on_hit)
@@ -948,7 +948,7 @@ OnInit.final("UnitSpells", function(Require)
                 local beetle = CreateUnit(Player(self.pid - 1), FourCC('u002'), x, y, 0)
                 BlzSetUnitFacingEx(beetle, bj_RADTODEG * math.atan(GetUnitY(target) - y, GetUnitX(target) - x))
                 PauseUnit(beetle, true)
-                UnitAddAbility(beetle, FourCC('Avul'))
+                UnitAddAbility(beetle, ABIL_AVUL)
                 SetUnitAnimation(beetle, "birth")
                 TQ:callDelayed(GetRandomReal(0.75, 1.), beetle_ai, beetle, target)
                 target = FirstOfGroup(ug)
@@ -1024,7 +1024,7 @@ OnInit.final("UnitSpells", function(Require)
         end
 
         local function valid_target(object)
-            return UnitAlive(object) and GetUnitAbilityLevel(object, FourCC('Avul')) == 0 and GetPlayerId(GetOwningPlayer(object)) < PLAYER_CAP
+            return UnitAlive(object) and GetUnitAbilityLevel(object, ABIL_AVUL) == 0 and GetPlayerId(GetOwningPlayer(object)) < PLAYER_CAP
         end
 
         local function dummy_attack(object, source)
@@ -1636,9 +1636,9 @@ OnInit.final("UnitSpells", function(Require)
         end
     end
 
-    local DARKASCENSION = Spell.define("A065")
+    local METAMORPHOSIS = Spell.define("A065")
     do
-        local thistype = DARKASCENSION
+        local thistype = METAMORPHOSIS
 
         local function onStruck(target, source)
             if GetWidgetLife(target) < BlzGetUnitMaxHP(target) * 0.5 then
@@ -1883,7 +1883,7 @@ OnInit.final("UnitSpells", function(Require)
             UnitRemoveAbility(pt.source, FourCC('Amrf'))
             UnitRemoveAbility(pt.source, FourCC('A043'))
             UnitRemoveAbility(pt.source, FourCC('BOwk'))
-            UnitRemoveAbility(pt.source, FourCC('Avul'))
+            UnitRemoveAbility(pt.source, ABIL_AVUL)
             SetUnitXBounded(pt.source, pt.x)
             SetUnitYBounded(pt.source, pt.y)
             SetUnitAnimation(pt.source, "Attack Slam")
@@ -1916,7 +1916,7 @@ OnInit.final("UnitSpells", function(Require)
 
                     FloatingTextUnit(thistype.tag, target, 1.75, 100, 0, 12, 90, 30, 150, 0, true)
                     Buff.dispelAll(target)
-                    UnitAddAbility(target, FourCC('Avul'))
+                    UnitAddAbility(target, ABIL_AVUL)
                     UnitAddAbility(target, FourCC('A043'))
                     IssueImmediateOrder(target, "windwalk")
 
@@ -2353,6 +2353,7 @@ OnInit.final("UnitSpells", function(Require)
         end
     end
 
+    -- xallarath
     local REINFORCEMENTS = Spell.define("A01I")
     do
         local thistype = REINFORCEMENTS
