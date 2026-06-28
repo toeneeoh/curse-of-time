@@ -169,7 +169,11 @@ OnInit.global("PlayerTimer", function(Require)
             end
 
             if self.sfx then
-                DestroyEffect(self.sfx)
+                if type(self.sfx) == "table" then
+                    DestroyEffect(self.sfx.effect)
+                else
+                    DestroyEffect(self.sfx)
+                end
                 self.sfx = nil
             end
 
