@@ -167,12 +167,12 @@ OnInit.final("Cosmetics", function(Require)
             effect = function(self, pid)
                 if GetUnitAbilityLevel(Hero[pid], FourCC('A04T')) > 0 then
                     SetUnitScale(Hero[pid], BlzGetUnitRealField(Hero[pid], UNIT_RF_SCALING_VALUE), BlzGetUnitRealField(Hero[pid], UNIT_RF_SCALING_VALUE), BlzGetUnitRealField(Hero[pid], UNIT_RF_SCALING_VALUE))
-                    DestroyEffect(self[pid .. self.name])
+                    Unit[Hero[pid]]:removeEffect(self[pid .. self.name])
                     self[pid .. self.name] = nil
                     UnitRemoveAbility(Hero[pid], FourCC('A04T'))
                 else
                     SetUnitScale(Hero[pid], 1.4, 1.4, 1.4)
-                    self[pid .. self.name] = AddSpecialEffectTarget("war3mapImported\\ArchAngelArcana2.mdx", Hero[pid], "overhead")
+                    self[pid .. self.name] = Unit[Hero[pid]]:addEffect("war3mapImported\\ArchAngelArcana2.mdx", "overhead")
                     UnitAddAbility(Hero[pid], FourCC('A04T'))
                 end
             end
@@ -223,12 +223,12 @@ OnInit.final("Cosmetics", function(Require)
             name = "Vampiric Aura",
             effect = function(self, pid)
                 if self[pid .. self.name] then
-                    DestroyEffect(self[pid .. self.name])
+                    Unit[Hero[pid]]:removeEffect(self[pid .. self.name])
                     self[pid .. self.name] = nil
                 else
-                    self[pid .. self.name] = AddSpecialEffectTarget("Abilities\\Spells\\Undead\\VampiricAura\\VampiricAura.mdl", Hero[pid], "origin")
-                    BlzSetSpecialEffectScale(self[pid .. self.name], 0.75)
-                    BlzSetSpecialEffectColor(self[pid .. self.name], 255, 0, 0)
+                    self[pid .. self.name] = Unit[Hero[pid]]:addEffect("Abilities\\Spells\\Undead\\VampiricAura\\VampiricAura.mdl", "origin")
+                    BlzSetSpecialEffectScale(self[pid .. self.name].effect, 0.75)
+                    BlzSetSpecialEffectColor(self[pid .. self.name].effect, 255, 0, 0)
                 end
             end
         },
@@ -236,10 +236,10 @@ OnInit.final("Cosmetics", function(Require)
             name = "Blood Ritual",
             effect = function(self, pid)
                 if self[pid .. self.name] then
-                    DestroyEffect(self[pid .. self.name])
+                    Unit[Hero[pid]]:removeEffect(self[pid .. self.name])
                     self[pid .. self.name] = nil
                 else
-                    self[pid .. self.name] = AddSpecialEffectTarget("war3mapImported\\Blood Ritual.mdx", Hero[pid], "origin")
+                    self[pid .. self.name] = Unit[Hero[pid]]:addEffect("war3mapImported\\Blood Ritual.mdx", "origin")
                 end
             end
         },
@@ -247,10 +247,10 @@ OnInit.final("Cosmetics", function(Require)
             name = "Soul Armor",
             effect = function(self, pid)
                 if self[pid .. self.name] then
-                    DestroyEffect(self[pid .. self.name])
+                    Unit[Hero[pid]]:removeEffect(self[pid .. self.name])
                     self[pid .. self.name] = nil
                 else
-                    self[pid .. self.name] = AddSpecialEffectTarget("war3mapImported\\Soul Armor Cosmic_opt.mdx", Hero[pid], "origin")
+                    self[pid .. self.name] = Unit[Hero[pid]]:addEffect("war3mapImported\\Soul Armor Cosmic_opt.mdx", "origin")
                 end
             end
         },
@@ -258,10 +258,10 @@ OnInit.final("Cosmetics", function(Require)
             name = "Orange Radiance",
             effect = function(self, pid)
                 if self[pid .. self.name] then
-                    DestroyEffect(self[pid .. self.name])
+                    Unit[Hero[pid]]:removeEffect(self[pid .. self.name])
                     self[pid .. self.name] = nil
                 else
-                    self[pid .. self.name] = AddSpecialEffectTarget("war3mapImported\\Radiance_Orange.mdx", Hero[pid], "origin")
+                    self[pid .. self.name] = Unit[Hero[pid]]:addEffect("war3mapImported\\Radiance_Orange.mdx", "origin")
                 end
             end
         },
@@ -269,10 +269,10 @@ OnInit.final("Cosmetics", function(Require)
             name = "Liberty Green",
             effect = function(self, pid)
                 if self[pid .. self.name] then
-                    DestroyEffect(self[pid .. self.name])
+                    Unit[Hero[pid]]:removeEffect(self[pid .. self.name])
                     self[pid .. self.name] = nil
                 else
-                    self[pid .. self.name] = AddSpecialEffectTarget("war3mapImported\\Liberty Green.mdx", Hero[pid], "chest")
+                    self[pid .. self.name] = Unit[Hero[pid]]:addEffect("war3mapImported\\Liberty Green.mdx", "chest")
                 end
             end
         },
@@ -280,10 +280,10 @@ OnInit.final("Cosmetics", function(Require)
             name = "Running Flame",
             effect = function(self, pid)
                 if self[pid .. self.name] then
-                    DestroyEffect(self[pid .. self.name])
+                    Unit[Hero[pid]]:removeEffect(self[pid .. self.name])
                     self[pid .. self.name] = nil
                 else
-                    self[pid .. self.name] = AddSpecialEffectTarget("war3mapImported\\s_RunningFlame Aura.mdx", Hero[pid], "origin")
+                    self[pid .. self.name] = Unit[Hero[pid]]:addEffect("war3mapImported\\s_RunningFlame Aura.mdx", "origin")
                 end
             end
         },
@@ -291,10 +291,10 @@ OnInit.final("Cosmetics", function(Require)
             name = "Grudge Aura",
             effect = function(self, pid)
                 if self[pid .. self.name] then
-                    DestroyEffect(self[pid .. self.name])
+                    Unit[Hero[pid]]:removeEffect(self[pid .. self.name])
                     self[pid .. self.name] = nil
                 else
-                    self[pid .. self.name] = AddSpecialEffectTarget("war3mapImported\\GrudgeAura.mdx", Hero[pid], "origin")
+                    self[pid .. self.name] = Unit[Hero[pid]]:addEffect("war3mapImported\\GrudgeAura.mdx", "origin")
                 end
             end
         },
@@ -302,10 +302,10 @@ OnInit.final("Cosmetics", function(Require)
             name = "Nuke Aura",
             effect = function(self, pid)
                 if self[pid .. self.name] then
-                    DestroyEffect(self[pid .. self.name])
+                    Unit[Hero[pid]]:removeEffect(self[pid .. self.name])
                     self[pid .. self.name] = nil
                 else
-                    self[pid .. self.name] = AddSpecialEffectTarget("war3mapImported\\AuraNuke.mdx", Hero[pid], "origin")
+                    self[pid .. self.name] = Unit[Hero[pid]]:addEffect("war3mapImported\\AuraNuke.mdx", "origin")
                 end
             end
         },
@@ -313,10 +313,10 @@ OnInit.final("Cosmetics", function(Require)
             name = "Runic Aura",
             effect = function(self, pid)
                 if self[pid .. self.name] then
-                    DestroyEffect(self[pid .. self.name])
+                    Unit[Hero[pid]]:removeEffect(self[pid .. self.name])
                     self[pid .. self.name] = nil
                 else
-                    self[pid .. self.name] = AddSpecialEffectTarget("war3mapImported\\RunicAura.mdx", Hero[pid], "origin")
+                    self[pid .. self.name] = Unit[Hero[pid]]:addEffect("war3mapImported\\RunicAura.mdx", "origin")
                 end
             end
         },
@@ -324,10 +324,10 @@ OnInit.final("Cosmetics", function(Require)
             name = "Void Disc",
             effect = function(self, pid)
                 if self[pid .. self.name] then
-                    DestroyEffect(self[pid .. self.name])
+                    Unit[Hero[pid]]:removeEffect(self[pid .. self.name])
                     self[pid .. self.name] = nil
                 else
-                    self[pid .. self.name] = AddSpecialEffectTarget("war3mapImported\\Void Disc.mdx", Hero[pid], "origin")
+                    self[pid .. self.name] = Unit[Hero[pid]]:addEffect("war3mapImported\\Void Disc.mdx", "origin")
                 end
             end
         },
