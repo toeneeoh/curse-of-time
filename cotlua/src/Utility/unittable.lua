@@ -457,6 +457,46 @@ OnInit.final("UnitTable", function(Require)
             end
         end
 
+        local effect_operators = {
+            timescale = function(tbl, val)
+                BlzSetSpecialEffectTimeScale(tbl.effect, val)
+            end,
+
+            anim = function(tbl, val)
+                BlzPlaySpecialEffect(tbl.effect, val)
+            end,
+
+            color = function(tbl, val)
+                BlzSetSpecialEffectColor(tbl.effect, val[1], val[2], val[3])
+            end,
+
+            scale = function(tbl, val)
+                BlzSetSpecialEffectScale(tbl.effect, val)
+            end,
+        }
+
+        local mt2 = {
+            __index = function(tbl, key)
+                local val = rawget(tbl, key)
+                if val ~= nil then
+                    return val
+                end
+                return tbl.proxy[key]
+            end,
+            __newindex = function(tbl, key, val)
+                local op = effect_operators[key]
+                if op then
+                    rawset(tbl.proxy, key, val)
+
+                    if tbl.effect then
+                        op(tbl, val)
+                    end
+                else
+                    rawset(tbl, key, val)
+                end
+            end
+        }
+
         function Unit:addEffect(model, attachPoint, attachPointAlternate)
             self.effects = self.effects or {}
 
@@ -465,8 +505,11 @@ OnInit.final("UnitTable", function(Require)
                 attach = attachPoint,
                 effect = AddSpecialEffectTarget(model, self.unit, self.morphed and attachPointAlternate or attachPoint),
                 attach_alternate = attachPointAlternate,
-                morphed = false
+                morphed = false,
+                proxy = {}
             }
+
+            setmetatable(data, mt2)
 
             self.effects[#self.effects + 1] = data
 
@@ -495,6 +538,14 @@ OnInit.final("UnitTable", function(Require)
                 if not sfx.effect then
                     local effect = self.morphed and sfx.attach_alternate or sfx.attach
                     sfx.effect = AddSpecialEffectTarget(sfx.model, self.unit, effect)
+
+                    -- reapply attributes
+                    for key, val in pairs(sfx.proxy) do
+                        local op = effect_operators[key]
+                        if op then
+                            op(sfx, val)
+                        end
+                    end
                 end
             end
         end
