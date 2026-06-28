@@ -55,7 +55,7 @@ OnInit.final("Dev", function(Require)
         ["hp"] = "Sets the maximum health of the selected unit. usage: -hp [#]",
         ["armor"] = "Sets the armor of the selected unit. usage: -armor [#]",
         ["armortype"] = "Sets the armor type of the selected unit. usage: -armortype [0-7]",
-        ["boost"] = "Toggles the spellboost +/-20% variance on/off",
+        ["boost"] = "Toggles the spellboost +/-10% variance on/off",
         ["hurt"] = "Damages the selected unit by a percent #. usage: hurt [1-100]",
         ["buddha"] = "Prevents your hero from dying",
         ["tp"] = "Teleports the selected unit to your cursor's position.",
@@ -365,10 +365,10 @@ modifiers:
             print((StringHash(GetLocalizedString("TRIGSTR_001"))))
         end,
         ["invul"] = function(p, pid, args)
-            if GetUnitAbilityLevel(PLAYER_SELECTED_UNIT[pid], FourCC('Avul')) > 0 then
-                UnitRemoveAbility(PLAYER_SELECTED_UNIT[pid], FourCC('Avul'))
+            if GetUnitAbilityLevel(PLAYER_SELECTED_UNIT[pid], ABIL_AVUL) > 0 then
+                UnitRemoveAbility(PLAYER_SELECTED_UNIT[pid], ABIL_AVUL)
             else
-                UnitAddAbility(PLAYER_SELECTED_UNIT[pid], FourCC('Avul'))
+                UnitAddAbility(PLAYER_SELECTED_UNIT[pid], ABIL_AVUL)
             end
         end,
         ["colo"] = function(p, pid, args)
