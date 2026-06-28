@@ -47,12 +47,12 @@ OnInit.global("Buffs", function(Require)
         thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
 
         function thistype:onRemove()
-            DestroyEffect(self.sfx)
+            Unit[self.target]:removeEffect(self.sfx)
             ToggleCommandCard(self.target, true)
         end
 
         function thistype:onApply()
-            self.sfx = AddSpecialEffectTarget("Abilities\\Spells\\Other\\Silence\\SilenceTarget.mdl", self.target, "overhead")
+            self.sfx = Unit[self.target]:addEffect("Abilities\\Spells\\Other\\Silence\\SilenceTarget.mdl", "overhead")
             ToggleCommandCard(self.target, false)
         end
     end
@@ -162,11 +162,11 @@ OnInit.global("Buffs", function(Require)
         function thistype:onRemove()
             TQ:disableCallback(self.callback)
 
-            DestroyEffect(self.sfx)
+            Unit[self.target]:removeEffect(self.sfx)
         end
 
         function thistype:onApply()
-            self.sfx = AddSpecialEffectTarget("war3mapImported\\Real Fire2.mdx", self.target, "origin")
+            self.sfx = Unit[self.target]:addEffect("war3mapImported\\Real Fire2.mdx", "origin")
             self.dmg = SEARINGARROWS.dot(self.pid)
 
             self.callback = TQ:callDelayed(0.5, periodic, self)
@@ -415,13 +415,13 @@ OnInit.global("Buffs", function(Require)
         thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
 
         function thistype:onRemove()
-            DestroyEffect(self.sfx)
+            Unit[self.target]:removeEffect(self.sfx)
 
             Unit[self.target].dr = Unit[self.target].dr / self.dr
         end
 
         function thistype:onApply()
-            self.sfx = AddSpecialEffectTarget("Abilities\\Spells\\Human\\DivineShield\\DivineShieldTarget.mdl", self.target, "origin")
+            self.sfx = Unit[self.target]:addEffect("Abilities\\Spells\\Human\\DivineShield\\DivineShieldTarget.mdl", "origin")
             self.dr = 0.8
 
             Unit[self.target].dr = Unit[self.target].dr * self.dr
@@ -453,7 +453,7 @@ OnInit.global("Buffs", function(Require)
 
         function thistype:onRemove()
             EVENT_ON_HIT:unregister_unit_action(self.target, on_hit)
-            DestroyEffect(self.sfx)
+            Unit[self.target]:removeEffect(self.sfx)
         end
 
         function thistype:onApply()
@@ -461,7 +461,7 @@ OnInit.global("Buffs", function(Require)
             self.dmg = (.25 + .25 * GetUnitAbilityLevel(self.source, ENCORE.id)) * GetHeroStat(MainStat(self.target), self.target, true)
             self.count = 10
 
-            self.sfx = AddSpecialEffectTarget("Abilities\\Spells\\Items\\VampiricPotion\\VampPotionCaster.mdl", self.target, "origin")
+            self.sfx = Unit[self.target]:addEffect("Abilities\\Spells\\Items\\VampiricPotion\\VampPotionCaster.mdl", "origin")
         end
     end
 
@@ -539,31 +539,34 @@ OnInit.global("Buffs", function(Require)
             local increase = 0.01
 
             if self.attack < self.max then
+                local u = Unit[self.target]
                 if MULTISHOT.enabled[source] then
                     increase = increase / (1. + GetUnitAbilityLevel(self.target, MULTISHOT.id))
                 end
 
-                Unit[self.target].damage_percent = Unit[self.target].damage_percent - self.attack
+                u.damage_percent = u.damage_percent - self.attack
                 self.attack = math.min(self.attack + increase, self.max)
-                Unit[self.target].damage_percent = Unit[self.target].damage_percent + self.attack
+                u.damage_percent = u.damage_percent + self.attack
                 UnitRefreshBuff(source, self)
             end
         end
 
         function thistype:onRemove()
+            local u = Unit[self.target]
             EVENT_ON_HIT:unregister_unit_action(self.target, on_hit)
-            DestroyEffect(self.sfx)
             UnitRemoveAbility(self.target, FourCC('A08B'))
-            Unit[self.target].damage_percent = Unit[self.target].damage_percent - self.attack
+            u:removeEffect(self.sfx)
+            u.damage_percent = u.damage_percent - self.attack
         end
 
         function thistype:onApply()
+            local u = Unit[self.target]
             EVENT_ON_HIT:register_unit_action(self.target, on_hit)
             self.attack = 0.5
             self.max = 0.8 + 0.02 * GetUnitAbilityLevel(self.target, FLAMINGBOW.id)
 
-            Unit[self.target].damage_percent = Unit[self.target].damage_percent + self.attack
-            self.sfx = AddSpecialEffectTarget("Environment\\SmallBuildingspeffect\\SmallBuildingspeffect2.mdl", self.target, "weapon")
+            u.damage_percent = u.damage_percent + self.attack
+            self.sfx = u:addEffect("Soul Bow Enchantment Cinder.mdx", "weapon")
             UnitAddAbility(self.target, FourCC('A08B'))
         end
     end
@@ -623,13 +626,13 @@ OnInit.global("Buffs", function(Require)
         thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
 
         function thistype:onRemove()
-            DestroyEffect(self.sfx)
+            Unit[self.target]:removeEffect(self.sfx)
             Unit[self.target].ms_percent = Unit[self.target].ms_percent + self.ms
             Unit[self.target].regen_percent = Unit[self.target].regen_percent + self.regen
         end
 
         function thistype:onApply()
-            self.sfx = AddSpecialEffectTarget("Abilities\\Spells\\Orc\\EarthQuake\\EarthQuakeTarget.mdl", self.target, "origin")
+            self.sfx = Unit[self.target]:addEffect("Abilities\\Spells\\Orc\\EarthQuake\\EarthQuakeTarget.mdl", "origin")
             self.ms = 0.5 * (math.min(1, Unit[self.target].ms_percent))
             self.regen = 0.5
 
@@ -733,12 +736,12 @@ OnInit.global("Buffs", function(Require)
         end
 
         function thistype:onRemove()
-            DestroyEffect(self.sfx)
+            Unit[self.target]:removeEffect(self.sfx)
             TQ:disableCallback(self.callback)
         end
 
         function thistype:onApply()
-            self.sfx = AddSpecialEffectTarget("spinning fire.mdl", self.target, "origin")
+            self.sfx = Unit[self.target]:addEffect("spinning fire.mdl", "origin")
             periodic(self)
         end
     end
@@ -775,21 +778,23 @@ OnInit.global("Buffs", function(Require)
         thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
 
         function thistype:onRemove()
+            local u = Unit[self.target]
             SetUnitPathing(self.target, true)
 
-            Unit[self.target].ms_percent = Unit[self.target].ms_percent + self.ms
+            u.ms_percent = u.ms_percent + self.ms
 
-            BlzSetSpecialEffectScale(self.sfx, 0)
-            DestroyEffect(self.sfx)
+            self.sfx.scale = 0
+            u:removeEffect(self.sfx)
         end
 
         function thistype:onApply()
+            local u = Unit[self.target]
             SetUnitPathing(self.target, false)
 
-            self.ms = 0.5 * (math.min(1, Unit[self.target].ms_percent))
-            self.sfx = AddSpecialEffectTarget("Abilities\\Spells\\Human\\Banish\\BanishTarget.mdl", self.target, "chest")
+            self.ms = 0.5 * (math.min(1, u.ms_percent))
+            self.sfx = u:addEffect("Abilities\\Spells\\Human\\Banish\\BanishTarget.mdl", "chest")
 
-            Unit[self.target].ms_percent = Unit[self.target].ms_percent - self.ms
+            u.ms_percent = u.ms_percent - self.ms
         end
     end
 
@@ -834,7 +839,7 @@ OnInit.global("Buffs", function(Require)
 
         function thistype:onRemove()
             TQ:disableCallback(self.timer)
-            DestroyEffect(self.sfx)
+            Unit[self.target]:removeEffect(self.sfx)
             DestroyGroup(self.ug)
         end
 
@@ -851,7 +856,7 @@ OnInit.global("Buffs", function(Require)
         end
 
         function thistype:onApply()
-            self.sfx = AddSpecialEffectTarget("Abilities\\Spells\\Orc\\Voodoo\\VoodooAura.mdl", self.target, "origin")
+            self.sfx = Unit[self.target]:addEffect("Abilities\\Spells\\Orc\\Voodoo\\VoodooAura.mdl", "origin")
             self.ug = CreateGroup()
 
             periodic(self)
@@ -1011,7 +1016,7 @@ OnInit.global("Buffs", function(Require)
         thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
 
         function thistype:onRemove()
-            DestroyEffect(self.sfx)
+            Unit[self.target]:removeEffect(self.sfx)
 
             UnitAddBonus(self.target, self.main + 2, -self.bonus)
         end
@@ -1023,7 +1028,7 @@ OnInit.global("Buffs", function(Require)
             self.bonus = R2I(GetHeroStat(self.main, self.target, true) * LAWOFMIGHT.pbonus(self.pid) * 0.01 * LBOOST[self.pid] + LAWOFMIGHT.fbonus(self.pid) * BOOST[self.pid])
             UnitAddBonus(self.target, self.main + 2, self.bonus)
 
-            self.sfx = AddSpecialEffectTarget("Abilities\\Spells\\Human\\InnerFire\\InnerFireTarget.mdl", self.target, "overhead")
+            self.sfx = Unit[self.target]:addEffect("Abilities\\Spells\\Human\\InnerFire\\InnerFireTarget.mdl", "overhead")
         end
     end
 
@@ -1038,7 +1043,7 @@ OnInit.global("Buffs", function(Require)
         thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
 
         function thistype:onRemove()
-            DestroyEffect(self.sfx)
+            Unit[self.target]:removeEffect(self.sfx)
 
             Unit[self.target].regen_flat = Unit[self.target].regen_flat - self.regen
             Unit[self.target].regen_percent = Unit[self.target].regen_percent - self.percent * 0.01
@@ -1051,7 +1056,7 @@ OnInit.global("Buffs", function(Require)
             Unit[self.target].regen_flat = Unit[self.target].regen_flat + self.regen
             Unit[self.target].regen_percent = Unit[self.target].regen_percent + self.percent * 0.01
 
-            self.sfx = AddSpecialEffectTarget("war3mapImported\\RunicShield.mdx", self.target, "chest")
+            self.sfx = Unit[self.target]:addEffect("war3mapImported\\RunicShield.mdx", "chest")
         end
     end
 
@@ -1075,16 +1080,16 @@ OnInit.global("Buffs", function(Require)
 
         function thistype:onRemove()
             EVENT_ON_HIT_AFTER_REDUCTIONS:unregister_unit_action(self.target, on_hit)
-            DestroyEffect(self.sfx)
+            Unit[self.target]:removeEffect(self.sfx)
         end
 
         function thistype:onApply()
             EVENT_ON_HIT_AFTER_REDUCTIONS:register_unit_action(self.target, on_hit)
             self.multiplier = LAWOFRESONANCE.echo(self.pid) * 0.01
 
-            self.sfx = AddSpecialEffectTarget("Abilities\\Spells\\Other\\Parasite\\ParasiteTarget.mdl", self.target, "overhead")
-            BlzSetSpecialEffectColor(self.sfx, 60, 60, 255)
-            BlzSetSpecialEffectTimeScale(self.sfx, 2.)
+            self.sfx = Unit[self.target]:addEffect("Abilities\\Spells\\Other\\Parasite\\ParasiteTarget.mdl", "overhead")
+            self.sfx.color = {60, 60, 255}
+            self.sfx.timescale = 2.
         end
     end
 
@@ -1115,7 +1120,7 @@ OnInit.global("Buffs", function(Require)
         function thistype:onRemove()
             Unit[self.target].mm = Unit[self.target].mm / self.mm
             IssueImmediateOrder(self.target, "unimmolation")
-            DestroyEffect(self.sfx)
+            Unit[self.target]:removeEffect(self.sfx)
 
             if self.timer then
                 TQ:disableCallback(self.timer)
@@ -1123,7 +1128,7 @@ OnInit.global("Buffs", function(Require)
         end
 
         function thistype:onApply()
-            self.sfx = AddSpecialEffectTarget("war3mapImported\\Windwalk Blue Soul.mdx", self.target, "origin")
+            self.sfx = Unit[self.target]:addEffect("war3mapImported\\Windwalk Blue Soul.mdx", "origin")
             self.mm = OVERLOAD.mult(self.pid)
             Unit[self.target].mm = Unit[self.target].mm * self.mm
 
@@ -1152,20 +1157,20 @@ OnInit.global("Buffs", function(Require)
                     self.ms = 50 + 50 * GetUnitAbilityLevel(self.source, BLOODMIST.id)
                     Unit[self.target].ms_flat = Unit[self.target].ms_flat + self.ms
                     PlayerAddItemById(self.tpid, PHASED_MOVEMENT)
-                    BlzSetSpecialEffectColor(self.sfx, 255, 255, 255)
+                    self.sfx.color = {255, 255, 255}
                 end
             else
                 Unit[self.target].ms_flat = Unit[self.target].ms_flat - self.ms
                 self.ms = 0
                 UnitRemoveAbility(self.target, FourCC('B02Q'))
-                BlzSetSpecialEffectColor(self.sfx, 0, 0, 0)
+                self.sfx.color = {0, 0, 0}
             end
 
             self.timer = TQ:callDelayed(0.5, periodic, self)
         end
 
         function thistype:onRemove()
-            DestroyEffect(self.sfx)
+            Unit[self.target]:removeEffect(self.sfx)
 
             Unit[self.target].ms_flat = Unit[self.target].ms_flat - self.ms
             UnitRemoveAbility(self.target, FourCC('B02Q'))
@@ -1182,7 +1187,7 @@ OnInit.global("Buffs", function(Require)
                 Unit[self.target].ms_flat = Unit[self.target].ms_flat + self.ms
             end
 
-            self.sfx = AddSpecialEffectTarget("war3mapImported\\Chumpool.mdx", self.target, "origin")
+            self.sfx = Unit[self.target]:addEffect("war3mapImported\\Chumpool.mdx", "origin")
 
             self.timer = TQ:callDelayed(0.5, periodic, self)
         end
@@ -1223,12 +1228,14 @@ OnInit.global("Buffs", function(Require)
         end
 
         function thistype:onRemove()
+            local u = Unit[self.target]
             DestroyGroup(self.ug)
             EVENT_ON_HIT:unregister_unit_action(self.source, on_hit)
 
-            Unit[self.target].bonus_bat = Unit[self.target].bonus_bat / self.bat
-            Unit[self.source].bonus_agi = Unit[self.source].bonus_agi - self.agi
-            Unit[self.source].bonus_str = Unit[self.source].bonus_str - self.str
+            u.bonus_bat = u.bonus_bat / self.bat
+            u.bonus_agi = u.bonus_agi - self.agi
+            u.bonus_str = u.bonus_str - self.str
+            u:removeEffect(self.sfx)
 
             if self.timer then
                 UnitDisableAbility(self.source, BLOODLEECH.id, false)
@@ -1238,6 +1245,8 @@ OnInit.global("Buffs", function(Require)
         end
 
         function thistype:onApply()
+            local u = Unit[self.target]
+
             self.agi = 0
             self.str = 0
             EVENT_ON_HIT:register_unit_action(self.source, on_hit)
@@ -1253,18 +1262,18 @@ OnInit.global("Buffs", function(Require)
                 self.ug = CreateGroup()
                 self.timer = TQ:callDelayed(1., periodic, self)
                 self.agi = BLOODLORD.bonus(self.pid)
-                Unit[self.source].bonus_agi = Unit[self.source].bonus_agi + self.agi
+                u.bonus_agi = u.bonus_agi + self.agi
                 self.bonus = self.agi
             else
                 self.stat = "Strength"
                 self.str = BLOODLORD.bonus(self.pid)
-                Unit[self.source].bonus_str = Unit[self.source].bonus_str + self.str
+                u.bonus_str = u.bonus_str + self.str
                 self.bonus = self.str
             end
 
             self.bat = 0.7
-            Unit[self.target].bonus_bat = Unit[self.target].bonus_bat * self.bat
-            TQ:callDelayed(BLOODLORD.dur(self.pid) * LBOOST[self.pid], DestroyEffect, AddSpecialEffectTarget("war3mapImported\\Burning Rage Red.mdx", self.source, "overhead"))
+            u.bonus_bat = u.bonus_bat * self.bat
+            self.sfx = u:addEffect("war3mapImported\\Burning Rage Red.mdx", "overhead")
             SetUnitAnimationByIndex(self.source, 3)
 
             BLOODBANK.set(self.tpid, 0)
@@ -1353,15 +1362,18 @@ OnInit.global("Buffs", function(Require)
         thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
 
         function thistype:onRemove()
-            DestroyEffect(self.sfx)
-            Unit[self.target].bonus_bat = Unit[self.target].bonus_bat / self.as
+            local u = Unit[self.target]
+            u:removeEffect(self.sfx)
+            u.bonus_bat = u.bonus_bat / self.as
         end
 
         function thistype:onApply()
-            self.as = 1.25
-            Unit[self.target].bonus_bat = Unit[self.target].bonus_bat * self.as
+            local u = Unit[self.target]
 
-            self.sfx = AddSpecialEffectTarget("Abilities\\Spells\\Orc\\StasisTrap\\StasisTotemTarget.mdl", self.target, "overhead")
+            self.as = 1.25
+            u.bonus_bat = u.bonus_bat * self.as
+
+            self.sfx = u:addEffect("Abilities\\Spells\\Orc\\StasisTrap\\StasisTotemTarget.mdl", "overhead")
         end
     end
 
@@ -1398,17 +1410,17 @@ OnInit.global("Buffs", function(Require)
         function thistype:onRemove()
             EVENT_ON_STRUCK_MULTIPLIER:unregister_unit_action(self.target, on_hit)
             AddUnitAnimationProperties(self.target, "ready", false)
-            DestroyEffect(self.sfx)
+            Unit[self.target]:removeEffect(self.sfx)
         end
 
         function thistype:onApply()
             EVENT_ON_STRUCK_MULTIPLIER:register_unit_action(self.target, on_hit)
             AddUnitAnimationProperties(self.target, "ready", true)
 
-            self.sfx = AddSpecialEffectTarget("war3mapImported\\Buff_Shield_Non.mdx", self.target, "chest")
+            self.sfx = Unit[self.target]:addEffect("war3mapImported\\Buff_Shield_Non.mdx", "chest")
 
             if LIMITBREAK.flag[self.tpid] & 0x1 > 0 then
-                BlzSetSpecialEffectColor(self.sfx, 255, 255, 0)
+                self.sfx.color = {255, 255, 0}
             end
         end
     end
@@ -1424,14 +1436,14 @@ OnInit.global("Buffs", function(Require)
         thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
 
         function thistype:onRemove()
-            DestroyEffect(self.sfx)
+            Unit[self.target]:removeEffect(self.sfx)
 
             Unit[self.target].damage_percent = Unit[self.target].damage_percent - self.dmg
         end
 
         function thistype:onApply()
             self.dmg = 0.2
-            self.sfx = AddSpecialEffectTarget("war3mapImported\\BattleCryTarget.mdx", self.target, "overhead")
+            self.sfx = Unit[self.target]:addEffect("war3mapImported\\BattleCryTarget.mdx", "overhead")
 
             Unit[self.target].damage_percent = Unit[self.target].damage_percent + self.dmg
         end
@@ -1448,21 +1460,23 @@ OnInit.global("Buffs", function(Require)
         thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
 
         function thistype:onRemove()
-            Unit[self.target].mr = Unit[self.target].mr / self.mr
-            DestroyEffect(self.sfx)
+            local u = Unit[self.target]
+            u.mr = Unit[self.target].mr / self.mr
+            u:removeEffect(self.sfx)
 
-            Unit[self.target].damage_percent = Unit[self.target].damage_percent + self.dmg
+            u.damage_percent = u.damage_percent + self.dmg
         end
 
         function thistype:onApply()
+            local u = Unit[self.target]
             self.mr = (LIMITBREAK.flag[self.pid] & 0x4 > 0 and 1.4) or 1
 
-            Unit[self.target].mr = Unit[self.target].mr * self.mr
+            u.mr = u.mr * self.mr
             self.dmg = 0.4
 
-            self.sfx = AddSpecialEffectTarget("Abilities\\Spells\\Other\\HowlOfTerror\\HowlTarget.mdl", self.target, "overhead")
+            self.sfx = u:addEffect("Abilities\\Spells\\Other\\HowlOfTerror\\HowlTarget.mdl", "overhead")
 
-            Unit[self.target].damage_percent = Unit[self.target].damage_percent - self.dmg
+            u.damage_percent = Unit[self.target].damage_percent - self.dmg
         end
     end
 
@@ -1499,7 +1513,7 @@ OnInit.global("Buffs", function(Require)
         end
 
         function thistype:onRemove()
-            DestroyEffect(self.sfx)
+            Unit[self.target]:removeEffect(self.sfx)
             DestroyTextTag(self.text)
 
             if self.totalRegen >= 0 then
@@ -1533,7 +1547,7 @@ OnInit.global("Buffs", function(Require)
 
             Unit[self.target].hidehp = true
 
-            self.sfx = AddSpecialEffectTarget("war3mapImported\\DemonicAdornment.mdx", self.target, "head")
+            self.sfx = Unit[self.target]:addEffect("war3mapImported\\DemonicAdornment.mdx", "head")
 
             self.timer = TQ:callDelayed(FPS_32, periodic, self)
         end
@@ -1550,11 +1564,12 @@ OnInit.global("Buffs", function(Require)
         thistype.STACK_TYPE      = BUFF_STACK_NONE
 
         function thistype:onRemove()
-            Unit[self.target].ms_flat = Unit[self.target].ms_flat - self.ms
-            Unit[self.target].armor_pen_percent = Unit[self.target].armor_pen_percent - self.pen
+            local u = Unit[self.target]
+            u.ms_flat = u.ms_flat - self.ms
+            u.armor_pen_percent = u.armor_pen_percent - self.pen
 
             TQ:disableCallback(self.timer)
-            DestroyEffect(self.sfx)
+            u:removeEffect(self.sfx)
         end
 
         local function periodic(self)
@@ -1563,12 +1578,13 @@ OnInit.global("Buffs", function(Require)
         end
 
         function thistype:onApply()
+            local u = Unit[self.target]
             self.pen = RAMPAGE.pen(self.tpid)
             self.ms = 100
-            Unit[self.target].armor_pen_percent = Unit[self.target].armor_pen_percent + self.pen
-            Unit[self.target].ms_flat = Unit[self.target].ms_flat + self.ms
+            u.armor_pen_percent = u.armor_pen_percent + self.pen
+            u.ms_flat = u.ms_flat + self.ms
 
-            self.sfx = AddSpecialEffectTarget("war3mapImported\\Windwalk Blood.mdx", self.source, "origin")
+            self.sfx = u:addEffect("war3mapImported\\Windwalk Blood.mdx", "origin")
             periodic(self)
         end
     end
@@ -1584,16 +1600,18 @@ OnInit.global("Buffs", function(Require)
         thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
 
         function thistype:onRemove()
-            Unit[self.target].ms_percent = Unit[self.target].ms_percent + self.ms
-            Unit[self.target].bonus_bat = Unit[self.target].bonus_bat / self.bat
+            local u = Unit[self.target]
+            u.ms_percent = u.ms_percent + self.ms
+            u.bonus_bat = u.bonus_bat / self.bat
         end
 
         function thistype:onApply()
-            self.ms = 0.25 * (math.min(1, Unit[self.target].ms_percent))
+            local u = Unit[self.target]
+            self.ms = 0.25 * (math.min(1, u.ms_percent))
             self.bat = 1.25
 
-            Unit[self.target].ms_percent = Unit[self.target].ms_percent - self.ms
-            Unit[self.target].bonus_bat = Unit[self.target].bonus_bat * self.bat
+            u.ms_percent = u.ms_percent - self.ms
+            u.bonus_bat = u.bonus_bat * self.bat
         end
     end
 
@@ -1615,13 +1633,13 @@ OnInit.global("Buffs", function(Require)
             EVENT_ON_STRUCK:unregister_unit_action(self.target, on_hit)
             Unit[self.target].bonus_armor = Unit[self.target].bonus_armor - self.armor
 
-            DestroyEffect(self.sfx)
+            Unit[self.target]:removeEffect(self.sfx)
         end
 
         function thistype:onApply()
             self.armor = 100
             EVENT_ON_STRUCK:register_unit_action(self.target, on_hit)
-            self.sfx = AddSpecialEffectTarget("Abilities\\Spells\\Undead\\FrostArmor\\FrostArmorTarget.mdl", self.source, "chest")
+            self.sfx = Unit[self.target]:addEffect("Abilities\\Spells\\Undead\\FrostArmor\\FrostArmorTarget.mdl", "chest")
 
             Unit[self.target].bonus_armor = Unit[self.target].bonus_armor + self.armor
         end
@@ -1817,10 +1835,11 @@ OnInit.global("Buffs", function(Require)
         end
 
         function thistype:onRemove()
+            local u = Unit[self.target]
             SetUnitScale(self.target, BlzGetUnitRealField(self.target, UNIT_RF_SCALING_VALUE), BlzGetUnitRealField(self.target, UNIT_RF_SCALING_VALUE), BlzGetUnitRealField(self.target, UNIT_RF_SCALING_VALUE))
-            Unit[self.target].mr = Unit[self.target].mr / self.mr
-            Unit[self.target].damage_percent = Unit[self.target].damage_percent - self.dmg
-            Unit[self.target].armor_percent = Unit[self.target].armor_percent - self.armor
+            u.mr = u.mr / self.mr
+            u.damage_percent = u.damage_percent - self.dmg
+            u.armor_percent = u.armor_percent - self.armor
 
             if self.timer then
                 TQ:disableCallback(self.timer)
@@ -1828,14 +1847,15 @@ OnInit.global("Buffs", function(Require)
         end
 
         function thistype:onApply()
+            local u = Unit[self.target]
             local size = BlzGetUnitRealField(self.target, UNIT_RF_SCALING_VALUE)
 
             self.timer = TQ:callDelayed(FPS_32, grow, self, size, 60)
             self.mr = 0.2
 
-            Unit[self.target].mr = Unit[self.target].mr * self.mr
-            Unit[self.target].damage_percent = Unit[self.target].damage_percent + self.dmg
-            Unit[self.target].armor_percent = Unit[self.target].armor_percent + self.armor
+            u.mr = u.mr * self.mr
+            u.damage_percent = u.damage_percent + self.dmg
+            u.armor_percent = u.armor_percent + self.armor
         end
     end
 
@@ -1851,11 +1871,11 @@ OnInit.global("Buffs", function(Require)
 
         function thistype:onRemove()
             Unit[self.target].bonus_bat = Unit[self.target].bonus_bat * self.bat
-            DestroyEffect(self.sfx)
+            Unit[self.target]:removeEffect(self.sfx)
         end
 
         function thistype:onApply()
-            self.sfx = AddSpecialEffectTarget("Abilities\\Spells\\Orc\\Bloodlust\\BloodlustTarget.mdl", self.target, "chest")
+            self.sfx = Unit[self.target]:addEffect("Abilities\\Spells\\Orc\\Bloodlust\\BloodlustTarget.mdl", "chest")
             self.bat = 1.5
 
             Unit[self.target].bonus_bat = Unit[self.target].bonus_bat / self.bat
@@ -1898,18 +1918,20 @@ OnInit.global("Buffs", function(Require)
         thistype.CANNOT_PURGE    = true
 
        local function periodic(self)
+            local u = Unit[self.target]
+
             if UnitAlive(self.target) and
-                Unit[self.target].x == GetUnitX(self.target) and
-                Unit[self.target].y == GetUnitY(self.target)
+                u.x == GetUnitX(self.target) and
+                u.y == GetUnitY(self.target)
             then
                 self.count = self.count + 1
                 if self.count >= 3 then
-                    Unit[self.target].dr = Unit[self.target].dr / self.mult
+                    u.dr = u.dr / self.mult
                     self.mult = 0.85
-                    Unit[self.target].dr = Unit[self.target].dr * self.mult
+                    u.dr = u.dr * self.mult
                 end
             else
-                Unit[self.target].dr = Unit[self.target].dr / self.mult
+                u.dr = u.dr / self.mult
                 self.mult = 1.
                 self.count = 0
             end
@@ -1961,11 +1983,11 @@ OnInit.global("Buffs", function(Require)
 
         function thistype:onRemove()
             Unit[self.target].ms_percent = Unit[self.target].ms_percent + self.ms
-            DestroyEffect(self.sfx)
+            Unit[self.target]:removeEffect(self.sfx)
         end
 
         function thistype:onApply()
-            self.sfx = AddSpecialEffectTarget("Abilities\\Spells\\Undead\\Cripple\\CrippleTarget.mdl", self.target, "chest")
+            self.sfx = Unit[self.target]:addEffect("Abilities\\Spells\\Undead\\Cripple\\CrippleTarget.mdl", "chest")
             self.ms = 0.5 * (math.min(1, Unit[self.target].ms_percent))
 
             Unit[self.target].ms_percent = Unit[self.target].ms_percent - self.ms
@@ -2027,13 +2049,13 @@ OnInit.global("Buffs", function(Require)
 
         function thistype:onRemove()
             Unit[self.target].mr = Unit[self.target].mr / self.mr
-            DestroyEffect(self.sfx)
+            Unit[self.target]:removeEffect(self.sfx)
         end
 
         function thistype:onApply()
             self.mr = 0.333
             Unit[self.target].mr = Unit[self.target].mr * self.mr
-            self.sfx = AddSpecialEffectTarget("war3mapImported\\DemonShieldTarget3A.mdx", self.target, "origin")
+            self.sfx = Unit[self.target]:addEffect("war3mapImported\\DemonShieldTarget3A.mdx", "origin")
         end
     end
 
@@ -2049,13 +2071,13 @@ OnInit.global("Buffs", function(Require)
 
         function thistype:onRemove()
             Unit[self.target].mr = Unit[self.target].mr / self.mr
-            DestroyEffect(self.sfx)
+            Unit[self.target]:removeEffect(self.sfx)
         end
 
         function thistype:onApply()
             self.mr = 0.666
             Unit[self.target].mr = Unit[self.target].mr * self.mr
-            self.sfx = AddSpecialEffectTarget("war3mapImported\\DemonShieldTarget3A.mdx", self.target, "origin")
+            self.sfx = Unit[self.target]:addEffect("war3mapImported\\DemonShieldTarget3A.mdx", "origin")
         end
     end
 
@@ -2235,12 +2257,12 @@ OnInit.global("Buffs", function(Require)
 
         function thistype:onRemove()
             UnitAddBonus(self.target, BONUS_ATTACK_SPEED, self.as)
-            DestroyEffect(self.sfx)
+            Unit[self.target]:removeEffect(self.sfx)
         end
 
         function thistype:onApply()
             self.as = 0.35
-            self.sfx = AddSpecialEffectTarget("Abilities\\Spells\\Orc\\StasisTrap\\StasisTotemTarget.mdl", self.target, "overhead")
+            self.sfx = Unit[self.target]:addEffect("Abilities\\Spells\\Orc\\StasisTrap\\StasisTotemTarget.mdl", "overhead")
 
             UnitAddBonus(self.target, BONUS_ATTACK_SPEED, - self.as)
         end
@@ -2259,12 +2281,12 @@ OnInit.global("Buffs", function(Require)
 
         function thistype:onRemove()
             Unit[self.target].armor_percent = Unit[self.target].armor_percent + self.armor
-            DestroyEffect(self.sfx)
+            Unit[self.target]:removeEffect(self.sfx)
         end
 
         function thistype:onApply()
             self.armor = 0.12 + 0.02 * GetUnitAbilityLevel(self.source, FourCC('A06H'))
-            self.sfx = AddSpecialEffectTarget("Abilities\\Spells\\Other\\HowlOfTerror\\HowlTarget.mdl", self.target, "chest")
+            self.sfx = Unit[self.target]:addEffect("Abilities\\Spells\\Other\\HowlOfTerror\\HowlTarget.mdl", "chest")
 
             Unit[self.target].armor_percent = Unit[self.target].armor_percent - self.armor
         end
@@ -2292,7 +2314,7 @@ OnInit.global("Buffs", function(Require)
             UnitAddBonus(self.target, BONUS_ATTACK_SPEED, self.as)
             Unit[self.target].ms_percent = Unit[self.target].ms_percent + self.ms
             Unit[self.target].armor_percent = Unit[self.target].armor_percent + self.armor
-            DestroyEffect(self.sfx)
+            Unit[self.target]:removeEffect(self.sfx)
             TQ:disableCallback(self.timer)
         end
 
@@ -2304,7 +2326,7 @@ OnInit.global("Buffs", function(Require)
             UnitAddBonus(self.target, BONUS_ATTACK_SPEED, - self.as)
             Unit[self.target].ms_percent = Unit[self.target].ms_percent - self.ms
             Unit[self.target].armor_percent = Unit[self.target].armor_percent - self.armor
-            self.sfx = AddSpecialEffectTarget("Abilities\\Spells\\Other\\AcidBomb\\BottleImpact.mdl", self.target, "chest")
+            self.sfx = Unit[self.target]:addEffect("Abilities\\Spells\\Other\\AcidBomb\\BottleImpact.mdl", "chest")
 
             self.timer = TQ:callDelayed(0.25, periodic, self)
         end
@@ -2347,16 +2369,16 @@ OnInit.global("Buffs", function(Require)
 
         function thistype:onRemove()
             masterElement[self.tpid] = 0
-            DestroyEffect(self.sfx)
-            DestroyEffect(self.sfx2)
+            Unit[self.target]:removeEffect(self.sfx)
+            Unit[self.target]:removeEffect(self.sfx2)
             Unit[self.target].spellboost = Unit[self.target].spellboost - self.spellboost
         end
 
         function thistype:onApply()
             self.spellboost = 0.15
             masterElement[self.tpid] = ELEMENTFIRE.value
-            self.sfx = AddSpecialEffectTarget("war3mapImported\\Fire Uber.mdx", self.target, "right hand")
-            self.sfx2 = AddSpecialEffectTarget("war3mapImported\\Fire Uber.mdx", self.target, "left hand")
+            self.sfx = Unit[self.target]:addEffect("war3mapImported\\Fire Uber.mdx", "right hand")
+            self.sfx2 = Unit[self.target]:addEffect("war3mapImported\\Fire Uber.mdx", "left hand")
             Unit[self.target].spellboost = Unit[self.target].spellboost + self.spellboost
         end
     end
@@ -2375,16 +2397,16 @@ OnInit.global("Buffs", function(Require)
         function thistype:onRemove()
             masterElement[self.tpid] = 0
             Unit[self.target].mana_regen_max = Unit[self.target].mana_regen_max - self.regen
-            DestroyEffect(self.sfx)
-            DestroyEffect(self.sfx2)
+            Unit[self.target]:removeEffect(self.sfx)
+            Unit[self.target]:removeEffect(self.sfx2)
         end
 
         function thistype:onApply()
             self.regen = 1.5
             masterElement[self.tpid] = ELEMENTICE.value
             Unit[self.target].mana_regen_max = Unit[self.target].mana_regen_max + self.regen
-            self.sfx = AddSpecialEffectTarget("war3mapImported\\Water High.mdx", self.target, "right hand")
-            self.sfx2 = AddSpecialEffectTarget("war3mapImported\\Water High.mdx", self.target, "left hand")
+            self.sfx = Unit[self.target]:addEffect("war3mapImported\\Water High.mdx", "right hand")
+            self.sfx2 = Unit[self.target]:addEffect("war3mapImported\\Water High.mdx", "left hand")
         end
     end
 
@@ -2425,8 +2447,8 @@ OnInit.global("Buffs", function(Require)
 
         function thistype:onRemove()
             masterElement[self.tpid] = 0
-            DestroyEffect(self.sfx)
-            DestroyEffect(self.sfx2)
+            Unit[self.target]:removeEffect(self.sfx)
+            Unit[self.target]:removeEffect(self.sfx2)
             Unit[self.target].ms_percent = Unit[self.target].ms_percent - self.ms
 
             TQ:disableCallback(self.timer)
@@ -2434,8 +2456,8 @@ OnInit.global("Buffs", function(Require)
 
         function thistype:onApply()
             masterElement[self.tpid] = ELEMENTLIGHTNING.value
-            self.sfx = AddSpecialEffectTarget("war3mapImported\\Storm Cast.mdx", self.target, "right hand")
-            self.sfx2 = AddSpecialEffectTarget("war3mapImported\\Storm Cast.mdx", self.target, "left hand")
+            self.sfx = Unit[self.target]:addEffect("war3mapImported\\Storm Cast.mdx", "right hand")
+            self.sfx2 = Unit[self.target]:addEffect("war3mapImported\\Storm Cast.mdx", "left hand")
             self.ms = 0.4 * (math.min(1, Unit[self.target].ms_percent))
             Unit[self.target].ms_percent = Unit[self.target].ms_percent + self.ms
 
@@ -2456,16 +2478,16 @@ OnInit.global("Buffs", function(Require)
 
         function thistype:onRemove()
             masterElement[self.tpid] = 0
-            DestroyEffect(self.sfx)
-            DestroyEffect(self.sfx2)
+            Unit[self.target]:removeEffect(self.sfx)
+            Unit[self.target]:removeEffect(self.sfx2)
             Unit[self.target].dr = Unit[self.target].dr / self.dr
         end
 
         function thistype:onApply()
             self.dr = 0.75
             masterElement[self.tpid] = ELEMENTEARTH.value
-            self.sfx = AddSpecialEffectTarget("war3mapImported\\Earth High.mdx", self.target, "right hand")
-            self.sfx2 = AddSpecialEffectTarget("war3mapImported\\Earth High.mdx", self.target, "left hand")
+            self.sfx = Unit[self.target]:addEffect("war3mapImported\\Earth High.mdx", "right hand")
+            self.sfx2 = Unit[self.target]:addEffect("war3mapImported\\Earth High.mdx", "left hand")
             Unit[self.target].dr = Unit[self.target].dr * self.dr
         end
     end
@@ -2556,7 +2578,7 @@ OnInit.global("Buffs", function(Require)
         function thistype:onRemove()
             UnitAddBonus(self.target, BONUS_ATTACK_SPEED, self.as)
             Unit[self.target].ms_percent = Unit[self.target].ms_percent + self.ms
-            DestroyEffect(self.sfx)
+            Unit[self.target]:removeEffect(self.sfx)
         end
 
         function thistype:onApply()
@@ -2564,7 +2586,7 @@ OnInit.global("Buffs", function(Require)
             self.ms = 0.35 * (math.min(1, Unit[self.target].ms_percent))
 
             Unit[self.target].ms_percent = Unit[self.target].ms_percent - self.ms
-            self.sfx = AddSpecialEffectTarget("Abilities\\Spells\\Other\\FrostDamage\\FrostDamage.mdl", self.target, "chest")
+            self.sfx = Unit[self.target]:addEffect("Abilities\\Spells\\Other\\FrostDamage\\FrostDamage.mdl", "chest")
 
             UnitAddBonus(self.target, BONUS_ATTACK_SPEED, - self.as)
         end
@@ -2603,13 +2625,13 @@ OnInit.global("Buffs", function(Require)
         function thistype:onRemove()
             UnitAddBonus(self.target, BONUS_ATTACK_SPEED, self.as)
             Unit[self.target].ms_percent = Unit[self.target].ms_percent + self.ms
-            DestroyEffect(self.sfx)
+            Unit[self.target]:removeEffect(self.sfx)
         end
 
         function thistype:onApply()
             self.as = 0.3
             self.ms = 0.5 * (math.min(1, Unit[self.target].ms_percent))
-            self.sfx = AddSpecialEffectTarget("Abilities\\Spells\\Other\\FrostDamage\\FrostDamage.mdl", self.target, "chest")
+            self.sfx = Unit[self.target]:addEffect("Abilities\\Spells\\Other\\FrostDamage\\FrostDamage.mdl", "chest")
 
             UnitAddBonus(self.target, BONUS_ATTACK_SPEED, - self.as)
             Unit[self.target].ms_percent = Unit[self.target].ms_percent - self.ms
@@ -2630,13 +2652,13 @@ OnInit.global("Buffs", function(Require)
         function thistype:onRemove()
             UnitAddBonus(self.target, BONUS_ATTACK_SPEED, self.as)
             Unit[self.target].ms_percent = Unit[self.target].ms_percent + self.ms
-            DestroyEffect(self.sfx)
+            Unit[self.target]:removeEffect(self.sfx)
         end
 
         function thistype:onApply()
             self.as = 0.3
             self.ms = 0.3 * (math.min(1, Unit[self.target].ms_percent))
-            self.sfx = AddSpecialEffectTarget("Abilities\\Spells\\Human\\slow\\slowtarget.mdl", self.target, "origin")
+            self.sfx = Unit[self.target]:addEffect("Abilities\\Spells\\Human\\slow\\slowtarget.mdl", "origin")
 
             UnitAddBonus(self.target, BONUS_ATTACK_SPEED, - self.as)
             Unit[self.target].ms_percent = Unit[self.target].ms_percent - self.ms
@@ -2656,13 +2678,13 @@ OnInit.global("Buffs", function(Require)
         function thistype:onRemove()
             UnitAddBonus(self.target, BONUS_ATTACK_SPEED, self.as)
             Unit[self.target].ms_percent = Unit[self.target].ms_percent + self.ms
-            DestroyEffect(self.sfx)
+            Unit[self.target]:removeEffect(self.sfx)
         end
 
         function thistype:onApply()
             self.as = 0.3
             self.ms = 0.3 * (math.min(1, Unit[self.target].ms_percent))
-            self.sfx = AddSpecialEffectTarget("Abilities\\Spells\\Orc\\StasisTrap\\StasisTotemTarget.mdl", self.target, "overhead")
+            self.sfx = Unit[self.target]:addEffect("Abilities\\Spells\\Orc\\StasisTrap\\StasisTotemTarget.mdl", "overhead")
 
             Unit[self.target].ms_percent = Unit[self.target].ms_percent - self.ms
             UnitAddBonus(self.target, BONUS_ATTACK_SPEED, - self.as)
@@ -2682,13 +2704,13 @@ OnInit.global("Buffs", function(Require)
         function thistype:onRemove()
             UnitAddBonus(self.target, BONUS_ATTACK_SPEED, self. as)
             Unit[self.target].ms_percent = Unit[self.target].ms_percent + self.ms
-            DestroyEffect(self.sfx)
+            Unit[self.target]:removeEffect(self.sfx)
         end
 
         function thistype:onApply()
             self.as = 0.35
             self.ms = 0.35 * (math.min(1, Unit[self.target].ms_percent))
-            self.sfx = AddSpecialEffectTarget("Abilities\\Spells\\Orc\\StasisTrap\\StasisTotemTarget.mdl", self.target, "overhead")
+            self.sfx = Unit[self.target]:addEffect("Abilities\\Spells\\Orc\\StasisTrap\\StasisTotemTarget.mdl", "overhead")
 
             UnitAddBonus(self.target, BONUS_ATTACK_SPEED, - self.as)
             Unit[self.target].ms_percent = Unit[self.target].ms_percent - self.ms
@@ -2706,13 +2728,13 @@ OnInit.global("Buffs", function(Require)
         thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
 
         function thistype:onRemove()
-            DestroyEffect(self.sfx)
+            Unit[self.target]:removeEffect(self.sfx)
             Unit[self.target].evasion = Unit[self.target].evasion - self.evasion
         end
 
         function thistype:onApply()
             self.evasion = 30
-            self.sfx = AddSpecialEffectTarget("war3mapImported\\Windwalk.mdx", self.target, "origin")
+            self.sfx = Unit[self.target]:addEffect("war3mapImported\\Windwalk.mdx", "origin")
             Unit[self.target].evasion = Unit[self.target].evasion + self.evasion
         end
     end
@@ -2735,11 +2757,11 @@ OnInit.global("Buffs", function(Require)
 
         function thistype:onRemove()
             EVENT_ON_STRUCK:unregister_unit_action(self.target, onStruck)
-            DestroyEffect(self.sfx)
+            Unit[self.target]:removeEffect(self.sfx)
         end
 
         function thistype:onApply()
-            self.sfx = AddSpecialEffectTarget("Abilities\\Spells\\Undead\\ThornyShield\\ThornyShieldTargetChestLeft.mdl", self.target, "chest")
+            self.sfx = Unit[self.target]:addEffect("Abilities\\Spells\\Undead\\ThornyShield\\ThornyShieldTargetChestLeft.mdl", "chest")
             EVENT_ON_STRUCK:register_unit_action(self.target, onStruck)
 
             TQ:callDelayed(2.5, DestroyEffect, AddSpecialEffectTarget("Abilities\\Spells\\NightElf\\ThornsAura\\ThornsAura.mdl", self.target, "origin"))
@@ -2958,24 +2980,6 @@ OnInit.global("Buffs", function(Require)
 
         local DB = DARKBLADE
 
-        local function damage(target, source, _, amount)
-            DamageTarget(source, target, amount, ATTACK_TYPE_NORMAL, PHYSICAL, DARKASCENSION.tag)
-        end
-
-        local function valid_target(object, self, orig_target)
-            if type(self) == "table" then
-                self = self.owner
-            else
-                self = GetOwningPlayer(self)
-            end
-
-            return UnitAlive(object) and IsUnitEnemy(object, self) and object ~= orig_target
-        end
-
-        local function on_hit(source, orig_target, amount_ref)
-            ALICE_ForAllObjectsInRangeDo(damage, GetUnitX(orig_target), GetUnitY(orig_target), 300., "unit", valid_target, source, orig_target, amount_ref.value)
-        end
-
         function thistype:onRemove()
             local u = Unit[self.target]
 
@@ -2984,8 +2988,6 @@ OnInit.global("Buffs", function(Require)
             u.base_bat = 2.0
 
             UnitDisableAbility(self.target, DB.id, false)
-
-            EVENT_ON_HIT_MULTIPLIER:unregister_unit_action(self.target, on_hit)
         end
 
         function thistype:onApply()
@@ -3002,9 +3004,6 @@ OnInit.global("Buffs", function(Require)
             UnitDisableAbility(self.target, DB.id, true)
             BlzUnitHideAbility(self.target, DB.id, false)
             DarkBladeBuff:add(self.target, self.target):duration(DARKASCENSION.dur(self.pid) * LBOOST[self.pid])
-
-            -- splash attack
-            EVENT_ON_HIT_MULTIPLIER:register_unit_action(self.target, on_hit)
         end
     end
 
@@ -3021,6 +3020,10 @@ OnInit.global("Buffs", function(Require)
         local DB = DARKBLADE
         local GetWidgetLife, SetWidgetLife, SetUnitState, GetUnitState, BlzGetUnitMaxMana = GetWidgetLife, SetWidgetLife, SetUnitState, GetUnitState, BlzGetUnitMaxMana
         local GetHeroStr, DamageTarget, UnitRefreshBuff = GetHeroStr, DamageTarget, UnitRefreshBuff
+
+        local function damage(target, source, amount)
+            DamageTarget(source, target, amount, ATTACK_TYPE_NORMAL, MAGIC, DB.tag)
+        end
 
         local function on_hit(source, target)
             local maxmp = BlzGetUnitMaxMana(source)
@@ -3041,7 +3044,13 @@ OnInit.global("Buffs", function(Require)
             end
 
             SetUnitState(source, UNIT_STATE_MANA, GetUnitState(source, UNIT_STATE_MANA) + maxmp * 0.005)
-            DamageTarget(source, target, DB.dmg(u.pid) * BOOST[u.pid], ATTACK_TYPE_NORMAL, MAGIC, DB.tag)
+
+            -- splash effect if morphed
+            if u.morphed then
+                ALICE_ForAllObjectsInRangeDo(damage, GetUnitX(target), GetUnitY(target), 300., "unit", valid_damage_target, source, DB.dmg(u.pid) * BOOST[u.pid])
+            else
+                DamageTarget(source, target, DB.dmg(u.pid) * BOOST[u.pid], ATTACK_TYPE_NORMAL, MAGIC, DB.tag)
+            end
         end
 
         function thistype:onRemove()
@@ -3200,12 +3209,12 @@ OnInit.global("Buffs", function(Require)
 
         function thistype:onRemove()
             BlzPauseUnitEx(self.target, false)
-            DestroyEffect(self.sfx)
+            Unit[self.target]:removeEffect(self.sfx)
         end
 
         function thistype:onApply()
             BlzPauseUnitEx(self.target, true)
-            self.sfx = AddSpecialEffectTarget("Abilities\\Spells\\Undead\\FreezingBreath\\FreezingBreathTargetArt.mdl", self.target, "chest")
+            self.sfx = Unit[self.target]:addEffect("Abilities\\Spells\\Undead\\FreezingBreath\\FreezingBreathTargetArt.mdl", "chest")
         end
     end
 
@@ -3221,12 +3230,12 @@ OnInit.global("Buffs", function(Require)
 
         function thistype:onRemove()
             BlzPauseUnitEx(self.target, false)
-            DestroyEffect(self.sfx)
+            Unit[self.target]:removeEffect(self.sfx)
         end
 
         function thistype:onApply()
             BlzPauseUnitEx(self.target, true)
-            self.sfx = AddSpecialEffectTarget("Abilities\\Spells\\Human\\Thunderclap\\ThunderclapTarget.mdl", self.target, "overhead")
+            self.sfx = Unit[self.target]:addEffect("Abilities\\Spells\\Human\\Thunderclap\\ThunderclapTarget.mdl", "overhead")
         end
     end
 
@@ -3247,14 +3256,14 @@ OnInit.global("Buffs", function(Require)
         end
 
         function thistype:onRemove()
-            DestroyEffect(self.sfx)
+            Unit[self.target]:removeEffect(self.sfx)
 
             EVENT_ON_STRUCK_MULTIPLIER:unregister_unit_action(self.target, onStruck)
         end
 
         function thistype:onApply()
             self.dm = 0.15
-            self.sfx = AddSpecialEffectTarget("Abilities\\Spells\\NightElf\\shadowstrike\\shadowstrike.mdl", self.target, "overhead")
+            self.sfx = Unit[self.target]:addEffect("Abilities\\Spells\\NightElf\\shadowstrike\\shadowstrike.mdl", "overhead")
 
             EVENT_ON_STRUCK_MULTIPLIER:register_unit_action(self.target, onStruck)
         end
@@ -3271,14 +3280,14 @@ OnInit.global("Buffs", function(Require)
         thistype.STACK_TYPE      = BUFF_STACK_NONE
 
         function thistype:onRemove()
-            DestroyEffect(self.sfx)
+            Unit[self.target]:removeEffect(self.sfx)
 
             Unit[self.target].dr = Unit[self.target].dr / self.dr
         end
 
         function thistype:onApply()
             self.dr = 0.7
-            self.sfx = AddSpecialEffectTarget("war3mapImported\\SoulArmor.mdx", self.target, "chest")
+            self.sfx = Unit[self.target]:addEffect("war3mapImported\\SoulArmor.mdx", "chest")
 
             Unit[self.target].dr = Unit[self.target].dr * self.dr
         end
@@ -3321,13 +3330,13 @@ OnInit.global("Buffs", function(Require)
 
         function thistype:onRemove()
             EVENT_ON_HIT_AFTER_REDUCTIONS:unregister_unit_action(self.target, on_hit)
-            DestroyEffect(self.sfx)
+            Unit[self.target]:removeEffect(self.sfx)
         end
 
         function thistype:onApply()
             self.leech = 0.05
             EVENT_ON_HIT_AFTER_REDUCTIONS:register_unit_action(self.target, on_hit)
-            self.sfx = AddSpecialEffectTarget("Abilities\\Spells\\Items\\VampiricPotion\\VampPotionCaster.mdl", self.target, "origin")
+            self.sfx = Unit[self.target]:addEffect("Abilities\\Spells\\Items\\VampiricPotion\\VampPotionCaster.mdl", "origin")
         end
     end
 
