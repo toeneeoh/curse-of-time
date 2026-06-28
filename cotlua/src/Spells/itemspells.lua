@@ -279,19 +279,19 @@ OnInit.final("ItemSpells", function(Require)
 
                 local tbl = ItemData[wings.id].sfx[wings.sfx_index]
 
-                DestroyEffect(wings.sfx)
-                wings.sfx = AddSpecialEffectTarget(tbl.path, self.caster, tbl.attach)
+                Unit[self.caster]:removeEffect(wings.sfx)
+                wings.sfx = Unit[self.caster]:addEffect(tbl.path, tbl.attach)
             end
         end
 
         function thistype.onUnequip(itm, id, index, orig_holder)
-            DestroyEffect(itm.sfx)
+            Unit[orig_holder]:removeEffect(itm.sfx)
         end
 
         function thistype.onEquip(itm, id, index)
             local sfx = ItemData[itm.id].sfx[itm.sfx_index or itm.cached_stats[index]]
 
-            itm.sfx = AddSpecialEffectTarget(sfx.path, itm.holder, sfx.attach)
+            itm.sfx = Unit[itm.holder]:addEffect(sfx.path, sfx.attach)
         end
     end
 
@@ -347,15 +347,15 @@ OnInit.final("ItemSpells", function(Require)
         end
 
         function thistype.onUnequip(itm, id, index, orig_holder)
-            DestroyEffect(itm.sfx)
-            DestroyEffect(itm.sfx2)
+            Unit[orig_holder]:removeEffect(itm.sfx)
+            Unit[orig_holder]:removeEffect(itm.sfx2)
         end
 
         function thistype.onEquip(itm, id, index)
             local tbl = ItemData[itm.id].sfx
 
-            itm.sfx = AddSpecialEffectTarget(tbl[1].path, itm.holder, tbl[1].attach)
-            itm.sfx2 = AddSpecialEffectTarget(tbl[2].path, itm.holder, tbl[2].attach)
+            itm.sfx = Unit[itm.holder]:addEffect(tbl[1].path, tbl[1].attach)
+            itm.sfx2 = Unit[itm.holder]:addEffect(tbl[2].path, tbl[2].attach)
 
             BlzSetAbilityRealLevelField(BlzGetUnitAbility(itm.holder, id), ABILITY_RLF_MAXIMUM_RANGE, 0, itm.cached_stats[index])
 
