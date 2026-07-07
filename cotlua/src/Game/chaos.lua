@@ -202,6 +202,7 @@ OnInit.final("Chaos", function(Require)
         -- Azazoth
         Boss.create(BOSS_AZAZOTH, GetRectCenterX(gg_rct_Azazoth_Boss_Spawn), GetRectCenterY(gg_rct_Azazoth_Boss_Spawn), 270.00, FourCC('O02T'), "Azazoth", 380,
         12, 2000)
+        Boss[BOSS_AZAZOTH].stun_anim = 23 -- flavor
         -- Xallarath
         Boss.create(BOSS_XALLARATH, GetRectCenterX(gg_rct_Forgotten_Leader_Boss_Spawn), GetRectCenterY(gg_rct_Forgotten_Leader_Boss_Spawn), 135.00, FourCC('O03G'), "Xallarath", 360,
         12, 4000)
