@@ -82,6 +82,7 @@ OnInit.global("Users", function()
                 hex = OriginalHex[i + 1],
             }
 
+            self.nameTrimmed = self.name:match("^(.-)#") or self.name
             self.nameColored = self.hex .. self.name .. "|r"
 
             thistype[p] = self
