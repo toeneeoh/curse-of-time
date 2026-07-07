@@ -202,27 +202,12 @@ OnInit.final("Damage", function(Require)
         EVENT_ON_HIT_AFTER_REDUCTIONS:trigger(source, target, amount, amount_after_red, damage_type)
         EVENT_ON_STRUCK_AFTER_REDUCTIONS:trigger(target, source, amount, amount_after_red, damage_type)
 
-        -- damage numbers
-        local colors = amount.color or (crit > 1. and color_tag.crit) or color_tag[damage_type]
-        local zeroDamage = (amount_after_red <= 0. or amount.value <= 0.)
-
-        -- don't log or show zero damage
-        if zeroDamage == false and source ~= target then
-            -- prevent non-crit physical attacks from appearing if they do not reach a 0.05% max health damage threshold 
-            if target == PUNCHING_BAG or damage_type ~= PHYSICAL or crit > 1. or (amount_after_red >= (BlzGetUnitMaxHP(target) * 0.0005)) then
-                ArcingTextTag.create(amount_after_red, target, 1, 1, colors[1], colors[2], colors[3], 0)
-            end
-
-            local damageHex = format("|cff%02X%02X%02X", colors[1], colors[2], colors[3])
-            LogDamage(source, target, damageHex .. RealToString(amount_after_red) .. "|r", false, tag)
-        end
-
         -- pure damage on chaos armor
         if damage_type == PURE and (BlzGetUnitIntegerField(target, UNIT_IF_DEFENSE_TYPE) == ARMOR_CHAOS or BlzGetUnitIntegerField(target, UNIT_IF_DEFENSE_TYPE) == ARMOR_CHAOS_BOSS) then
             BlzSetEventAttackType(ATTACK_TYPE_CHAOS)
         end
 
-        -- after displaying damage numbers
+        -- final damage callbacks before applying engine damage
         EVENT_ON_HIT_FINAL:trigger(source, target, amount, amount_after_red, damage_type)
         EVENT_ON_STRUCK_FINAL:trigger(target, source, amount, amount_after_red, damage_type)
 
@@ -232,23 +217,43 @@ OnInit.final("Damage", function(Require)
             EVENT_ON_FATAL_DAMAGE:trigger(target, source, amount, damage_type)
         else
             -- enemy ai
-            if not target_tbl._casting then
+            if not target_tbl._casting and not target_tbl.silenced then
                 EVENT_ENEMY_AI:trigger(target, source)
+                target_tbl:silence(INTERNAL_AI_COOLDOWN)
             end
 
-            if not source_tbl._casting then
+            if not source_tbl._casting and not source_tbl.silenced then
                 EVENT_ENEMY_AI:trigger(source, target)
+                source_tbl:silence(INTERNAL_AI_COOLDOWN)
             end
         end
 
         -- set final event damage
         blz_set_event_damage(amount.value)
 
-        -- attack count based health
-        if target_tbl.attackCount > 0 then
-            target_tbl.attackCount = target_tbl.attackCount - 1
+        local display_amount = amount_after_red
+
+        -- hit count based health
+        if target_tbl.hit_based_health then
+            local hit_dmg = source_tbl.hit_damage
             blz_set_event_damage(0.00)
-            SetWidgetLife(target, GetWidgetLife(target) - 1)
+            SetWidgetLife(target, GetWidgetLife(target) - hit_dmg)
+            display_amount = hit_dmg
+        end
+
+        -- damage numbers
+        local colors = amount.color or (crit > 1. and color_tag.crit) or color_tag[damage_type]
+        local zeroDamage = display_amount <= 0.
+
+        -- don't log or display zero damage
+        if zeroDamage == false and source ~= target then
+            -- prevent non-crit physical attacks from appearing if they do not reach a 0.05% max health damage threshold 
+            if target == PUNCHING_BAG or damage_type ~= PHYSICAL or crit > 1. or (display_amount >= (BlzGetUnitMaxHP(target) * 0.0005)) then
+                ArcingTextTag.create(display_amount, target, 1, 1, colors[1], colors[2], colors[3], 0)
+            end
+
+            local damageHex = format("|cff%02X%02X%02X", colors[1], colors[2], colors[3])
+            LogDamage(source, target, damageHex .. RealToString(display_amount) .. "|r", false, tag)
         end
 
         return false
