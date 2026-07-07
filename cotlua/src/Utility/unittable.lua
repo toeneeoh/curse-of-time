@@ -15,6 +15,7 @@ OnInit.final("UnitTable", function(Require)
     local MOVESPEED_CAP = 600
     local mtype, floor, rawset, rawget = math.type, math.floor, rawset, rawget
     local EVENT_STAT_CHANGE = EVENT_STAT_CHANGE
+    local INT_REGEN_FACTOR = 0.05
 
     ---@class Unit
     ---@field owner player
@@ -22,7 +23,7 @@ OnInit.final("UnitTable", function(Require)
     ---@field unit unit
     ---@field create function
     ---@field destroy function
-    ---@field attackCount integer
+    ---@field hit_based_health boolean
     ---@field damage integer
     ---@field bonus_damage integer
     ---@field damage_percent number
@@ -120,6 +121,13 @@ OnInit.final("UnitTable", function(Require)
             rawset(proxy, "armor", new_armor)
         end
 
+        local function recalc_damage(tbl)
+            -- recalc DAMAGE (uses bonus_damage + damage_percent)
+            local damage = (BlzGetUnitBaseDamage(tbl.unit, 0) + tbl.proxy.bonus_damage) * tbl.proxy.damage_percent
+            UnitSetBonus(tbl.unit, BONUS_DAMAGE, damage - BlzGetUnitBaseDamage(tbl.unit, 0))
+            rawset(tbl.proxy, "damage", damage)
+        end
+
         -- dot method set operators
         local set_operators = {
             str = function(tbl, val)
@@ -130,10 +138,7 @@ OnInit.final("UnitTable", function(Require)
                 BlzSetUnitMaxHP(tbl.unit, hp)
                 rawset(tbl.proxy, "hp", hp)
 
-                -- recalc DAMAGE (uses bonus_damage + damage_percent)
-                local damage = (BlzGetUnitBaseDamage(tbl.unit, 0) + tbl.proxy.bonus_damage) * tbl.proxy.damage_percent
-                UnitSetBonus(tbl.unit, BONUS_DAMAGE, damage - BlzGetUnitBaseDamage(tbl.unit, 0))
-                rawset(tbl.proxy, "damage", damage)
+                recalc_damage(tbl)
             end,
             bonus_str = function(tbl, val)
                 UnitSetBonus(tbl.unit, BONUS_HERO_STR, val)
@@ -143,28 +148,18 @@ OnInit.final("UnitTable", function(Require)
                 BlzSetUnitMaxHP(tbl.unit, hp)
                 rawset(tbl.proxy, "hp", hp)
 
-                local damage = (BlzGetUnitBaseDamage(tbl.unit, 0) + tbl.proxy.bonus_damage) * tbl.proxy.damage_percent
-                UnitSetBonus(tbl.unit, BONUS_DAMAGE, damage - BlzGetUnitBaseDamage(tbl.unit, 0))
-                rawset(tbl.proxy, "damage", damage)
+                recalc_damage(tbl)
             end,
             agi = function(tbl, val)
                 UnitSetBonus(tbl.unit, BONUS_HERO_BASE_AGI, val)
 
-                local damage = (BlzGetUnitBaseDamage(tbl.unit, 0) + tbl.proxy.bonus_damage) * tbl.proxy.damage_percent
-                UnitSetBonus(tbl.unit, BONUS_DAMAGE, damage - BlzGetUnitBaseDamage(tbl.unit, 0))
-                rawset(tbl.proxy, "damage", damage)
-
-                -- recalc armor
+                recalc_damage(tbl)
                 recalc_armor(tbl)
             end,
             bonus_agi = function(tbl, val)
                 UnitSetBonus(tbl.unit, BONUS_HERO_AGI, val)
 
-                local damage = (BlzGetUnitBaseDamage(tbl.unit, 0) + tbl.proxy.bonus_damage) * tbl.proxy.damage_percent
-                UnitSetBonus(tbl.unit, BONUS_DAMAGE, damage - BlzGetUnitBaseDamage(tbl.unit, 0))
-                rawset(tbl.proxy, "damage", damage)
-
-                -- recalc armor
+                recalc_damage(tbl)
                 recalc_armor(tbl)
             end,
             int = function(tbl, val)
@@ -176,9 +171,11 @@ OnInit.final("UnitTable", function(Require)
                 rawset(tbl.proxy, "mana", mana)
 
                 -- recalc MANA_REGEN
-                local mregen = (tbl.proxy.nomanaregen and 0) or (tbl.proxy.mana_regen_flat + val * 0.05 + tbl.proxy.mana_regen_max * mana * 0.01) * tbl.proxy.mana_regen_percent
+                local mregen = (tbl.proxy.nomanaregen and 0) or (tbl.proxy.mana_regen_flat + (val + tbl.proxy.bonus_int) * INT_REGEN_FACTOR + tbl.proxy.mana_regen_max * mana * 0.01) * tbl.proxy.mana_regen_percent
                 UnitSetBonus(tbl.unit, BONUS_MANA_REGEN, mregen)
                 rawset(tbl.proxy, "mana_regen", mregen)
+
+                recalc_damage(tbl)
             end,
             bonus_int = function(tbl, val)
                 UnitSetBonus(tbl.unit, BONUS_HERO_INT, val)
@@ -188,9 +185,11 @@ OnInit.final("UnitTable", function(Require)
                 BlzSetUnitMaxMana(tbl.unit, mana)
                 rawset(tbl.proxy, "mana", mana)
 
-                local mregen = (tbl.proxy.nomanaregen and 0) or (tbl.proxy.mana_regen_flat + tbl.proxy.int * 0.05 + tbl.proxy.mana_regen_max * mana * 0.01) * tbl.proxy.mana_regen_percent
+                local mregen = (tbl.proxy.nomanaregen and 0) or (tbl.proxy.mana_regen_flat + (tbl.proxy.int + val) * INT_REGEN_FACTOR + tbl.proxy.mana_regen_max * mana * 0.01) * tbl.proxy.mana_regen_percent
                 UnitSetBonus(tbl.unit, BONUS_MANA_REGEN, mregen)
                 rawset(tbl.proxy, "mana_regen", mregen)
+
+                recalc_damage(tbl)
             end,
             bonus_mana = function(tbl, val)
                 local mana = tbl.base_mana + val + 20 * (tbl.proxy.int + tbl.proxy.bonus_int)
@@ -259,32 +258,32 @@ OnInit.final("UnitTable", function(Require)
                 UnitSetBonus(tbl.unit, BONUS_MOVE_SPEED, tbl.proxy.movespeed)
             end,
             regen_flat = function(tbl, val)
-                local new_regen = (tbl.proxy.noregen and 0) or ( val + tbl.proxy.regen_max * tbl.proxy.hp * 0.01) * tbl.proxy.regen_percent
+                local new_regen = (tbl.proxy.noregen and 0) or (val + tbl.proxy.regen_max * tbl.proxy.hp * 0.01) * tbl.proxy.regen_percent
                 UnitSetBonus(tbl.unit, BONUS_LIFE_REGEN, new_regen)
                 rawset(tbl.proxy, "regen", new_regen)
             end,
             regen_percent = function(tbl, val)
-                local new_regen = (tbl.proxy.noregen and 0) or ( tbl.proxy.regen_flat + tbl.proxy.regen_max * tbl.proxy.hp * 0.01) * val
+                local new_regen = (tbl.proxy.noregen and 0) or (tbl.proxy.regen_flat + tbl.proxy.regen_max * tbl.proxy.hp * 0.01) * val
                 UnitSetBonus(tbl.unit, BONUS_LIFE_REGEN, new_regen)
                 rawset(tbl.proxy, "regen", new_regen)
             end,
             regen_max = function(tbl, val)
-                local new_regen = (tbl.proxy.noregen and 0) or ( tbl.proxy.regen_flat + val * tbl.proxy.hp * 0.01) * tbl.proxy.regen_percent
+                local new_regen = (tbl.proxy.noregen and 0) or (tbl.proxy.regen_flat + val * tbl.proxy.hp * 0.01) * tbl.proxy.regen_percent
                 UnitSetBonus(tbl.unit, BONUS_LIFE_REGEN, new_regen)
                 rawset(tbl.proxy, "regen", new_regen)
             end,
             mana_regen_flat = function(tbl, val)
-                local m = (tbl.proxy.nomanaregen and 0) or ( val + tbl.proxy.int * 0.05 + tbl.proxy.mana_regen_max * tbl.proxy.mana * 0.01) * tbl.proxy.mana_regen_percent
+                local m = (tbl.proxy.nomanaregen and 0) or (val + (tbl.proxy.int + tbl.proxy.bonus_int) * INT_REGEN_FACTOR + (tbl.proxy.mana_regen_max * tbl.proxy.mana * 0.01)) * tbl.proxy.mana_regen_percent
                 UnitSetBonus(tbl.unit, BONUS_MANA_REGEN, m)
                 rawset(tbl.proxy, "mana_regen", m)
             end,
             mana_regen_percent = function(tbl, val)
-                local m = (tbl.proxy.nomanaregen and 0) or ( tbl.proxy.mana_regen_flat + tbl.proxy.int * 0.05 + tbl.proxy.mana_regen_max * tbl.proxy.mana * 0.01) * val
+                local m = (tbl.proxy.nomanaregen and 0) or (tbl.proxy.mana_regen_flat + (tbl.proxy.int + tbl.proxy.bonus_int) * INT_REGEN_FACTOR + (tbl.proxy.mana_regen_max * tbl.proxy.mana * 0.01)) * val
                 UnitSetBonus(tbl.unit, BONUS_MANA_REGEN, m)
                 rawset(tbl.proxy, "mana_regen", m)
             end,
             mana_regen_max = function(tbl, val)
-                local m = (tbl.proxy.nomanaregen and 0) or ( tbl.proxy.mana_regen_flat + tbl.proxy.int * 0.05 + val * tbl.proxy.mana * 0.01) * tbl.proxy.mana_regen_percent
+                local m = (tbl.proxy.nomanaregen and 0) or (tbl.proxy.mana_regen_flat + (tbl.proxy.int + tbl.proxy.bonus_int) * INT_REGEN_FACTOR + (val * tbl.proxy.mana * 0.01)) * tbl.proxy.mana_regen_percent
                 UnitSetBonus(tbl.unit, BONUS_MANA_REGEN, m)
                 rawset(tbl.proxy, "mana_regen", m)
             end,
@@ -378,7 +377,8 @@ OnInit.final("UnitTable", function(Require)
             self.pid = GetPlayerId(self.owner) + 1
             self.id = GetUnitTypeId(u)
             self.unit = u
-            self.attackCount = 0
+            self.hit_based_health = false
+            self.hit_damage = 1
             self._casting = false
             self.can_attack = true
             self.base_hp = BlzGetUnitMaxHP(u)
@@ -580,6 +580,16 @@ OnInit.final("UnitTable", function(Require)
             TQ:callDelayed(0., Unit.applyEffects, self)
         end
 
+        local function unsilence(self)
+            self.silenced = false
+        end
+
+        function Unit:silence(time)
+            self.silenced = true
+
+            TQ:callDelayed(time, unsilence, self)
+        end
+
         function thistype:destroy()
             if self.taunted then
                 DestroyGroup(self.taunted)
@@ -587,6 +597,12 @@ OnInit.final("UnitTable", function(Require)
 
             if self.aggro_timer then
                 TQ:disableCallback(self.aggro_timer)
+            end
+
+            if self.effects then
+                for i = 1, #self.effects do
+                    DestroyEffect(self.effects[i].effect)
+                end
             end
         end
     end
