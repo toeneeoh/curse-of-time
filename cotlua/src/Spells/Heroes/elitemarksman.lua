@@ -541,12 +541,12 @@ OnInit.final("MarksmanSpells", function(Require)
             local turret = CreateUnit(Player(self.pid - 1), FourCC("o003"), self.targetX, self.targetY, GetUnitFacing(self.caster))
             UnitApplyTimedLife(turret, FourCC('Bhwd'), self.dur * LBOOST[self.pid])
             EVENT_ON_HIT_MULTIPLIER:register_unit_action(turret, on_hit)
-            Unit[turret].attackCount = 8
             SoundHandler("Units\\Creeps\\HeroTinkerRobot\\ClockwerkGoblinReady1.flac", true, nil, turret)
             DestroyEffect(AddSpecialEffect("UI\\Feedback\\TargetPreSelected\\TargetPreSelected.mdl", self.targetX, self.targetY))
 
-            -- force heal?
+            BlzSetUnitMaxHP(turret, 8)
             SetWidgetLife(turret, BlzGetUnitMaxHP(turret))
+            Unit[turret].hit_based_health = true
 
             thistype.charges[self.pid] = thistype.charges[self.pid] - 1
 
