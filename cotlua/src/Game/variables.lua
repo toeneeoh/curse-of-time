@@ -631,6 +631,8 @@ OnInit.global("Variables", function()
     ABIL_AVUL = FourCC('Avul')
     ABIL_ALOC = FourCC('Aloc')
 
+    INTERNAL_AI_COOLDOWN = 4
+
     MIN_SPELLBOOST_VARIANCE = -0.1
     MAX_SPELLBOOST_VARIANCE = 0.1
 
