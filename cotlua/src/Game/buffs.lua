@@ -809,20 +809,16 @@ OnInit.global("Buffs", function(Require)
         thistype.DISPEL_TYPE     = BUFF_POSITIVE
         thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
 
-        local function on_hit(target, source, amount_ref)
-            local pid = GetPlayerId(GetOwningPlayer(target)) + 1
-
-            if target == Hero[pid] then
-                amount_ref.value = 0.
-            end
+        local function on_struck(target, source, amount_ref)
+            amount_ref.value = 0.
         end
 
         function thistype:onRemove()
-            EVENT_ON_STRUCK_MULTIPLIER:unregister_unit_action(self.target, on_hit)
+            EVENT_ON_STRUCK_MULTIPLIER:unregister_unit_action(self.target, on_struck)
         end
 
         function thistype:onApply()
-            EVENT_ON_STRUCK_MULTIPLIER:register_unit_action(self.target, on_hit)
+            EVENT_ON_STRUCK_MULTIPLIER:register_unit_action(self.target, on_struck)
         end
     end
 
@@ -833,31 +829,28 @@ OnInit.global("Buffs", function(Require)
         thistype.NAME            = "Fight Me"
         thistype.DESC            = "This unit gives nearby allies damage immunity"
         thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNWarCry.blp"
-        thistype.AURA            = true
         thistype.DISPEL_TYPE     = BUFF_POSITIVE
         thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
+
+        local function aura_target(object, source, player)
+            if UnitAlive(object) and IsUnitAlly(object, player) and object ~= source then
+                FightMeBuff:add(source, object):duration(2.)
+            end
+        end
 
         function thistype:onRemove()
             TQ:disableCallback(self.timer)
             Unit[self.target]:removeEffect(self.sfx)
-            DestroyGroup(self.ug)
         end
 
         local function periodic(self)
-            MakeGroupInRange(self.pid, self.ug, GetUnitX(self.source), GetUnitY(self.source), 900. * LBOOST[self.pid], Condition(FilterAlly))
-
-            for target in each(self.ug) do
-                if target ~= self.source then
-                    FightMeBuff:add(self.source, target):duration(2.)
-                end
-            end
+            ALICE_EnumObjectsInRange(GetUnitX(self.source), GetUnitY(self.source), 900. * LBOOST[self.pid], "unit", aura_target, self.target, GetOwningPlayer(self.target))
 
             self.timer = TQ:callDelayed(1., periodic, self)
         end
 
         function thistype:onApply()
             self.sfx = Unit[self.target]:addEffect("Abilities\\Spells\\Orc\\Voodoo\\VoodooAura.mdl", "origin")
-            self.ug = CreateGroup()
 
             periodic(self)
         end
@@ -1962,12 +1955,18 @@ OnInit.global("Buffs", function(Require)
         thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
 
         function thistype:onRemove()
-            Unit[self.target].ms_flat = Unit[self.target].ms_flat - self.ms
+            local u = Unit[self.target]
+
+            u.ms_flat = u.ms_flat - self.ms
+            u:morph(HERO_ROYAL_GUARDIAN)
         end
 
         function thistype:onApply()
+            local u = Unit[self.target]
             self.ms = 100
-            Unit[self.target].ms_flat = Unit[self.target].ms_flat + self.ms
+            u.ms_flat = u.ms_flat + self.ms
+
+            u:morph(FourCC('H04Y'))
         end
     end
 
@@ -2056,6 +2055,177 @@ OnInit.global("Buffs", function(Require)
             self.mr = 0.333
             Unit[self.target].mr = Unit[self.target].mr * self.mr
             self.sfx = Unit[self.target]:addEffect("war3mapImported\\DemonShieldTarget3A.mdx", "origin")
+        end
+    end
+
+    ---@class AstralPrisonDebuff : Buff
+    AstralPrisonDebuff = Buff.new()
+    do
+        local thistype = AstralPrisonDebuff
+        thistype.NAME            = "Astral Prison"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNShadowCapture.blp"
+        thistype.DESC            = "This unit has -^#dr% damage resist"
+        thistype.DISPEL_TYPE     = BUFF_NEGATIVE
+        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
+
+        local missile_template = {
+            selfInteractions = {
+                CAT_MoveArcedHoming,
+                CAT_Orient3D,
+            },
+            interactions = {
+                unit = CAT_UnitCollisionCheck3D,
+            },
+            identifier = "missile",
+            collisionRadius = 1.,
+            onlyTarget = true,
+            visualZ = 100.,
+            speed = 600.,
+            arc = 0.5,
+            onUnitCollision = CAT_UnitImpact3D,
+            onUnitCallback = function(self, target)
+                HP(self.source, target, self.heal, thistype.tag)
+            end
+        }
+        missile_template.__index = missile_template
+
+        local function delay(self, x, y, z, heal)
+            PauseUnit(self.target, false)
+
+            local missile = setmetatable({}, missile_template)
+            missile.x = x
+            missile.y = y
+            missile.z = z
+            missile.visual = AddSpecialEffect("Abilities\\Spells\\Undead\\Darksummoning\\DarkSummonMissile.mdl", x, y)
+            BlzSetSpecialEffectScale(missile.visual, 1.1)
+            missile.source = self.spire
+            missile.target = self.target
+            missile.collideZ = true
+            missile.owner = Player(self.pid - 1)
+            missile.heal = heal
+
+            ALICE_Create(missile)
+        end
+
+        function thistype:onRemove()
+            Unit[self.target].dr = Unit[self.target].dr * self.dr
+
+            -- heal sequence
+            if UnitAlive(self.spire) then
+                local heal = GetWidgetLife(self.spire) * BlzGetUnitMaxHP(self.target) * 0.01
+                local x, y, z = GetUnitX(self.spire), GetUnitY(self.spire), GetUnitZ(self.spire)
+
+                BlzSetUnitFacingEx(self.target, bj_RADTODEG * math.atan(y - GetUnitY(self.target), x - GetUnitX(self.target)))
+                PauseUnit(self.target, true)
+                SetUnitAnimationByIndex(self.target, 21)
+                TQ:callDelayed(1.1, delay, self, x, y, z, heal)
+                TQ:callDelayed(1.1, DestroyEffect, AddSpecialEffect("Abilities\\Spells\\Undead\\Darksummoning\\DarkSummonTarget.mdl", x, y))
+
+                KillUnit(self.spire)
+            end
+        end
+
+        function thistype:onApply()
+            self.dr = 0.65
+            Unit[self.target].dr = Unit[self.target].dr / self.dr
+        end
+    end
+
+    ---@class AstralChainsDebuff : Buff
+    AstralChainsDebuff = Buff.new()
+    do
+        local thistype = AstralChainsDebuff
+        thistype.NAME            = "Astral Chains"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNShadowCapture.blp"
+        thistype.DESC            = "This unit cannot move $dist units away from the spire"
+        thistype.DISPEL_TYPE     = BUFF_NEGATIVE
+        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
+
+        local function soul_death(target)
+            RemoveUnit(target)
+        end
+
+        local function soul_periodic(self)
+            if UnitAlive(self.soul) then
+                local chain = self.chain.source
+                local x, y = GetUnitX(chain), GetUnitY(chain)
+                IssuePointOrder(self.soul, "move", x, y)
+
+                if IsUnitInRange(self.soul, chain, 25.) then
+                    BlzSetUnitMaxHP(chain, BlzGetUnitMaxHP(chain) + 10)
+                    SetWidgetLife(chain, GetWidgetLife(chain) + 20.)
+                    DestroyEffect(AddSpecialEffect("Abilities\\Spells\\Human\\DispelMagic\\DispelMagicTarget.mdl", x, y))
+                    RemoveUnit(self.soul)
+                    self.soul = nil
+
+                    return
+                end
+
+                self.timer2 = TQ:callDelayed(0.5, soul_periodic, self)
+            end
+        end
+
+        function thistype:spawn_soul()
+            if not UnitAlive(self.soul) then
+                local x, y = GetUnitX(self.chain.source), GetUnitY(self.chain.source)
+                local x2, y2 = GetUnitX(self.target), GetUnitY(self.target)
+                local angle = math.atan(y2 - y, x2 - x)
+                self.soul = CreateUnit(PLAYER_BOSS, FourCC('n002'), x2, y2, bj_RADTODEG * angle)
+                local unit = Unit[self.soul]
+                unit.hit_based_health = true
+                unit.ms_flat = 150
+                unit.attack = false
+                BlzSetUnitMaxHP(self.soul, 15)
+                SetWidgetLife(self.soul, 15)
+                UnitAddAbility(self.soul, FourCC('A094'))
+                IssueImmediateOrder(self.soul, "windwalk")
+                SetUnitX(self.soul, x2)
+                SetUnitY(self.soul, y2)
+                BlzSetUnitSkin(self.soul, HeroID[self.tpid])
+                local name = User[self.tpid - 1].nameTrimmed
+                BlzSetUnitName(self.soul, "Soul of " .. name)
+                BlzSetHeroProperName(self.soul, "Soul of " .. name)
+                SetUnitVertexColor(self.soul, 0, 168, 107, 120)
+                SetUnitColor(self.soul, PLAYER_COLOR_EMERALD)
+                SetUnitScale(self.soul, 0.85, 0.85, 0.85)
+                unit:addEffect("Abilities\\Spells\\Human\\Banish\\BanishTarget.mdl", "origin")
+
+                IssuePointOrder(self.soul, "move", x, y)
+
+                EVENT_ON_UNIT_DEATH:register_unit_action(self.soul, soul_death)
+
+                self.timer2 = TQ:callDelayed(0.5, soul_periodic, self)
+            end
+        end
+
+        local function periodic(self)
+            self.chain:update()
+            self.timer = TQ:callDelayed(FPS_32, periodic, self)
+        end
+
+        function thistype:onRemove()
+            Unit[self.target]:removeEffect(self.sfx)
+            self.chain:destroy()
+            RemoveUnit(self.soul)
+            TQ:disableCallback(self.timer)
+            TQ:disableCallback(self.timer2)
+        end
+
+        function thistype:onApply()
+            local spire = AstralPrisonDebuff:get(nil, Boss[BOSS_AZAZOTH].unit).spire
+            self.dist = 1000.
+
+            local chain = Chain.create{
+                source = spire,
+                target = self.target,
+                length = 1000.,
+                segments = 14,
+                color = {0.24, 0.80, 0.50, 1.},
+            }
+
+            self.sfx = Unit[self.target]:addEffect("Bondage Teal SD.mdx", "chest")
+            self.chain = chain
+            self.timer = TQ:callDelayed(FPS_32, periodic, self)
         end
     end
 
@@ -3215,6 +3385,11 @@ OnInit.global("Buffs", function(Require)
         function thistype:onApply()
             BlzPauseUnitEx(self.target, true)
             self.sfx = Unit[self.target]:addEffect("Abilities\\Spells\\Undead\\FreezingBreath\\FreezingBreathTargetArt.mdl", "chest")
+
+            local boss = IsBoss(self.target)
+            if boss and boss.stun_anim then
+                SetUnitAnimationByIndex(self.target, boss.stun_anim)
+            end
         end
     end
 
@@ -3236,6 +3411,11 @@ OnInit.global("Buffs", function(Require)
         function thistype:onApply()
             BlzPauseUnitEx(self.target, true)
             self.sfx = Unit[self.target]:addEffect("Abilities\\Spells\\Human\\Thunderclap\\ThunderclapTarget.mdl", "overhead")
+
+            local boss = IsBoss(self.target)
+            if boss and boss.stun_anim then
+                SetUnitAnimationByIndex(self.target, boss.stun_anim)
+            end
         end
     end
 
