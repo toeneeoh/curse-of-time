@@ -501,6 +501,21 @@ OnInit.final("Inventory", function(Require)
             move_item_cooldown[pid] = false
         end
 
+        local function find_empty_equip_slot(it, items)
+            local type = ItemData[it.id][ITEM_TYPE]
+            local start_index, end_index = 1, 6
+            if type == 11 then -- TODO: define potion type check somewhere
+                start_index, end_index = POTION_INDEX, POTION_INDEX + 1
+            end
+            for i = start_index, end_index do
+                if not items[i] then
+                    return i
+                end
+            end
+
+            return nil
+        end
+
         local function update_context_buttons(pid, slot)
             local owner = viewing[pid]
             local items = Profile[owner].hero.items -- safe for read only
@@ -527,14 +542,9 @@ OnInit.final("Inventory", function(Require)
                     end
                 else
                 -- equip logic
-                    if it then
-                        local type = ItemData[it.id][ITEM_TYPE]
-                        for i = 1, BACKPACK_INDEX - 1 do
-                            if items[i] == nil and VerifySlotForType(i, type) then
-                                visible_buttons[#visible_buttons + 1] = 1 -- EQUIP
-                                break
-                            end
-                        end
+                    local empty_slot = find_empty_equip_slot(it, items)
+                    if it and empty_slot and ValidateItemSlot(it, empty_slot) then
+                        visible_buttons[#visible_buttons + 1] = 1 -- EQUIP
                     end
                 end
 
@@ -690,25 +700,65 @@ OnInit.final("Inventory", function(Require)
             end
         end
 
+        ---@type fun(pid: integer, itm: Item, slot: integer, ignore: Item, show_error: boolean): boolean
+        local function validate_item_move(pid, itm, slot, ignore, show_error)
+            local valid, err = ValidateItemSlot(itm, slot, ignore)
+
+            if not valid then
+                if show_error and err then
+                    local p = Player(pid - 1)
+                    DisplayTimedTextToPlayer(p, 0, 0, 15., err)
+                    SoundHandler("Sound\\Interface\\Error.wav", false, p)
+                end
+
+                return false
+            end
+
+            return true
+        end
+
         local confirm_item = function(pid)
             target_thread[pid] = coroutine.create(function()
                 local hero = Profile[pid].hero
                 local itm = hero.items[context[pid]]
                 local itm2 = hero.items[target[pid]]
                 local slot = get_hovered_slot() -- not sync safe
-                local valid, err = false, nil
+                local valid = false
 
                 -- async visual swap
                 if itm and slot > 0 then
-                    valid, err = ValidateItemSlot(itm, slot)
-                    if err then
-                        DisplayTimedTextToPlayer(Player(pid - 1), 0, 0, 15., err)
-                    end
-                    if itm2 and valid then
-                        valid = ValidateItemSlot(itm2, context[pid])
-                    end
-                    if valid then
-                        swap_slot_visuals(pid, context[pid], slot)
+                    itm2 = hero.items[slot]
+
+                    local dragged_from_backpack = context[pid] >= BACKPACK_INDEX
+                    local target_is_equipped_slot = slot < BACKPACK_INDEX
+                    local target_has_item = itm2 ~= nil
+
+                    if itm ~= itm2 then
+                        if dragged_from_backpack and target_is_equipped_slot then
+                            if target_has_item then
+                                -- backpack -> occupied equipped slot
+                                -- occupant leaves first, so ignore it
+                                valid = validate_item_move(pid, itm2, context[pid], itm, false)
+
+                                if valid then
+                                    valid = validate_item_move(pid, itm, slot, itm2, true)
+                                end
+                            else
+                                -- backpack -> empty equipped slot
+                                -- no occupant leaves, so do NOT ignore anything
+                                valid = validate_item_move(pid, itm, slot, nil, true)
+                            end
+                        else
+                            valid = validate_item_move(pid, itm, slot, itm2, true)
+
+                            if itm2 and valid then
+                                valid = validate_item_move(pid, itm2, context[pid], itm, false)
+                            end
+                        end
+
+                        if valid then
+                            swap_slot_visuals(pid, context[pid], slot)
+                        end
                     end
                 end
 
@@ -724,22 +774,54 @@ OnInit.final("Inventory", function(Require)
                 -- check for syncs (extra safe)
                 if synced_context[pid] and synced_target[pid] then
                     itm = hero.items[context[pid]]
-                    itm2 = hero.items[slot]
 
                     if slot == -1 then -- negative indicates bailed out of menu
                         if itm then
                             hero.item_to_drop = itm
                             IssuePointOrder(itm.holder, DROP_ITEM_COMMAND, GetMouseX(pid), GetMouseY(pid))
                         end
-                    elseif slot > 0 then
-                        -- validate slots again (synced)
-                        valid, err = ValidateItemSlot(itm, slot)
-                        if itm2 and valid then
-                            valid = ValidateItemSlot(itm2, context[pid])
-                        end
-                        if valid and itm and itm:equip(slot) then
-                            if itm2 and itm ~= itm2 then -- if another item is there
-                                itm2:equip(context[pid])
+                    elseif slot > 0 and itm then
+                        itm2 = hero.items[slot]
+
+                        if itm ~= itm2 then
+                            if context[pid] >= BACKPACK_INDEX and slot < BACKPACK_INDEX then
+                                if itm2 then
+                                    -- backpack -> occupied equipped slot
+                                    valid = validate_item_move(pid, itm2, context[pid], itm, false)
+
+                                    if valid then
+                                        valid = validate_item_move(pid, itm, slot, itm2, false)
+                                    end
+
+                                    if valid then
+                                        if itm2:equip(context[pid]) then
+                                            itm:equip(slot)
+                                        end
+                                    end
+                                else
+                                    -- backpack -> empty equipped slot
+                                    valid = validate_item_move(pid, itm, slot, nil, false)
+
+                                    if valid then
+                                        itm:equip(slot)
+                                    end
+                                end
+                            else
+                                valid = validate_item_move(pid, itm, slot, itm2, false)
+
+                                if itm2 and valid then
+                                    valid = validate_item_move(pid, itm2, context[pid], itm, false)
+                                end
+
+                                if valid then
+                                    if itm2 then
+                                        if itm:equip(slot) then
+                                            itm2:equip(context[pid])
+                                        end
+                                    else
+                                        itm:equip(slot)
+                                    end
+                                end
                             end
                         end
                     end
