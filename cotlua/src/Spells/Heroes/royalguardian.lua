@@ -86,16 +86,12 @@ OnInit.final("RoyalGuardianSpells", function(Require)
             SoundHandler("Units\\Human\\Knight\\KnightYesAttack3.flac", true, nil, self.caster)
             DestroyEffect(AddSpecialEffect("Abilities\\Spells\\Human\\Polymorph\\PolyMorphDoneGround.mdl", self.x, self.y))
 
-            BlzUnitHideAbility(self.caster, FourCC('A06K'), false)
-            IssueImmediateOrderById(self.caster, 852180) --avatar
-            BlzUnitHideAbility(self.caster, FourCC('A06K'), true)
-            BlzStartUnitAbilityCooldown(self.caster, thistype.id, 30.)
             SteedChargeBuff:add(self.caster, self.caster):duration(self.dur * LBOOST[self.pid])
             self.g = {}
             self.x = self.targetX
             self.y = self.targetY
 
-            TQ:callDelayed(0.05, charge, self)
+            TQ:callDelayed(FPS_32, charge, self)
         end
 
         function thistype.onSetup(u)
