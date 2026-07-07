@@ -208,7 +208,7 @@ end
 -- formats a number to a string with commas (no decimals)
 ---@param value number
 ---@return string
-local function RealToString(value)
+function RealToString(value)
     -- let Lua handle giant values directly
     if value >= INT_32_LIMIT then
         return tostring(value)
@@ -256,7 +256,7 @@ local function RealToString(value)
     return out
 end
 
-RealToString = RealToString
+local RealToString = RealToString
 
 --[[Damage number pop-up text]]
 do
@@ -1564,14 +1564,16 @@ end
 
 ---@param pid integer
 function ToggleAutoAttack(pid)
-    local u = Unit[Hero[pid]]
-
     if IS_AUTO_ATTACK_OFF[pid] then
         IS_AUTO_ATTACK_OFF[pid] = false
-        DisplayTimedTextToPlayer(u.owner, 0, 0, 10, "Toggled Auto Attacking on.")
+        DisplayTimedTextToPlayer(Player(pid - 1), 0, 0, 10, "Toggled Auto Attacking on.")
+        if Unit[Hero[pid]].can_attack then
+            BlzSetUnitWeaponBooleanField(Hero[pid], UNIT_WEAPON_BF_ATTACKS_ENABLED, 0, true)
+        end
     else
         IS_AUTO_ATTACK_OFF[pid] = true
-        DisplayTimedTextToPlayer(u.owner, 0, 0, 10, "Toggled Auto Attacking off.")
+        DisplayTimedTextToPlayer(Player(pid - 1), 0, 0, 10, "Toggled Auto Attacking off.")
+        BlzSetUnitWeaponBooleanField(Hero[pid], UNIT_WEAPON_BF_ATTACKS_ENABLED, 0, false)
     end
 end
 
@@ -1892,8 +1894,8 @@ end
 
 ---@type fun(source: unit, target: unit, hp: number, tag: string|nil)
 function HP(source, target, hp, tag)
-    --attack count based units cannot be healed
-    if Unit[target].attackCount == 0 then
+    -- hit count based units cannot be healed
+    if not Unit[target].hit_based_health then
         hp = hp * Unit[target].regen_percent
 
         local text = RealToString(hp)
