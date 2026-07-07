@@ -482,7 +482,7 @@ OnInit.final("Colosseum", function(Require)
     , "ReplaceableTextures\\CommandButtons\\BTNImpale.blp")
     do
         local callback
-        local model = "war3mapImported\\indicators (1).mdl"
+        local model = "Indicators\\circle.mdl"
         local function impale(sfx, x, y)
             local ug = CreateGroup()
             MakeGroupInRange(BOSS_ID, ug, x, y, 200., Condition(FilterEnemy))
@@ -493,6 +493,7 @@ OnInit.final("Colosseum", function(Require)
             sfx = AddSpecialEffect("Abilities\\Spells\\Undead\\Impale\\ImpaleHitTarget.mdl", x, y)
             BlzSetSpecialEffectScale(sfx, 2.0)
             DestroyEffect(sfx)
+            DestroyGroup(ug)
         end
         local function spike_wave()
             for _, pid in ipairs(players) do
@@ -547,7 +548,7 @@ OnInit.final("Colosseum", function(Require)
     , "ReplaceableTextures\\CommandButtons\\BTNTemp.blp")
     do
         local callback
-        local model = "moving arrows.mdl"
+        local model = "Indicators\\moving arrows.mdl"
         local bullet_template = {
             interactions = {
                 unit = CAT_UnitCollisionCheck2D,
