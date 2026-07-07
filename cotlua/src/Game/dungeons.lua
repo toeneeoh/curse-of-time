@@ -305,11 +305,13 @@ OnInit.final("Dungeons", function(Require)
             else
                 PauseUnit(thistype.boss, false)
                 SetUnitTimeScale(thistype.boss, 1.)
+                UnitRemoveAbility(thistype.boss, ABIL_AVUL)
             end
         end
 
         function thistype:onStart()
             thistype.boss = Boss[BOSS_AZAZOTH].unit
+            UnitAddAbility(thistype.boss, ABIL_AVUL)
             PauseUnit(thistype.boss, true)
             SetUnitTimeScale(thistype.boss, 0.)
             TimerQueue:callDelayed(5., unpause_boss, false)
