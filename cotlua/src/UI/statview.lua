@@ -14,12 +14,12 @@ OnInit.final("StatView", function(Require)
     local STAT_WINDOW = STAT_WINDOW
 
     local STAT_LOOKUP = {
-        str = ITEM_STRENGTH,
-        bonus_str = ITEM_STRENGTH,
-        agi = ITEM_AGILITY,
-        bonus_agi = ITEM_AGILITY,
-        int = ITEM_INTELLIGENCE,
-        bonus_int = ITEM_INTELLIGENCE,
+        str = {ITEM_STRENGTH, ITEM_HEALTH, ITEM_DAMAGE},
+        bonus_str = {ITEM_STRENGTH, ITEM_HEALTH, ITEM_DAMAGE},
+        agi = {ITEM_AGILITY, ITEM_ARMOR, ITEM_DAMAGE},
+        bonus_agi = {ITEM_AGILITY, ITEM_ARMOR, ITEM_DAMAGE},
+        int = {ITEM_INTELLIGENCE, ITEM_MANA_REGENERATION, ITEM_DAMAGE},
+        bonus_int = {ITEM_INTELLIGENCE, ITEM_MANA_REGENERATION, ITEM_DAMAGE},
         bonus_mana = ITEM_MANA,
         base_bat = ITEM_BASE_ATTACK_SPEED,
         bonus_bat = ITEM_BASE_ATTACK_SPEED,
@@ -32,7 +32,7 @@ OnInit.final("StatView", function(Require)
         cd_= ITEM_CRIT_DAMAGE,
         cc_percent = ITEM_CRIT_CHANCE_MULT,
         cd_percent = ITEM_CRIT_DAMAGE_MULT,
-        ms_= ITEM_MOVESPEED,
+        ms = ITEM_MOVESPEED,
         ms_percent = ITEM_MOVESPEED,
         overmovespeed = ITEM_MOVESPEED,
         regen_= ITEM_REGENERATION,
@@ -174,7 +174,11 @@ OnInit.final("StatView", function(Require)
         -- try to map event key -> STAT_TAG index
         local stat_idx = STAT_LOOKUP[stat]
 
-        if stat_idx then
+        if type(stat_idx) == "table" then
+            for _, key in ipairs(stat_idx) do
+                STAT_WINDOW.refresh(pid, key)
+            end
+        elseif stat_idx then
             STAT_WINDOW.refresh(pid, stat_idx)
         else
             STAT_WINDOW.refresh(pid)
@@ -412,7 +416,7 @@ OnInit.final("StatView", function(Require)
         end
 
         local line = 0
-        local order   = T.order
+        local order = T.order
 
         -- walk through stats by priority buckets
         for priority = 1, ishero do
