@@ -11,76 +11,18 @@ OnInit.final("Items", function(Require)
     Require('Inventory')
     Require('ItemLookup')
 
+    CHURCH_DONATION = {} ---@type boolean[] 
+    RECHARGE_COOLDOWN = __jarray(0) ---@type timer[] 
+    IS_ITEM_DROP = __jarray(true) ---@type boolean[]
+
     local get_widget_life, get_unit_state, set_widget_life, set_unit_state = GetWidgetLife, GetUnitState, SetWidgetLife, SetUnitState
-    local ItemData = ItemData
-
-    local shop_prices = {
-        [FourCC('I00O')] = 80,
-        [FourCC('I01T')] = 15000,
-        [FourCC('I01M')] = 1200,
-        [FourCC('I00B')] = 1500,
-        [FourCC('I00Q')] = 50,
-        [FourCC('I00R')] = 70,
-        [FourCC('I0FJ')] = 15,
-        [FourCC('I01Z')] = 25,
-        [FourCC('I06F')] = 30,
-        [FourCC('I01A')] = 100,
-        [FourCC('I01A')] = 100,
-        [FourCC('I01C')] = 35,
-        [FourCC('I08V')] = 200,
-        [FourCC('I07S')] = 50,
-        [FourCC('I08X')] = 400,
-        [FourCC('I01D')] = 90,
-        [FourCC('I01G')] = 30,
-        [FourCC('I01H')] = 30,
-        [FourCC('I011')] = 30,
-        [FourCC('I01K')] = 150,
-        [FourCC('I01L')] = 80,
-        [FourCC('I010')] = 500,
-        [FourCC('I0FL')] = 500,
-        [FourCC('I00F')] = 500,
-        [FourCC('I0FK')] = 500,
-        [FourCC('I024')] = 50,
-        [FourCC('I026')] = 50,
-        [FourCC('I01S')] = 110,
-        [FourCC('I02H')] = 30,
-        [FourCC('I02R')] = 150,
-        [FourCC('I02T')] = 50,
-        [FourCC('I03A')] = 80,
-        [FourCC('I090')] = 30,
-        [FourCC('I03K')] = 80,
-        [FourCC('I004')] = 150,
-        [FourCC('I03S')] = 90,
-        [FourCC('I03W')] = 80,
-        [FourCC('I01X')] = 1000,
-        [FourCC('I06G')] = 40,
-        [FourCC('I04D')] = 50,
-        [FourCC('I00P')] = 1000,
-        [FourCC('I04O')] = 30,
-        [FourCC('I01I')] = 30,
-        [FourCC('I00H')] = 300,
-        [FourCC('I00I')] = 800,
-        [FourCC('I06H')] = 500,
-        [FourCC('I00G')] = 300,
-    }
-
-    ---@type fun(itm: Item)
-    ---@return number total, number gold, number plat
-    function GetItemSellPrice(itm)
-        local total = itm.cached_stats[ITEM_COST] // 2
-
-        if total == 0 then
-            total = shop_prices[itm.id] and shop_prices[itm.id] // 2 or 0
-        end
-
-        local gold = math.fmod(total, 1000000)
-        local plat = total // 1000000
-
-        return total, gold, plat
-    end
-
     local floor = math.floor
     local log = math.log
+    local ItemData = ItemData
+    local TQ = TimerQueue
+    local Unit = Unit
+    local Spells = Spells
+    local ITEM_ABILITY, ITEM_ABILITY2 = ITEM_ABILITY, ITEM_ABILITY2
 
     -- per-stat applicators
     -- sig: applier(unit, mult, value, mod, self_item)
@@ -170,10 +112,6 @@ OnInit.final("Items", function(Require)
         end
     end
 
-    CHURCH_DONATION   = {} ---@type boolean[] 
-    RECHARGE_COOLDOWN = __jarray(0) ---@type timer[] 
-    IS_ITEM_DROP = __jarray(true) ---@type boolean[]
-
     local slot_types = {
         TYPE_EQUIPPABLE, TYPE_EQUIPPABLE, TYPE_EQUIPPABLE, TYPE_EQUIPPABLE, TYPE_EQUIPPABLE, TYPE_EQUIPPABLE,
         TYPE_POTION, TYPE_POTION,
@@ -181,6 +119,71 @@ OnInit.final("Items", function(Require)
         TYPE_ALL, TYPE_ALL, TYPE_ALL, TYPE_ALL, TYPE_ALL, TYPE_ALL,
         TYPE_ALL, TYPE_ALL, TYPE_ALL, TYPE_ALL, TYPE_ALL, TYPE_ALL,
     }
+
+    local shop_prices = {
+        [FourCC('I00O')] = 80,
+        [FourCC('I01T')] = 15000,
+        [FourCC('I01M')] = 1200,
+        [FourCC('I00B')] = 1500,
+        [FourCC('I00Q')] = 50,
+        [FourCC('I00R')] = 70,
+        [FourCC('I0FJ')] = 15,
+        [FourCC('I01Z')] = 25,
+        [FourCC('I06F')] = 30,
+        [FourCC('I01A')] = 100,
+        [FourCC('I01A')] = 100,
+        [FourCC('I01C')] = 35,
+        [FourCC('I08V')] = 200,
+        [FourCC('I07S')] = 50,
+        [FourCC('I08X')] = 400,
+        [FourCC('I01D')] = 90,
+        [FourCC('I01G')] = 30,
+        [FourCC('I01H')] = 30,
+        [FourCC('I011')] = 30,
+        [FourCC('I01K')] = 150,
+        [FourCC('I01L')] = 80,
+        [FourCC('I010')] = 500,
+        [FourCC('I0FL')] = 500,
+        [FourCC('I00F')] = 500,
+        [FourCC('I0FK')] = 500,
+        [FourCC('I024')] = 50,
+        [FourCC('I026')] = 50,
+        [FourCC('I01S')] = 110,
+        [FourCC('I02H')] = 30,
+        [FourCC('I02R')] = 150,
+        [FourCC('I02T')] = 50,
+        [FourCC('I03A')] = 80,
+        [FourCC('I090')] = 30,
+        [FourCC('I03K')] = 80,
+        [FourCC('I004')] = 150,
+        [FourCC('I03S')] = 90,
+        [FourCC('I03W')] = 80,
+        [FourCC('I01X')] = 1000,
+        [FourCC('I06G')] = 40,
+        [FourCC('I04D')] = 50,
+        [FourCC('I00P')] = 1000,
+        [FourCC('I04O')] = 30,
+        [FourCC('I01I')] = 30,
+        [FourCC('I00H')] = 300,
+        [FourCC('I00I')] = 800,
+        [FourCC('I06H')] = 500,
+        [FourCC('I00G')] = 300,
+    }
+
+    ---@type fun(itm: Item)
+    ---@return number total, number gold, number plat
+    function GetItemSellPrice(itm)
+        local total = itm.cached_stats[ITEM_COST] // 2
+
+        if total == 0 then
+            total = shop_prices[itm.id] and shop_prices[itm.id] // 2 or 0
+        end
+
+        local gold = math.fmod(total, 1000000)
+        local plat = total // 1000000
+
+        return total, gold, plat
+    end
 
     ---@type fun(slot: integer, type: integer): boolean
     function VerifySlotForType(slot, type)
@@ -244,7 +247,7 @@ OnInit.final("Items", function(Require)
         function thistype.onDeath()
             -- typecast widget to item
             SaveWidgetHandle(hash, 0, 0, GetTriggerWidget())
-            TimerQueue:callDelayed(2., thistype.destroy, Item[LoadItemHandle(hash, 0, 0)])
+            TQ:callDelayed(2., thistype.destroy, Item[LoadItemHandle(hash, 0, 0)])
             RemoveSavedHandle(hash, 0, 0)
             return false
         end
@@ -337,7 +340,7 @@ OnInit.final("Items", function(Require)
 
             -- timed life
             if expire then
-                TimerQueue:callDelayed(expire, thistype.expire, self)
+                TQ:callDelayed(expire, thistype.expire, self)
             end
 
             -- randomize rolls
@@ -529,14 +532,16 @@ OnInit.final("Items", function(Require)
                 return
             end
 
+            local prof = ItemProfMod(itm.id, itm.pid) >= 1
+
             for index = ITEM_ABILITY, ITEM_ABILITY2 do
                 local abilid = ItemData[itm.id][index .. "id"]
                 -- don't add ability if backpack is not allowed
                 if GetUnitTypeId(itm.holder) == BACKPACK and not backpack_allowed[abilid] then
                     abilid = 0
                 end
-                -- ability exists and unlocked
-                if abilid ~= 0 and Spells[abilid] and itm.level >= ItemData[itm.id][index .. "unlock"] then
+                -- ability exists and unlocked and has proficiency
+                if abilid ~= 0 and Spells[abilid] and itm.level >= ItemData[itm.id][index .. "unlock"] and prof then
                     if not itm.abilities then
                         itm.abilities = {}
                     end
@@ -689,8 +694,10 @@ OnInit.final("Items", function(Require)
                         -- trigger unequip event
                         Spells[abil.id].onUnequip(self, abil.id, i, holder)
 
+                        local orig_spell_owner = backpack_allowed[abil.id] and Backpack[self.pid] or Hero[self.pid]
+
                         -- remove ability after cooldown expires
-                        TimerQueue:callDelayed(BlzGetUnitAbilityCooldownRemaining(holder, abil.id), remove_item_ability, self, abil, i)
+                        TQ:callDelayed(BlzGetUnitAbilityCooldownRemaining(orig_spell_owner, abil.id), remove_item_ability, self, abil, i)
                     end
                 end
             end
@@ -703,7 +710,7 @@ OnInit.final("Items", function(Require)
 
         ---@param itm Item
         ---@return boolean, string?
-        local function is_item_limited(itm)
+        local function is_item_limited(itm, ignore)
             local limit = ItemData[itm.id][ITEM_LIMIT] ---@type integer 
 
             if limit == 0 then
@@ -715,7 +722,7 @@ OnInit.final("Items", function(Require)
             for i = 1, 6 do
                 local itm2 = items[i]
 
-                if itm2 and itm2 ~= itm then
+                if itm2 and itm2 ~= itm and itm2 ~= ignore then
                     if (limit == 1 and itm.id ~= itm2.id) then
                     -- safe case
                     elseif limit == ItemData[itm2.id][ITEM_LIMIT] then
@@ -731,7 +738,7 @@ OnInit.final("Items", function(Require)
         ---@param slot integer
         ---@return boolean
         ---@return string? err
-        function ValidateItemSlot(self, slot)
+        function ValidateItemSlot(self, slot, ignore)
             local type = ItemData[self.id][ITEM_TYPE]
 
             -- restrict by slot type
@@ -743,7 +750,7 @@ OnInit.final("Items", function(Require)
             local lvl = GetHeroLevel(Hero[self.pid])
 
             if slot <= BACKPACK_INDEX - 1 then
-                local limited, err = is_item_limited(self)
+                local limited, err = is_item_limited(self, ignore)
 
                 if lvlreq > lvl then
                     return false, "This item requires at least level |c00FF5555" .. (lvlreq) .. "|r to equip."
@@ -1084,7 +1091,7 @@ OnInit.final("Items", function(Require)
 local function recharge_cd(pid)
     if RECHARGE_COOLDOWN[pid] > 0 then
         RECHARGE_COOLDOWN[pid] = RECHARGE_COOLDOWN[pid] - 1
-        TimerQueue:callDelayed(1., recharge_cd, pid)
+        TQ:callDelayed(1., recharge_cd, pid)
     end
 end
 
@@ -1121,7 +1128,7 @@ function RechargeItem()
 
                 -- start recharge cooldown
                 RECHARGE_COOLDOWN[pid] = 180.
-                TimerQueue:callDelayed(1., recharge_cd, pid)
+                TQ:callDelayed(1., recharge_cd, pid)
             end
         end
 
