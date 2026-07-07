@@ -95,15 +95,11 @@ OnInit.final("ItemSpells", function(Require)
         end
 
         function thistype:onCast()
-            if HasProficiency(self.pid, PROF_SWORD) then
-                local pt = TimerList[self.pid]:add()
-                pt.dur = 5.
-                pt.source = self.caster
-                pt.ug = CreateGroup()
-                pt:startLoop(0.05, periodic)
-            else
-                DisplayTimedTextToPlayer(Player(self.pid - 1), 0, 0, 15., "You do not have the proficiency to use this spell!")
-            end
+            local pt = TimerList[self.pid]:add()
+            pt.dur = 5.
+            pt.source = self.caster
+            pt.ug = CreateGroup()
+            pt:startLoop(0.05, periodic)
         end
     end
 
@@ -112,19 +108,15 @@ OnInit.final("ItemSpells", function(Require)
         local thistype = AZAZOTH_STOMP
 
         function thistype:onCast()
-            if HasProficiency(self.pid, PROF_HEAVY) then
-                local ug = CreateGroup()
-                MakeGroupInRange(self.pid, ug, self.x, self.y, 550.00, Condition(FilterEnemy))
+            local ug = CreateGroup()
+            MakeGroupInRange(self.pid, ug, self.x, self.y, 550.00, Condition(FilterEnemy))
 
-                for target in each(ug) do
-                    AzazothHammerStomp:add(self.caster, target):duration(15.)
-                    DamageTarget(self.caster, target, 15.00 * GetHeroStr(self.caster, true) * BOOST[self.pid], ATTACK_TYPE_NORMAL, MAGIC, thistype.tag)
-                end
-
-                DestroyGroup(ug)
-            else
-                DisplayTimedTextToPlayer(Player(self.pid - 1), 0, 0, 15., "You do not have the proficiency to use this spell!")
+            for target in each(ug) do
+                AzazothHammerStomp:add(self.caster, target):duration(15.)
+                DamageTarget(self.caster, target, 15.00 * GetHeroStr(self.caster, true) * BOOST[self.pid], ATTACK_TYPE_NORMAL, MAGIC, thistype.tag)
             end
+
+            DestroyGroup(ug)
         end
     end
 
@@ -261,7 +253,7 @@ OnInit.final("ItemSpells", function(Require)
         end
     end
 
-    local THANATOS_WINGS = Spell.define('A00D')
+    local THANATOS_WINGS = Spell.define('A01F')
     do
         local thistype = THANATOS_WINGS
 
@@ -286,12 +278,17 @@ OnInit.final("ItemSpells", function(Require)
 
         function thistype.onUnequip(itm, id, index, orig_holder)
             Unit[orig_holder]:removeEffect(itm.sfx)
+            itm.sfx = nil
         end
 
         function thistype.onEquip(itm, id, index)
             local sfx = ItemData[itm.id].sfx[itm.sfx_index or itm.cached_stats[index]]
 
-            itm.sfx = Unit[itm.holder]:addEffect(sfx.path, sfx.attach)
+            if not itm.sfx then
+                itm.sfx = Unit[itm.holder]:addEffect(sfx.path, sfx.attach)
+            end
+
+            return true
         end
     end
 
@@ -332,7 +329,7 @@ OnInit.final("ItemSpells", function(Require)
         end
     end
 
-    THANATOS_BOOTS = Spell.define('A01S')
+    local THANATOS_BOOTS = Spell.define('A01S')
     do
         local thistype = THANATOS_BOOTS
 
@@ -349,13 +346,16 @@ OnInit.final("ItemSpells", function(Require)
         function thistype.onUnequip(itm, id, index, orig_holder)
             Unit[orig_holder]:removeEffect(itm.sfx)
             Unit[orig_holder]:removeEffect(itm.sfx2)
+            itm.sfx = nil
         end
 
         function thistype.onEquip(itm, id, index)
             local tbl = ItemData[itm.id].sfx
 
-            itm.sfx = Unit[itm.holder]:addEffect(tbl[1].path, tbl[1].attach)
-            itm.sfx2 = Unit[itm.holder]:addEffect(tbl[2].path, tbl[2].attach)
+            if not itm.sfx then
+                itm.sfx = Unit[itm.holder]:addEffect(tbl[1].path, tbl[1].attach)
+                itm.sfx2 = Unit[itm.holder]:addEffect(tbl[2].path, tbl[2].attach)
+            end
 
             BlzSetAbilityRealLevelField(BlzGetUnitAbility(itm.holder, id), ABILITY_RLF_MAXIMUM_RANGE, 0, itm.cached_stats[index])
 
@@ -402,21 +402,17 @@ OnInit.final("ItemSpells", function(Require)
         missile_template.__index = missile_template
 
         function thistype:onCast()
-            if HasProficiency(self.pid, PROF_DAGGER) then
-                local missile = setmetatable({}, missile_template)
-                missile.x = self.x
-                missile.y = self.y
-                missile.z = GetUnitZ(self.caster)
-                missile.visual = AddSpecialEffect("Abilities\\Spells\\NightElf\\shadowstrike\\ShadowStrikeMissile.mdl", self.x, self.y)
-                BlzSetSpecialEffectScale(missile.visual, 1.1)
-                missile.source = self.caster
-                missile.target = self.target
-                missile.owner = Player(self.pid - 1)
+            local missile = setmetatable({}, missile_template)
+            missile.x = self.x
+            missile.y = self.y
+            missile.z = GetUnitZ(self.caster)
+            missile.visual = AddSpecialEffect("Abilities\\Spells\\NightElf\\shadowstrike\\ShadowStrikeMissile.mdl", self.x, self.y)
+            BlzSetSpecialEffectScale(missile.visual, 1.1)
+            missile.source = self.caster
+            missile.target = self.target
+            missile.owner = Player(self.pid - 1)
 
-                ALICE_Create(missile)
-            else
-                DisplayTimedTextToPlayer(Player(self.pid - 1), 0, 0, 15., "You do not have the proficiency to use this spell!")
-            end
+            ALICE_Create(missile)
         end
     end
 
@@ -434,16 +430,12 @@ OnInit.final("ItemSpells", function(Require)
         local thistype = ASTRAL_FREEZE_ITEM
 
         function thistype:onCast()
-            if HasProficiency(self.pid, PROF_STAFF) then
-                local pt = TimerList[self.pid]:add()
-                pt.source = self.caster
-                pt.dmg = 40. * GetHeroInt(self.caster, true) * BOOST[self.pid]
-                pt.angle = bj_RADTODEG * self.angle
+            local pt = TimerList[self.pid]:add()
+            pt.source = self.caster
+            pt.dmg = 40. * GetHeroInt(self.caster, true) * BOOST[self.pid]
+            pt.angle = bj_RADTODEG * self.angle
 
-                pt:after(0., ASTRAL_FREEZE.effect)
-            else
-                DisplayTimedTextToPlayer(Player(self.pid - 1), 0, 0, 15., "You do not have the proficiency to use this spell!")
-            end
+            pt:after(0., ASTRAL_FREEZE.effect)
         end
     end
 
@@ -512,9 +504,7 @@ OnInit.final("ItemSpells", function(Require)
         end
 
         function thistype.onEquip(itm, id, index)
-            if HasProficiency(itm.pid, PROF_BOW) then
-                IntenseFocusBuff:add(itm.holder, itm.holder)
-            end
+            IntenseFocusBuff:add(itm.holder, itm.holder)
         end
     end
 
