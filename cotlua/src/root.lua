@@ -153,6 +153,7 @@ dofile('Utility/unittable.lua')
 dofile('Utility/users.lua')
 dofile('Utility/worldbounds.lua')
 dofile('Utility/shield.lua')
+dofile('Utility/chain.lua')
 
 dofile('Utility/PrecomputedHeightMap.lua')
 dofile('Utility/HandleType.lua')
@@ -196,6 +197,9 @@ dofile('Spells/Heroes/savior.lua')
 dofile('Spells/Heroes/thunderblade.lua')
 dofile('Spells/Heroes/vampire.lua')
 dofile('Spells/Heroes/warrior.lua')
+
+dofile('Spells/Bosses/azazoth.lua')
+
 dofile('Spells/spelltools.lua')
 dofile('Spells/unitspells.lua')
 dofile('Spells/itemspells.lua')
