@@ -5,13 +5,15 @@
 ]]
 
 OnInit.final("Dev", function(Require)
-    DEV_ENABLED        = true
-    SAVE_LOAD_VERSION  = 0x40000000
-    MAP_NAME           = "CoT Nevermore BETA"
-    EXTRA_DEBUG        = false
-    BUDDHA_MODE        = {} ---@type boolean[] 
-    DEBUG_COUNT        = 0
-    WEATHER_OVERRIDE   = 0
+    DEV_ENABLED            = true
+    PROFILE_SAVE_VERSION   = 0x40000000
+    CHARACTER_SAVE_VERSION = 0x40000000
+    SAVE_SCRAMBLE_VERSION  = 0x40000000
+    MAP_NAME               = "CoT Nevermore BETA"
+    EXTRA_DEBUG            = false
+    BUDDHA_MODE            = {} ---@type boolean[] 
+    DEBUG_COUNT            = 0
+    WEATHER_OVERRIDE       = 0
 
     local BOOST_OFF = false
 
