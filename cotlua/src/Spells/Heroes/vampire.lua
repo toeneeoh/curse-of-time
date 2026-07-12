@@ -175,9 +175,6 @@ OnInit.final("VampireSpells", function(Require)
 
                 if UnitAlive(target) then
                     DamageTarget(self.caster, target, pt.dmg * BOOST[self.pid], ATTACK_TYPE_NORMAL, MAGIC, thistype.tag)
-                    if GetHeroStr(self.caster, true) > GetHeroAgi(self.caster, true) and GetUnitAbilityLevel(self.caster, BLOODLORD.id) > 0 then
-                        --TODO: blood domain taunt
-                    end
                 end
 
                 local dummy = Dummy.create(GetUnitX(target), GetUnitY(target), FourCC('A09D'), 1)
@@ -254,6 +251,11 @@ OnInit.final("VampireSpells", function(Require)
                 local dummy = AddSpecialEffect("war3mapImported\\Death Nova.mdx", self.x, self.y)
                 BlzSetSpecialEffectScale(dummy, 0.75 + 0.075 * self.ablev)
                 DestroyEffect(dummy)
+
+                -- taunt
+                if GetHeroStr(self.caster, true) > GetHeroAgi(self.caster, true) then
+                    Taunt(self.caster, 800.)
+                end
 
                 DestroyGroup(ug)
             end
