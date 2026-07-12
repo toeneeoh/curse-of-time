@@ -228,8 +228,6 @@ OnInit.final("Boss", function(Require)
             RewardXPGold(killed, killer)
             boss:reward(x, y)
 
-            TQ:callDelayed(3., spawn_select_difficulty, boss, killed, CHAOS_MODE)
-
             local delay = BOSS_RESPAWN_TIME
 
             if IsUnitIdType(uid, UNIT_TYPE_HERO) == false then
@@ -244,7 +242,10 @@ OnInit.final("Boss", function(Require)
 
             delay = delay * boss.respawn_modifier
 
-            TQ:callDelayed(delay, boss_respawn, uid, CHAOS_MODE)
+            if not boss.disable_respawn then
+                TQ:callDelayed(3., spawn_select_difficulty, boss, killed, CHAOS_MODE)
+                TQ:callDelayed(delay, boss_respawn, uid, CHAOS_MODE)
+            end
         end
 
         ON_BUY_LOOKUP[FourCC('I05V')] = function(u, b, pid, itm)
@@ -331,11 +332,13 @@ OnInit.final("Boss", function(Require)
             end
         end
 
-        local U = User.first
-        while U do
-            -- on select show multiboard
-            EVENT_ON_SELECT:register_action(U.id, on_click)
-            U = U.next
+        do
+            local U = User.first
+            while U do
+                -- on select show multiboard
+                EVENT_ON_SELECT:register_action(U.id, on_click)
+                U = U.next
+            end
         end
 
         local function valid_target()
@@ -522,22 +525,6 @@ OnInit.final("Boss", function(Require)
         -- refresh boss regen, threat, etc.
         TQ:callPeriodically(1., nil, periodic)
 
-        local function kill_zeppelin_factory(boss)
-            local function f()
-                local source = GetTriggerUnit()
-
-                if UnitAlive(boss) and GetUnitTypeId(source) == FourCC('nzep') then
-                    ExpireUnit(source)
-                    DestroyEffect(AddSpecialEffect("Abilities\\Spells\\Human\\Thunderclap\\ThunderClapCaster.mdl", GetUnitX(boss), GetUnitY(boss)))
-                    SetUnitAnimation(boss, "attack slam")
-                end
-
-                return false
-            end
-
-            return Filter(f)
-        end
-
         function thistype:setup_range_event()
             -- clean up trigger event
             if self.trigger then
@@ -545,7 +532,7 @@ OnInit.final("Boss", function(Require)
             end
             self.trigger = CreateTrigger()
             if CHAOS_MODE then
-                TriggerRegisterUnitInRange(self.trigger, self.unit, 900., kill_zeppelin_factory(self.unit))
+                -- TriggerRegisterUnitInRange(self.trigger, self.unit, 900., kill_zeppelin_factory(self.unit))
             end
         end
 
@@ -554,7 +541,7 @@ OnInit.final("Boss", function(Require)
             EVENT_ON_STRUCK_FINAL:register_unit_action(self.unit, BossAI)
             EVENT_ON_UNIT_DEATH:register_unit_action(self.unit, on_boss_death)
 
-            self:setup_range_event()
+            -- self:setup_range_event()
 
             SetHeroLevel(self.unit, self.level, false)
             if self.difficulty == 2 then
