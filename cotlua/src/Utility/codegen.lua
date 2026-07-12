@@ -36,7 +36,7 @@ OnInit.global("CodeGen", function()
     end
 
     -- string scrambling init
-    local scrambled = pseudoRandomPermutation(ALPHABET, SAVE_LOAD_VERSION)
+    local scrambled = pseudoRandomPermutation(ALPHABET, SAVE_SCRAMBLE_VERSION)
     local SCRAMBLED = {}
     local UNSCRAMBLED = {}
     for i = 1, ALPHABET:len() do
