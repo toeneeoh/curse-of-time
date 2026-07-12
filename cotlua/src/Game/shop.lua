@@ -14,107 +14,102 @@ OnInit.final("Shop", function(Require)
 
     ITEM_PRICE = array2d(0) ---@type table
 
-        -- Credits:
-        --      Taysen: FDF file
-        --      Hate: Frame border effects
-        --      Chopinski: Original vJass
+    -- Credits:
+    --      Taysen: FDF file
+    --      Hate: Frame border effects
+    --      Chopinski: Original vJass
 
-        -- Main window 
-        local X                              = -0.04 ---@type number 
-        local Y                              = 0.52 ---@type number 
-        local WIDTH                          = 0.6 ---@type number 
-        local HEIGHT                         = 0.35 ---@type number 
-        local TOOLBAR_BUTTON_SIZE            = 0.02 ---@type number 
-        local ROWS                           = 4 ---@type integer 
-        local COLUMNS                        = 10 ---@type integer 
-        local DETAILED_ROWS                  = 4 ---@type integer 
-        local DETAILED_COLUMNS               = 4 ---@type integer 
-        local CLOSE_ICON                     = "ReplaceableTextures\\CommandButtons\\BTNCancel.blp" ---@type string 
-        local PURCHASE_ICON                  = "ReplaceableTextures\\CommandButtons\\BTNReturnGoods.blp" ---@type string 
-        local CLEAR_ICON                     = "ReplaceableTextures\\CommandButtons\\BTNCancel.blp" ---@type string 
-        local LOGIC_ICON                     = "ReplaceableTextures\\CommandButtons\\BTNMagicalSentry.blp" ---@type string 
-        local SORT_LEVEL_ICON                = "ReplaceableTextures\\CommandButtons\\BTNHelmutPurple.blp" ---@type string 
-        local SORT_CRAFTABLE_ICON            = "ReplaceableTextures\\CommandButtons\\BTNBasicStruct.blp" ---@type string 
-        --local HELP_ICON                      = "UI\\Widgets\\EscMenu\\Human\\quest-unknown.blp" ---@type string 
-        --local UNDO_ICON                      = "ReplaceableTextures\\CommandButtons\\BTNReplay-Loop.blp" ---@type string 
-        --local DISMANTLE_ICON                 = "UI\\Feedback\\Resources\\ResourceUpkeep.blp" ---@type string 
+    -- Main window 
+    local X                              = -0.04 ---@type number 
+    local Y                              = 0.52 ---@type number 
+    local WIDTH                          = 0.6 ---@type number 
+    local HEIGHT                         = 0.35 ---@type number 
+    local TOOLBAR_BUTTON_SIZE            = 0.02 ---@type number 
+    local ROWS                           = 4 ---@type integer 
+    local COLUMNS                        = 10 ---@type integer 
+    local DETAILED_ROWS                  = 4 ---@type integer 
+    local DETAILED_COLUMNS               = 4 ---@type integer 
+    local CLOSE_ICON                     = "ReplaceableTextures\\CommandButtons\\BTNCancel.blp" ---@type string 
+    local PURCHASE_ICON                  = "ReplaceableTextures\\CommandButtons\\BTNReturnGoods.blp" ---@type string 
+    local CLEAR_ICON                     = "ReplaceableTextures\\CommandButtons\\BTNCancel.blp" ---@type string 
+    local LOGIC_ICON                     = "ReplaceableTextures\\CommandButtons\\BTNMagicalSentry.blp" ---@type string 
+    local SORT_LEVEL_ICON                = "ReplaceableTextures\\CommandButtons\\BTNHelmutPurple.blp" ---@type string 
+    local SORT_CRAFTABLE_ICON            = "ReplaceableTextures\\CommandButtons\\BTNBasicStruct.blp" ---@type string 
+    --local HELP_ICON                      = "UI\\Widgets\\EscMenu\\Human\\quest-unknown.blp" ---@type string 
+    --local UNDO_ICON                      = "ReplaceableTextures\\CommandButtons\\BTNReplay-Loop.blp" ---@type string 
+    --local DISMANTLE_ICON                 = "UI\\Feedback\\Resources\\ResourceUpkeep.blp" ---@type string 
 
-        local INVENTORY_COUNT                = 24 ---@type integer 
+    local INVENTORY_COUNT                = 24 ---@type integer 
 
-        -- Details window
-        local DETAIL_WIDTH                   = 0.3125 ---@type number 
-        local DETAIL_HEIGHT                  = HEIGHT ---@type number 
-        local DETAIL_USED_COUNT              = 6 ---@type integer 
-        local DETAIL_BUTTON_SIZE             = 0.028 ---@type number 
-        local DETAIL_BUTTON_GAP              = 0.045 ---@type number 
-        local DETAIL_CLOSE_BUTTON_SIZE       = 0.02 ---@type number 
-        local DETAIL_SHIFT_BUTTON_SIZE       = 0.012 ---@type number 
-        local USED_RIGHT                     = "ReplaceableTextures\\CommandButtons\\BTNReplay-SpeedDown.blp" ---@type string 
-        local USED_LEFT                      = "ReplaceableTextures\\CommandButtons\\BTNReplay-SpeedUp.blp" ---@type string 
+    -- Details window
+    local DETAIL_WIDTH                   = 0.3125 ---@type number 
+    local DETAIL_HEIGHT                  = HEIGHT ---@type number 
+    local DETAIL_USED_COUNT              = 6 ---@type integer 
+    local DETAIL_BUTTON_SIZE             = 0.028 ---@type number 
+    local DETAIL_BUTTON_GAP              = 0.045 ---@type number 
+    local DETAIL_CLOSE_BUTTON_SIZE       = 0.02 ---@type number 
+    local DETAIL_SHIFT_BUTTON_SIZE       = 0.012 ---@type number 
+    local USED_RIGHT                     = "ReplaceableTextures\\CommandButtons\\BTNReplay-SpeedDown.blp" ---@type string 
+    local USED_LEFT                      = "ReplaceableTextures\\CommandButtons\\BTNReplay-SpeedUp.blp" ---@type string 
 
-        -- When true, a click in a component in the
-        -- detail panel will detail the clicked component
-        local DETAIL_COMPONENT               = true ---@type boolean 
+    -- When true, a click in a component in the
+    -- detail panel will detail the clicked component
+    local DETAIL_COMPONENT               = true ---@type boolean 
 
-        -- Side Panels
-        local SIDE_WIDTH                     = 0.075 ---@type number 
-        local SIDE_HEIGHT                    = HEIGHT ---@type number 
-        local EDIT_WIDTH                     = 0.15 ---@type number 
-        local EDIT_HEIGHT                    = 0.0285 ---@type number 
+    -- Side Panels
+    local SIDE_WIDTH                     = 0.075 ---@type number 
+    local SIDE_HEIGHT                    = HEIGHT ---@type number 
+    local EDIT_WIDTH                     = 0.15 ---@type number 
+    local EDIT_HEIGHT                    = 0.0285 ---@type number 
 
-        -- Category buttons
-        local CATEGORY_COUNT                 = 15 ---@type integer 
-        local CATEGORY_SIZE                  = 0.0255 ---@type number 
-        local CATEGORY_GAP                   = 0.00225 ---@type number 
+    -- Category buttons
+    local CATEGORY_COUNT                 = 15 ---@type integer 
+    local CATEGORY_SIZE                  = 0.0255 ---@type number 
+    local CATEGORY_GAP                   = 0.00225 ---@type number 
 
-        -- Item slots
-        local INITIAL_X_OFFSET               = 0.04
-        local INITIAL_Y_OFFSET               = 0.03
-        local SLOT_WIDTH                     = 0.0375 ---@type number 
-        local SLOT_HEIGHT                    = 0.0375 ---@type number 
-        local ITEM_SIZE                      = 0.0375 ---@type number 
-        local GOLD_SIZE                      = 0.008 ---@type number 
-        local COST_WIDTH                     = 0.06 ---@type number 
-        local COST_HEIGHT                    = 0.005 ---@type number 
-        local COST_SCALE                     = 0.7 ---@type number 
-        local COST_GAP                   = 0.009 ---@type number 
-        local SLOT_GAP_X                     = 0.0145 ---@type number 
-        local SLOT_GAP_Y                     = 0.038 ---@type number 
-        local COMPONENT_GAP                  = SLOT_WIDTH * 0.61 ---@type number 
+    -- Item slots
+    local INITIAL_X_OFFSET               = 0.04
+    local INITIAL_Y_OFFSET               = 0.03
+    local SLOT_WIDTH                     = 0.0375 ---@type number 
+    local SLOT_HEIGHT                    = 0.0375 ---@type number 
+    local ITEM_SIZE                      = 0.0375 ---@type number 
+    local GOLD_SIZE                      = 0.008 ---@type number 
+    local COST_WIDTH                     = 0.06 ---@type number 
+    local COST_HEIGHT                    = 0.005 ---@type number 
+    local COST_SCALE                     = 0.7 ---@type number 
+    local COST_GAP                   = 0.009 ---@type number 
+    local SLOT_GAP_X                     = 0.0145 ---@type number 
+    local SLOT_GAP_Y                     = 0.038 ---@type number 
+    local COMPONENT_GAP                  = SLOT_WIDTH * 0.61 ---@type number 
 
-        -- Selected item highlight
-        local ITEM_HIGHLIGHT                 = "blue_energy_sprite.mdx" ---@type string 
-        local HIGHLIGHT_WIDTH                = 0.00001 ---@type number 
-        local HIGHLIGHT_HEIGHT               = 0.00001 ---@type number 
-        local HIGHLIGHT_SCALE                = 0.675 ---@type number 
-        local HIGHLIGHT_XOFFSET              = -0.0052 ---@type number 
-        local HIGHLIGHT_YOFFSET              = -0.0048 ---@type number 
+    -- Selected item highlight
+    local ITEM_HIGHLIGHT                 = "blue_energy_sprite.mdx" ---@type string 
+    local HIGHLIGHT_WIDTH                = 0.00001 ---@type number 
+    local HIGHLIGHT_HEIGHT               = 0.00001 ---@type number 
+    local HIGHLIGHT_SCALE                = 0.675 ---@type number 
+    local HIGHLIGHT_XOFFSET              = -0.0052 ---@type number 
+    local HIGHLIGHT_YOFFSET              = -0.0048 ---@type number 
 
-        -- Scroll
-        local SCROLL_DELAY                   = 0.01 ---@type number 
+    -- Scroll
+    local SCROLL_DELAY                   = 0.01 ---@type number 
 
-        -- Update time
-        local UPDATE_PERIOD                  = 0.2 ---@type number 
+    -- Update time
+    local UPDATE_PERIOD                  = 0.33 ---@type number 
 
-        -- Buy / Sell sound, model and scale
-        local SPRITE_MODEL                   = "UI\\Feedback\\GoldCredit\\GoldCredit.mdl" ---@type string 
-        local SPRITE_SCALE                   = 0.0005 ---@type number 
-        local SUCCESS_SOUND                  = "Abilities\\Spells\\Other\\Transmute\\AlchemistTransmuteDeath1.wav" ---@type string 
-        local ERROR_SOUND                    = "Sound\\Interface\\Error.wav" ---@type string 
+    -- Buy / Sell sound, model and scale
+    local SPRITE_MODEL                   = "UI\\Feedback\\GoldCredit\\GoldCredit.mdl" ---@type string 
+    local SPRITE_SCALE                   = 0.0005 ---@type number 
+    local SUCCESS_SOUND                  = "Abilities\\Spells\\Other\\Transmute\\AlchemistTransmuteDeath1.wav" ---@type string 
+    local ERROR_SOUND                    = "Sound\\Interface\\Error.wav" ---@type string 
 
-        -- Main storage table
-        local table = array2d() ---@type any[][]
-
-    ---@return any[][]
-    function GetShopStorage()
-        return table
-    end
+    -- Main storage table
+    local table = array2d() ---@type any[][]
 
     --[[ ----------------------------------------------------------------------------------------- ]]
     --[[                                          API                                              ]]
     --[[ ----------------------------------------------------------------------------------------- ]]
     ---@type fun(pid: integer, si: ShopItem): boolean
-    function IsCraftable(pid, si)
+    local function IsCraftable(pid, si)
         local counter = __jarray(0)
         local componentCount = si:components()
 
@@ -2020,7 +2015,7 @@ OnInit.final("Shop", function(Require)
         SetSoundParamsFromLabel(thistype.noGold[id], "NoGoldNaga")
         SetSoundDuration(thistype.noGold[id], 2690)
 
-        TimerStart(thistype.update, UPDATE_PERIOD, true, thistype.onPeriod)
+        --TimerStart(thistype.update, UPDATE_PERIOD, true, thistype.onPeriod)
         TriggerAddAction(thistype.trigger, thistype.onScroll)
         TriggerAddCondition(thistype.search, Condition(thistype.onSearch))
         RegisterPlayerUnitEvent(EVENT_PLAYER_UNIT_SELECTED, thistype.onSelect)
