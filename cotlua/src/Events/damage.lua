@@ -18,6 +18,15 @@ OnInit.final("Damage", function(Require)
     MAGIC    = DAMAGE_TYPE_MAGIC ---@type damagetype 
     PURE     = DAMAGE_TYPE_DIVINE ---@type damagetype 
 
+    local DAMAGE_TAG = "" ---@type string
+    local WEAPON_TYPE_WHOKNOWS = WEAPON_TYPE_WHOKNOWS
+
+    ---@type fun(source: unit, target: unit, dmg: number, attack_type: attacktype, damage_type: damagetype, tag: string|nil)
+    function DamageTarget(source, target, dmg, attack_type, damage_type, tag)
+        DAMAGE_TAG = tag
+        UnitDamageTarget(source, target, dmg, true, false, attack_type, damage_type, WEAPON_TYPE_WHOKNOWS)
+    end
+
     local format = string.format
     local color_tag = {
         [MAGIC] = {100, 100, 255},
@@ -78,15 +87,6 @@ OnInit.final("Damage", function(Require)
         return amount
     end
 
-    ---@return string
-    local function GetDamageTag()
-        local str = DAMAGE_TAG[#DAMAGE_TAG]
-
-        DAMAGE_TAG[#DAMAGE_TAG] = nil
-
-        return str
-    end
-
     local get_event_damage_source = GetEventDamageSource
     local blz_get_event_damage_target = BlzGetEventDamageTarget
     local get_event_damage = GetEventDamage
@@ -119,7 +119,7 @@ OnInit.final("Damage", function(Require)
         local amount      = { value = get_event_damage() }
         local damage_type = blz_get_event_damage_type()
         local crit        = 1.
-        local tag         = GetDamageTag()
+        local tag         = DAMAGE_TAG
         local source_tbl  = Unit[source]
         local target_tbl  = Unit[target]
 
