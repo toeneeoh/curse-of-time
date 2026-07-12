@@ -394,7 +394,7 @@ OnInit.final("ArcanistSpells", function(Require)
                         SetUnitPathing(target, false)
                         SetUnitXBounded(target, pt.x)
                         SetUnitYBounded(target, pt.y)
-                        TQ:callDelayed(2., ResetPathing, target)
+                        TQ:callDelayed(2., SetUnitPathing, target, true)
                     end
                     DestroyEffect(AddSpecialEffect("Abilities\\Spells\\Human\\Thunderclap\\ThunderClapCaster.mdl", GetUnitX(target), GetUnitY(target)))
                     DamageTarget(pt.source, target, pt.dmg, ATTACK_TYPE_NORMAL, MAGIC, thistype.tag)
