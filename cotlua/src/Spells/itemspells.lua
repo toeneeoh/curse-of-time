@@ -474,20 +474,20 @@ OnInit.final("ItemSpells", function(Require)
     do
         local thistype = BANISH_DEMON
 
+        local quotes = {
+            [BOSS_LEGION] = "|cffffcc00Legion:|r Fool! Did you really think splashing water on me would do anything?",
+            [BOSS_DEATH_KNIGHT] = "|cffffcc00Death Knight:|r ...???",
+        }
+
         function thistype:onCast()
             local itm = GetItemFromPlayer(self.pid, FourCC('I0OU'))
+            local boss = IsBoss(self.target)
 
-            if self.target == Boss[BOSS_LEGION].unit then
+            if boss and quotes[boss.index] then
                 itm:destroy()
-                if BANISH_FLAG == false then
-                    BANISH_FLAG = true
-                    DisplayTimedTextToForce(FORCE_PLAYING, 30., "|cffffcc00Legion:|r Fool! Did you really think splashing water on me would do anything?")
-                end
-            elseif self.target == Boss[BOSS_DEATH_KNIGHT].unit then
-                itm:destroy()
-                if BANISH_FLAG == false then
-                    BANISH_FLAG = true
-                    DisplayTimedTextToForce(FORCE_PLAYING, 30., "|cffffcc00Death Knight:|r ...???")
+                if not boss.disable_respawn then
+                    boss.disable_respawn = true
+                    DisplayTimedTextToForce(FORCE_PLAYING, 30., quotes[boss.index])
                 end
             else
                 DisplayTimedTextToPlayer(Player(self.pid - 1), 0., 0., 30., "Maybe you shouldn't waste this...")
@@ -527,7 +527,7 @@ OnInit.final("ItemSpells", function(Require)
         end
 
         function thistype.onEquip(itm, id, index)
-            TQ:callDelayed(0., periodic, itm, itm.holder)
+            periodic(itm, itm.holder)
             return true
         end
     end
@@ -551,7 +551,7 @@ OnInit.final("ItemSpells", function(Require)
         end
 
         function thistype.onEquip(itm, id, index)
-            TQ:callDelayed(0., periodic, itm, itm.holder)
+            periodic(itm, itm.holder)
             return true
         end
     end
