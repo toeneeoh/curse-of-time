@@ -49,6 +49,20 @@ OnInit.final("MapSetup", function(Require)
     FogModifierStart(CreateFogModifierRect(PLAYER_BOSS,FOG_OF_WAR_VISIBLE,gg_rct_InfiniteStruggleCameraBounds, false, false))
 
     -- player clean on leave
+    ---@type fun():boolean
+    local function onPlayerLeave()
+        local p   = GetTriggerPlayer()
+        local pid = GetPlayerId(p) + 1
+
+        -- clean up
+        DisplayTextToForce(FORCE_PLAYING, (User[p].nameColored .. " has left the game"))
+
+        if Profile[pid] then
+            PlayerCleanup(pid)
+        end
+
+        return false
+    end
     TriggerAddCondition(LEAVE_TRIGGER, Filter(onPlayerLeave))
 
     -- setup alliances
