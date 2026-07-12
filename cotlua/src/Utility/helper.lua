@@ -1,7 +1,7 @@
 --[[
     helper.lua
 
-    A general purpose module with a myriad of useful helper functions and structs for use across files.
+    A general purpose module with useful helper functions for use across files.
 ]]
 
 OnInit.global("Helper", function(Require)
@@ -18,127 +18,15 @@ OnInit.global("Helper", function(Require)
     local ABIL_AVUL = ABIL_AVUL
     local ABIL_ALOC = ABIL_ALOC
 
-    ---@class CircularArrayList
-    ---@field iterator function
-    ---@field data table
-    ---@field add function
-    ---@field add_timed function
-    ---@field count integer
-    ---@field START integer
-    ---@field END integer
-    ---@field MAXSIZE integer
-    ---@field create function
-    ---@field destroy function
-    ---@field wipe function
-    CircularArrayList = {}
-    do
-        local thistype = CircularArrayList
-        local mt = { __index = thistype }
-
-        function thistype:iterator()
-            local index = self.START
-            local count = 0
-
-            return function()
-                if count < self.count then
-                    local value = self.data[index]
-                    index = fmod(index + 1, self.MAXSIZE)
-                    count = count + 1
-                    return value
-                end
-            end
-        end
-
-        ---@type fun(size: integer): CircularArrayList
-        function thistype.create(size)
-            local self = {
-                data = {},
-                count = 0,
-                START = 1,
-                END = 1,
-                MAXSIZE = size or 200
-            }
-
-            setmetatable(self, mt)
-            return self
-        end
-
-        ---@param value any
-        function thistype:add(value)
-            self.data[self.END] = value
-            self.END = fmod((self.END + 1), self.MAXSIZE)
-
-            if self.count < self.MAXSIZE then
-                self.count = self.count + 1
-            else
-                -- Free up the last slot
-                self.START = fmod((self.START + 1), self.MAXSIZE)
-            end
-        end
-
-        local function remove(self)
-            if self.count > 0 then
-                self.START = fmod((self.START + 1), self.MAXSIZE)
-                self.count = self.count - 1
-            end
-        end
-
-        ---@param value any
-        ---@param time number
-        function thistype:add_timed(value, time)
-            self:add(value)
-
-            TQ:callDelayed(time, remove, self)
-        end
-
-        function thistype:wipe()
-            self.data = {}
-            self.count = 0
-            self.START = 1
-            self.END = 1
-        end
-    end
-
----@type fun(val: number, min: number, max: number): number
-function MathClamp(val, min, max)
-    if val < min then
-        return min
-    elseif val > max then
-        return max
+---@type fun(val: number, a: number, b: number): number
+function MathClamp(val, a, b)
+    if val < a then
+        return a
+    elseif val > b then
+        return a
     end
 
     return val
-end
-
----@param b boolean
----@return integer
-function B2I(b)
-    if b then
-        return 1
-    end
-
-    return 0
-end
-
----@type fun(source: unit, target: unit, dmg: number, attack_type: attacktype, damage_type: damagetype, tag: string|nil)
-function DamageTarget(source, target, dmg, attack_type, damage_type, tag)
-    DAMAGE_TAG[#DAMAGE_TAG + 1] = tag
-    UnitDamageTarget(source, target, dmg, true, false, attack_type, damage_type, WEAPON_TYPE_WHOKNOWS)
-end
-
----@type fun():boolean
-function onPlayerLeave()
-    local p   = GetTriggerPlayer()
-    local pid = GetPlayerId(p) + 1
-
-    -- clean up
-    DisplayTextToForce(FORCE_PLAYING, (User[p].nameColored .. " has left the game"))
-
-    if Profile[pid] then
-        PlayerCleanup(pid)
-    end
-
-    return false
 end
 
 --[[Tasyen/Bribes's GetMainSelectedUnit]]
@@ -257,340 +145,6 @@ function RealToString(value)
 end
 
 local RealToString = RealToString
-
---[[Damage number pop-up text]]
-do
-    local SIZE_MIN                = 0.009          ---@type number -- Minimum size of text
-    local SIZE_BONUS              = 0.006          ---@type number -- Text size increase
-    local TIME_LIFE               = 0.9            ---@type number -- How long the text lasts
-    local TIME_FADE               = 0.7            ---@type number -- When does the text start to fade
-    local Z_OFFSET                = 100             ---@type number -- Height above unit
-    local Z_OFFSET_BON            = 75             ---@type number -- How much extra height the text gains
-    local VELOCITY                = 2.75              ---@type number -- How fast the text move in x/y plane
-    local MAX_PER_TICK            = 4 ---@type integer 
-    local count                   = 0 ---@type integer 
-    local instances               = {}
-
-    ---@class ArcingTextTag
-    ---@field create function
-    ArcingTextTag = {}
-    do
-        local thistype = ArcingTextTag
-
-        local move_text_tag = SetTextTagPos
-        local set_text_tag_text = SetTextTagText
-
-        local function condition()
-            return #instances == 0
-        end
-
-        local function update()
-            local i = 1
-            count = 0
-
-            while i <= #instances do
-                local self = instances[i]
-                local p = sin(bj_PI * (self.time / self.timeScale))
-                self.time = self.time - FPS_32
-                self.x = self.x + self.ac
-                self.y = self.y + self.as
-                move_text_tag(self.tt, self.x, self.y, Z_OFFSET + Z_OFFSET_BON * p)
-                set_text_tag_text(self.tt, self.text, (SIZE_MIN + SIZE_BONUS * p) * self.scale)
-
-                if self.time <= 0 then
-                    instances[i] = instances[#instances]
-                    instances[#instances] = nil
-                else
-                    i = i + 1
-                end
-            end
-        end
-
-        ---@type fun(text: string|number, u: unit, duration: number, size: number, r: integer, g: integer, b: integer, alpha: integer): ArcingTextTag?
-        function thistype.create(text, u, duration, size, r, g, b, alpha)
-            count = count + 1
-
-            if count > MAX_PER_TICK then
-                return
-            end
-
-            if type(text) == "number" then
-                local hp = text / BlzGetUnitMaxHP(u)
-                size = size + min(hp * 2., 2.)
-                duration = duration + min(hp, 1.25)
-                text = RealToString(text)
-            end
-
-            local a = random() * 2 * bj_PI
-            ---@diagnostic disable-next-line: missing-fields
-            local self = { ---@type ArcingTextTag
-                scale = size,
-                timeScale = max(duration, 0.001),
-                text = text,
-                x = GetUnitX(u),
-                y = GetUnitY(u),
-                time = TIME_LIFE,
-                as = sin(a) * VELOCITY,
-                ac = cos(a) * VELOCITY,
-            }
-
-            local pid = GetPlayerId(GetLocalPlayer()) + 1 ---@type integer 
-
-            if DMG_NUMBERS[pid] == 0 or (DMG_NUMBERS[pid] == 1 and not IsUnitAlly(u, GetLocalPlayer())) then
-                self.tt = CreateTextTag()
-                SetTextTagPermanent(self.tt, false)
-                SetTextTagColor(self.tt, r, g, b, 255 - alpha)
-                SetTextTagLifespan(self.tt, TIME_LIFE * duration)
-                SetTextTagFadepoint(self.tt, TIME_FADE * duration)
-                SetTextTagText(self.tt, text, SIZE_MIN * size)
-                SetTextTagPos(self.tt, self.x, self.y, Z_OFFSET)
-            end
-
-            instances[#instances + 1] = self
-
-            if #instances == 1 then
-                TQ:callPeriodically(FPS_32, condition, update)
-            end
-
-            return self
-        end
-    end
-end
-
----@class DialogWindow
----@field getClickedIndex function
----@field pid integer
----@field data any[]
----@field Button button[]
----@field ButtonName string[]
----@field MenuButton button[]
----@field MenuButtonName string[]
----@field count integer
----@field menu_count integer
----@field Page integer
----@field display function
----@field addButton function
----@field addMenuButton function
----@field create function
----@field destroy function
----@field BUTTON_MAX integer
-DialogWindow = {}
-do
-    local thistype = DialogWindow
-    local mt = { __index = thistype }
-
-    thistype.OPTIONS_PER_PAGE = 7 ---@type integer 
-    thistype.BUTTON_MAX       = 100 ---@type integer 
-    thistype.MENU_BUTTON_MAX  = 5 ---@type integer 
-    thistype.DATA_MAX         = 100 ---@type integer 
-
-    thistype.dialog          = nil ---@type dialog 
-    thistype.pid             = 0 ---@type integer 
-    thistype.title           = "" ---@type string 
-    thistype.count     = 0  ---@type integer 
-    thistype.menu_count = 2  ---@type integer 
-    thistype.Page            = -1 ---@type integer 
-    thistype.trig            = nil
-
-    thistype.cancellable     = true ---@type boolean 
-
-    ---@return boolean
-    function thistype.dialogHandler()
-        local self = thistype[GetPlayerId(GetTriggerPlayer()) + 1]
-
-        --cancel
-        if self then
-            if GetClickedButton() == self.MenuButton[0] then
-                self:destroy()
-            --next page
-            elseif GetClickedButton() == self.MenuButton[1] then
-                self:display()
-            end
-        end
-
-        return false
-    end
-
-    ---@param b button
-    ---@return integer
-    function thistype:getClickedIndex(b)
-        for index = 0, self.count do
-            if b == self.Button[index] then
-                return index
-            end
-        end
-
-        return -1
-    end
-
-    function thistype:display()
-        local index = self.Page * self.OPTIONS_PER_PAGE + self.OPTIONS_PER_PAGE ---@type integer 
-        local shown = 0 ---@type integer 
-
-        DialogClear(self.dialog)
-
-        --buttons
-        if index >= self.count then
-            index = 0
-            self.Page = -1
-        end
-
-        while not (shown >= self.OPTIONS_PER_PAGE or index >= self.count) do
-
-            self.Button[index] = DialogAddButton(self.dialog, self.ButtonName[index], 0)
-
-            index = index + 1
-            shown = shown + 1
-        end
-
-        --menu buttons
-        index = 2
-        while index < self.menu_count do
-
-            self.MenuButton[index] = DialogAddButton(self.dialog, self.MenuButtonName[index], 0)
-
-            index = index + 1
-        end
-
-        --reserve first two menu buttons for next page / cancel
-        if self.count > self.OPTIONS_PER_PAGE then
-            self.MenuButton[1] = DialogAddButton(self.dialog, "Next Page", 0)
-            self.Page = self.Page + 1
-        end
-
-        if self.cancellable then
-            self.MenuButton[0] = DialogAddButton(self.dialog, "Cancel", 0)
-        end
-
-        DialogSetMessage(self.dialog, self.title)
-        DialogDisplay(Player(self.pid - 1), self.dialog, GetLocalPlayer() == Player(self.pid - 1))
-    end
-
-    ---Second argument allows some data to be associated with the button index
-    ---@type fun(self: DialogWindow, s: string, data: any?)
-    function thistype:addButton(s, data)
-        if data ~= nil then
-            self.data[self.count] = data
-        end
-        self.ButtonName[self.count] = s
-        self.count = self.count + 1
-    end
-
-    ---@param s string
-    function thistype:addMenuButton(s)
-        self.MenuButtonName[self.menu_count] = s
-        self.menu_count = self.menu_count + 1
-    end
-
-    function thistype:destroy()
-        DialogDisplay(Player(self.pid - 1), self.dialog, false)
-        DialogDestroy(self.dialog)
-        DestroyTrigger(self.trig)
-
-        thistype[self.pid] = nil
-    end
-
-    ---@type fun(pid: integer, s: string, c: function): DialogWindow | nil
-    function DialogWindow.create(pid, s, c)
-        --safety
-        if thistype[pid] then
-            thistype[pid]:destroy()
-        end
-
-        ---@diagnostic disable-next-line: missing-fields
-        local self = {} ---@type DialogWindow
-        self.dialog = DialogCreate()
-        self.title = s
-        self.pid = pid
-        self.trig = CreateTrigger()
-        self.data = {}
-        self.Button = {}
-        self.ButtonName = __jarray("")
-        self.MenuButton = {}
-        self.MenuButtonName = __jarray("")
-
-        setmetatable(self, mt)
-
-        DialogSetMessage(self.dialog, self.title)
-        TriggerRegisterDialogEvent(self.trig, self.dialog)
-        TriggerAddCondition(self.trig, Filter(c))
-        TriggerAddCondition(self.trig, Filter(thistype.dialogHandler))
-
-        thistype[pid] = self
-
-        return self
-    end
-end
-
-
--- simple priority queue
-
----@class PriorityQueue
----@field create function
----@field push function
----@field pop function
----@field clear function
----@field isEmpty function
-PriorityQueue = {}
-do
-    local thistype = PriorityQueue
-    thistype.__index = thistype
-
-    function thistype.create()
-        local self = setmetatable({}, thistype)
-        self.heap = {}
-        self.currentSize = 0
-        return self
-    end
-
-    function thistype:push(value, priority)
-        local node = {value = value, priority = priority}
-        self.currentSize = self.currentSize + 1
-        local i = self.currentSize
-        self.heap[i] = node
-        while i > 1 do
-            local parentIndex = math.floor(i / 2)
-            if self.heap[parentIndex].priority <= priority then
-                break
-            end
-            self.heap[i] = self.heap[parentIndex]
-            self.heap[parentIndex] = node
-            i = parentIndex
-        end
-    end
-
-    function thistype:pop()
-        local minNode = self.heap[1]
-        local lastNode = self.heap[self.currentSize]
-        self.currentSize = self.currentSize - 1
-        local i = 1
-        while true do
-            local childIndex = 2 * i
-            if childIndex > self.currentSize then
-                break
-            end
-            if childIndex + 1 <= self.currentSize and self.heap[childIndex + 1].priority < self.heap[childIndex].priority then
-                childIndex = childIndex + 1
-            end
-            if lastNode.priority <= self.heap[childIndex].priority then
-                break
-            end
-            self.heap[i] = self.heap[childIndex]
-            i = childIndex
-        end
-        self.heap[i] = lastNode
-        return minNode.value
-    end
-
-    function thistype:isEmpty()
-        return self.currentSize == 0
-    end
-
-    function thistype:clear()
-        self.heap = {}
-        self.currentSize = 0
-    end
-end
 
 --misc helper functions
 
@@ -908,36 +462,11 @@ function IsEnemy(enemy)
     return (enemy >= 12)
 end
 
-function ExplodeUnits()
-    SetUnitExploded(GetEnumUnit(), true)
-    KillUnit(GetEnumUnit())
-end
-
----@type fun(itm: item): boolean
-function isImportantItem(itm)
-    return itm == PATH_ITEM
-end
-
-function ClearItems()
-    local itm = GetEnumItem() ---@type item 
-
-    if not isImportantItem(itm) then -- pathcheck
-        Item[itm]:destroy()
-    end
-end
-
 ---@param source unit
 ---@param target unit
 local function AttackDelay(source, target)
     BlzSetUnitWeaponBooleanField(source, UNIT_WEAPON_BF_ATTACKS_ENABLED, 0, true)
     IssueTargetOrderById(source, 852173, target)
-end
-
----@param source unit
----@param target unit
-function InstantAttack(source, target)
-    UnitAddAbility(source, FourCC('IATK'))
-    TQ:callDelayed(FPS_32, AttackDelay, source, target)
 end
 
 ---@param pid integer
@@ -998,22 +527,6 @@ end
 ---@return integer
 function MainStat(hero) -- returns integer signifying primary attribute
     return BlzGetUnitIntegerField(hero, UNIT_IF_PRIMARY_ATTRIBUTE)
-end
-
----@param r rect
----@param x number
----@param y number
----@return boolean
-function NearbyRect(r, x, y)
-    local angle = math.atan(GetRectCenterY(r) - y, GetRectCenterX(r) - x) ---@type number 
-
-    for i = 5, 50, 5 do
-        if RectContainsCoords(r, x + i * cos(angle), y + sin(angle) * i) then
-            return true
-        end
-    end
-
-    return false
 end
 
 ---@type fun(pt: PlayerTimer)
@@ -1135,11 +648,6 @@ function SetCamera(pid, r)
 end
 --#endregion
 
----@type fun(u: unit)
-function ResetPathing(u)
-    SetUnitPathing(u, true)
-end
-
 ---@param line integer
 ---@param contents string?
 ---@return string
@@ -1158,21 +666,6 @@ function GetLine(line, contents)
     end
 
     return ""
-end
-
----@return boolean
-function ConfirmDeleteCharacter()
-    local pid   = GetPlayerId(GetTriggerPlayer()) + 1
-    local dw    = DialogWindow[pid]
-    local index = dw:getClickedIndex(GetClickedButton())
-
-    if index ~= -1 then
-        Profile[pid]:delete_character()
-
-        dw:destroy()
-    end
-
-    return false
 end
 
 ---@type fun(pid: integer, slot: integer): string
@@ -1254,21 +747,6 @@ end
 ---@type fun(x: number, y: number, x2: number, y2: number):number
 function DistanceCoords(x, y, x2, y2)
     return SquareRoot((x - x2) * (x - x2) + (y - y2) * (y - y2))
-end
-
----@param u unit
-function ExpireUnit(u)
-    UnitApplyTimedLife(u, FourCC('BTLF'), 0.1)
-end
-
----@param u unit
----@param abid integer
-function UnitResetAbility(u, abid)
-    local i = GetUnitAbilityLevel(u, abid) ---@type integer 
-
-    UnitRemoveAbility(u, abid)
-    UnitAddAbility(u, abid)
-    SetUnitAbilityLevel(u, abid,i)
 end
 
 ---@type fun(p: player, p2: player, show: boolean)
@@ -1400,8 +878,7 @@ function ItemToIndex(itemid)
     return SAVE_TABLE.KEY_ITEMS[itemid]
 end
 
-
---overrides default UnitAddItemById function
+-- overrides default UnitAddItemById function
 ---@type fun(u: unit, id: integer): Item
 function UnitAddItemById(u, id)
     local itm = CreateItem(id, GetUnitX(u), GetUnitY(u)) ---@type Item
@@ -1445,17 +922,6 @@ function PlayerAddItemById(pid, id)
     end
 
     return itm
-end
-
----@type fun(pid: integer): integer
-function GetEmptyIndex(pid)
-    for i = 1, MAX_INVENTORY_SLOTS do
-        if Profile[pid].hero.items[i] == nil then
-            return i
-        end
-    end
-
-    return -1
 end
 
 ---@type fun(killed: unit, killer: unit)
@@ -1879,19 +1345,6 @@ function FloatingTextUnit(s, u, dur, speed, z, size, r, g, b, alpha, shared)
     end
 end
 
----@type fun(s: string, x: number, y: number, dur: number, speed: number, z: number, size: number, r: integer, g: integer, b: integer, alpha: integer)
-function DoFloatingTextCoords(s, x, y, dur, speed, z, size, r, g, b, alpha)
-    local tt = CreateTextTag()
-
-    SetTextTagText(tt, s, size * 0.0023)
-    SetTextTagPos(tt, x, y, z)
-    SetTextTagColor(tt, r, g, b, 255 - alpha)
-    SetTextTagPermanent(tt, false)
-    SetTextTagVelocity(tt, 0, speed / 1803.)
-    SetTextTagLifespan(tt, dur)
-    SetTextTagFadepoint(tt, dur - .4)
-end
-
 ---@type fun(source: unit, target: unit, hp: number, tag: string|nil)
 function HP(source, target, hp, tag)
     -- hit count based units cannot be healed
@@ -1935,64 +1388,6 @@ function BinomialCoefficient(n, k)
     end
 
     return result
-end
-
----@class BezierCurve
----@field numPoints integer
----@field pointX number[]
----@field pointY number[]
----@field X number
----@field Y number
----@field addPoint function
----@field calcT function
----@field create function
----@field destroy function
-BezierCurve = {}
-do
-    local thistype = BezierCurve
-    local mt = { __index = thistype }
-
-    ---@type fun():BezierCurve
-    function thistype.create()
-        local self = {
-            pointX = {},
-            pointY = {},
-            X = 0.,
-            Y = 0.
-        }
-
-        setmetatable(self, mt)
-
-        return self
-    end
-
-    function thistype:destroy()
-        self = nil
-    end
-
-    ---@param x number
-    ---@param y number
-    function thistype:addPoint(x, y)
-        self.pointX[#self.pointX + 1] = x
-        self.pointY[#self.pointY + 1] = y
-    end
-
-    ---@param t number
-    function thistype:calcT(t)
-        local n       = #self.pointX - 1
-        local resultX = 0.
-        local resultY = 0.
-        local blend   = 0.
-
-        for i = 0, n do
-            blend = BinomialCoefficient(n, i) * (t ^ i) * ((1 - t) ^ (n - i))
-            resultX = resultX + blend * self.pointX[i + 1]
-            resultY = resultY + blend * self.pointY[i + 1]
-        end
-
-        self.X = resultX
-        self.Y = resultY
-    end
 end
 
 local function apply_fade(u, dur, fade, amount)
@@ -2176,17 +1571,6 @@ function reselect(u)
 end
 
 ---@return boolean
-function FilterHound()
-    if UnitAlive(GetFilterUnit()) and GetUnitTypeId(GetFilterUnit()) == SUMMON_HOUND then
-        if GetOwningPlayer(GetFilterUnit()) == Player(passedValue[#passedValue] - 1) then
-            return true
-        end
-    end
-
-    return false
-end
-
----@return boolean
 function FilterEnemyDead()
     local u = GetFilterUnit()
 
@@ -2243,17 +1627,6 @@ function FilterEnemyAwake()
 end
 
 ---@return boolean
-function FilterNotIllusion()
-    local u = GetFilterUnit()
-
-    return UnitAlive(u) and
-    GetUnitAbilityLevel(u, ABIL_AVUL) == 0 and
-    GetUnitAbilityLevel(u, ABIL_ALOC) == 0 and
-    not IsDummy(u) and
-    IsUnitIllusion(u) == false
-end
-
----@return boolean
 function FilterAlive()
     local u = GetFilterUnit()
 
@@ -2261,11 +1634,6 @@ function FilterAlive()
     GetUnitAbilityLevel(u, ABIL_AVUL) == 0 and
     GetUnitAbilityLevel(u, ABIL_ALOC) == 0 and
     not IsDummy(u)
-end
-
----@type fun(enemy: unit, player: player): boolean
-function IsHittable(enemy, player)
-    return UnitAlive(enemy) and GetUnitAbilityLevel(enemy, ABIL_AVUL) == 0 and IsUnitEnemy(enemy, player)
 end
 
 ---@type fun(frame: framehandle, title: string, text: string, simple: boolean, point1: framepointtype|nil, point2: framepointtype|nil, x: number|nil, y: number|nil, margin: number|nil): table
@@ -2307,252 +1675,6 @@ function FrameAddSimpleTooltip(frame, title, text, simple, point1, point2, x, y,
     BlzFrameSetTooltip(frame, self.frame)
 
     return self
-end
-
----@class SimpleButton
----@field frame framehandle
----@field button framehandle
----@field tooltip framehandle|table
----@field text_frame framehandle
----@field text function
----@field onClick function
----@field makeTooltip function
----@field icon function
----@field iconColor function
----@field enable function
----@field enabled boolean
----@field texture string
----@field visible function
----@field setTooltipIcon function
----@field setTooltipText function
----@field setTooltipName function
-SimpleButton = {}
-do
-    local thistype = SimpleButton
-    local mt = { __index = thistype }
-
-    ---@type fun(frame: framehandle, texture: string, width: number, height: number, point1: framepointtype, point2: framepointtype, x: number, y: number, onClick: function?, tooltip: string?, point3: framepointtype?, point4: framepointtype?, x2: number?, y2: number?): SimpleButton
-    function SimpleButton.create(frame, texture, width, height, point1, point2, x, y, onClick, tooltip, point3, point4, x2, y2)
-        local self = setmetatable({ enabled = true }, mt)
-        local inset = 0.004
-
-        self.frame = BlzCreateFrame("ContextFrameButton", frame, 0, 0)
-        self.button = BlzGetFrameByName("ContextFrameButtonIcon", 0)
-        self.text_frame = BlzGetFrameByName("ContextFrameText", 0)
-        BlzFrameSetPoint(self.frame, point1, frame, point2, x, y)
-        BlzFrameSetSize(self.frame, width + inset * 2, height + inset * 2)
-        BlzFrameSetTexture(self.button, texture, 0, true)
-        BlzFrameSetSize(self.frame, width, height)
-        --BlzFrameSetPoint(self.frame, FRAMEPOINT_CENTER, frame, FRAMEPOINT_CENTER, 0, 0)
-        self.texture = texture
-
-        -- Set up onClick event
-        if onClick then
-            self:onClick(onClick)
-        end
-
-        -- Set up simple tooltip
-        if tooltip then
-            self.tooltip = FrameAddSimpleTooltip(self.frame, "", tooltip, true, point3, point4, x2, y2)
-        end
-
-        return self
-    end
-
-    function thistype:setTooltipIcon(icon)
-        if self.iconFrame then
-            BlzFrameSetTexture(self.iconFrame, icon, 0, false)
-        end
-    end
-
-    function thistype:setTooltipText(string)
-        BlzFrameSetText(self.tooltip, string)
-    end
-
-    function thistype:setTooltipName(name)
-        if self.nameFrame then
-            BlzFrameSetText(self.nameFrame, name)
-        end
-    end
-
-    function thistype:iconColor(color)
-        BlzFrameSetVertexColor(self.button, color)
-        BlzFrameSetVertexColor(self.frame, color)
-    end
-
-    function thistype:point(p1, p2, x, y)
-        BlzFrameClearAllPoints(self.tooltip)
-        BlzFrameSetPoint(self.tooltip, p1, self.frame, p2, x, y)
-    end
-
-    -- advanced tooltip
-    function thistype:makeTooltip(point, width)
-        self.tooltip_frame = BlzCreateFrame("TooltipBoxFrame", self.frame, 0, 0)
-        self.box = BlzGetFrameByName("TooltipBox", 0)
-        self.line = BlzGetFrameByName("TooltipSeperator", 0)
-        self.tooltip = BlzGetFrameByName("TooltipText", 0)
-        self.iconFrame = BlzGetFrameByName("TooltipIcon", 0)
-        self.nameFrame = BlzGetFrameByName("TooltipName", 0)
-
-        if point == FRAMEPOINT_TOPLEFT then
-            BlzFrameSetPoint(self.tooltip, point, self.frame, FRAMEPOINT_TOPRIGHT, 0.005, -0.05)
-        elseif point == FRAMEPOINT_TOPRIGHT then
-            BlzFrameSetPoint(self.tooltip, point, self.frame, FRAMEPOINT_TOPLEFT, -0.005, -0.05)
-        elseif point == FRAMEPOINT_BOTTOMLEFT then
-            BlzFrameSetPoint(self.tooltip, point, self.frame, FRAMEPOINT_BOTTOMRIGHT, 0.005, 0.0)
-        end
-
-        BlzFrameSetPoint(self.box, FRAMEPOINT_TOPLEFT, self.iconFrame, FRAMEPOINT_TOPLEFT, -0.005, 0.005)
-        BlzFrameSetPoint(self.box, FRAMEPOINT_BOTTOMRIGHT, self.tooltip, FRAMEPOINT_BOTTOMRIGHT, 0.005, -0.005)
-        BlzFrameSetSize(self.tooltip, width, 0)
-        BlzFrameSetTooltip(self.frame, self.tooltip_frame)
-    end
-
-    function thistype:text(string)
-        BlzFrameSetText(self.text_frame, string)
-    end
-
-    function thistype:icon(path)
-        if path ~= nil then
-            self.texture = path
-            BlzFrameSetTexture(self.button, path, 0, false)
-        end
-
-        return self.texture
-    end
-
-    function thistype:visible(flag)
-        BlzFrameSetVisible(self.frame, flag)
-    end
-
-    function thistype:enable(flag)
-        local t = self.texture ---@type string 
-
-        if flag == false then
-            t = (t:sub(1, 34) .. "Disabled\\DIS" .. t:sub(36, t:len()))
-        end
-
-        self.enabled = flag
-
-        BlzFrameSetTexture(self.button, t, 0, true)
-    end
-
-    function thistype:onClick(func)
-        DestroyTrigger(self.click)
-        self.click = nil
-
-        if func ~= nil then
-            self.click = CreateTrigger()
-            TriggerAddCondition(self.click, Condition(func))
-            BlzTriggerRegisterFrameEvent(self.click, self.frame, FRAMEEVENT_CONTROL_CLICK)
-        end
-    end
-end
-
----@class PromptFrame
-PromptFrame = {}
-do
-    local thistype = SimpleButton
-    local prompt_queue = {}
-
-    -- frame setup
-    local main = BlzCreateFrame("QuestButtonDisabledBackdropTemplate", BlzGetFrameByName("ConsoleUIBackdrop", 0), 0, 0)
-    BlzFrameSetAbsPoint(main, FRAMEPOINT_TOP, 0.4, 0.48)
-    BlzFrameSetSize(main, 0.25, 0.20)
-    BlzFrameSetEnable(main, false)
-    BlzFrameSetLevel(main, 20)
-
-    local title = BlzCreateFrame("TitleText", main, 0, 0)
-    BlzFrameSetPoint(title, FRAMEPOINT_TOP, main, FRAMEPOINT_TOP, 0., -0.028)
-    BlzFrameSetEnable(title, false)
-
-    local blurb = BlzCreateFrameByType("TEXT", "", main, "", 0)
-    BlzFrameSetPoint(blurb, FRAMEPOINT_TOP, main, FRAMEPOINT_TOP, 0., -0.06)
-    BlzFrameSetEnable(blurb, false)
-    BlzFrameSetSize(blurb, 0.2, 1.0)
-
-    BlzFrameSetVisible(main, false)
-    --
-
-    local function refresh(pid)
-        local q = prompt_queue[pid][1]
-
-        if GetLocalPlayer() == Player(pid - 1) then
-            BlzFrameSetText(title, "|cffffffff" .. q.name .. "|r")
-            BlzFrameSetText(blurb, q.desc)
-            BlzFrameSetVisible(main, true)
-        end
-    end
-
-    local close = function(pid)
-        -- shift queue positions
-        local q = prompt_queue[pid]
-        for i = 1, #q do
-            q[i] = q[i + 1]
-        end
-
-        if q[1] then
-            refresh(pid)
-        else
-            if GetLocalPlayer() == Player(pid - 1) then
-                BlzFrameSetVisible(main, false)
-            end
-        end
-    end
-
-    local onClose = function()
-        local f = BlzGetTriggerFrame()
-        local pid = GetPlayerId(GetTriggerPlayer()) + 1
-
-        if GetLocalPlayer() == Player(pid - 1) then
-            BlzFrameSetEnable(f, false)
-            BlzFrameSetEnable(f, true)
-        end
-
-        close(pid)
-
-        return false
-    end
-
-    local onAccept = function()
-        local f = BlzGetTriggerFrame()
-        local pid = GetPlayerId(GetTriggerPlayer()) + 1
-
-        if GetLocalPlayer() == Player(pid - 1) then
-            BlzFrameSetEnable(f, false)
-            BlzFrameSetEnable(f, true)
-        end
-
-        prompt_queue[pid][1].func(pid)
-        close(pid)
-
-        return false
-    end
-
-    local accept = SimpleButton.create(main, "ReplaceableTextures\\CommandButtons\\BTNcheck.blp", 0.025, 0.025, FRAMEPOINT_TOP, FRAMEPOINT_TOP, 0., -0.15, onAccept)
-    local exit = SimpleButton.create(main, "ReplaceableTextures\\CommandButtons\\BTNCancel.blp", 0.015, 0.015, FRAMEPOINT_TOPRIGHT, FRAMEPOINT_TOPRIGHT, -0.02, -0.02, onClose, "Close", FRAMEPOINT_BOTTOM, FRAMEPOINT_TOP, 0., 0.01)
-
-    ---@type fun(pid: integer, t: table): boolean
-    function PromptFrame.create(pid, t)
-        if not prompt_queue[pid] then
-            prompt_queue[pid] = {}
-        end
-
-        -- ignore duplicate functions
-        local q = prompt_queue[pid]
-        for i = 1, #q do
-            if q[i].func == t.func then
-                return false
-            end
-        end
-
-        -- add to queue
-        prompt_queue[pid][#prompt_queue[pid] + 1] = t
-
-        refresh(pid)
-
-        return true
-    end
 end
 
 ---@type fun(tbl: table, fadedur: number, fade: boolean)
@@ -2629,6 +1751,7 @@ function GetItemFromPlayer(pid, id, count)
     return nil
 end
 
+-- TODO: Remove / replace with perks
 function UpdateBackpackTooltips(pid)
     local s = ""
     local u = User[pid - 1]
@@ -2691,16 +1814,6 @@ function RevivePlayer(pid, x, y, percenthp, percentmana)
     SetUnitPathing(Hero[pid], true)
 
     EVENT_ON_REVIVE:trigger(Hero[pid])
-end
-
----@param mana number
----@return integer
-function Roundmana(mana)
-    if mana > 99999 then
-        return 1000 * (mana // 1000)
-    end
-
-    return R2I(mana)
 end
 
 function SyncCallback(prefix, func)
