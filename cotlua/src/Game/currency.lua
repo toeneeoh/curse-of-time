@@ -111,7 +111,7 @@ OnInit.final("Currency", function(Require)
         end
     end
 
-    -- crystal to gold & platinum
+    -- crystal to gold
     ITEM_LOOKUP[FourCC('I0ME')] = function(p, pid)
         if GetCurrency(pid, CRYSTAL) >= 1 then
             AddCurrency(pid, CRYSTAL, -1)
@@ -121,18 +121,20 @@ OnInit.final("Currency", function(Require)
         end
     end
 
-    --platinum to crystal
+    -- platinum to crystal
     ITEM_LOOKUP[FourCC('I0MF')] = function(p, pid)
         AddCurrency(pid, CRYSTAL, 1)
         DisplayTimedTextToPlayer(p, 0, 0, 20, CRYSTAL_TAG .. (GetCurrency(pid, CRYSTAL)))
     end
 
+    -- buy platinum
     ITEM_LOOKUP[FourCC('I04G')] = function(p, pid)
         AddCurrency(pid, PLATINUM, 1)
         ConversionEffect(pid)
         DisplayTimedTextToPlayer(p, 0, 0, 20, PLATINUM_TAG .. (GetCurrency(pid, PLATINUM)))
     end
 
+    -- buy gold
     ITEM_LOOKUP[FourCC('I052')] = function(p, pid)
         ConversionEffect(pid)
         AddCurrency(pid, GOLD, 1000000)
