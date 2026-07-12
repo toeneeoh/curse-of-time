@@ -77,6 +77,7 @@ OnInit.final("Inventory", function(Require)
     end
 
     local disabled_for_player = {}
+    local alt_down = {} ---@type boolean[]
 
     ---@param pid integer
     ---@param disable boolean
@@ -418,7 +419,9 @@ OnInit.final("Inventory", function(Require)
 
             local me = GetPlayerId(GetLocalPlayer()) + 1
 
-            if viewing[me] ~= pid then return end
+            if viewing[me] ~= pid then
+                return
+            end
 
             -- local block for players viewing this inventory
             local items = Profile[pid].hero.items
@@ -430,7 +433,7 @@ OnInit.final("Inventory", function(Require)
                     slots[i]:icon(icon)
                     slots[i].tooltip:icon(icon)
                     slots[i].tooltip:name(GetItemName(itm.obj))
-                    slots[i].tooltip:text(BlzGetItemExtendedTooltip(itm.obj))
+                    slots[i].tooltip:text(alt_down[pid] and itm.alt_tooltip or itm.tooltip)
                     slots[i]:visible(true)
                     slots[i]:charge(itm.charges)
                 else
@@ -829,7 +832,7 @@ OnInit.final("Inventory", function(Require)
 
                 -- final cleanup
                 clear_context(pid)
-                INVENTORY.refresh(pid)
+                thistype.refresh(pid)
 
                 -- short cooldown to prevent spam
                 move_item_cooldown[pid] = true
@@ -894,6 +897,17 @@ OnInit.final("Inventory", function(Require)
             EVENT_ON_CLEANUP:register_action(U.id, on_cleanup)
             U = U.next
         end
+
+        -- hold alt for extended item tooltips
+        local function extended_item_tooltip(pid, is_down)
+            if alt_down[pid] ~= is_down then
+                alt_down[pid] = is_down
+                thistype.refresh(viewing[pid])
+            end
+        end
+
+        RegisterHotkeyToFunc('ALT', nil, extended_item_tooltip, nil, true)
+        RegisterHotkeyToFunc('ALT+ALT', nil, extended_item_tooltip, nil, true)
 
         -- slot initialization
         do
