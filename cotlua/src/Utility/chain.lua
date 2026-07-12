@@ -1,7 +1,7 @@
 --[[ 
     chain.lua 
     
-    A graphics library that introduces chain physics between two units (anchors) with customizable texture / length / segments / etc.
+    A graphics library that introduces chain physics between two units/sfx (anchors) with customizable texture / length / segments / etc.
     Features leash and yank functionality to restrain and pull the target towards the source
 
 --]]
@@ -34,17 +34,75 @@ OnInit.global("Chain", function(Require)
         return SquareRoot(dx * dx + dy * dy + dz * dz)
     end
 
-    local function unit_anchor(u, height)
-        local x = GetUnitX(u)
-        local y = GetUnitY(u)
+    function Chain.unit(u, height)
+        return {
+            type = "unit",
+            handle = u,
+            height = height or 0.,
+        }
+    end
 
-        return x, y, GetUnitZ(u) + height
+    function Chain.sfx(sfx, height)
+        return {
+            type = "sfx",
+            handle = sfx,
+            height = height or 0.,
+        }
+    end
+
+    local function anchor_pos(anchor, fallback_height)
+        if anchor.type == "unit" then
+            local u = anchor.handle
+            local x = GetUnitX(u)
+            local y = GetUnitY(u)
+
+            return x, y, GetUnitZ(u) + (anchor.height or fallback_height or 0.)
+        end
+
+        if anchor.type == "sfx" then
+            local sfx = anchor.handle
+            local x = BlzGetLocalSpecialEffectX(sfx)
+            local y = BlzGetLocalSpecialEffectY(sfx)
+
+            return x, y, GetLocZ(x, y) + (anchor.height or fallback_height or 0.)
+        end
+
+        -- backwards compat: raw unit
+        local x = GetUnitX(anchor)
+        local y = GetUnitY(anchor)
+
+        return x, y, GetUnitZ(anchor) + (fallback_height or 0.)
+    end
+
+    local function anchor_alive(anchor)
+        if anchor.type == "unit" then
+            return UnitAlive(anchor.handle)
+        end
+
+        if anchor.type == "sfx" then
+            return anchor.handle ~= nil
+        end
+
+        -- backwards compat raw unit
+        return UnitAlive(anchor)
+    end
+
+    local function anchor_unit(anchor)
+        if anchor.type == "unit" then
+            return anchor.handle
+        end
+
+        if anchor.type == nil then
+            return anchor -- backwards compat
+        end
+
+        return nil
     end
 
     -- initialize segments evenly between both anchors
     function Chain:init()
-        local sx, sy, sz = unit_anchor(self.source, self.source_height)
-        local tx, ty, tz = unit_anchor(self.target, self.target_height)
+        local sx, sy, sz = anchor_pos(self.source, self.source_height)
+        local tx, ty, tz = anchor_pos(self.target, self.target_height)
 
         for i = 0, self.segments do
             local t = i / self.segments
@@ -219,8 +277,8 @@ OnInit.global("Chain", function(Require)
     end
 
     function Chain:update_anchors()
-        self.x[0], self.y[0], self.z[0] = unit_anchor(self.source, self.source_height)
-        self.x[self.segments], self.y[self.segments], self.z[self.segments] = unit_anchor(self.target, self.target_height)
+        self.x[0], self.y[0], self.z[0] = anchor_pos(self.source, self.source_height)
+        self.x[self.segments], self.y[self.segments], self.z[self.segments] = anchor_pos(self.target, self.target_height)
     end
 
     function Chain:yank(length_cut, segment_cut, duration)
@@ -307,6 +365,12 @@ OnInit.global("Chain", function(Require)
             return
         end
 
+        local target_unit = anchor_unit(self.target)
+
+        if not target_unit then
+            return
+        end
+
         local end_index = self.segments
 
         local dx = self.x[end_index] - self.x[0]
@@ -317,10 +381,10 @@ OnInit.global("Chain", function(Require)
             local nx = dx / d
             local ny = dy / d
 
-            SetUnitX(self.target, self.x[0] + nx * self.length)
-            SetUnitY(self.target, self.y[0] + ny * self.length)
+            SetUnitX(target_unit, self.x[0] + nx * self.length)
+            SetUnitY(target_unit, self.y[0] + ny * self.length)
 
-            self.x[end_index], self.y[end_index], self.z[end_index] = unit_anchor(self.target, self.target_height)
+            self.x[end_index], self.y[end_index], self.z[end_index] = anchor_pos(self.target, self.target_height)
         end
     end
 
@@ -454,7 +518,7 @@ OnInit.global("Chain", function(Require)
             return false
         end
 
-        if not UnitAlive(self.source) or not UnitAlive(self.target) then
+        if not anchor_alive(self.source) or not anchor_alive(self.target) then
             self:destroy()
             return false
         end
