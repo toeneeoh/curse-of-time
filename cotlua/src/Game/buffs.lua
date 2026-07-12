@@ -956,8 +956,7 @@ OnInit.global("Buffs", function(Require)
         function thistype:onRemove()
             EVENT_ON_FATAL_DAMAGE:unregister_unit_action(self.target, SOULLINK.onHit)
             FadeSFX(self.sfx, true)
-            TQ:callDelayed(2., HideEffect, self.sfx)
-            DestroyLightning(self.lfx)
+            TQ:callDelayed(1.75, HideEffect, self.sfx)
 
             HP(self.source, self.target, math.max(0., self.hp - GetWidgetLife(self.target)), SOULLINK.tag)
             if not Unit[self.target].nomanaregen then
@@ -965,10 +964,13 @@ OnInit.global("Buffs", function(Require)
             end
 
             TQ:disableCallback(self.timer)
+            self.chain:destroy()
+
+            DestroyEffect(AddSpecialEffectTarget("Abilities\\Spells\\Items\\AIil\\AIilTarget.mdl", self.target, "origin"))
         end
 
         local function periodic(self, x, y)
-            MoveLightningEx(self.lfx, false, x, y, BlzGetUnitZ(self.target) + 75., GetUnitX(self.target), GetUnitY(self.target), BlzGetUnitZ(self.target) + 75.)
+            self.chain:update()
 
             self.timer = TQ:callDelayed(FPS_32, periodic, self, x, y)
         end
@@ -984,8 +986,18 @@ OnInit.global("Buffs", function(Require)
 
             BlzSetItemSkin(PATH_ITEM, BlzGetUnitSkin(self.target))
             self.sfx = AddSpecialEffect(BlzGetItemStringField(PATH_ITEM, ITEM_SF_MODEL_USED), x, y)
-            self.lfx = AddLightningEx("HCHA", false, x, y, BlzGetUnitZ(self.target) + 75., GetUnitX(self.target), GetUnitY(self.target), BlzGetUnitZ(self.target) + 75.)
             BlzSetItemSkin(PATH_ITEM, BlzGetUnitSkin(DUMMY_UNIT))
+
+            local chain = Chain.create{
+                source = Chain.sfx(self.sfx, 50.),
+                target = Chain.unit(self.target, 50.),
+                length = 700.,
+                segments = 10,
+                color = {0.95, 0.90, 0.20, 1.},
+                leash = false,
+            }
+
+            self.chain = chain
 
             DestroyEffect(AddSpecialEffect("Abilities\\Spells\\Items\\AIil\\AIilTarget.mdl", x, y))
 
@@ -994,7 +1006,7 @@ OnInit.global("Buffs", function(Require)
             BlzSetSpecialEffectColor(self.sfx, 255, 255, 0)
             BlzSetSpecialEffectAlpha(self.sfx, 100)
 
-            self.timer = TQ:callDelayed(FPS_32, periodic, self, x, y)
+            periodic(self, x, y)
         end
     end
 
@@ -2216,8 +2228,8 @@ OnInit.global("Buffs", function(Require)
             self.dist = 1000.
 
             local chain = Chain.create{
-                source = spire,
-                target = self.target,
+                source = Chain.unit(spire, 50.),
+                target = Chain.unit(self.target, 50.),
                 length = 1000.,
                 segments = 14,
                 color = {0.24, 0.80, 0.50, 1.},
