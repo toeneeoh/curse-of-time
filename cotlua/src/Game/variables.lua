@@ -7,9 +7,11 @@
 OnInit.global("Variables", function()
     local FourCC = FourCC
 
-    DEV_ENABLED         = false
-    MAP_NAME            = "CoT Nevermore"
-    SAVE_LOAD_VERSION   = 1
+    DEV_ENABLED            = false -- not necessary for release
+    MAP_NAME               = "CoT Nevermore"
+    PROFILE_SAVE_VERSION   = 1
+    CHARACTER_SAVE_VERSION = 1
+    SAVE_SCRAMBLE_VERSION  = 1
 
     DUMMY_UNIT                         = gg_unit_h05E_0717
     PLAYER_CAP                         = 6
@@ -622,7 +624,6 @@ OnInit.global("Variables", function()
     MAIN_MAP.centerY = (MAIN_MAP.minY + MAIN_MAP.maxY) / 2.00
 
     PLAYER_SUMMONS = {} ---@type unit[]
-    DAMAGE_TAG = {}
     PLATINUM_TAG    = "|cffccccccPlatinum Coins|r: " ---@type string 
     CRYSTAL_TAG = "|cff6969FFCrystals: |r" ---@type string 
     CHAOS_MODE = false ---@type boolean 
@@ -652,6 +653,8 @@ OnInit.global("Variables", function()
     TOWN_CENTER_Y = 160.
     STRUGGLE_CENTER_X = 28030.
     STRUGGLE_CENTER_Y = 4361.
+
+    MAX_SOCKETS = 3
 
     DEFAULT_LIGHTING = "Environment\\DNC\\DNCAshenvale\\DNCAshenValeTerrain\\DNCAshenValeTerrain.mdx" ---@type string 
 
