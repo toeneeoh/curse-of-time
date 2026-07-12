@@ -12,6 +12,7 @@ OnInit.final("Dummy", function(Require)
     Require("Events")
     Require("Units")
     Require('Frames')
+    Require('CircularArrayList')
 
     DUMMY_COUNT = 0
 
@@ -30,6 +31,7 @@ OnInit.final("Dummy", function(Require)
     local DPS_CURRENT        = 0.
     local DPS_PEAK           = 0.
     local DPS_STORAGE        = CircularArrayList.create(30) ---@type CircularArrayList 
+    local IATK               = FourCC('IATK')
 
     ---@class Dummy
     ---@field unit unit
@@ -44,6 +46,13 @@ OnInit.final("Dummy", function(Require)
     do
         local thistype = Dummy
         local mt = { __index = thistype }
+
+        ---@param source unit
+        ---@param target unit
+        local function instant_attack(source, target)
+            UnitAddAbility(source, IATK)
+            TQ:callDelayed(FPS_32, AttackDelay, source, target)
+        end
 
         ---@type fun(self: Dummy, owner: player, order: string, a: any, b: any)
         function thistype:cast(owner, order, a, b)
@@ -162,7 +171,7 @@ OnInit.final("Dummy", function(Require)
             if func then
                 EVENT_DUMMY_ON_HIT:register_unit_action(source, func)
             end
-            InstantAttack(self.unit, enemy)
+            instant_attack(self.unit, enemy)
         end
 
         -- exclude from ALICE
