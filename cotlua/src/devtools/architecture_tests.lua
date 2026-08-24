@@ -1,0 +1,142 @@
+-- Development-only architecture regression checks.
+
+OnInit.final("ArchitectureTests", function(Require)
+    Require('Events')
+    Require('InventoryService')
+    Require('ShopTransaction')
+    Require('TimerQueue')
+    Require('Profile')
+    Require('SaveSchema')
+
+    ArchitectureTests = {
+        tests = {},
+    }
+
+    function ArchitectureTests.register(name, test)
+        ArchitectureTests.tests[#ArchitectureTests.tests + 1] = {
+            name = name,
+            run = test,
+        }
+    end
+
+    ArchitectureTests.register("event guard suppresses recursion and then clears", function()
+        local event = EVENT.create()
+        local subject = {}
+        local calls = 0
+        local function recurse_once()
+            calls = calls + 1
+            event:trigger(subject)
+        end
+
+        event:register_unit_action(subject, recurse_once)
+        event:trigger(subject)
+        event:trigger(subject)
+        if calls ~= 2 then
+            return false, "event recursion guard did not clear between dispatches"
+        end
+        return true
+    end)
+
+    ArchitectureTests.register("initializer trace is complete and unique", function()
+        local seen = {}
+
+        for index = 1, #InitTrace do
+            local entry = InitTrace[index]
+            if seen[entry.name] then
+                return false, "initializer ran more than once: " .. entry.name
+            end
+            if entry.status ~= "completed" then
+                return false, "initializer did not complete: " .. entry.name
+            end
+            seen[entry.name] = true
+        end
+
+        if RuntimeMetrics.initializers.started ~= RuntimeMetrics.initializers.completed then
+            return false, "initializer start/completion counters differ"
+        end
+        return true
+    end)
+
+    ArchitectureTests.register("save wire preserves sparse physical slots", function()
+        for slot = 1, MAX_SLOTS do
+            local payload = slot == 17 and "" or "character-code"
+            local decoded_slot, decoded_payload = SaveWire.decodeCharacter(
+                SaveWire.encodeCharacter(slot, payload))
+            if decoded_slot ~= slot then
+                return false, "save wire changed physical slot " .. slot
+            end
+            if decoded_payload ~= payload then
+                return false, "save wire changed slot payload " .. slot
+            end
+        end
+
+        if SaveWire.decodeCharacter("0:bad") ~= nil then
+            return false, "slot zero was accepted"
+        end
+        if SaveWire.decodeCharacter((MAX_SLOTS + 1) .. ":bad") ~= nil then
+            return false, "out-of-range slot was accepted"
+        end
+        if SaveWire.decodeCharacter("malformed") ~= nil then
+            return false, "malformed slot payload was accepted"
+        end
+        return true
+    end)
+
+    ArchitectureTests.register("unknown character version is rejected", function()
+        local hero = HeroData.create()
+        local ok = hero:propagate({ 271828, CHARACTER_SAVE_VERSION + 1 })
+        if ok then
+            return false, "unknown character version was accepted"
+        end
+        return true
+    end)
+
+    ArchitectureTests.register("item lifecycle counters balance", function()
+        local items = RuntimeMetrics.items
+        if items.live ~= items.created - items.destroyed then
+            return false, "live item count differs from created minus destroyed"
+        end
+        if items.live < 0 then
+            return false, "live item counter is negative"
+        end
+        if RuntimeMetrics.timer_queue.active < 0 then
+            return false, "timer queue active counter is negative"
+        end
+        return true
+    end)
+
+    ---Runs registered safe assertions. Stateful shop, inventory, save and damage
+    ---scenarios can register additional tests from development map commands.
+    ---@return boolean, table
+    function ArchitectureTests.run()
+        local failures = {}
+
+        for index = 1, #ArchitectureTests.tests do
+            local test = ArchitectureTests.tests[index]
+            local ok, err = test.run()
+            if not ok then
+                failures[#failures + 1] = test.name .. ": " .. tostring(err or "failed")
+            end
+        end
+
+        RuntimeMetrics.tests = {
+            total = #ArchitectureTests.tests,
+            failed = #failures,
+            failures = failures,
+        }
+
+        if #failures > 0 then
+            for index = 1, #failures do
+                print("ARCH TEST FAILED: " .. failures[index])
+            end
+            return false, failures
+        end
+
+        print("Architecture tests passed: " .. #ArchitectureTests.tests)
+        return true, failures
+    end
+
+    if DEV_ENABLED then
+        TimerQueue:callDelayed(0., ArchitectureTests.run)
+    end
+end, Debug and Debug.getLine())

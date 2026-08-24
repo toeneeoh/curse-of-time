@@ -259,6 +259,7 @@ ITEM_LIMIT                         = 0
 ITEM_COST                          = 0
 ITEM_DISCOUNT                      = 0
 ITEM_STACK                         = 0
+ITEM_RARITY                        = 0
 TOTAL_ATTACK_SPEED                 = 0
 XP_RATE                            = 0
 HERO_TIME                          = 0
