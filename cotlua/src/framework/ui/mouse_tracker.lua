@@ -350,6 +350,7 @@ do
 
     BlzSetMousePos(screenWidth>>1, screenHeight>>1);
     CreateTracker();
+    SetTrackerVisible(false);
 
     Fill(trackerXBuffer, TRACKER_BUFFER_N, 0.0);
     Fill(trackerYBuffer, TRACKER_BUFFER_N, 0.0);
