@@ -8,6 +8,7 @@ OnInit.global("Variables", function()
     local FourCC = FourCC
 
     DEV_ENABLED            = false -- not necessary for release
+    DEV_LOG_ENABLED        = true  -- disable after the current in-engine verification pass
     MAP_NAME               = "CoT Nevermore"
     PROFILE_SAVE_VERSION   = 1
     CHARACTER_SAVE_VERSION = 1

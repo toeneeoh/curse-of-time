@@ -7,6 +7,7 @@ OnInit.final("ArchitectureTests", function(Require)
     Require('TimerQueue')
     Require('Profile')
     Require('SaveSchema')
+    Require('DevRuntimeLog')
 
     ArchitectureTests = {
         tests = {},
@@ -116,6 +117,9 @@ OnInit.final("ArchitectureTests", function(Require)
             local ok, err = test.run()
             if not ok then
                 failures[#failures + 1] = test.name .. ": " .. tostring(err or "failed")
+                DevLog.write("TEST", "FAIL " .. test.name .. ": " .. tostring(err or "failed"))
+            else
+                DevLog.write("TEST", "PASS " .. test.name)
             end
         end
 
@@ -129,14 +133,20 @@ OnInit.final("ArchitectureTests", function(Require)
             for index = 1, #failures do
                 print("ARCH TEST FAILED: " .. failures[index])
             end
+            DevLog.snapshot("architecture-tests-failed")
             return false, failures
         end
 
         print("Architecture tests passed: " .. #ArchitectureTests.tests)
+        for index = 1, #InitTrace do
+            local entry = InitTrace[index]
+            DevLog.write("INIT", index .. " " .. entry.phase .. " " .. entry.name .. " " .. entry.status, true)
+        end
+        DevLog.snapshot("architecture-tests-passed")
         return true, failures
     end
 
-    if DEV_ENABLED then
+    if DEV_ENABLED or DevLog.enabled then
         TimerQueue:callDelayed(0., ArchitectureTests.run)
     end
 end, Debug and Debug.getLine())

@@ -86,6 +86,13 @@ initialization. Additional in-engine scenarios can register with
 success or `false, message` on failure. Runtime observations are exposed
 through `RuntimeMetrics`, including initializer and live-item counters.
 
+`DevRuntimeLog` mirrors DebugUtils output, test results, initializer state, and
+metric snapshots to
+`CustomMapData\\CoT Nevermore\\dev\\runtime-player-<slot>.pld`. FileIO replaces
+the file after every entry, so it can be inspected while Warcraft is running.
+Logging is controlled by `DEV_LOG_ENABLED` and uses separate files per local
+player. Disable it after the current in-engine verification pass.
+
 Outside Warcraft, syntax can be checked without executing natives:
 
 ```powershell
