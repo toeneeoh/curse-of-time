@@ -20,6 +20,15 @@ OnInit.global("Variables", function()
     LEECH_CONSTANT                     = 50
     BOSS_RESPAWN_TIME                  = 600
     MIN_LIFE                           = 0.406
+    ORDER_ID_SMART                     = 851971
+    ORDER_ID_HOLD_POSITION             = 851972
+    ORDER_ID_ATTACK                    = 851983
+    ORDER_ID_MOVE                      = 851986
+    ORDER_ID_STOP                      = 851993
+    ORDER_ID_UNDEFEND                  = 852056
+    ORDER_ID_IMMOLATION                = 852177
+    ORDER_ID_UNIMMOLATION              = 852178
+    ORDER_ID_MANA_SHIELD               = 852589
     PLAYER_CREEP                       = Player(PLAYER_NEUTRAL_AGGRESSIVE)
     PLAYER_TOWN                        = 8
     PLAYER_BOSS                        = Player(11)
