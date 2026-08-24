@@ -462,13 +462,6 @@ function IsEnemy(enemy)
     return (enemy >= 12)
 end
 
----@param source unit
----@param target unit
-local function AttackDelay(source, target)
-    BlzSetUnitWeaponBooleanField(source, UNIT_WEAPON_BF_ATTACKS_ENABLED, 0, true)
-    IssueTargetOrderById(source, 852173, target)
-end
-
 ---@param pid integer
 function RemovePlayerUnits(pid)
     local ug = CreateGroup()

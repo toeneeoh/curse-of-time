@@ -53,9 +53,16 @@ OnInit.final("Dummy", function(Require)
 
         ---@param source unit
         ---@param target unit
+        local function attack_delay(source, target)
+            BlzSetUnitWeaponBooleanField(source, UNIT_WEAPON_BF_ATTACKS_ENABLED, 0, true)
+            IssueTargetOrderById(source, 852173, target)
+        end
+
+        ---@param source unit
+        ---@param target unit
         local function instant_attack(source, target)
             UnitAddAbility(source, IATK)
-            TQ:callDelayed(FPS_32, AttackDelay, source, target)
+            TQ:callDelayed(FPS_32, attack_delay, source, target)
         end
 
         ---@type fun(self: Dummy, owner: player, order: string, a: any, b: any)
@@ -272,6 +279,7 @@ OnInit.final("Dummy", function(Require)
             DPS_TIMER:disableCallback(reset)
         end
         reset = DPS_TIMER:callDelayed(7.5, DPS_RESET)
+        amount.display = amount_after_red
         amount.value = 0.
         SetWidgetLife(target, BlzGetUnitMaxHP(target))
     end

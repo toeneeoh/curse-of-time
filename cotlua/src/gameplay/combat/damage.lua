@@ -124,6 +124,9 @@ OnInit.final("Damage", function(Require)
 
         local source      = get_event_damage_source()
         local target      = blz_get_event_damage_target()
+        ---Final damage callbacks may set `display` when the engine damage is
+        ---suppressed but the calculated hit should still be shown.
+        ---@type {value: number, display: number?, color: number[]?}
         local amount      = { value = get_event_damage() }
         local damage_type = blz_get_event_damage_type()
         local crit        = 1.
@@ -255,7 +258,7 @@ OnInit.final("Damage", function(Require)
         -- set final event damage
         blz_set_event_damage(amount.value)
 
-        local display_amount = amount_after_red
+        local display_amount = amount.display or amount_after_red
 
         -- hit count based health
         if target_tbl.hit_based_health then

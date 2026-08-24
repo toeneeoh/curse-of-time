@@ -220,7 +220,8 @@ OnInit.final("HeroSelect", function(Require)
                                 abilities[j]:icon(BlzGetAbilityIcon(abil))
                                 abilities[j]:setTooltipIcon(BlzGetAbilityIcon(abil))
                                 abilities[j]:setTooltipName(GetAbilityName(abil))
-                                abilities[j]:setTooltipText(Spells[abil]:getTooltip())
+                                local spell = Spells[abil]
+                                abilities[j]:setTooltipText(spell and spell:getTooltip() or BlzGetAbilityExtendedTooltip(abil, 0))
                             else
                                 abilities[j]:visible(false)
                             end

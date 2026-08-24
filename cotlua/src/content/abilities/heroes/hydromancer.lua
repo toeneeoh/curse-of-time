@@ -464,7 +464,7 @@ OnInit.final("HydromancerSpells", function(Require)
             end
 
             pt:startLoop(0.05, on_spawn)
-            thistype.onSpawn(pt)
+            on_spawn(pt)
         end
     end
 end, Debug and Debug.getLine())

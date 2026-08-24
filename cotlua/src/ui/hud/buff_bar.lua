@@ -212,13 +212,13 @@ OnInit.final("BuffBar", function(Require)
     end
 
     local function on_select(pid, u)
-        if GetLocalPlayer() == Player(pid - 1) then
-            BlzFrameSetVisible(backdrop, UnitAlive(u))
-        end
+        viewing[pid] = u
+        local selected = u and Unit[u]
 
-        if u ~= viewing[pid] then
-            viewing[pid] = u
-            display(Unit[u], pid)
+        if selected then
+            display(selected, pid)
+        elseif GetLocalPlayer() == Player(pid - 1) then
+            BlzFrameSetVisible(backdrop, false)
         end
     end
 
