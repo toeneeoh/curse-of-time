@@ -423,6 +423,13 @@ OnInit.final("DialogWindow", function(Require)
                 return false
             end
 
+            -- A dialog with no choices has no useful interaction and otherwise
+            -- renders as an empty cabinet with only a close button.
+            if self.count == 0 and self.menu_count == 0 then
+                self:destroy()
+                return false
+            end
+
             queues[self.pid] = queues[self.pid] or {}
             self.queued = true
             queues[self.pid][#queues[self.pid] + 1] = self

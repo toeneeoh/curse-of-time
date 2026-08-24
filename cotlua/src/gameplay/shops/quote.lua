@@ -18,7 +18,7 @@ OnInit.final("ShopQuote", function(Require)
 
     local function inventory_components(pid)
         local inventory = __jarray(0)
-        for slot = 1, INVENTORY_COUNT do
+        for slot = 1, MAX_INVENTORY_SLOTS do
             local owned = Profile[pid].hero.items[slot]
             if owned and not owned.nocraft then
                 local id = GetItem(owned.id)

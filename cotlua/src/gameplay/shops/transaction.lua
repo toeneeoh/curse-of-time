@@ -20,7 +20,7 @@ OnInit.final("ShopTransaction", function(Require)
             end
         end
 
-        for slot = 1, INVENTORY_COUNT do
+        for slot = 1, MAX_INVENTORY_SLOTS do
             local owned = Profile[pid].hero.items[slot]
             if owned then
                 local id = GetItem(owned.id)

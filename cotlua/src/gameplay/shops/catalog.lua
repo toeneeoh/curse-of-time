@@ -110,7 +110,7 @@ OnInit.final("ShopCatalog", function(Require)
             lvl = level,
             name = GetItemName(runtime_item.obj),
             icon = BlzGetItemIconPath(runtime_item.obj),
-            tooltip = runtime_item.alt_tooltip or runtime_item.tooltip,
+            tooltip = runtime_item.alt_tooltip or runtime_item.tooltip or BlzGetItemExtendedTooltip(runtime_item.obj) or "",
             charges = GetItemCharges(runtime_item.obj),
             recharge = -1,
             relation = __jarray(0),

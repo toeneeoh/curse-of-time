@@ -215,7 +215,7 @@ OnInit.final("StatView", function(Require)
 
     -- escape button
     local esc_button = SimpleButton.create(frame, "ReplaceableTextures\\CommandButtons\\BTNCancel.blp", 0.015, 0.015, FRAMEPOINT_TOPRIGHT, FRAMEPOINT_TOPRIGHT, -0.02, -0.02, onClose, "Close 'B'", FRAMEPOINT_BOTTOM, FRAMEPOINT_TOP, 0., 0.01)
-    RegisterHotkeyTooltip(esc_button, 5)
+    RegisterHotkeyTooltip(esc_button, 6)
 
     local function ViewPlayersClick()
         local pid   = GetPlayerId(GetTriggerPlayer()) + 1 ---@type integer 
