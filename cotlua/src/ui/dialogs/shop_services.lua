@@ -232,12 +232,12 @@ OnInit.final("ShopServiceDialogs", function(Require)
         open = open_converter,
     })
     RegisterShopAction('I101', {
-        label = "DYNAMIC COST",
+        label = "AVAILABLE",
         availability = function(pid) return service_availability(BackpackUpgradeService.quote(pid, 'I101')) end,
         open = function(pid) return open_upgrade(pid, 'I101') end,
     })
     RegisterShopAction('I102', {
-        label = "DYNAMIC COST",
+        label = "AVAILABLE",
         availability = function(pid) return service_availability(BackpackUpgradeService.quote(pid, 'I102')) end,
         open = function(pid) return open_upgrade(pid, 'I102') end,
     })
