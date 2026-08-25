@@ -24,33 +24,37 @@ OnInit.final("ItemSpells", function(Require)
 
         function thistype.onEquip(itm, id, index)
             BlzSetAbilityRealLevelField(BlzGetUnitAbility(itm.holder, id), ABILITY_RLF_CHANCE_TO_BASH, 0, itm.cached_stats[index])
-            BlzSetAbilityRealLevelField(BlzGetUnitAbility(itm.holder, id), ABILITY_RLF_DURATION_NORMAL, 0, ItemData[itm.id][index .. "data" .. 1])
-            BlzSetAbilityRealLevelField(BlzGetUnitAbility(itm.holder, id), ABILITY_RLF_DURATION_HERO, 0, ItemData[itm.id][index .. "data" .. 1])
-
-            return true
+            BlzSetAbilityRealLevelField(BlzGetUnitAbility(itm.holder, id), ABILITY_RLF_DURATION_NORMAL, 0, itm:getAbilityArgument(index, 1))
+            BlzSetAbilityRealLevelField(BlzGetUnitAbility(itm.holder, id), ABILITY_RLF_DURATION_HERO, 0, itm:getAbilityArgument(index, 1))
         end
     end
 
     local SHIELD_BLOCK = Spell.define('Zs00', 'Zs01', 'Zs02', 'Zs03', 'Zs04', 'Zs05', 'Zs06')
     do
         local thistype = SHIELD_BLOCK
-        local shield_variations = {}
+        function thistype.onUnequip(itm, id, index, orig_holder)
+            local runtime = itm.abilities[index]
 
-        -- iterate over definitions
-        for _, v in ipairs(thistype.shared) do
-            shield_variations[v] = function(target, source, amount, damage_type)
-                if damage_type == PHYSICAL and math.random(0, 99) < GetAbilityField(target, v, 0) then
-                    amount.value = amount.value * (1. - GetAbilityField(target, v, 1) * 0.01)
-                end
+            if runtime and runtime.callback then
+                EVENT_ON_STRUCK_MULTIPLIER:unregister_unit_action(orig_holder, runtime.callback)
             end
         end
 
-        function thistype.onUnequip(itm, id, index, orig_holder)
-            EVENT_ON_STRUCK_MULTIPLIER:unregister_unit_action(orig_holder, shield_variations[id])
-        end
-
         function thistype.onEquip(itm, id, index)
-            EVENT_ON_STRUCK_MULTIPLIER:register_unit_action(itm.holder, shield_variations[id])
+            local runtime = itm.abilities[index]
+
+            runtime.block_chance = itm.cached_stats[index]
+            runtime.damage_reduction = itm:getAbilityArgument(index, 1)
+            runtime.callback = runtime.callback or function(target, source, amount, damage_type)
+                local block_chance = runtime.block_chance or 0
+                local damage_reduction = runtime.damage_reduction or 0
+
+                if damage_type == PHYSICAL and math.random(0, 99) < block_chance then
+                    amount.value = amount.value * (1. - damage_reduction * 0.01)
+                end
+            end
+
+            EVENT_ON_STRUCK_MULTIPLIER:register_unit_action(itm.holder, runtime.callback)
         end
     end
 
@@ -130,7 +134,6 @@ OnInit.final("ItemSpells", function(Require)
 
         function thistype.onEquip(itm, id, index)
             Unit[itm.holder].mana_regen_percent = Unit[itm.holder].mana_regen_percent + 2
-            return true
         end
     end
 
@@ -144,7 +147,6 @@ OnInit.final("ItemSpells", function(Require)
 
         function thistype.onEquip(itm, id, index)
             Unit[itm.holder].mana_regen_max = Unit[itm.holder].mana_regen_max + 0.7
-            return true
         end
     end
 
@@ -162,7 +164,6 @@ OnInit.final("ItemSpells", function(Require)
 
             b.item = itm
             b = b:check(itm.holder, itm.holder)
-            return true
         end
     end
 
@@ -170,16 +171,23 @@ OnInit.final("ItemSpells", function(Require)
     do
         local thistype = POWERFULSTRIKE
 
-        local function onHit(source, target)
-            DamageTarget(source, target, GetAbilityField(source, thistype.id, 0), ATTACK_TYPE_NORMAL, MAGIC, thistype.tag)
-        end
-
         function thistype.onUnequip(itm, id, index, orig_holder)
-            EVENT_ON_HIT:unregister_unit_action(orig_holder, onHit)
+            local runtime = itm.abilities[index]
+
+            if runtime and runtime.callback then
+                EVENT_ON_HIT:unregister_unit_action(orig_holder, runtime.callback)
+            end
         end
 
         function thistype.onEquip(itm, id, index)
-            EVENT_ON_HIT:register_unit_action(itm.holder, onHit)
+            local runtime = itm.abilities[index]
+
+            runtime.damage = itm.cached_stats[index]
+            runtime.callback = runtime.callback or function(source, target)
+                DamageTarget(source, target, runtime.damage or 0, ATTACK_TYPE_NORMAL, MAGIC, thistype.tag)
+            end
+
+            EVENT_ON_HIT:register_unit_action(itm.holder, runtime.callback)
         end
     end
 
@@ -287,8 +295,6 @@ OnInit.final("ItemSpells", function(Require)
             if not itm.sfx then
                 itm.sfx = Unit[itm.holder]:addEffect(sfx.path, sfx.attach)
             end
-
-            return true
         end
     end
 
@@ -358,8 +364,6 @@ OnInit.final("ItemSpells", function(Require)
             end
 
             BlzSetAbilityRealLevelField(BlzGetUnitAbility(itm.holder, id), ABILITY_RLF_MAXIMUM_RANGE, 0, itm.cached_stats[index])
-
-            return true
         end
     end
 
@@ -528,7 +532,6 @@ OnInit.final("ItemSpells", function(Require)
 
         function thistype.onEquip(itm, id, index)
             periodic(itm, itm.holder)
-            return true
         end
     end
 
@@ -552,7 +555,6 @@ OnInit.final("ItemSpells", function(Require)
 
         function thistype.onEquip(itm, id, index)
             periodic(itm, itm.holder)
-            return true
         end
     end
 
@@ -575,7 +577,6 @@ OnInit.final("ItemSpells", function(Require)
 
         function thistype.onEquip(itm, id, index)
             SetItemCharges(itm.abilities[index].obj, itm.charges)
-            return true
         end
     end
 
@@ -597,7 +598,6 @@ OnInit.final("ItemSpells", function(Require)
 
         function thistype.onEquip(itm, id, index)
             SetItemCharges(itm.abilities[index].obj, itm.charges)
-            return true
         end
     end
 

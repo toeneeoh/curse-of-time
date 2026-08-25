@@ -1111,11 +1111,6 @@ function HL(s, y)
     return (y and ("|cffffcc00" .. s .. "|r")) or s
 end
 
----@type fun(u: unit, id: integer, index: integer):number
-function GetAbilityField(u, id, index)
-    return BlzGetAbilityRealLevelField(BlzGetUnitAbility(u, id), SPELL_FIELD[index], 0)
-end
-
 ---@type fun(itm: item, s: string)
 function ParseItemTooltip(itm, s)
     local orig = s ~= "" and s or BlzGetItemExtendedTooltip(itm)

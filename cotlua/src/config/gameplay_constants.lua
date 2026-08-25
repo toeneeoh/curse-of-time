@@ -697,17 +697,6 @@ OnInit.global("Variables", function()
     While any hero can equip them regardless of proficiency, those lacking proficiency receive 75% of the stats.
     Check your hero's proficiency with -pf.]]
 
-    --TODO: expand channel fields?
-    SPELL_FIELD = {} ---@type abilityreallevelfield[] 
-    SPELL_FIELD[0] = ABILITY_RLF_ART_DURATION
-    SPELL_FIELD[1] = ABILITY_RLF_AREA_OF_EFFECT
-    SPELL_FIELD[2] = ABILITY_RLF_CAST_RANGE
-    SPELL_FIELD[3] = ABILITY_RLF_CASTING_TIME
-    SPELL_FIELD[4] = ABILITY_RLF_COOLDOWN
-    SPELL_FIELD[5] = ABILITY_RLF_DURATION_HERO
-    SPELL_FIELD[6] = ABILITY_RLF_DURATION_NORMAL
-    SPELL_FIELD_TOTAL = 6 ---@type integer 
-
     TIER_NAME = {} ---@type string[] 
     TYPE_NAME = {} ---@type string[] 
     ITEM_MODEL = {} ---@type integer[] 

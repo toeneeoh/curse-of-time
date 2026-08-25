@@ -160,6 +160,14 @@ OnInit.final("Items", function(Require)
         return ((slot_types[slot] & type) > 0)
     end
 
+    ---@class ItemAbilityRuntime
+    ---@field obj item
+    ---@field id integer
+    ---@field callback? function
+    ---@field block_chance? number
+    ---@field damage_reduction? number
+    ---@field damage? number
+
     ---@class Item
     ---@field obj item
     ---@field holder unit
@@ -200,13 +208,21 @@ OnInit.final("Items", function(Require)
     ---@field validate_slot function
     ---@field abil integer
     ---@field info function
-    ---@field abilities table
+    ---@field abilities ItemAbilityRuntime[]
+    ---@field getAbilityArgument fun(self: Item, index: integer, argument: integer): number
     ---@field cache_stats function
     ---@field sockets Item[]
     Item = {} ---@type Item|Item[]
     do
         local thistype = Item
         local hash = InitHashtable()
+
+        ---@param index integer
+        ---@param argument integer
+        ---@return number
+        function thistype:getAbilityArgument(index, argument)
+            return tonumber(ItemData[self.id][index .. "data" .. argument]) or 0
+        end
 
         function thistype.onDeath()
             -- typecast widget to item
@@ -584,17 +600,7 @@ OnInit.final("Items", function(Require)
                         BlzSetItemExtendedTooltip(dummy, desc)
                         BlzSetItemName(dummy, GetObjectName(abilid))
 
-                        -- if onequip returns true, dont allocate real fields
-                        if not Spells[abilid].onEquip(itm, abilid, index) then
-                            local ab = BlzGetItemAbility(dummy, abilid)
-                            BlzSetAbilityRealLevelField(ab, SPELL_FIELD[0], 0, itm.cached_stats[index])
-                            for i = 1, SPELL_FIELD_TOTAL do
-                                local v = ItemData[itm.id][concat({index, "data", i})]
-                                if v ~= 0 then
-                                    BlzSetAbilityRealLevelField(ab, SPELL_FIELD[i], 0, v)
-                                end
-                            end
-                        end
+                        Spells[abilid].onEquip(itm, abilid, index)
                     end
                 end
             end
