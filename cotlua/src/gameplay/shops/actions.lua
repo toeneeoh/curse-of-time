@@ -16,7 +16,7 @@ OnInit.final("ShopActions", function(Require)
     ---@field label string|fun(pid: integer): string
     ---@field availability fun(pid: integer): boolean, string?
     ---@field open fun(pid: integer): boolean
-    ---@field cooldown fun(pid: integer): number, number?
+    ---@field cooldown? fun(pid: integer): number, number?
 
     ---@param id string|integer
     ---@param definition ShopActionDefinition
@@ -51,10 +51,12 @@ OnInit.final("ShopActions", function(Require)
         if not action then
             return nil
         end
-        if type(action.label) == "function" then
-            return action.label(pid)
+        local label = action.label
+        if type(label) == "function" then
+            return label(pid)
         end
-        return action.label
+        ---@cast label string
+        return label
     end
 
     ---@param callback fun(pid: integer)
