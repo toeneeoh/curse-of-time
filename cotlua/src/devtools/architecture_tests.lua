@@ -9,6 +9,7 @@ OnInit.final("ArchitectureTests", function(Require)
     Require('SaveSchema')
     Require('DevRuntimeLog')
     Require('ShopServiceDialogs')
+    Require('Town')
 
     ArchitectureTests = {
         tests = {},
@@ -120,6 +121,13 @@ OnInit.final("ArchitectureTests", function(Require)
         if TomeService.bundles[1].gold ~= 10000
             or TomeService.bundles[5].platinum ~= 100 then
             return false, "tome bundle prices changed"
+        end
+        local converter_price = GetItemPrice('I084', 1)
+        if not converter_price or converter_price[PLATINUM] ~= 4 then
+            return false, "currency converter is not using the shop price contract"
+        end
+        if not ShopAction.get('I0JS').cooldown then
+            return false, "recharge action has no cooldown presentation"
         end
         return true
     end)

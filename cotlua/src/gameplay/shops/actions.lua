@@ -6,6 +6,7 @@ OnInit.final("ShopActions", function(Require)
 
     ShopAction = {}
     local registry = {}
+    local changed = {}
 
     local function key(id)
         return GetItem(id)
@@ -15,6 +16,7 @@ OnInit.final("ShopActions", function(Require)
     ---@field label string|fun(pid: integer): string
     ---@field availability fun(pid: integer): boolean, string?
     ---@field open fun(pid: integer): boolean
+    ---@field cooldown fun(pid: integer): number, number?
 
     ---@param id string|integer
     ---@param definition ShopActionDefinition
@@ -53,5 +55,19 @@ OnInit.final("ShopActions", function(Require)
             return action.label(pid)
         end
         return action.label
+    end
+
+    ---@param callback fun(pid: integer)
+    function RegisterShopActionChangedAction(callback)
+        changed[#changed + 1] = callback
+    end
+
+    ---Notifies presentation subscribers when action availability changes
+    ---without introducing a gameplay-to-UI dependency.
+    ---@param pid integer
+    function NotifyShopActionChanged(pid)
+        for index = 1, #changed do
+            changed[index](pid)
+        end
     end
 end, Debug and Debug.getLine())

@@ -106,6 +106,15 @@ OnInit.final("ShopQuote", function(Require)
                 quote.label = action_reason
                 return quote
             end
+            if price then
+                for currency = 0, CURRENCY_COUNT - 1 do
+                    quote.cost[currency] = price[currency]
+                    if GetCurrency(pid, currency) < quote.cost[currency] then
+                        quote.reason = "currency"
+                        return quote
+                    end
+                end
+            end
             quote.can_buy = true
             quote.reason = nil
             quote.action = action

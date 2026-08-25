@@ -272,10 +272,25 @@ OnInit.final("Shop", function(Require)
                 status = label or "UNAVAILABLE"
             elseif action then
                 local action_available, action_reason = ShopAction.evaluate(self.item.id, pid)
-                status = action_available and ShopAction.label(self.item.id, pid)
-                    or action_reason or "UNAVAILABLE"
+                if not action_available then
+                    status = action_reason or "UNAVAILABLE"
+                elseif not price then
+                    status = ShopAction.label(self.item.id, pid)
+                end
             elseif not price then
                 status = "NOT FOR SALE"
+            end
+
+            if action and action.cooldown then
+                local remaining, total = action.cooldown(pid)
+                if remaining > 0 then
+                    if not self.button.cooldown_time then
+                        self.button:use_cooldowns()
+                    end
+                    if self.button.cooldown_time[pid] <= 0 then
+                        self.button:cooldown(remaining, pid, total)
+                    end
+                end
             end
 
             local row = 0
@@ -1727,5 +1742,6 @@ OnInit.final("Shop", function(Require)
     end
 
     RegisterItemChangedAction(Shop.refresh)
+    RegisterShopActionChangedAction(Shop.refresh)
 
 end, Debug and Debug.getLine())

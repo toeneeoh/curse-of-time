@@ -68,7 +68,11 @@ OnInit.final("ShopServices", function(Require)
     local function recharge_tick(pid)
         if RECHARGE_COOLDOWN[pid] > 0 then
             RECHARGE_COOLDOWN[pid] = RECHARGE_COOLDOWN[pid] - 1
-            TimerQueue:callDelayed(1., recharge_tick, pid)
+            if RECHARGE_COOLDOWN[pid] > 0 then
+                TimerQueue:callDelayed(1., recharge_tick, pid)
+            else
+                NotifyShopActionChanged(pid)
+            end
         end
     end
 
@@ -102,10 +106,10 @@ OnInit.final("ShopServices", function(Require)
         if not quote.available then return quote end
         quote.item.charges = quote.item.charges + 1
         SetItemCharges(quote.item.abilities[ITEM_ABILITY].obj, quote.item.charges)
+        RECHARGE_COOLDOWN[pid] = 180
         AddCurrency(pid, GOLD, -quote.gold)
         AddCurrency(pid, PLATINUM, -quote.platinum)
         NotifyItemChanged(pid)
-        RECHARGE_COOLDOWN[pid] = 180
         TimerQueue:callDelayed(1., recharge_tick, pid)
         return quote
     end
@@ -158,19 +162,13 @@ OnInit.final("ShopServices", function(Require)
 
     function CurrencyConverterService.quote(pid)
         if HasCurrencyConverter(pid) then return result(false, "OWNED") end
-        local available = GetCurrency(pid, GOLD) + GetCurrency(pid, PLATINUM) * 1000000 >= 4000000
-        return result(available, available and nil or "currency")
+        return result(true)
     end
 
     function CurrencyConverterService.commit(pid)
         local quote = CurrencyConverterService.quote(pid)
         if not quote.available then return quote end
-        if ChargePlayer(pid, 4000000, "You have purchased a Currency Converter.") then
-            GrantCurrencyConverter(pid)
-        else
-            quote.available = false
-            quote.reason = "currency"
-        end
+        GrantCurrencyConverter(pid)
         return quote
     end
 

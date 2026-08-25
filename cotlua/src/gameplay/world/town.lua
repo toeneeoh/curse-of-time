@@ -281,6 +281,7 @@ OnInit.final("Town", function(Require)
     ShopAddItem(magic_shop, 'I0JN:0', 0) -- tome of retraining
     ShopAddItem(magic_shop, 'I0JS:0', 0) -- recharge reincarnation
     ShopAddItem(magic_shop, 'I00J:0', 0) -- refill potions
+    SetItemPrice('I084', { platinum = 4 })
     ShopAddItem(magic_shop, 'I084:0', 0) -- currency converter
     ShopAddItem(magic_shop, 'I102:0', 0) -- reveal upgrade
     ShopAddItem(magic_shop, 'I101:0', 0) -- teleport upgrade

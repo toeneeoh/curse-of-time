@@ -92,13 +92,10 @@ OnInit.final("ShopServiceDialogs", function(Require)
     local function open_focus(pid)
         local quote = FocusService.quote(pid)
         if not quote.available then return false end
-        local dialog = DialogWindow.create(pid,
-            "Reduce Strength by " .. quote.strength
-                .. ", Agility by " .. quote.agility
-                .. ", and Intelligence by " .. quote.intelligence
-                .. "? Refund: " .. quote.refund .. " gold.",
+        local dialog = DialogWindow.create(pid, "Focus attributes?",
             focus_confirm, "focus-service")
-        dialog:addButton("Confirm")
+        dialog:addButton("Reduce " .. quote.strength .. "/" .. quote.agility
+            .. "/" .. quote.intelligence .. " (+" .. quote.refund .. " Gold)")
         return dialog:display()
     end
 
@@ -132,11 +129,9 @@ OnInit.final("ShopServiceDialogs", function(Require)
     local function open_recharge(pid)
         local quote = RechargeService.quote(pid)
         if not quote.available then return false end
-        local dialog = DialogWindow.create(pid,
-            "Recharge " .. GetItemName(quote.item.obj) .. " for "
-                .. price_text(quote.gold, quote.platinum) .. "?",
+        local dialog = DialogWindow.create(pid, "Recharge reincarnation?",
             recharge_confirm, "recharge-service")
-        dialog:addButton("Recharge")
+        dialog:addButton("Recharge (" .. price_text(quote.gold, quote.platinum) .. ")")
         return dialog:display()
     end
 
@@ -157,19 +152,15 @@ OnInit.final("ShopServiceDialogs", function(Require)
         return dialog:display()
     end
 
-    local function converter_confirm(dialog)
-        local quote = CurrencyConverterService.commit(dialog.pid)
-        dialog:destroy()
-        if not quote.available then failure(dialog.pid, quote.reason) end
-        return false
-    end
-
     local function open_converter(pid)
-        local dialog = DialogWindow.create(pid,
-            "Purchase a Currency Converter for 4 |cffe3e2e2Platinum|r?",
-            converter_confirm, "converter-service")
-        dialog:addButton("Purchase")
-        return dialog:display()
+        local quote = CurrencyConverterService.commit(pid)
+        if not quote.available then
+            failure(pid, quote.reason)
+            return false
+        end
+        DisplayTextToPlayer(Player(pid - 1), 0, 0,
+            "You have purchased a Currency Converter.")
+        return true
     end
 
     local function upgrade_confirm(dialog, _, id)
@@ -203,7 +194,7 @@ OnInit.final("ShopServiceDialogs", function(Require)
 
     local function register_tome(id)
         RegisterShopAction(id, {
-            label = "CHOOSE AMOUNT",
+            label = "AVAILABLE",
             availability = function(pid) return TomeService.availability(pid) end,
             open = function(pid) return open_tome(pid, id) end,
         })
@@ -225,12 +216,13 @@ OnInit.final("ShopServiceDialogs", function(Require)
         open = open_retraining,
     })
     RegisterShopAction('I0JS', {
-        label = "DYNAMIC COST",
+        label = "AVAILABLE",
         availability = function(pid) return service_availability(RechargeService.quote(pid)) end,
         open = open_recharge,
+        cooldown = function(pid) return RECHARGE_COOLDOWN[pid], 180 end,
     })
     RegisterShopAction('I00J', {
-        label = "DYNAMIC COST",
+        label = "AVAILABLE",
         availability = function(pid) return service_availability(PotionRefillService.quote(pid)) end,
         open = open_refill,
     })
