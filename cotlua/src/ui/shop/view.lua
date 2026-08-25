@@ -82,6 +82,8 @@ OnInit.final("Shop", function(Require)
     local COST_SCALE                     = 0.7 ---@type number 
     local STATUS_WIDTH                   = 0.075 ---@type number
     local STATUS_SCALE                   = 0.55 ---@type number
+    local COOLDOWN_X_OFFSET              = 0.002 ---@type number
+    local COOLDOWN_Y_OFFSET              = 0.002 ---@type number
     local COST_GAP                   = 0.009 ---@type number 
     local SLOT_GAP_X                     = 0.0145 ---@type number 
     local SLOT_GAP_Y                     = 0.038 ---@type number 
@@ -286,6 +288,15 @@ OnInit.final("Shop", function(Require)
                 if remaining > 0 then
                     if not self.button.cooldown_time then
                         self.button:use_cooldowns()
+                        BlzFrameClearAllPoints(self.button.cooldownFrame)
+                        BlzFrameSetSize(self.button.cooldownFrame, ITEM_SIZE, ITEM_SIZE)
+                        BlzFrameSetPoint(self.button.cooldownFrame, FRAMEPOINT_CENTER,
+                            self.button.iconFrame, FRAMEPOINT_CENTER,
+                            COOLDOWN_X_OFFSET, COOLDOWN_Y_OFFSET)
+                        BlzFrameClearAllPoints(self.button.cooldownText)
+                        BlzFrameSetPoint(self.button.cooldownText, FRAMEPOINT_CENTER,
+                            self.button.iconFrame, FRAMEPOINT_CENTER,
+                            COOLDOWN_X_OFFSET, COOLDOWN_Y_OFFSET)
                     end
                     if self.button.cooldown_time[pid] <= 0 then
                         self.button:cooldown(remaining, pid, total)
