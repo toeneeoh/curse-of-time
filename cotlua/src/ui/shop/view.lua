@@ -293,10 +293,6 @@ OnInit.final("Shop", function(Require)
                         BlzFrameSetPoint(self.button.cooldownFrame, FRAMEPOINT_CENTER,
                             self.button.iconFrame, FRAMEPOINT_CENTER,
                             COOLDOWN_X_OFFSET, COOLDOWN_Y_OFFSET)
-                        BlzFrameClearAllPoints(self.button.cooldownText)
-                        BlzFrameSetPoint(self.button.cooldownText, FRAMEPOINT_CENTER,
-                            self.button.iconFrame, FRAMEPOINT_CENTER,
-                            COOLDOWN_X_OFFSET, COOLDOWN_Y_OFFSET)
                     end
                     if self.button.cooldown_time[pid] <= 0 then
                         self.button:cooldown(remaining, pid, total)
