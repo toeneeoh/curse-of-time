@@ -1076,7 +1076,10 @@ OnInit.final("Shop", function(Require)
     ---@field canScroll boolean[]
     ---@field timer timer[]
     ---@field visible function
-    ---@field first ShopSlot
+    ---@field first? ShopSlot
+    ---@field last? ShopSlot
+    ---@field head? ShopSlot
+    ---@field tail? ShopSlot
     ---@field group group[]
     ---@field trigger trigger
     ---@field search trigger
@@ -1237,7 +1240,7 @@ OnInit.final("Shop", function(Require)
                         slot:move(R2I(i/self.columns), ModuloInteger(i, self.columns))
                         slot:visible(slot.row >= 0 and slot.row <= self.rows - 1 and slot.column >= 0 and slot.column <= self.columns - 1)
 
-                        if i > 0 then
+                        if i > 0 and self.last then
                             slot.left = self.last
                             self.last.right = slot
                         else
@@ -1359,7 +1362,7 @@ OnInit.final("Shop", function(Require)
                         slot:visible(slot.row >= 0 and slot.row <= ROWS - 1 and slot.column >= 0 and slot.column <= COLUMNS - 1)
                         self.stock[itemId] = -1
 
-                        if self.index > 0 then
+                        if self.index > 0 and self.last then
                             slot.prev = self.last
                             slot.left = self.last
                             self.last.next = slot
@@ -1407,10 +1410,12 @@ OnInit.final("Shop", function(Require)
                 self = setmetatable({}, mt)
                 self.id = id
                 self.aoe = aoe
-                self.first = 0
-                self.last = 0
-                self.head = 0
-                self.tail = 0
+                -- Empty linked lists use nil. Unlike JASS, Lua treats 0 as
+                -- truthy, so a refresh would otherwise call 0:refresh().
+                self.first = nil
+                self.last = nil
+                self.head = nil
+                self.tail = nil
                 self.size = 0
                 self.index = -1
                 self.rows = ROWS
