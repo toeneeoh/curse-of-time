@@ -7,13 +7,20 @@ OnInit.final("ShopQuote", function(Require)
     Require('Helper')
     Require('Items')
     Require('ShopCatalog')
+    Require('ShopActions')
 
     ShopQuote = {}
 
     ---@type fun(id: string|integer, pid: integer): boolean
     function IsBuyable(id, pid)
         local available = GetItemAvailability(id, pid)
-        return available and GetItemPrice(id, pid) ~= nil
+        if not available then
+            return false
+        end
+        if ShopAction.get(id) then
+            return ShopAction.evaluate(id, pid)
+        end
+        return GetItemPrice(id, pid) ~= nil
     end
 
     local function inventory_components(pid)
@@ -63,6 +70,7 @@ OnInit.final("ShopQuote", function(Require)
     ---@field cost PriceQuote
     ---@field inventory table
     ---@field consume table
+    ---@field action ShopActionDefinition?
 
     ---@return PurchaseQuote
     function ShopQuote.evaluate(shop, item, pid)
@@ -90,6 +98,19 @@ OnInit.final("ShopQuote", function(Require)
             return quote
         end
         local price = GetItemPrice(item.id, pid)
+        local action = ShopAction.get(item.id)
+        if action then
+            local action_available, action_reason = ShopAction.evaluate(item.id, pid)
+            if not action_available then
+                quote.reason = "unavailable"
+                quote.label = action_reason
+                return quote
+            end
+            quote.can_buy = true
+            quote.reason = nil
+            quote.action = action
+            return quote
+        end
         if not price then
             quote.reason = "unpriced"
             return quote

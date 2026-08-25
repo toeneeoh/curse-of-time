@@ -142,48 +142,4 @@ OnInit.final("Potion", function(Require)
         U = U.next
     end
 
-    local function confirm_refill_potions()
-        local pid   = GetPlayerId(GetTriggerPlayer()) + 1 ---@type integer 
-        local dw    = DialogWindow[pid] ---@type DialogWindow 
-        local index = dw:getClickedIndex(GetClickedButton()) ---@type integer 
-
-        if index ~= -1 then
-            local price = dw.data[0] ---@type Item 
-
-            if ChargePlayer(pid, price, "Your potions have been refilled.") then
-                for i = POTION_INDEX, POTION_INDEX + 1 do
-                    local pot = Profile[pid].hero.items[i]
-
-                    if pot then
-                        pot.charges = pot.cached_stats[ITEM_CHARGES]
-                    end
-                end
-                INVENTORY.refresh(pid)
-            end
-            dw:destroy()
-        end
-
-        return false
-    end
-
-    ITEM_LOOKUP[FourCC('I00J')] = function(p, pid) -- refill potions
-        local price = 0
-        for i = POTION_INDEX, POTION_INDEX + 1 do
-            local pot = Profile[pid].hero.items[i]
-
-            if pot then
-                price = price + ItemData[pot.id][ITEM_LEVEL_REQUIREMENT] ^ 2 + pot.cached_stats[ITEM_FLAT_HEAL] * 0.5 + pot.cached_stats[ITEM_FLAT_MANA] * 0.5
-            end
-        end
-
-        price = math.floor(price)
-
-        if price > 0 then
-            local dw = DialogWindow.create(pid, "|cffffffffRefill potions for |r" .. price .. " |cffffffffgold?|r", confirm_refill_potions)
-
-            dw:addButton("Yes", price)
-            dw:display()
-        end
-    end
-
 end, Debug and Debug.getLine())

@@ -5,6 +5,7 @@ OnInit.final("ShopTransaction", function(Require)
     Require('Profile')
     Require('Items')
     Require('ShopQuote')
+    Require('ShopActions')
 
     ShopTransaction = {}
 
@@ -13,6 +14,14 @@ OnInit.final("ShopTransaction", function(Require)
     function ShopTransaction.commit(shop, item, pid)
         local quote = ShopQuote.evaluate(shop, item, pid)
         if not quote.can_buy then return quote end
+
+        if quote.action then
+            if not quote.action.open(pid) then
+                quote.can_buy = false
+                quote.reason = "action"
+            end
+            return quote
+        end
 
         for currency = 0, CURRENCY_COUNT - 1 do
             if quote.cost[currency] > 0 then

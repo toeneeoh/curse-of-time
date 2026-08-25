@@ -1,0 +1,57 @@
+-- Registry for shop entries that invoke synchronized gameplay services instead
+-- of creating an item.
+
+OnInit.final("ShopActions", function(Require)
+    Require('Helper')
+
+    ShopAction = {}
+    local registry = {}
+
+    local function key(id)
+        return GetItem(id)
+    end
+
+    ---@class ShopActionDefinition
+    ---@field label string|fun(pid: integer): string
+    ---@field availability fun(pid: integer): boolean, string?
+    ---@field open fun(pid: integer): boolean
+
+    ---@param id string|integer
+    ---@param definition ShopActionDefinition
+    function RegisterShopAction(id, definition)
+        registry[key(id)] = definition
+    end
+
+    ---@param id string|integer
+    ---@return ShopActionDefinition?
+    function ShopAction.get(id)
+        return registry[key(id)]
+    end
+
+    ---@param id string|integer
+    ---@param pid integer
+    ---@return boolean, string?
+    function ShopAction.evaluate(id, pid)
+        local action = ShopAction.get(id)
+        if not action then
+            return false
+        end
+
+        local available, reason = action.availability(pid)
+        return available ~= false, reason
+    end
+
+    ---@param id string|integer
+    ---@param pid integer
+    ---@return string?
+    function ShopAction.label(id, pid)
+        local action = ShopAction.get(id)
+        if not action then
+            return nil
+        end
+        if type(action.label) == "function" then
+            return action.label(pid)
+        end
+        return action.label
+    end
+end, Debug and Debug.getLine())

@@ -119,31 +119,6 @@ OnInit.final("Town", function(Require)
     end
     --#endregion
 
-    ITEM_LOOKUP[FourCC('I101')] = function(p, pid, u, itm)
-        local lvl = (itm.id == FourCC('I101') and GetUnitAbilityLevel(Backpack[pid], TELEPORT.id)) or GetUnitAbilityLevel(Backpack[pid], FourCC('A0FK'))
-
-        if lvl < 10 then -- 10 upgrade limit
-            local dw ---@type DialogWindow
-            local index = R2I(400. * Pow(5., lvl - 1.))
-
-            if index > 1000000 then
-                dw = DialogWindow.create(pid, "Upgrade cost: |n|cffffffff" .. (index // 1000000) .. " |cffe3e2e2Platinum|r |cffffffffand " .. ModuloInteger(index, 1000000) .. " |cffffcc00Gold|r", BackpackUpgrades)
-            else
-                dw = DialogWindow.create(pid, "Upgrade cost: |n|cffffffff" .. (index) .. " |cffffcc00Gold|r", BackpackUpgrades)
-            end
-
-            if GetCurrency(pid, GOLD) >= ModuloInteger(index, 1000000) and GetCurrency(pid, PLATINUM) >= R2I(index / 1000000) then
-                dw.data[0] = itemid
-                dw.data[1] = index
-                dw:addButton("Upgrade")
-            end
-
-            dw:display()
-        end
-    end
-
-    ITEM_LOOKUP[FourCC('I102')] = ITEM_LOOKUP[FourCC('I101')]
-
     --#region town general shop
     local general_shop = FourCC('n01A')
     CreateShop(general_shop, 1000.)
@@ -296,24 +271,19 @@ OnInit.final("Town", function(Require)
     local magic_shop = FourCC('n01B')
     CreateShop(magic_shop, 1000.)
 
-    ShopAddItem(magic_shop, 'I0TS:0', 0)
-    SetItemAvailability('I0TS', true)
-
-    --[[
-    I0TS tome of strength
-    I0TA tome of agility
-    I0TI tome of intelligence
-    I0TT tome of knowledge
-    I0N0 grimoire of focus
-    I0JN tome of retraining
-
-    I0JS recharge reincarnation
-    I00J refill potions
-
-    I084 currency converter
-    I102 reveal upgrade
-    I101 teleport upgrade
-    ]]
+    -- Services are catalog entries backed by ShopAction rather than temporary
+    -- power-up items. Their current availability and price labels are dynamic.
+    ShopAddItem(magic_shop, 'I0TS:0', 0) -- tome of strength
+    ShopAddItem(magic_shop, 'I0TA:0', 0) -- tome of agility
+    ShopAddItem(magic_shop, 'I0TI:0', 0) -- tome of intelligence
+    ShopAddItem(magic_shop, 'I0TT:0', 0) -- tome of knowledge
+    ShopAddItem(magic_shop, 'I0N0:0', 0) -- grimoire of focus
+    ShopAddItem(magic_shop, 'I0JN:0', 0) -- tome of retraining
+    ShopAddItem(magic_shop, 'I0JS:0', 0) -- recharge reincarnation
+    ShopAddItem(magic_shop, 'I00J:0', 0) -- refill potions
+    ShopAddItem(magic_shop, 'I084:0', 0) -- currency converter
+    ShopAddItem(magic_shop, 'I102:0', 0) -- reveal upgrade
+    ShopAddItem(magic_shop, 'I101:0', 0) -- teleport upgrade
 
     --#endregion
 

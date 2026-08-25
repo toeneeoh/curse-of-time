@@ -15,6 +15,7 @@ OnInit.final("Shop", function(Require)
     Require('ShopTransaction')
     Require('ItemEventRegistry')
     Require('ShopCatalog')
+    Require('ShopActions')
 
     -- Credits:
     --      Taysen: FDF file
@@ -79,6 +80,8 @@ OnInit.final("Shop", function(Require)
     local COST_WIDTH                     = 0.06 ---@type number 
     local COST_HEIGHT                    = 0.005 ---@type number 
     local COST_SCALE                     = 0.7 ---@type number 
+    local STATUS_WIDTH                   = 0.075 ---@type number
+    local STATUS_SCALE                   = 0.55 ---@type number
     local COST_GAP                   = 0.009 ---@type number 
     local SLOT_GAP_X                     = 0.0145 ---@type number 
     local SLOT_GAP_Y                     = 0.038 ---@type number 
@@ -148,6 +151,7 @@ OnInit.final("Shop", function(Require)
     ---@field button Button
     ---@field costicon framehandle[]
     ---@field cost framehandle[]
+    ---@field status framehandle
     ---@field xPos number
     ---@field yPos number
     ---@field isVisible boolean
@@ -259,12 +263,17 @@ OnInit.final("Shop", function(Require)
         function thistype:refresh(pid)
             local available, label = GetItemAvailability(self.item.id, pid)
             local price = GetItemPrice(self.item.id, pid)
+            local action = ShopAction.get(self.item.id)
             local status
 
             if self.shop.stock[self.item.id] == 0 then
                 status = "SOLD OUT"
             elseif not available then
                 status = label or "UNAVAILABLE"
+            elseif action then
+                local action_available, action_reason = ShopAction.evaluate(self.item.id, pid)
+                status = action_available and ShopAction.label(self.item.id, pid)
+                    or action_reason or "UNAVAILABLE"
             elseif not price then
                 status = "NOT FOR SALE"
             end
@@ -284,10 +293,8 @@ OnInit.final("Shop", function(Require)
                 end
             end
 
-            if status then
-                BlzFrameSetVisible(self.cost[0], true)
-                BlzFrameSetText(self.cost[0], "|cff999999" .. status .. "|r")
-            end
+            BlzFrameSetVisible(self.status, status ~= nil)
+            BlzFrameSetText(self.status, status and "|cff999999" .. status .. "|r" or "")
         end
 
         ---@type fun(self: ShopSlot, row: integer, column: integer)
@@ -334,6 +341,7 @@ OnInit.final("Shop", function(Require)
             self.column = column
             self.costicon = {}
             self.cost = {}
+            self.status = BlzCreateFrameByType("TEXT", "", self.slot, "", 0)
             self:onClick(thistype.onClicked)
             self:onScroll(thistype.onScrolled)
             self:onDoubleClick(thistype.onDoubleClicked)
@@ -358,6 +366,16 @@ OnInit.final("Shop", function(Require)
                 BlzFrameSetVisible(self.costicon[k], false)
                 BlzFrameSetVisible(self.cost[k], false)
             end
+
+            -- Status text is wider and centered independently of currency rows,
+            -- preventing labels such as NOT FOR SALE from clipping or spilling
+            -- into the next shop column.
+            BlzFrameSetPoint(self.status, FRAMEPOINT_TOP, self.slot, FRAMEPOINT_BOTTOM, 0., -0.004)
+            BlzFrameSetSize(self.status, STATUS_WIDTH, COST_HEIGHT)
+            BlzFrameSetScale(self.status, STATUS_SCALE)
+            BlzFrameSetTextAlignment(self.status, TEXT_JUSTIFY_CENTER, TEXT_JUSTIFY_CENTER)
+            BlzFrameSetEnable(self.status, false)
+            BlzFrameSetVisible(self.status, false)
 
             ShopSlot.update(self)
 

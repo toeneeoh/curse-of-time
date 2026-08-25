@@ -8,6 +8,7 @@ OnInit.final("ArchitectureTests", function(Require)
     Require('Profile')
     Require('SaveSchema')
     Require('DevRuntimeLog')
+    Require('ShopServiceDialogs')
 
     ArchitectureTests = {
         tests = {},
@@ -102,6 +103,23 @@ OnInit.final("ArchitectureTests", function(Require)
         end
         if RuntimeMetrics.timer_queue.active < 0 then
             return false, "timer queue active counter is negative"
+        end
+        return true
+    end)
+
+    ArchitectureTests.register("magic shop services are registered as actions", function()
+        local ids = {
+            'I0TS', 'I0TA', 'I0TI', 'I0TT', 'I0N0', 'I0JN',
+            'I0JS', 'I00J', 'I084', 'I101', 'I102',
+        }
+        for index = 1, #ids do
+            if not ShopAction.get(ids[index]) then
+                return false, "missing shop action " .. ids[index]
+            end
+        end
+        if TomeService.bundles[1].gold ~= 10000
+            or TomeService.bundles[5].platinum ~= 100 then
+            return false, "tome bundle prices changed"
         end
         return true
     end)

@@ -95,35 +95,18 @@ OnInit.final("Currency", function(Require)
     end
     --
 
-    -- purchase auto converter
-    local function buy_converter()
-        local pid   = GetPlayerId(GetTriggerPlayer()) + 1 ---@type integer 
-        local dw    = DialogWindow[pid]
-        local index = dw:getClickedIndex(GetClickedButton()) ---@type integer 
-
-        -- converter
-        if index == 0 then
-            local price = dw.data[index]
-            if ChargePlayer(pid, price, "You have purchased a Currency Converter.") then
-                IS_CONVERTER_PURCHASED[pid] = true
-                refresh_converter_button(pid)
-            end
-
-            dw:destroy()
-        end
-
-        return false
+    ---@param pid integer
+    ---@return boolean
+    function HasCurrencyConverter(pid)
+        return IS_CONVERTER_PURCHASED[pid] == true
     end
 
-    -- map item currency exchange purchases to functions
-    ITEM_LOOKUP[FourCC('I084')] = function(p, pid)
-        if not IS_CONVERTER_PURCHASED[pid] then
-            local dw = DialogWindow.create(pid, "Purchase cost: |n|cffffffff4 |cffe3e2e2Platinum|r", buy_converter)
-
-            dw:addButton("Purchase", 4000000)
-
-            dw:display()
-        end
+    ---Marks the synchronized converter service as purchased. Charging remains
+    ---the responsibility of its transaction immediately before this call.
+    ---@param pid integer
+    function GrantCurrencyConverter(pid)
+        IS_CONVERTER_PURCHASED[pid] = true
+        refresh_converter_button(pid)
     end
 
     -- crystal to gold
