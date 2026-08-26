@@ -2049,13 +2049,30 @@ OnInit.final("Buffs", function(Require)
     end
 
     local DEMON_SHIELD_MODEL = "war3mapImported\\DemonShieldTarget3A.mdx"
+    local DEMON_SHIELD_BIRTH_DURATION = 0.9 + FPS_32
+
+    local function play_demon_shield_stand(buff, sfx)
+        if buff.sfx == sfx then
+            buff.sfx_timer = nil
+
+            if sfx.effect then
+                sfx.anim = ANIM_TYPE_STAND
+            end
+        end
+    end
 
     local function add_demon_shield(buff)
-        buff.sfx = Unit[buff.target]:addEffect(DEMON_SHIELD_MODEL, "origin")
-        buff.sfx.anim = ANIM_TYPE_STAND
+        local sfx = Unit[buff.target]:addEffect(DEMON_SHIELD_MODEL, "origin")
+        buff.sfx = sfx
+        buff.sfx_timer = TQ:callDelayed(DEMON_SHIELD_BIRTH_DURATION, play_demon_shield_stand, buff, sfx)
     end
 
     local function remove_demon_shield(buff)
+        if buff.sfx_timer then
+            TQ:disableCallback(buff.sfx_timer)
+            buff.sfx_timer = nil
+        end
+
         if buff.sfx then
             Unit[buff.target]:removeEffect(buff.sfx)
             buff.sfx = nil
