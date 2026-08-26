@@ -9,9 +9,21 @@
 OnInit.global("Chain", function(Require)
     Require('TimerQueue')
 
+    ---@class ChainUnitAnchor
+    ---@field type "unit"
+    ---@field handle unit
+    ---@field height number
+
+    ---@class ChainEffectAnchor
+    ---@field type "sfx"
+    ---@field handle effect
+    ---@field height number
+
+    ---@alias ChainAnchor ChainUnitAnchor|ChainEffectAnchor
+
     ---@class Chain
-    ---@field source unit
-    ---@field target unit
+    ---@field source ChainAnchor|unit
+    ---@field target ChainAnchor|unit
     ---@field source_height number
     ---@field target_height number
     ---@field length number
@@ -34,6 +46,9 @@ OnInit.global("Chain", function(Require)
         return SquareRoot(dx * dx + dy * dy + dz * dz)
     end
 
+    ---@param u unit
+    ---@param height number?
+    ---@return ChainUnitAnchor
     function Chain.unit(u, height)
         return {
             type = "unit",
@@ -42,6 +57,9 @@ OnInit.global("Chain", function(Require)
         }
     end
 
+    ---@param sfx effect
+    ---@param height number?
+    ---@return ChainEffectAnchor
     function Chain.sfx(sfx, height)
         return {
             type = "sfx",
@@ -51,7 +69,9 @@ OnInit.global("Chain", function(Require)
     end
 
     local function anchor_pos(anchor, fallback_height)
-        if anchor.type == "unit" then
+        local anchor_type = type(anchor) == "table" and anchor.type
+
+        if anchor_type == "unit" then
             local u = anchor.handle
             local x = GetUnitX(u)
             local y = GetUnitY(u)
@@ -59,7 +79,7 @@ OnInit.global("Chain", function(Require)
             return x, y, GetUnitZ(u) + (anchor.height or fallback_height or 0.)
         end
 
-        if anchor.type == "sfx" then
+        if anchor_type == "sfx" then
             local sfx = anchor.handle
             local x = BlzGetLocalSpecialEffectX(sfx)
             local y = BlzGetLocalSpecialEffectY(sfx)
@@ -75,11 +95,13 @@ OnInit.global("Chain", function(Require)
     end
 
     local function anchor_alive(anchor)
-        if anchor.type == "unit" then
+        local anchor_type = type(anchor) == "table" and anchor.type
+
+        if anchor_type == "unit" then
             return UnitAlive(anchor.handle)
         end
 
-        if anchor.type == "sfx" then
+        if anchor_type == "sfx" then
             return anchor.handle ~= nil
         end
 
@@ -88,6 +110,10 @@ OnInit.global("Chain", function(Require)
     end
 
     local function anchor_unit(anchor)
+        if type(anchor) ~= "table" then
+            return anchor -- backwards compatibility
+        end
+
         if anchor.type == "unit" then
             return anchor.handle
         end
@@ -97,6 +123,16 @@ OnInit.global("Chain", function(Require)
         end
 
         return nil
+    end
+
+    ---@return unit?
+    function Chain:get_source_unit()
+        return anchor_unit(self.source)
+    end
+
+    ---@return unit?
+    function Chain:get_target_unit()
+        return anchor_unit(self.target)
     end
 
     -- initialize segments evenly between both anchors
@@ -180,6 +216,10 @@ OnInit.global("Chain", function(Require)
     end
 
     function Chain:clear_lightning()
+        if not self.lightning then
+            return
+        end
+
         for i = 0, self.segments - 1 do
             if self.lightning[i] then
                 DestroyLightning(self.lightning[i])
@@ -282,6 +322,12 @@ OnInit.global("Chain", function(Require)
     end
 
     function Chain:yank(length_cut, segment_cut, duration)
+        local source = self:get_source_unit()
+        local target = self:get_target_unit()
+        if self.destroyed or not source or not target then
+            return false
+        end
+
         self.yanking = true
         self.yank_time = 0.
         self.yank_duration = duration or 0.25
@@ -295,11 +341,12 @@ OnInit.global("Chain", function(Require)
         self.yank_old_leash = self.leash
         self.leash = false
 
-        self.yank_start_x = GetUnitX(self.target)
-        self.yank_start_y = GetUnitY(self.target)
+        self.yank_target = target
+        self.yank_start_x = GetUnitX(target)
+        self.yank_start_y = GetUnitY(target)
 
-        local sx = GetUnitX(self.source)
-        local sy = GetUnitY(self.source)
+        local sx = GetUnitX(source)
+        local sy = GetUnitY(source)
 
         -- direction from target -> source
         local dx = sx - self.yank_start_x
@@ -321,13 +368,14 @@ OnInit.global("Chain", function(Require)
         if excess <= 0.001 then
             self.yank_end_x = self.yank_start_x
             self.yank_end_y = self.yank_start_y
-            return
+            return true
         end
 
         local pull = math.min(length_cut, excess)
 
         self.yank_end_x = self.yank_start_x + dx * pull
         self.yank_end_y = self.yank_start_y + dy * pull
+        return true
     end
 
     function Chain:apply_yank()
@@ -345,8 +393,8 @@ OnInit.global("Chain", function(Require)
         local x = self.yank_start_x + (self.yank_end_x - self.yank_start_x) * smooth
         local y = self.yank_start_y + (self.yank_end_y - self.yank_start_y) * smooth
 
-        SetUnitX(self.target, x)
-        SetUnitY(self.target, y)
+        SetUnitX(self.yank_target, x)
+        SetUnitY(self.yank_target, y)
 
         self.length = self.yank_start_length +
             (self.yank_end_length - self.yank_start_length) * smooth
@@ -357,6 +405,7 @@ OnInit.global("Chain", function(Require)
 
             self.leash = self.yank_old_leash
             self.yanking = false
+            self.yank_target = nil
         end
     end
 
@@ -513,6 +562,10 @@ OnInit.global("Chain", function(Require)
 
     -- main loop
     function Chain:update()
+        if self.destroyed then
+            return false
+        end
+
         if not self.source or not self.target then
             self:destroy()
             return false
@@ -533,6 +586,11 @@ OnInit.global("Chain", function(Require)
     end
 
     function Chain:destroy()
+        if self.destroyed then
+            return
+        end
+
+        self.destroyed = true
         self:clear_lightning()
 
         self.source = nil
@@ -545,6 +603,8 @@ OnInit.global("Chain", function(Require)
         self.vx = nil
         self.vy = nil
         self.vz = nil
+
+        self.yank_target = nil
 
         self.fx = nil
         self.fy = nil

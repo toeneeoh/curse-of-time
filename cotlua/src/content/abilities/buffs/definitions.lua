@@ -2067,6 +2067,7 @@ OnInit.final("Buffs", function(Require)
             self.mr = 0.333
             Unit[self.target].mr = Unit[self.target].mr * self.mr
             self.sfx = Unit[self.target]:addEffect("war3mapImported\\DemonShieldTarget3A.mdx", "origin")
+            self.sfx.anim = ANIM_TYPE_STAND
         end
     end
 
@@ -2158,8 +2159,8 @@ OnInit.final("Buffs", function(Require)
         end
 
         local function soul_periodic(self)
-            if UnitAlive(self.soul) then
-                local chain = self.chain.source
+            local chain = self.chain:get_source_unit()
+            if UnitAlive(self.soul) and UnitAlive(chain) then
                 local x, y = GetUnitX(chain), GetUnitY(chain)
                 IssuePointOrder(self.soul, "move", x, y)
 
@@ -2179,7 +2180,12 @@ OnInit.final("Buffs", function(Require)
 
         function thistype:spawn_soul()
             if not UnitAlive(self.soul) then
-                local x, y = GetUnitX(self.chain.source), GetUnitY(self.chain.source)
+                local chain_source = self.chain:get_source_unit()
+                if not UnitAlive(chain_source) then
+                    return
+                end
+
+                local x, y = GetUnitX(chain_source), GetUnitY(chain_source)
                 local x2, y2 = GetUnitX(self.target), GetUnitY(self.target)
                 local angle = math.atan(y2 - y, x2 - x)
                 self.soul = CreateUnit(PLAYER_BOSS, FourCC('n002'), x2, y2, bj_RADTODEG * angle)
@@ -2211,8 +2217,11 @@ OnInit.final("Buffs", function(Require)
         end
 
         local function periodic(self)
-            self.chain:update()
-            self.timer = TQ:callDelayed(FPS_32, periodic, self)
+            if self.chain:update() then
+                self.timer = TQ:callDelayed(FPS_32, periodic, self)
+            else
+                self.timer = nil
+            end
         end
 
         function thistype:onRemove()
@@ -2260,6 +2269,7 @@ OnInit.final("Buffs", function(Require)
             self.mr = 0.666
             Unit[self.target].mr = Unit[self.target].mr * self.mr
             self.sfx = Unit[self.target]:addEffect("war3mapImported\\DemonShieldTarget3A.mdx", "origin")
+            self.sfx.anim = ANIM_TYPE_STAND
         end
     end
 
