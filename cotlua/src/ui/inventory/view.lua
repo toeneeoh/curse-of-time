@@ -96,12 +96,13 @@ OnInit.final("Inventory", function(Require)
     INVENTORY = {}
     do
         local thistype = INVENTORY
-        local context, target, slots = __jarray(0), __jarray(0), {} ---@type Button[]
+        local context = __jarray(0) ---@type integer[]
+        local target = __jarray(0) ---@type integer[]
+        local slots = {} ---@type Button[]
         local viewing, move_item_cooldown = __jarray(-1), {}
         local on_m1_down, on_m2_down, on_m1_up, on_m2_up, open_context_menu
         local target_thread = {} -- used to sync context and target acquisition
         local synced_context, synced_target = {}, {}
-        local pending_click  = {} -- stores index of context menu click
         local ui_mode = __jarray(0) -- 0 = normal, 1 = context menu open
 
         -- determines what item slot a user has their cursor over
@@ -243,49 +244,50 @@ OnInit.final("Inventory", function(Require)
         BlzFrameSetTooltip(context_buttons[4].frame, cost_frame)
         BlzFrameSetTooltip(context_buttons[5].frame, transparent_placeholder)
 
+        local result_messages = {
+            invalid_slot = "That inventory slot is invalid.",
+            invalid_player = "Your inventory is not available.",
+            missing_source = "That item is no longer in the selected slot.",
+            missing_target = "The destination item is no longer available.",
+            invalid_target = "That item cannot be moved to the selected slot.",
+            invalid_source = "The destination item cannot move into the vacated slot.",
+            no_equip_slot = "There is no compatible empty equipment slot.",
+            no_backpack_slot = "There is no empty backpack slot.",
+            not_in_town = "Items can only be sold while in town.",
+            unsellable = "That item cannot be sold.",
+            stale = "Your inventory changed before the move completed.",
+            destroy_failed = "That item could not be removed.",
+        }
+
+        ---@param pid integer
+        ---@param response InventoryResult?
+        local function render_inventory_result(pid, response)
+            if response and not response.ok then
+                local message = response.message or result_messages[response.code]
+                if message then
+                    local p = Player(pid - 1)
+                    DisplayTimedTextToPlayer(p, 0, 0, 15., message)
+                    SoundHandler("Sound\\Interface\\Error.wav", false, p)
+                end
+            end
+        end
+
         local context_functions = {
             function(pid, slot) -- EQUIP
-                local itm = Profile[pid].hero.items[slot]
-
-                if itm then
-                    itm:equip()
-                end
+                return InventoryService.equip(pid, slot)
             end,
             function(pid, slot) -- UNEQUIP
-                local index = -1
-                local items = Profile[pid].hero.items
-                for i = BACKPACK_INDEX, MAX_INVENTORY_SLOTS do
-                    local itm = items[i]
-                    if itm == nil then
-                        index = i
-                        break
-                    end
-                end
-                if index ~= -1 then
-                    local itm = items[slot]
-                    if itm then
-                        itm:equip(index)
-                    end
-                end
+                return InventoryService.unequip(pid, slot)
             end,
             function(pid, slot) -- DROP
-                local hero = Profile[pid].hero
-                local itm = hero.items[slot]
-
-                if itm then
-                    itm:drop(GetUnitX(Hero[pid]), GetUnitY(Hero[pid]))
-                end
+                return InventoryService.drop(pid, slot, GetUnitX(Hero[pid]), GetUnitY(Hero[pid]))
             end,
             function(pid, slot) -- SELL
-                local itm = Profile[pid].hero.items[slot]
-                if itm then
-                    SoundHandler("Abilities\\Spells\\Items\\ResourceItems\\ReceiveGold.flac", true, Player(pid - 1), itm.holder)
-                    local _, gold, plat = GetItemSellPrice(itm)
-                    AddCurrency(pid, GOLD, gold)
-                    AddCurrency(pid, PLATINUM, plat)
-
-                    itm:destroy(nil, nil, true)
+                local response = InventoryService.sell(pid, slot)
+                if response.ok then
+                    SoundHandler("Abilities\\Spells\\Items\\ResourceItems\\ReceiveGold.flac", true, Player(pid - 1), response.holder)
                 end
+                return response
             end,
             function(pid, slot) -- DETAILS
                 local itm = Profile[viewing[pid]].hero.items[slot]
@@ -301,7 +303,6 @@ OnInit.final("Inventory", function(Require)
             target[pid] = 0
             synced_context[pid] = false
             synced_target[pid] = false
-            pending_click[pid] = nil
         end
 
         local on_context_push = function()
@@ -316,16 +317,11 @@ OnInit.final("Inventory", function(Require)
 
             open_context_menu(pid, false)
 
-            -- if not synced, queue pending click to execute at on_context_sync
-            if not synced_context[pid] then
-                --print("not synced yet!")
-                if not pending_click[pid] then
-                    pending_click[pid] = btn_index
-                end
-                return false
-            elseif not pending_click[pid] and context[pid] > 0 then
+            if btn_index == 5 then
                 context_functions[btn_index](pid, context[pid])
                 clear_context(pid)
+            elseif context[pid] > 0 and GetLocalPlayer() == GetTriggerPlayer() then
+                BlzSendSyncData("inventory_action", btn_index .. ":" .. context[pid])
             end
 
             return false
@@ -556,21 +552,6 @@ OnInit.final("Inventory", function(Require)
             move_item_cooldown[pid] = false
         end
 
-        local function find_empty_equip_slot(it, items)
-            local type = ItemData[it.id][ITEM_TYPE]
-            local start_index, end_index = 1, 6
-            if type == 11 then -- TODO: define potion type check somewhere
-                start_index, end_index = POTION_INDEX, POTION_INDEX + 1
-            end
-            for i = start_index, end_index do
-                if not items[i] then
-                    return i
-                end
-            end
-
-            return nil
-        end
-
         local function update_context_buttons(pid, slot)
             local owner = viewing[pid]
             local items = Profile[owner].hero.items -- safe for read only
@@ -589,16 +570,12 @@ OnInit.final("Inventory", function(Require)
             if pid == viewing[pid] then
                 -- unequip logic
                 if slot.index < BACKPACK_INDEX then
-                    for i = BACKPACK_INDEX, MAX_INVENTORY_SLOTS do
-                        if items[i] == nil then
-                            visible_buttons[#visible_buttons + 1] = 2 -- UNEQUIP
-                            break
-                        end
+                    if InventoryService.findUnequipTarget(pid, slot.index) then
+                        visible_buttons[#visible_buttons + 1] = 2 -- UNEQUIP
                     end
                 else
                 -- equip logic
-                    local empty_slot = find_empty_equip_slot(it, items)
-                    if it and empty_slot and ValidateItemSlot(it, empty_slot) then
+                    if it and InventoryService.findEquipTarget(pid, slot.index) then
                         visible_buttons[#visible_buttons + 1] = 1 -- EQUIP
                     end
                 end
@@ -608,15 +585,17 @@ OnInit.final("Inventory", function(Require)
 
                 -- selling logic
                 if it then
-                    local total, gold, plat = GetItemSellPrice(it)
-                    if RectContainsUnit(gg_rct_Town_Main, Hero[pid]) and total > 0 then
+                    local quote = InventoryService.canSell(pid, slot.index)
+                    if quote.ok then
+                        local gold = quote.gold or 0
+                        local platinum = quote.platinum or 0
                         visible_buttons[#visible_buttons + 1] = 4
                         if GetLocalPlayer() == Player(pid - 1) then
                             BlzFrameSetText(cost_text, string.format("%01d", gold))
-                            local show_plat = plat > 0
+                            local show_plat = platinum > 0
                             frame_set_visible(cost_icon2, show_plat)
                             if show_plat then
-                                BlzFrameSetText(cost_text2, string.format("%01d", plat))
+                                BlzFrameSetText(cost_text2, string.format("%01d", platinum))
                             end
                         end
                     end
@@ -698,12 +677,21 @@ OnInit.final("Inventory", function(Require)
             context[pid] = slot
             synced_context[pid] = true
 
-            local pc = pending_click[pid]
-            if pc then
-                context_functions[pc](pid, slot)
-                clear_context(pid)
+            return false
+        end
+
+        local function on_inventory_action_sync()
+            local pid = GetPlayerId(GetTriggerPlayer()) + 1
+            local action, slot = BlzGetTriggerSyncData():match("^(%d+):(%d+)$")
+            action = tonumber(action)
+            slot = tonumber(slot)
+
+            if action and action >= 1 and action <= 4 and slot then
+                local response = context_functions[action](pid, slot)
+                render_inventory_result(pid, response)
             end
 
+            clear_context(pid)
             return false
         end
 
@@ -726,98 +714,10 @@ OnInit.final("Inventory", function(Require)
             return false
         end
 
-        -- paint a slot from an item (or hide if nil)
-        local function apply_item_visual(slot_btn, itm)
-            if not itm then
-                update_socket_tooltips(slot_btn.tooltip)
-                slot_btn:visible(false)
-                return
-            end
-            local icon = BlzGetItemIconPath(itm.obj)
-            slot_btn:icon(icon)
-            slot_btn.tooltip:icon(icon)
-            slot_btn.tooltip:name(GetItemName(itm.obj))
-            slot_btn.tooltip:text(BlzGetItemExtendedTooltip(itm.obj))
-            update_socket_tooltips(slot_btn.tooltip, itm)
-            slot_btn:charge(itm.charges)
-            slot_btn:visible(true)
-        end
-
-        ---@param pid integer
-        ---@param a integer
-        ---@param b integer
-        local function swap_slot_visuals(pid, a, b)
-            if a == b then return end
-            local items = Profile[pid].hero.items
-            local itmA, itmB = items[a], items[b]
-
-            if GetLocalPlayer() == Player(pid - 1) then
-                apply_item_visual(slots[a], itmB)
-                apply_item_visual(slots[b], itmA)
-            end
-        end
-
-        ---@type fun(pid: integer, itm: Item, slot: integer, ignore: Item, show_error: boolean): boolean
-        local function validate_item_move(pid, itm, slot, ignore, show_error)
-            local valid, err = ValidateItemSlot(itm, slot, ignore)
-
-            if not valid then
-                if show_error and err then
-                    local p = Player(pid - 1)
-                    DisplayTimedTextToPlayer(p, 0, 0, 15., err)
-                    SoundHandler("Sound\\Interface\\Error.wav", false, p)
-                end
-
-                return false
-            end
-
-            return true
-        end
-
         local confirm_item = function(pid)
             target_thread[pid] = coroutine.create(function()
                 local hero = Profile[pid].hero
-                local itm = hero.items[context[pid]]
-                local itm2 = hero.items[target[pid]]
                 local slot = get_hovered_slot() -- not sync safe
-                local valid = false
-
-                -- async visual swap
-                if itm and slot > 0 then
-                    itm2 = hero.items[slot]
-
-                    local dragged_from_backpack = context[pid] >= BACKPACK_INDEX
-                    local target_is_equipped_slot = slot < BACKPACK_INDEX
-                    local target_has_item = itm2 ~= nil
-
-                    if itm ~= itm2 then
-                        if dragged_from_backpack and target_is_equipped_slot then
-                            if target_has_item then
-                                -- backpack -> occupied equipped slot
-                                -- occupant leaves first, so ignore it
-                                valid = validate_item_move(pid, itm2, context[pid], itm, false)
-
-                                if valid then
-                                    valid = validate_item_move(pid, itm, slot, itm2, true)
-                                end
-                            else
-                                -- backpack -> empty equipped slot
-                                -- no occupant leaves, so do NOT ignore anything
-                                valid = validate_item_move(pid, itm, slot, nil, true)
-                            end
-                        else
-                            valid = validate_item_move(pid, itm, slot, itm2, true)
-
-                            if itm2 and valid then
-                                valid = validate_item_move(pid, itm2, context[pid], itm, false)
-                            end
-                        end
-
-                        if valid then
-                            swap_slot_visuals(pid, context[pid], slot)
-                        end
-                    end
-                end
 
                 hide_tracker(pid)
                 PauseMouseTracker(pid)
@@ -830,7 +730,7 @@ OnInit.final("Inventory", function(Require)
 
                 -- check for syncs (extra safe)
                 if synced_context[pid] and synced_target[pid] then
-                    itm = hero.items[context[pid]]
+                    local itm = hero.items[context[pid]]
 
                     if slot == -1 then -- negative indicates bailed out of menu
                         if itm then
@@ -838,7 +738,7 @@ OnInit.final("Inventory", function(Require)
                             IssuePointOrder(itm.holder, DROP_ITEM_COMMAND, GetMouseX(pid), GetMouseY(pid))
                         end
                     elseif slot > 0 and itm then
-                        InventoryService.move(pid, context[pid], slot)
+                        render_inventory_result(pid, InventoryService.move(pid, context[pid], slot))
                     end
                 end
 
@@ -903,6 +803,7 @@ OnInit.final("Inventory", function(Require)
         -- assign a prefix and function for BlzSendSyncData calls
         SyncCallback("context", on_context_sync)
         SyncCallback("target", on_target_sync)
+        SyncCallback("inventory_action", on_inventory_action_sync)
 
         local U = User.first
         while U do

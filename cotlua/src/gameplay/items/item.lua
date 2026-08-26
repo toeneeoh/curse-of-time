@@ -212,6 +212,7 @@ OnInit.final("Items", function(Require)
     ---@field getAbilityArgument fun(self: Item, index: integer, argument: integer): number
     ---@field cache_stats function
     ---@field sockets Item[]
+    ---@field alive boolean
     Item = {} ---@type Item|Item[]
     do
         local thistype = Item
@@ -248,7 +249,12 @@ OnInit.final("Items", function(Require)
                 end,
             }
 
-        ItemRuntime = {}
+        ---@class ItemRuntime
+        ---@field native_create function
+        ---@field create fun(id: string|integer|item, x: number?, y: number?, expire: number?): Item
+        ---@field wrap fun(handle: item): Item
+        ---@field commit_slot fun(self: Item, slot: integer, suppress_refresh: boolean?): boolean
+        ItemRuntime = {} ---@type ItemRuntime
         local NativeCreateItem = CreateItem
         ItemRuntime.native_create = NativeCreateItem
 
@@ -864,6 +870,10 @@ OnInit.final("Items", function(Require)
         ---@return boolean
         ---@return string? err
         function ValidateItemSlot(self, slot, ignore)
+            if is_item_bound(self, self.pid) and SAVE_TABLE.KEY_ITEMS[self.id] then
+                return false, "This item is bound to " .. User[self.owner].nameColored .. "."
+            end
+
             local type = ItemData[self.id][ITEM_TYPE]
 
             -- restrict by slot type
@@ -904,16 +914,68 @@ OnInit.final("Items", function(Require)
             return nil
         end
 
+        ---Applies a previously validated slot transition. This function does
+        ---not stack or perform validation and is reserved for domain services
+        ---that have prepared the complete final inventory state.
+        ---@param self Item
+        ---@param slot integer
+        ---@param suppress_refresh boolean?
+        ---@return boolean
+        function ItemRuntime.commit_slot(self, slot, suppress_refresh)
+            local items = Profile[self.pid].hero.items
+            local orig_holder = self.holder
+            local orig_index = self.index
+            local was_equipped = self.equipped
+            local new_holder = (slot <= 6 and Hero[self.pid]) or Backpack[self.pid]
+
+            -- New holder needs to be set before applying stats and abilities.
+            self.holder = new_holder
+
+            if orig_index and items[orig_index] == self then
+                items[orig_index] = nil
+            end
+
+            -- From equipped to backpack.
+            if was_equipped and slot > 6 then
+                refresh_item_abilities(self, false, orig_holder)
+                apply_item_stats(self, -1)
+                self.equipped = false
+            end
+
+            -- Newly equipped.
+            if not was_equipped and slot <= 6 then
+                self.equipped = true
+
+                if SAVE_TABLE.KEY_ITEMS[self.id] then
+                    self.owner = Player(self.pid - 1)
+                end
+
+                apply_item_stats(self, 1)
+            end
+
+            items[slot] = self
+            self.index = slot
+
+            -- A move within the same holder changes only the slot. Re-running
+            -- onEquip in that case can duplicate periodic item effects.
+            if orig_holder ~= new_holder then
+                add_item_abilities(self)
+            end
+
+            SetItemPosition(self.obj, 30000., 30000.)
+            SetItemVisible(self.obj, false)
+
+            if not suppress_refresh then
+                NotifyItemChanged(self.pid)
+            end
+
+            return true
+        end
+
         -- Main equip function with optional target slot
         -- Returns true if successfully moves an item to the slot
         ---@type fun(self: Item, slot: integer?, ignore: Item?, suppress_refresh: boolean?): boolean
         function thistype:equip(slot, ignore, suppress_refresh)
-            -- check if item is bound
-            if is_item_bound(self, self.pid) and SAVE_TABLE.KEY_ITEMS[self.id] then
-                DisplayTimedTextToPlayer(Player(self.pid - 1), 0, 0, 30, "This item is bound to " .. User[self.owner].nameColored .. ".")
-                return false
-            end
-
             -- determine the slot
             slot = slot or find_empty_slot(self)
 
@@ -932,13 +994,6 @@ OnInit.final("Items", function(Require)
                 return false
             end
 
-            local items = Profile[self.pid].hero.items
-            local orig_holder = self.holder
-            local orig_index = self.index
-            local was_equipped = self.equipped
-            -- new holder needs to be set before applying stats
-            self.holder = (slot <= 6 and Hero[self.pid]) or Backpack[self.pid]
-
             -- if item is stackable
             local stack = self.cached_stats[ITEM_STACK]
             if stack > 1 then
@@ -949,45 +1004,7 @@ OnInit.final("Items", function(Require)
                 end
             end
 
-            -- make sure item is not occupying previous space
-            if orig_index and items[orig_index] == self then
-                items[orig_index] = nil
-            end
-
-            -- from equipped to backpack
-            if was_equipped and slot > 6 then
-                refresh_item_abilities(self, false, orig_holder) -- backpack abilities are not removed
-                apply_item_stats(self, -1)
-
-                self.equipped = false
-            end
-
-            -- newly equipped
-            if not was_equipped and slot <= 6 then
-                self.equipped = true
-
-                -- bind item
-                if SAVE_TABLE.KEY_ITEMS[self.id] then
-                    self.owner = Player(self.pid - 1)
-                end
-
-                apply_item_stats(self, 1)
-            end
-
-            -- set index
-            items[slot] = self
-            self.index = slot
-
-            add_item_abilities(self)
-
-            SetItemPosition(self.obj, 30000., 30000.)
-            SetItemVisible(self.obj, false)
-
-            if not suppress_refresh then
-                NotifyItemChanged(self.pid)
-            end
-
-            return true
+            return ItemRuntime.commit_slot(self, slot, suppress_refresh)
         end
 
         local parse_item_stat = {

@@ -108,6 +108,25 @@ OnInit.final("ArchitectureTests", function(Require)
         return true
     end)
 
+    ArchitectureTests.register("inventory commands reject invalid slots without mutation", function()
+        local invalid = {
+            InventoryService.move(1, 0, 1),
+            InventoryService.move(1, 1, MAX_INVENTORY_SLOTS + 1),
+            InventoryService.move(1, 1.5, 2),
+        }
+
+        for index = 1, #invalid do
+            local response = invalid[index]
+            if response.ok or response.code ~= "invalid_slot" then
+                return false, "invalid inventory slot was accepted"
+            end
+            if #response.changed_slots ~= 0 then
+                return false, "rejected inventory command reported changed slots"
+            end
+        end
+        return true
+    end)
+
     ArchitectureTests.register("magic shop services are registered as actions", function()
         local ids = {
             'I0TS', 'I0TA', 'I0TI', 'I0TT', 'I0N0', 'I0JN',
