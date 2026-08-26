@@ -213,7 +213,13 @@ OnInit.final("Azazoth", function(Require)
         local function onStruck(target)
             if CastSpell(target, thistype.id, 1., SPELL_ANIM, 1.) then
                 FloatingTextUnit(thistype.tag, target, 3, 70, 0, 12, 255, 255, 255, 0, true)
-                AstralShieldBuff:add(target, target):duration(13.)
+                local buff = AstralShieldBuff:get(nil, target)
+                if buff then
+                    buff:refresh()
+                else
+                    buff = AstralShieldBuff:add(target, target)
+                end
+                buff:duration(13.)
             end
         end
 
@@ -230,8 +236,8 @@ OnInit.final("Azazoth", function(Require)
         local ANGLE_FACING_DOWN = 306.
 
         local function on_death()
-            AstralPrisonDebuff:removeAll()
             AstralChainsDebuff:removeAll()
+            AstralPrisonDebuff:removeAll()
         end
 
         local function onStruck(target)
@@ -256,6 +262,7 @@ OnInit.final("Azazoth", function(Require)
 
         function thistype.onSetup(u)
             EVENT_ENEMY_AI:register_unit_action(u, onStruck)
+            EVENT_ON_UNIT_DEATH:register_unit_action(u, on_death)
         end
     end
 

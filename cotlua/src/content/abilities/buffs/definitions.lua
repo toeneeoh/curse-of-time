@@ -2049,30 +2049,13 @@ OnInit.final("Buffs", function(Require)
     end
 
     local DEMON_SHIELD_MODEL = "war3mapImported\\DemonShieldTarget3A.mdx"
-    local DEMON_SHIELD_REFRESH = 0.6
-
-    local function refresh_demon_shield(buff)
-        if buff.sfx then
-            if buff.sfx.effect then
-                buff.sfx.anim = ANIM_TYPE_STAND
-            end
-            buff.sfx_timer = TQ:callDelayed(DEMON_SHIELD_REFRESH, refresh_demon_shield, buff)
-        else
-            buff.sfx_timer = nil
-        end
-    end
 
     local function add_demon_shield(buff)
         buff.sfx = Unit[buff.target]:addEffect(DEMON_SHIELD_MODEL, "origin")
-        refresh_demon_shield(buff)
+        buff.sfx.anim = ANIM_TYPE_STAND
     end
 
     local function remove_demon_shield(buff)
-        if buff.sfx_timer then
-            TQ:disableCallback(buff.sfx_timer)
-            buff.sfx_timer = nil
-        end
-
         if buff.sfx then
             Unit[buff.target]:removeEffect(buff.sfx)
             buff.sfx = nil
@@ -2160,17 +2143,21 @@ OnInit.final("Buffs", function(Require)
             Unit[self.target].dr = Unit[self.target].dr * self.dr
 
             -- heal sequence
-            if UnitAlive(self.spire) and UnitAlive(self.target) then
-                local heal = GetWidgetLife(self.spire) * BlzGetUnitMaxHP(self.target) * 0.01
-                local x, y, z = GetUnitX(self.spire), GetUnitY(self.spire), GetUnitZ(self.spire)
+            if UnitAlive(self.spire) then
+                if UnitAlive(self.target) then
+                    local heal = GetWidgetLife(self.spire) * BlzGetUnitMaxHP(self.target) * 0.01
+                    local x, y, z = GetUnitX(self.spire), GetUnitY(self.spire), GetUnitZ(self.spire)
 
-                BlzSetUnitFacingEx(self.target, bj_RADTODEG * math.atan(y - GetUnitY(self.target), x - GetUnitX(self.target)))
-                PauseUnit(self.target, true)
-                SetUnitAnimationByIndex(self.target, 21)
-                TQ:callDelayed(1.1, delay, self, x, y, z, heal)
-                TQ:callDelayed(1.1, DestroyEffect, AddSpecialEffect("Abilities\\Spells\\Undead\\Darksummoning\\DarkSummonTarget.mdl", x, y))
+                    BlzSetUnitFacingEx(self.target, bj_RADTODEG * math.atan(y - GetUnitY(self.target), x - GetUnitX(self.target)))
+                    PauseUnit(self.target, true)
+                    SetUnitAnimationByIndex(self.target, 21)
+                    TQ:callDelayed(1.1, delay, self, x, y, z, heal)
+                    TQ:callDelayed(1.1, DestroyEffect, AddSpecialEffect("Abilities\\Spells\\Undead\\Darksummoning\\DarkSummonTarget.mdl", x, y))
 
-                KillUnit(self.spire)
+                    KillUnit(self.spire)
+                else
+                    RemoveUnit(self.spire)
+                end
             end
         end
 

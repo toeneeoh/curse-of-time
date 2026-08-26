@@ -2202,7 +2202,13 @@ OnInit.final("UnitSpells", function(Require)
         local function onStruck(target, source)
             if CastSpell(target, thistype.id, 1.5, 4, 1.5) then
                 FloatingTextUnit(thistype.tag, target, 3, 70, 0, 12, 100, 255, 100, 0, true)
-                ProtectedExistenceBuff:add(target, target):duration(10.)
+                local buff = ProtectedExistenceBuff:get(nil, target)
+                if buff then
+                    buff:refresh()
+                else
+                    buff = ProtectedExistenceBuff:add(target, target)
+                end
+                buff:duration(10.)
             end
         end
 
