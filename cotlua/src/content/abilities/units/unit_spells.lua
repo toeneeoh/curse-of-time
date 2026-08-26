@@ -693,7 +693,7 @@ OnInit.final("UnitSpells", function(Require)
     do
         local thistype = MAGIC_RESIST
 
-        function thistype.setup(u)
+        function thistype.onSetup(u)
             Unit[u].mr = Unit[u].mr * 0.7
         end
     end
@@ -706,7 +706,7 @@ OnInit.final("UnitSpells", function(Require)
             IssueTargetOrder(target, "frostnova", source)
         end
 
-        function thistype.setup(u)
+        function thistype.onSetup(u)
             EVENT_ENEMY_AI:register_unit_action(u, onStruck)
         end
     end

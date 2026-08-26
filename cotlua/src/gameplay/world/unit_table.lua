@@ -13,6 +13,7 @@ OnInit.final("UnitTable", function(Require)
     local TQ = TimerQueue
     local MOVESPEED_CAP = 600
     local index_listeners = {}
+    local indexed_units = setmetatable({}, { __mode = 'k' })
     local mtype, floor, rawset, rawget = math.type, math.floor, rawset, rawget
     local EVENT_STAT_CHANGE = EVENT_STAT_CHANGE
     local INT_REGEN_FACTOR = 0.05
@@ -93,9 +94,15 @@ OnInit.final("UnitTable", function(Require)
         local thistype = Unit
 
         ---Registers a subsystem callback for newly indexed units.
+        ---Units indexed before registration are replayed on the next timer tick,
+        ---after final initializers have finished registering their definitions.
         ---@param callback fun(u: unit)
         function Unit.onIndex(callback)
             index_listeners[#index_listeners + 1] = callback
+
+            for u in pairs(indexed_units) do
+                TQ:callDelayed(0., callback, u)
+            end
         end
 
         setmetatable(Unit, {
@@ -624,6 +631,8 @@ OnInit.final("UnitTable", function(Require)
     ---@type fun(u: unit)
     local function index_unit(u)
         if u and not IsDummy(u) and GetUnitAbilityLevel(u, DETECT_LEAVE_ABILITY) == 0 then
+            indexed_units[u] = true
+
             for index = 1, #index_listeners do
                 index_listeners[index](u)
             end
