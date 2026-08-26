@@ -408,7 +408,7 @@ OnInit.final("Boss", function(Require)
             for _ = 1, boss.difficulty do
                 if random(0, 99) < chance then
                     local itm = ItemRuntime.create(DropTable:pickItem(boss.id), x, y, 600.)
-                    itm:lvl(min(0, ItemData[itm.id][ITEM_UPGRADE_MAX] - random(ITEM_MIN_LEVEL_VARIANCE, ITEM_MAX_LEVEL_VARIANCE)))
+                    itm:lvl(max(0, ItemData[itm.id][ITEM_UPGRADE_MAX] - random(ITEM_MIN_LEVEL_VARIANCE, ITEM_MAX_LEVEL_VARIANCE)))
                 end
             end
         end
