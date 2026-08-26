@@ -191,9 +191,7 @@ OnInit.final("Dungeons", function(Require)
                     if IsUnitInRangeXY(Hero[U.id], self.queue_x, self.queue_y, 750.) and UnitAlive(Hero[U.id]) and not Unit[Hero[U.id]].busy then
                         if TableHas(QUEUE_GROUP, U.id) == false and GetHeroLevel(Hero[U.id]) >= self.level then
                             QUEUE_GROUP[#QUEUE_GROUP + 1] = U.id
-                            mb.player_lookup[U.id] = mb.last_row
-                            mb:get(mb.last_row, 1).text = {0.02, 0, 0.09, 0.011}
-                            mb:get(mb.last_row, 2).icon = {0.26, 0, 0.011, 0.011}
+                            mb:showRow(mb.last_row, true)
                             mb.available[U.id] = true
                             mb:display(U.id)
                             mb.last_row = mb.last_row + 1
@@ -201,9 +199,8 @@ OnInit.final("Dungeons", function(Require)
                     elseif TableHas(QUEUE_GROUP, U.id) then
                         TableRemove(QUEUE_GROUP, U.id)
                         QUEUE_READY[U.id] = false
-                        mb.player_lookup[mb.last_row + 1] = mb.player_lookup[U.id]
-                        mb:showRow(mb.player_lookup[U.id], false)
                         mb.last_row = mb.last_row - 1
+                        mb:showRow(mb.last_row, false)
                         mb.available[U.id] = false
                         MULTIBOARD.MAIN:display(U.id)
                     end

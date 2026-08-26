@@ -358,8 +358,11 @@ OnInit.final("Multiboard", function(Require)
         damageLog.title = "|cffffcc00Damage Log|r"
 
         queue:addRows(User.AmountPlaying)
-        -- keep track of player positions
-        queue.player_lookup = __jarray(0)
+        for index = 1, User.AmountPlaying do
+            queue:get(index, 1).text = {0.02, 0, 0.09, 0.011}
+            queue:get(index, 2).icon = {0.26, 0, 0.011, 0.011}
+            queue:showRow(index, false)
+        end
         queue.last_row = 1
 
         MB.MAIN = main
