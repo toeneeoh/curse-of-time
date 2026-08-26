@@ -1,4 +1,5 @@
-OnInit.global("SimpleButton", function()
+OnInit.global("SimpleButton", function(Require)
+    Require('Helper')
 
     ---@class SimpleButton
     ---@field frame framehandle
@@ -26,10 +27,11 @@ OnInit.global("SimpleButton", function()
         function SimpleButton.create(frame, texture, width, height, point1, point2, x, y, onClick, tooltip, point3, point4, x2, y2)
             local self = setmetatable({ enabled = true }, mt)
             local inset = 0.004
+            local context = NextFrameCreateContext()
 
-            self.frame = BlzCreateFrame("ContextFrameButton", frame, 0, 0)
-            self.button = BlzGetFrameByName("ContextFrameButtonIcon", 0)
-            self.text_frame = BlzGetFrameByName("ContextFrameText", 0)
+            self.frame = BlzCreateFrame("ContextFrameButton", frame, 0, context)
+            self.button = BlzGetFrameByName("ContextFrameButtonIcon", context)
+            self.text_frame = BlzGetFrameByName("ContextFrameText", context)
             BlzFrameSetPoint(self.frame, point1, frame, point2, x, y)
             BlzFrameSetSize(self.frame, width + inset * 2, height + inset * 2)
             BlzFrameSetTexture(self.button, texture, 0, true)
@@ -78,12 +80,13 @@ OnInit.global("SimpleButton", function()
 
         -- advanced tooltip
         function thistype:makeTooltip(point, width)
-            self.tooltip_frame = BlzCreateFrame("TooltipBoxFrame", self.frame, 0, 0)
-            self.box = BlzGetFrameByName("TooltipBox", 0)
-            self.line = BlzGetFrameByName("TooltipSeperator", 0)
-            self.tooltip = BlzGetFrameByName("TooltipText", 0)
-            self.iconFrame = BlzGetFrameByName("TooltipIcon", 0)
-            self.nameFrame = BlzGetFrameByName("TooltipName", 0)
+            local context = NextFrameCreateContext()
+            self.tooltip_frame = BlzCreateFrame("TooltipBoxFrame", self.frame, 0, context)
+            self.box = BlzGetFrameByName("TooltipBox", context)
+            self.line = BlzGetFrameByName("TooltipSeperator", context)
+            self.tooltip = BlzGetFrameByName("TooltipText", context)
+            self.iconFrame = BlzGetFrameByName("TooltipIcon", context)
+            self.nameFrame = BlzGetFrameByName("TooltipName", context)
 
             if point == FRAMEPOINT_TOPLEFT then
                 BlzFrameSetPoint(self.tooltip, point, self.frame, FRAMEPOINT_TOPRIGHT, 0.005, -0.05)
@@ -136,6 +139,25 @@ OnInit.global("SimpleButton", function()
                 self.click = CreateTrigger()
                 TriggerAddCondition(self.click, Condition(func))
                 BlzTriggerRegisterFrameEvent(self.click, self.frame, FRAMEEVENT_CONTROL_CLICK)
+            end
+        end
+
+        function thistype:destroy()
+            if self.click then
+                DestroyTrigger(self.click)
+                self.click = nil
+            end
+
+            if self.tooltip_frame then
+                BlzDestroyFrame(self.tooltip_frame)
+                self.tooltip_frame = nil
+            elseif type(self.tooltip) == "table" and self.tooltip.frame then
+                BlzDestroyFrame(self.tooltip.frame)
+            end
+
+            if self.frame then
+                BlzDestroyFrame(self.frame)
+                self.frame = nil
             end
         end
     end

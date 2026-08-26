@@ -24,42 +24,39 @@ OnInit.global("TimerFrame", function(Require)
         local mt = { __index = thistype }
         local date = os.date
 
-        -- #region frame setup
-        local minimize = BlzCreateFrameByType("GLUEBUTTON", "", BlzGetOriginFrame(ORIGIN_FRAME_WORLD_FRAME, 0), "ScoreScreenTabButtonTemplate", 0)
-        local minimize_frame = BlzCreateFrameByType("BACKDROP", "", minimize, "", 0)
-        local frame = BlzCreateFrame("ListBoxWar3", minimize_frame, 0, 0)
-        local text = BlzCreateFrameByType("TEXT", "", frame, "", 0)
+        local function create_frames(self)
+            self.minimize = BlzCreateFrameByType("GLUEBUTTON", "", BlzGetOriginFrame(ORIGIN_FRAME_WORLD_FRAME, 0), "ScoreScreenTabButtonTemplate", 0)
+            self.minimize_frame = BlzCreateFrameByType("BACKDROP", "", self.minimize, "", 0)
+            self.frame = BlzCreateFrame("ListBoxWar3", self.minimize_frame, 0, 0)
+            self.text = BlzCreateFrameByType("TEXT", "", self.frame, "", 0)
+            self.trig = CreateTrigger()
 
-        local trig = CreateTrigger()
-        BlzTriggerRegisterFrameEvent(trig, minimize, FRAMEEVENT_CONTROL_CLICK)
+            BlzTriggerRegisterFrameEvent(self.trig, self.minimize, FRAMEEVENT_CONTROL_CLICK)
+            TriggerAddAction(self.trig, function()
+                if GetTriggerPlayer() == GetLocalPlayer() then
+                    BlzFrameSetEnable(BlzGetTriggerFrame(), false)
+                    BlzFrameSetEnable(BlzGetTriggerFrame(), true)
 
-        local show_hide = function()
-            if GetTriggerPlayer() == GetLocalPlayer() then
-                BlzFrameSetEnable(BlzGetTriggerFrame(), false)
-                BlzFrameSetEnable(BlzGetTriggerFrame(), true)
-
-                if BlzFrameIsVisible(frame) then
-                    BlzFrameSetVisible(frame, false)
-                    BlzFrameSetTexture(minimize_frame, "war3mapImported\\minimize.blp", 0, true)
-                else
-                    BlzFrameSetVisible(frame, true)
-                    BlzFrameSetTexture(minimize_frame, "war3mapImported\\expand.blp", 0, true)
+                    if BlzFrameIsVisible(self.frame) then
+                        BlzFrameSetVisible(self.frame, false)
+                        BlzFrameSetTexture(self.minimize_frame, "war3mapImported\\minimize.blp", 0, true)
+                    else
+                        BlzFrameSetVisible(self.frame, true)
+                        BlzFrameSetTexture(self.minimize_frame, "war3mapImported\\expand.blp", 0, true)
+                    end
                 end
-            end
+            end)
+
+            BlzFrameSetSize(self.minimize, 0.015, 0.015)
+            BlzFrameSetTexture(self.minimize_frame, "war3mapImported\\expand.blp", 0, true)
+            BlzFrameSetTextAlignment(self.text, TEXT_JUSTIFY_CENTER, TEXT_JUSTIFY_CENTER)
+            BlzFrameSetPoint(self.minimize, FRAMEPOINT_CENTER, BlzGetOriginFrame(ORIGIN_FRAME_WORLD_FRAME, 0), FRAMEPOINT_CENTER, 0, -0.154)
+            BlzFrameSetAllPoints(self.minimize_frame, self.minimize)
+            BlzFrameSetPoint(self.text, FRAMEPOINT_BOTTOM, self.minimize_frame, FRAMEPOINT_TOP, 0, 0.018)
+            BlzFrameSetPoint(self.frame, FRAMEPOINT_TOPLEFT, self.text, FRAMEPOINT_TOPLEFT, -0.04, 0.02)
+            BlzFrameSetPoint(self.frame, FRAMEPOINT_BOTTOMRIGHT, self.text, FRAMEPOINT_BOTTOMRIGHT, 0.04, -0.02)
+            BlzFrameSetVisible(self.minimize, false)
         end
-
-        BlzFrameSetSize(minimize, 0.015, 0.015)
-        BlzFrameSetTexture(minimize_frame, "war3mapImported\\expand.blp", 0, true)
-        BlzFrameSetTextAlignment(text, TEXT_JUSTIFY_CENTER, TEXT_JUSTIFY_CENTER)
-        BlzFrameSetPoint(minimize, FRAMEPOINT_CENTER, BlzGetOriginFrame(ORIGIN_FRAME_WORLD_FRAME, 0), FRAMEPOINT_CENTER, 0, -0.154)
-        BlzFrameSetAllPoints(minimize_frame, minimize)
-        BlzFrameSetPoint(text, FRAMEPOINT_BOTTOM, minimize_frame, FRAMEPOINT_TOP, 0, 0.018)
-        BlzFrameSetPoint(frame, FRAMEPOINT_TOPLEFT, text, FRAMEPOINT_TOPLEFT, -0.04, 0.02)
-        BlzFrameSetPoint(frame, FRAMEPOINT_BOTTOMRIGHT, text, FRAMEPOINT_BOTTOMRIGHT, 0.04, -0.02)
-        BlzFrameSetVisible(minimize, false)
-
-        TriggerAddAction(trig, show_hide)
-        -- #endregion
 
         function thistype:run()
             self.time = self.time - 1
@@ -73,12 +70,18 @@ OnInit.global("TimerFrame", function(Require)
         end
 
         function thistype:destroy()
+            if self.destroyed then
+                return
+            end
+
+            self.destroyed = true
             TQ:disableCallback(self.timer)
             local pid = GetPlayerId(GetLocalPlayer()) + 1
             if TableHas(self.playerGroup, GetLocalPlayer()) or TableHas(self.playerGroup, pid) then
-                BlzFrameSetVisible(minimize, false)
+                BlzFrameSetVisible(self.minimize, false)
             end
-            setmetatable(self, nil)
+            DestroyTrigger(self.trig)
+            BlzDestroyFrame(self.minimize)
         end
 
         function thistype:stop()
@@ -87,7 +90,7 @@ OnInit.global("TimerFrame", function(Require)
         end
 
         function thistype:update()
-            BlzFrameSetText(text, self.title .. "|n" .. date("!%H:%M:%S", self.time))
+            BlzFrameSetText(self.text, self.title .. "|n" .. date("!%H:%M:%S", self.time))
         end
 
         function TimerFrame.create(title, time, onExpire, playerGroup)
@@ -98,6 +101,8 @@ OnInit.global("TimerFrame", function(Require)
                 title = title,
             }, mt)
 
+            create_frames(self)
+
             -- deep copy of playerGroup
             self.playerGroup = {}
             for _, player in ipairs(playerGroup) do
@@ -106,7 +111,7 @@ OnInit.global("TimerFrame", function(Require)
 
             local pid = GetPlayerId(GetLocalPlayer()) + 1
             if TableHas(playerGroup, GetLocalPlayer()) or TableHas(playerGroup, pid) then
-                BlzFrameSetVisible(minimize, true)
+                BlzFrameSetVisible(self.minimize, true)
             end
 
             self:update()

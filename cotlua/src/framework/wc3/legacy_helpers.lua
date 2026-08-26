@@ -1621,6 +1621,14 @@ function FilterAlive()
     not IsDummy(u)
 end
 
+local frame_create_context = 0
+
+---@return integer
+function NextFrameCreateContext()
+    frame_create_context = frame_create_context + 1
+    return frame_create_context
+end
+
 ---@type fun(frame: framehandle, title: string, text: string, simple: boolean, point1: framepointtype|nil, point2: framepointtype|nil, x: number|nil, y: number|nil, margin: number|nil): table
 function FrameAddSimpleTooltip(frame, title, text, simple, point1, point2, x, y, margin)
     local self = {}
@@ -1637,12 +1645,13 @@ function FrameAddSimpleTooltip(frame, title, text, simple, point1, point2, x, y,
         BlzFrameSetPoint(self.frame, FRAMEPOINT_TOPLEFT, self.tooltip, FRAMEPOINT_TOPLEFT, -(margin), margin)
         BlzFrameSetPoint(self.frame, FRAMEPOINT_BOTTOMRIGHT, self.tooltip, FRAMEPOINT_BOTTOMRIGHT, margin, -(margin))
     else
-        self.frame = BlzCreateFrame("TooltipBoxFrame", frame, 0, 0)
-        self.box = BlzGetFrameByName("TooltipBox", 0)
-        self.line = BlzGetFrameByName("TooltipSeperator", 0)
-        self.tooltip = BlzGetFrameByName("TooltipText", 0)
-        self.iconFrame = BlzGetFrameByName("TooltipIcon", 0)
-        self.nameFrame = BlzGetFrameByName("TooltipName", 0)
+        local context = NextFrameCreateContext()
+        self.frame = BlzCreateFrame("TooltipBoxFrame", frame, 0, context)
+        self.box = BlzGetFrameByName("TooltipBox", context)
+        self.line = BlzGetFrameByName("TooltipSeperator", context)
+        self.tooltip = BlzGetFrameByName("TooltipText", context)
+        self.iconFrame = BlzGetFrameByName("TooltipIcon", context)
+        self.nameFrame = BlzGetFrameByName("TooltipName", context)
 
         BlzFrameSetPoint(self.tooltip, FRAMEPOINT_CENTER, BlzGetFrameByName("CommandButton_3", 0), FRAMEPOINT_TOPLEFT, -0.09, 0.045)
         BlzFrameSetSize(self.iconFrame, 0.009, 0.009)

@@ -79,7 +79,12 @@ OnInit.final("Dungeons", function(Require)
             end
 
             if self.exit_timer then
+                if self.exit_button then
+                    self.exit_button:destroy()
+                    self.exit_button = nil
+                end
                 self.exit_timer:destroy()
+                self.exit_timer = nil
             end
 
             if self.chest then
@@ -134,7 +139,7 @@ OnInit.final("Dungeons", function(Require)
                     self:destroy()
                 end
             end
-            SimpleButton.create(self.exit_timer.frame, "war3mapImported\\ExitButton.blp", 0.03, 0.015, FRAMEPOINT_TOP, FRAMEPOINT_TOP, 0., 0.015, exit)
+            self.exit_button = SimpleButton.create(self.exit_timer.frame, "war3mapImported\\ExitButton.blp", 0.03, 0.015, FRAMEPOINT_TOP, FRAMEPOINT_TOP, 0., 0.015, exit)
         end
 
         local function start(self)
