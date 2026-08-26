@@ -46,13 +46,15 @@ OnInit.global("DevRuntimeLog", function(Require)
         local items = RuntimeMetrics.items
         local initializers = RuntimeMetrics.initializers
         local events = RuntimeMetrics.events
+        local enemy_ai = RuntimeMetrics.enemy_ai
         local timers = RuntimeMetrics.timer_queue
         DevLog.write("METRICS", string.format(
-            "%s init=%d/%d items=%d/%d/%d peak=%d events=%d callbacks=%d damage=%d timers=%d peak=%d mouse_ticks=%d",
+            "%s init=%d/%d items=%d/%d/%d peak=%d events=%d callbacks=%d damage=%d ai=%d/%d timers=%d peak=%d mouse_ticks=%d",
             label or "snapshot",
             initializers.completed, initializers.started,
             items.live, items.created, items.destroyed, items.peak,
             events.triggers, events.callbacks, RuntimeMetrics.damage.events,
+            enemy_ai.dispatches, enemy_ai.evaluations,
             timers.active, timers.peak, RuntimeMetrics.mouse_tracker.ticks))
     end
 

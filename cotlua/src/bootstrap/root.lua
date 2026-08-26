@@ -11,6 +11,7 @@ do
         initializers = { started = 0, completed = 0 },
         events = { triggers = 0, callbacks = 0 },
         damage = { events = 0 },
+        enemy_ai = { evaluations = 0, dispatches = 0 },
         mouse_tracker = { active = false, ticks = 0 },
         timer_queue = { scheduled = 0, executed = 0, active = 0, peak = 0 },
     }
@@ -188,6 +189,7 @@ dofile('vendor/alice/CAT_ballistics.lua')
 
 dofile('framework/events/event_bus.lua')
 dofile('gameplay/combat/attacks.lua')
+dofile('gameplay/abilities/enemy_ai.lua')
 dofile('gameplay/combat/damage.lua')
 dofile('gameplay/combat/death.lua')
 dofile('gameplay/players/commands.lua')

@@ -594,16 +594,6 @@ OnInit.final("UnitTable", function(Require)
             TQ:callDelayed(0., Unit.applyEffects, self)
         end
 
-        local function unsilence(self)
-            self.silenced = false
-        end
-
-        function Unit:silence(time)
-            self.silenced = true
-
-            TQ:callDelayed(time, unsilence, self)
-        end
-
         function thistype:destroy()
             if self.taunted then
                 DestroyGroup(self.taunted)

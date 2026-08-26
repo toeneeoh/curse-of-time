@@ -10,6 +10,7 @@ OnInit.final("Events", function()
     ---@field create function
     ---@field unit_actions table
     ---@field trigger function
+    ---@field has_unit_actions fun(self: EVENT, u: unit): boolean
     ---@field register_unit_action function
     ---@field unregister_unit_action function
     EVENT = {}
@@ -99,6 +100,13 @@ OnInit.final("Events", function()
             end
 
             return false
+        end
+
+        ---@param u unit
+        ---@return boolean
+        function thistype:has_unit_actions(u)
+            local actions = u and self.unit_actions[u]
+            return actions ~= nil and #actions > 0
         end
 
         function thistype:unregister_unit_action(u, func)

@@ -9,6 +9,7 @@ OnInit.final("Damage", function(Require)
     Require('Variables')
     Require('UnitTable')
     Require('Events')
+    Require('EnemyAI')
 
     ATTACK_CHAOS     = 5 ---@type integer 
     ARMOR_CHAOS      = 6 ---@type integer 
@@ -102,7 +103,7 @@ OnInit.final("Damage", function(Require)
     local EVENT_ON_HIT, EVENT_ON_HIT_EVADE, EVENT_ON_HIT_MULTIPLIER, EVENT_ON_HIT_AFTER_REDUCTIONS, EVENT_ON_HIT_FINAL = EVENT_ON_HIT, EVENT_ON_HIT_EVADE, EVENT_ON_HIT_MULTIPLIER, EVENT_ON_HIT_AFTER_REDUCTIONS, EVENT_ON_HIT_FINAL
     local EVENT_ON_STRUCK, EVENT_ON_STRUCK_MULTIPLIER, EVENT_ON_STRUCK_AFTER_REDUCTIONS, EVENT_ON_STRUCK_FINAL = EVENT_ON_STRUCK, EVENT_ON_STRUCK_MULTIPLIER, EVENT_ON_STRUCK_AFTER_REDUCTIONS, EVENT_ON_STRUCK_FINAL
     local EVENT_ON_FATAL_DAMAGE = EVENT_ON_FATAL_DAMAGE
-    local EVENT_ENEMY_AI = EVENT_ENEMY_AI
+    local evaluate_enemy_ai = EnemyAI.evaluate
 
     ---@return boolean
     function OnDamage()
@@ -239,16 +240,8 @@ OnInit.final("Damage", function(Require)
         if GetWidgetLife(target) - amount_after_red < MIN_LIFE then
             EVENT_ON_FATAL_DAMAGE:trigger(target, source, amount, damage_type)
         else
-            -- enemy ai
-            if not target_tbl._casting and not target_tbl.silenced then
-                EVENT_ENEMY_AI:trigger(target, source)
-                target_tbl:silence(INTERNAL_AI_COOLDOWN)
-            end
-
-            if not source_tbl._casting and not source_tbl.silenced then
-                EVENT_ENEMY_AI:trigger(source, target)
-                source_tbl:silence(INTERNAL_AI_COOLDOWN)
-            end
+            evaluate_enemy_ai(target, source, target_tbl)
+            evaluate_enemy_ai(source, target, source_tbl)
         end
 
         -- Fatal callbacks may prevent or alter the hit. Derive the applied and
