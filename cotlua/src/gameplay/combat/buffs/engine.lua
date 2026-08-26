@@ -1,7 +1,7 @@
 OnInit.final("BuffSystem", function(Require)
     Require('TimerQueue')
     Require('UnitEvent')
-    Require('BuffBar')
+    Require('UnitTable')
 
     -------------------------------//
     ----------- BUFF TYPES --------//
@@ -25,7 +25,17 @@ OnInit.final("BuffSystem", function(Require)
     BUFF_STACK_FULL   = 2 ---@type integer 
 
     local buffs = {}
+    local change_listeners = {}
     local TQ = TimerQueue
+
+    ---@param u unit
+    ---@param buff Buff?
+    ---@param change "add"|"remove"|"refresh"
+    local function notify_change(u, buff, change)
+        for index = 1, #change_listeners do
+            change_listeners[index](u, buff, change)
+        end
+    end
 
     ---@class Buff
     ---@field pid integer
@@ -74,6 +84,57 @@ OnInit.final("BuffSystem", function(Require)
             self.parent = self -- self reference
 
             return self
+        end
+
+        ---Registers a presentation or gameplay observer for buff-list changes.
+        ---The buff engine owns synchronized list mutation; observers must not
+        ---modify the list while handling the notification.
+        ---@param callback fun(u: unit, buff: Buff?, change: "add"|"remove"|"refresh")
+        function Buff.onChange(callback)
+            change_listeners[#change_listeners + 1] = callback
+        end
+
+        local function shift_unit_buffs(u, index)
+            for i = index, #u.buffs do
+                u.buffs[i] = u.buffs[i + 1]
+                if not u.buffs[i] then
+                    break
+                end
+                u.buffs[i].index = i
+            end
+        end
+
+        ---@param u unit
+        ---@param buff Buff?
+        function UnitRefreshBuff(u, buff)
+            notify_change(u, buff, "refresh")
+        end
+
+        ---@param u unit
+        ---@param buff Buff
+        function UnitAddBuff(u, buff)
+            local unit_data = Unit[u]
+
+            if unit_data then
+                unit_data.buffs = unit_data.buffs or {}
+                local index = #unit_data.buffs + 1
+                unit_data.buffs[index] = buff
+                buff.index = index
+                notify_change(u, buff, "add")
+            end
+        end
+
+        ---@param u unit
+        ---@param buff Buff
+        function UnitRemoveBuff(u, buff)
+            local unit_data = Unit[u]
+
+            if unit_data then
+                if buff.index then
+                    shift_unit_buffs(unit_data, buff.index)
+                end
+                notify_change(u, buff, "remove")
+            end
         end
 
         ---@type fun(self: Buff)

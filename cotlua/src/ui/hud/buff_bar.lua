@@ -5,6 +5,7 @@
 ]]
 
 OnInit.final("BuffBar", function(Require)
+    Require('BuffSystem')
     Require('UnitTable')
     Require('Events')
 
@@ -167,49 +168,13 @@ OnInit.final("BuffBar", function(Require)
         end
     end
 
-    local function shift(u, index)
-        for i = index, #u.buffs do
-            u.buffs[i] = u.buffs[i + 1]
-            if not u.buffs[i] then
-                break
-            end
-            u.buffs[i].index = i
-        end
-    end
-
-    ---@type fun(u: unit, b: Buff?)
-    function UnitRefreshBuff(u, b)
-        if b and b.index then
-            refresh_buff(b)
+    Buff.onChange(function(u, buff, change)
+        if change == "refresh" and buff and buff.index then
+            refresh_buff(buff)
         else
             display(Unit[u])
         end
-    end
-
-    ---@type fun(u: unit, buff: Buff)
-    function UnitAddBuff(u, buff)
-        u = Unit[u]
-
-        if u then
-            u.buffs = u.buffs or {}
-            local index = #u.buffs + 1
-            u.buffs[index] = buff
-            buff.index = index
-            display(u)
-        end
-    end
-
-    ---@type fun(u: unit, buff: Buff)
-    function UnitRemoveBuff(u, buff)
-        u = Unit[u]
-
-        if u then
-            if buff.index then
-                shift(u, buff.index)
-            end
-            display(u)
-        end
-    end
+    end)
 
     local function on_select(pid, u)
         viewing[pid] = u
