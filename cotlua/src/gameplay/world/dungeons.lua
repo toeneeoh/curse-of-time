@@ -202,7 +202,7 @@ OnInit.final("Dungeons", function(Require)
                         TableRemove(QUEUE_GROUP, U.id)
                         QUEUE_READY[U.id] = false
                         mb.player_lookup[mb.last_row + 1] = mb.player_lookup[U.id]
-                        mb.showRow(mb.player_lookup[U.id], false)
+                        mb:showRow(mb.player_lookup[U.id], false)
                         mb.last_row = mb.last_row - 1
                         mb.available[U.id] = false
                         MULTIBOARD.MAIN:display(U.id)
