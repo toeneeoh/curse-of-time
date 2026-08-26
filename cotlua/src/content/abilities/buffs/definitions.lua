@@ -2048,6 +2048,37 @@ OnInit.final("Buffs", function(Require)
         end
     end
 
+    local DEMON_SHIELD_MODEL = "war3mapImported\\DemonShieldTarget3A.mdx"
+    local DEMON_SHIELD_REFRESH = 0.6
+
+    local function refresh_demon_shield(buff)
+        if buff.sfx then
+            if buff.sfx.effect then
+                buff.sfx.anim = ANIM_TYPE_STAND
+            end
+            buff.sfx_timer = TQ:callDelayed(DEMON_SHIELD_REFRESH, refresh_demon_shield, buff)
+        else
+            buff.sfx_timer = nil
+        end
+    end
+
+    local function add_demon_shield(buff)
+        buff.sfx = Unit[buff.target]:addEffect(DEMON_SHIELD_MODEL, "origin")
+        refresh_demon_shield(buff)
+    end
+
+    local function remove_demon_shield(buff)
+        if buff.sfx_timer then
+            TQ:disableCallback(buff.sfx_timer)
+            buff.sfx_timer = nil
+        end
+
+        if buff.sfx then
+            Unit[buff.target]:removeEffect(buff.sfx)
+            buff.sfx = nil
+        end
+    end
+
     ---@class AstralShieldBuff : Buff
     AstralShieldBuff = Buff.new()
     do
@@ -2060,14 +2091,13 @@ OnInit.final("Buffs", function(Require)
 
         function thistype:onRemove()
             Unit[self.target].mr = Unit[self.target].mr / self.mr
-            Unit[self.target]:removeEffect(self.sfx)
+            remove_demon_shield(self)
         end
 
         function thistype:onApply()
             self.mr = 0.333
             Unit[self.target].mr = Unit[self.target].mr * self.mr
-            self.sfx = Unit[self.target]:addEffect("war3mapImported\\DemonShieldTarget3A.mdx", "origin")
-            self.sfx.anim = ANIM_TYPE_STAND
+            add_demon_shield(self)
         end
     end
 
@@ -2085,6 +2115,7 @@ OnInit.final("Buffs", function(Require)
             selfInteractions = {
                 CAT_MoveArcedHoming,
                 CAT_Orient3D,
+                CAT_Decay,
             },
             interactions = {
                 unit = CAT_UnitCollisionCheck3D,
@@ -2105,6 +2136,10 @@ OnInit.final("Buffs", function(Require)
         local function delay(self, x, y, z, heal)
             PauseUnit(self.target, false)
 
+            if not UnitAlive(self.target) then
+                return
+            end
+
             local missile = setmetatable({}, missile_template)
             missile.x = x
             missile.y = y
@@ -2116,6 +2151,7 @@ OnInit.final("Buffs", function(Require)
             missile.collideZ = true
             missile.owner = Player(self.pid - 1)
             missile.heal = heal
+            missile.lifetime = 4.
 
             ALICE_Create(missile)
         end
@@ -2124,7 +2160,7 @@ OnInit.final("Buffs", function(Require)
             Unit[self.target].dr = Unit[self.target].dr * self.dr
 
             -- heal sequence
-            if UnitAlive(self.spire) then
+            if UnitAlive(self.spire) and UnitAlive(self.target) then
                 local heal = GetWidgetLife(self.spire) * BlzGetUnitMaxHP(self.target) * 0.01
                 local x, y, z = GetUnitX(self.spire), GetUnitY(self.spire), GetUnitZ(self.spire)
 
@@ -2262,14 +2298,13 @@ OnInit.final("Buffs", function(Require)
 
         function thistype:onRemove()
             Unit[self.target].mr = Unit[self.target].mr / self.mr
-            Unit[self.target]:removeEffect(self.sfx)
+            remove_demon_shield(self)
         end
 
         function thistype:onApply()
             self.mr = 0.666
             Unit[self.target].mr = Unit[self.target].mr * self.mr
-            self.sfx = Unit[self.target]:addEffect("war3mapImported\\DemonShieldTarget3A.mdx", "origin")
-            self.sfx.anim = ANIM_TYPE_STAND
+            add_demon_shield(self)
         end
     end
 
