@@ -10,11 +10,13 @@ OnInit.final("ItemDetails", function(Require)
     local HEADER_HEIGHT = 0.06
     local PADDING = 0.018
     local VIEW_HEIGHT = HEIGHT - HEADER_HEIGHT - 0.018
+    local SCROLL_GUTTER_WIDTH = 0.012
 
     local frame = BlzCreateFrame("ListBoxWar3", BlzGetFrameByName("ConsoleUIBackdrop", 0), 0, 0)
     local icon = BlzCreateFrameByType("BACKDROP", "", frame, "", 0)
     local title = BlzCreateFrame("TitleText", frame, 0, 0)
-    local scroll_frame = BlzCreateFrameByType("BUTTON", "", frame, "", 0)
+    local scroll_frame = BlzCreateFrameByType("FRAME", "", frame, "", 0)
+    local scroll_input = BlzCreateFrameByType("BUTTON", "", frame, "", 0)
     local text = BlzCreateFrameByType("TEXT", "", scroll_frame, "", 0)
     local lines = {}
     local first = 1
@@ -37,6 +39,12 @@ OnInit.final("ItemDetails", function(Require)
 
     BlzFrameSetPoint(scroll_frame, FRAMEPOINT_TOPLEFT, frame, FRAMEPOINT_TOPLEFT, PADDING, -HEADER_HEIGHT)
     BlzFrameSetSize(scroll_frame, WIDTH - PADDING * 2., VIEW_HEIGHT)
+    BlzFrameSetEnable(scroll_frame, false)
+    -- Warcraft requires an enabled frame to receive wheel events. Keep that
+    -- unavoidable hitbox in a narrow gutter so the description remains
+    -- scrollable without consuming world clicks across the whole panel.
+    BlzFrameSetPoint(scroll_input, FRAMEPOINT_TOPRIGHT, scroll_frame, FRAMEPOINT_TOPRIGHT, 0., 0.)
+    BlzFrameSetSize(scroll_input, SCROLL_GUTTER_WIDTH, VIEW_HEIGHT)
     BlzFrameSetPoint(text, FRAMEPOINT_TOPLEFT, scroll_frame, FRAMEPOINT_TOPLEFT, 0., 0.)
     BlzFrameSetSize(text, WIDTH - PADDING * 2., 0.)
     BlzFrameSetFont(text, "MasterFont", 0.010, 0)
@@ -85,7 +93,7 @@ OnInit.final("ItemDetails", function(Require)
     end
 
     local scroll_trigger = CreateTrigger()
-    BlzTriggerRegisterFrameEvent(scroll_trigger, scroll_frame, FRAMEEVENT_MOUSE_WHEEL)
+    BlzTriggerRegisterFrameEvent(scroll_trigger, scroll_input, FRAMEEVENT_MOUSE_WHEEL)
     TriggerAddAction(scroll_trigger, function()
         local trigger_frame = BlzGetTriggerFrame()
         BlzFrameSetEnable(trigger_frame, false)
