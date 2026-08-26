@@ -14,6 +14,7 @@
 OnInit.final("Spells", function(Require)
     Require("Users")
     Require("UnitEvent")
+    Require("UnitTable")
 
     -- this only exists to update mana costs if a spell is readded for any reason
     local OldUnitAddAbility = UnitAddAbility
@@ -387,6 +388,30 @@ OnInit.final("Spells", function(Require)
         --SetPlayerAbilityAvailable(PLAYER_CREEP, FourCC('Agyv'), true)
         --SetPlayerAbilityAvailable(PLAYER_CREEP, FourCC('Agyv'), false)
     end
+
+    ---Runs first-time setup for registered abilities on a newly indexed unit.
+    ---@param u unit
+    local function setup_unit_spells(u)
+        local index = 0
+        local ability = blzgetunitabilitybyindex(u, index)
+
+        while ability do
+            local id = blzgetabilityid(ability)
+            local spell = Spells[id]
+
+            if spell then
+                spell:setTooltip(u, id)
+                if spell.onSetup then
+                    spell.onSetup(u)
+                end
+            end
+
+            index = index + 1
+            ability = blzgetunitabilitybyindex(u, index)
+        end
+    end
+
+    Unit.onIndex(setup_unit_spells)
 
     RegisterPlayerUnitEvent(EVENT_PLAYER_UNIT_SPELL_CAST, SpellCast)
     RegisterPlayerUnitEvent(EVENT_PLAYER_UNIT_SPELL_EFFECT, SpellEffect)

@@ -9,10 +9,10 @@ OnInit.final("UnitTable", function(Require)
     Require('TimerQueue')
     Require('WorldBounds')
     Require('Events')
-    Require('Spells')
 
     local TQ = TimerQueue
     local MOVESPEED_CAP = 600
+    local index_listeners = {}
     local mtype, floor, rawset, rawget = math.type, math.floor, rawset, rawget
     local EVENT_STAT_CHANGE = EVENT_STAT_CHANGE
     local INT_REGEN_FACTOR = 0.05
@@ -23,6 +23,7 @@ OnInit.final("UnitTable", function(Require)
     ---@field unit unit
     ---@field create function
     ---@field destroy function
+    ---@field onIndex fun(callback: fun(u: unit))
     ---@field hit_based_health boolean
     ---@field damage integer
     ---@field bonus_damage integer
@@ -90,6 +91,12 @@ OnInit.final("UnitTable", function(Require)
     Unit = {}  ---@type Unit | Unit[]
     do
         local thistype = Unit
+
+        ---Registers a subsystem callback for newly indexed units.
+        ---@param callback fun(u: unit)
+        function Unit.onIndex(callback)
+            index_listeners[#index_listeners + 1] = callback
+        end
 
         setmetatable(Unit, {
             -- create a new unit object
@@ -617,21 +624,8 @@ OnInit.final("UnitTable", function(Require)
     ---@type fun(u: unit)
     local function index_unit(u)
         if u and not IsDummy(u) and GetUnitAbilityLevel(u, DETECT_LEAVE_ABILITY) == 0 then
-            -- first time setup for abilities
-            local index = 0
-            local abil = BlzGetUnitAbilityByIndex(u, index)
-
-            while abil do
-                local id = BlzGetAbilityId(abil)
-                if Spells[id] then
-                    Spells[id]:setTooltip(u, id)
-                    if Spells[id].onSetup then
-                        Spells[id].onSetup(u)
-                    end
-                end
-
-                index = index + 1
-                abil = BlzGetUnitAbilityByIndex(u, index)
+            for index = 1, #index_listeners do
+                index_listeners[index](u)
             end
 
             UnitAddAbility(u, DETECT_LEAVE_ABILITY)
