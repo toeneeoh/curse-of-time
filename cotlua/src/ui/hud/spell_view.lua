@@ -213,6 +213,21 @@ OnInit.final("SpellView", function(Require)
         end
         abi = nil
     end
+
+    local function FindDisplayPosition(preferred)
+        if preferred >= 0 and preferred <= 11 and this.Data[preferred].FourCC == 0 and not this.Data[preferred].Used then
+            return preferred
+        end
+
+        for pos = 0, 11 do
+            if this.Data[pos].FourCC == 0 and not this.Data[pos].Used then
+                return pos
+            end
+        end
+
+        return -1
+    end
+
     this.GetUnitData = function(unit)
         local unitCode = GetUnitTypeId(unit)
         local isHero = IsHeroUnitId(unitCode)
@@ -224,8 +239,8 @@ OnInit.final("SpellView", function(Require)
         if this.UnitSkills[unitCode] then
             if commandCardPos then
                 for i, v in ipairs(this.UnitSkills[unitCode]) do 
-                    local pos = BlzGetAbilityPosX(v) + BlzGetAbilityPosY(v)*4
-                    if pos >= 0 and pos <= 11 then this.Data[pos].FourCC = v end
+                    local pos = FindDisplayPosition(BlzGetAbilityPosX(v) + BlzGetAbilityPosY(v)*4)
+                    if pos >= 0 then this.Data[pos].FourCC = v end
                 end
                 -- only these are displayed, only add upto 11 skills and only get text/icons/data once for each slot
                 for i= 0, 11 do
@@ -255,12 +270,10 @@ OnInit.final("SpellView", function(Require)
                         end
 
                         if commandCardPos then
-                            local pos = BlzGetAbilityPosX(abi) + BlzGetAbilityPosY(abi)*4
-                            if pos >= 0 and pos <= 11 then this.Data[pos].FourCC = abi end
-                            for j = 0, 11 do
-                                if this.Data[j].FourCC > 0 then
-                                    this.GetUnitDataAddSkill(unit, j)
-                                end
+                            local pos = FindDisplayPosition(BlzGetAbilityPosX(abi) + BlzGetAbilityPosY(abi)*4)
+                            if pos >= 0 then
+                                this.Data[pos].FourCC = abi
+                                this.GetUnitDataAddSkill(unit, pos)
                             end
                         else
                             this.GetUnitDataAddSkill(unit, addCount, abi)
@@ -269,8 +282,9 @@ OnInit.final("SpellView", function(Require)
                         local insertPos = addCount
                         if commandCardPos then
                             local pos = BlzGetAbilityIntegerField(abi, ABILITY_IF_BUTTON_POSITION_NORMAL_X) + BlzGetAbilityIntegerField(abi, ABILITY_IF_BUTTON_POSITION_NORMAL_Y)*4
-                            if pos >= 0 and pos <= 11 then insertPos = pos end
+                            insertPos = FindDisplayPosition(pos)
                         end
+                        if insertPos < 0 then break end
                         -- store the data
                         local data = this.Data[insertPos]
                         data.Used = true

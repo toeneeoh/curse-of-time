@@ -48,37 +48,6 @@ OnInit.final("UnitSpells", function(Require)
         dw:display()
     end
 
-    ---@type fun(boss: unit, baseDamage: integer, effectability: integer, AOE: number, tag: string)
-    local function BossBlastTaper(boss, baseDamage, effectability, AOE, tag)
-        local castx = GetUnitX(boss) ---@type number 
-        local casty = GetUnitY(boss) ---@type number 
-        local dx    = 0. ---@type number 
-        local dy    = 0. ---@type number 
-        local ug    = CreateGroup()
-
-        for i = 1, 18 do
-            local angle = bj_PI * i /9.
-            local dummy = Dummy.create(castx, casty, effectability, 1).unit
-            SetUnitFlyHeight(dummy, 150., 0)
-            IssuePointOrder(dummy, "breathoffire", castx + 40 * math.cos(angle), casty + 40 * math.sin(angle))
-        end
-        GroupEnumUnitsInRange(ug, castx, casty, AOE, Condition(ishostileEnemy))
-        for target in each(ug) do
-            --call DestroyEffect(AddSpecialEffect("Abilities\\Weapons\\LordofFlameMissile\\LordofFlameMissile.mdl", GetUnitX(target), GetUnitY(target)))
-            dx= GetUnitX(target) - castx
-            dy= GetUnitY(target) - casty
-            local dist = SquareRoot(dx * dx +dy * dy)
-            if dist < 150 then
-                DamageTarget(boss,target, baseDamage, ATTACK_TYPE_NORMAL, MAGIC, tag)
-            else
-                DamageTarget(boss,target, baseDamage / (dist / 200.), ATTACK_TYPE_NORMAL, MAGIC, tag)
-            end
-        end
-
-        DestroyGroup(ug)
-        PauseUnit(boss, false)
-    end
-
     ---@type fun(boss: unit, baseDamage: integer, hgroup: integer, speffect: string, tag: string)
     local function BossPlusSpell(boss, baseDamage, hgroup, speffect, tag)
         local castx = GetUnitX(boss) ---@type number 
@@ -2135,80 +2104,6 @@ OnInit.final("UnitSpells", function(Require)
                     DestroyEffect(AddSpecialEffectTarget("Abilities\\Spells\\Other\\Charm\\CharmTarget.mdl", target, "origin"))
                     FloatingTextUnit(thistype.tag, target, 2, 70, 0, 10, 255, 255, 255, 0, true)
                 end
-            end
-        end
-
-        function thistype.onSetup(u)
-            EVENT_ENEMY_AI:register_unit_action(u, onStruck)
-        end
-    end
-
-    local EXISTENCE = Spell.define("A07F")
-    do
-        local thistype = EXISTENCE
-
-        local function expire(pt)
-            pt.dur = pt.dur - 1
-
-            if pt.dur == 3 then
-                if pt.spell == 2 then
-                    BossInnerRing(pt.source, 1000000, 2, 400, "Abilities\\Spells\\Undead\\FrostNova\\FrostNovaTarget.mdl", "Implosion")
-                elseif pt.spell == 3 then
-                    BossOuterRing(pt.source, 500000, 2, 400, 900, "war3mapImported\\NeutralExplosion.mdx", "Explosion")
-                end
-            elseif pt.dur == 1 then
-                if pt.spell == 1 then
-                    BossBlastTaper(pt.source, 1500000, FourCC('A0AB'), 800, "Extermination")
-                end
-            end
-
-            return pt.dur > 0
-        end
-
-        local function onStruck(target, source)
-            if CastSpell(target, thistype.id, 1.5, 4, 1.5) then
-                local rand = random(1, 3)
-
-                if rand == 1 then
-                    FloatingTextUnit("Extermination", target, 3, 70, 0, 12, 255, 255, 255, 0, true)
-                elseif rand == 2 and UnitDistance(source, target) <= 400 then
-                    FloatingTextUnit("Implosion", target, 3, 70, 0, 12, 68, 68, 255, 0, true)
-                elseif rand == 3 and UnitDistance(source, target) >= 400 then
-                    FloatingTextUnit("Explosion", target, 3, 70, 0, 12, 255, 100, 50, 0, true)
-                end
-
-                local pt = TimerList[BOSS_ID]:add()
-                pt.source = target
-                pt.dur = 6
-                pt.spell = rand
-
-                local id = FourCC('A07Q')
-                local shared_cooldown = 10
-                BlzStartUnitAbilityCooldown(target, id, shared_cooldown)
-                id = FourCC('A073')
-                BlzStartUnitAbilityCooldown(target, id, shared_cooldown)
-                pt:startLoop(0.5, expire)
-            end
-        end
-
-        function thistype.onSetup(u)
-            EVENT_ENEMY_AI:register_unit_action(u, onStruck)
-        end
-    end
-
-    local PROTECTED_EXISTENCE = Spell.define("A07X")
-    do
-        local thistype = PROTECTED_EXISTENCE
-        local function onStruck(target, source)
-            if CastSpell(target, thistype.id, 1.5, 4, 1.5) then
-                FloatingTextUnit(thistype.tag, target, 3, 70, 0, 12, 100, 255, 100, 0, true)
-                local buff = ProtectedExistenceBuff:get(nil, target)
-                if buff then
-                    buff:refresh()
-                else
-                    buff = ProtectedExistenceBuff:add(target, target)
-                end
-                buff:duration(10.)
             end
         end
 
