@@ -2050,15 +2050,28 @@ OnInit.final("Buffs", function(Require)
 
     local DEMON_SHIELD_MODEL = "war3mapImported\\DemonShieldTarget3A.mdx"
 
+    local function move_demon_shield(buff)
+        if buff.sfx then
+            BlzSetSpecialEffectPosition(buff.sfx, GetUnitX(buff.target), GetUnitY(buff.target), GetUnitZ(buff.target))
+            buff.sfx_timer = TQ:callDelayed(FPS_32, move_demon_shield, buff)
+        end
+    end
+
     local function add_demon_shield(buff)
-        local sfx = Unit[buff.target]:addEffect(DEMON_SHIELD_MODEL, "origin")
-        buff.sfx = sfx
-        sfx.anim = ANIM_TYPE_STAND
+        local x, y = GetUnitX(buff.target), GetUnitY(buff.target)
+        buff.sfx = AddSpecialEffect(DEMON_SHIELD_MODEL, x, y)
+        BlzPlaySpecialEffect(buff.sfx, ANIM_TYPE_STAND)
+        move_demon_shield(buff)
     end
 
     local function remove_demon_shield(buff)
+        if buff.sfx_timer then
+            TQ:disableCallback(buff.sfx_timer)
+            buff.sfx_timer = nil
+        end
+
         if buff.sfx then
-            Unit[buff.target]:removeEffect(buff.sfx)
+            DestroyEffect(buff.sfx)
             buff.sfx = nil
         end
     end
