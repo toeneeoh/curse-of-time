@@ -154,7 +154,7 @@ OnInit.final("ArchitectureTests", function(Require)
 
     ArchitectureTests.register("naga abilities are registered", function()
         local ids = {
-            'A04V', 'A04W', 'A04K', 'A04R', 'A00O', 'A05C', 'A05K',
+            'A04V', 'A04W', 'A04K', 'A04R', 'A00O', 'A05C', 'A05K', 'A006',
         }
 
         for index = 1, #ids do

@@ -330,4 +330,59 @@ OnInit.final("NagaAbilities", function(Require)
         end
     end
 
+    local WATER_STRIKE = Spell.define("A006")
+    do
+        local thistype = WATER_STRIKE
+
+        local missile_template = {
+            selfInteractions = {
+                CAT_MoveArcedHoming,
+                CAT_Orient3D,
+            },
+            interactions = {
+                unit = CAT_UnitCollisionCheck3D,
+            },
+            identifier = "missile",
+            collisionRadius = 5.,
+            onlyTarget = true,
+            visualZ = 75.,
+            speed = 900.,
+            arc = 0.6,
+            onUnitCollision = CAT_UnitImpact3D,
+            onUnitCallback = function(self, enemy)
+                DamageTarget(self.source, enemy, BlzGetUnitMaxHP(enemy) * 0.075, ATTACK_TYPE_NORMAL, MAGIC, thistype.tag)
+            end,
+        }
+        missile_template.__index = missile_template
+
+        local function onStruck(target)
+            if CastSpell(target, thistype.id, 0., 0, 0.) then
+                local ug = CreateGroup()
+
+                MakeGroupInRect(BOSS_ID, ug, gg_rct_Naga_Dungeon_Boss, Condition(FilterEnemy))
+
+                for enemy in each(ug) do
+                    local x = GetUnitX(target)
+                    local y = GetUnitY(target)
+                    local missile = setmetatable({}, missile_template)
+                    missile.x = x
+                    missile.y = y
+                    missile.z = GetUnitZ(target)
+                    missile.visual = AddSpecialEffect("Abilities\\Weapons\\WaterElementalMissile\\WaterElementalMissile.mdx", x, y)
+                    BlzSetSpecialEffectScale(missile.visual, 1.3)
+                    missile.source = target
+                    missile.target = enemy
+
+                    ALICE_Create(missile)
+                end
+
+                DestroyGroup(ug)
+            end
+        end
+
+        function thistype.onSetup(u)
+            EVENT_ENEMY_AI:register_unit_action(u, onStruck)
+        end
+    end
+
 end, Debug and Debug.getLine())
