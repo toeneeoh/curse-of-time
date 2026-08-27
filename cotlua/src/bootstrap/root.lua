@@ -34,7 +34,7 @@ do
             samples = 0,
             sample_time = 0.,
             max_sample_time = 0.,
-            period = 0.00625,
+            period = 0.015625,
         },
         timer_queue = { scheduled = 0, executed = 0, active = 0, peak = 0 },
     }

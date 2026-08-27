@@ -8,7 +8,7 @@ OnInit.final("Movespeed", function(Require)
     Require('Events')
 
     local CONST     = { MAX = 522 }
-    local PERIOD    = 0.00625
+    local PERIOD    = 1. / 64.
     local MARGIN_SQ = (0.01) ^ 2
     local PROFILE_SAMPLE_MASK = 15
 
