@@ -21,7 +21,7 @@ do
             samples = 0,
             sample_time = 0.,
             max_sample_time = 0.,
-            period = 0.001,
+            period = 0.0078125,
         },
         movespeed = {
             active = 0,

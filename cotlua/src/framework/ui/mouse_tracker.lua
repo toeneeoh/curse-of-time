@@ -23,6 +23,7 @@ mouseSaneY = 0.0;
 
 do
     local globalFrame = 0;
+    local PERIOD = 1./128.;
  
     local TRACKER_ERROR_BOUND = .15;
  
@@ -44,7 +45,9 @@ do
     -- These two should always be integer powers of 2.
     -- Changing them will make the stabilization stronger/weaker, and the coords update lag bigger/smaller.
     local TRACKER_BUFFER_N = 8;
-    local TRACKER_BUFFER_PERIOD_FRAMES = 16;
+    local TRACKER_BUFFER_PERIOD_FRAMES = 2;
+    local TRACKER_SCREEN_PERIOD_FRAMES = 64;
+    local TRACKER_FLICKER_DELAY_FRAMES = 3;
  
  
     local curTrackerBufferInd = -1;
@@ -203,7 +206,7 @@ do
                     
                             -- I think this could be called FlickerDelay, but since this really turned out to be a Magic Number..
                             -- Why not make it true to its nature?
-                            trackerFlickerFrame = globalFrame + 25;
+                            trackerFlickerFrame = globalFrame + TRACKER_FLICKER_DELAY_FRAMES;
                     
                             -- After the hit is detected, re-center the tracker on the position of the hit tile to
                             -- initiate the cybernetic process.
@@ -279,11 +282,11 @@ do
 
     local enabled = __jarray(false)
     local id = GetPlayerId(GetLocalPlayer()) + 1
-    local PERIOD = 0.001
     local PROFILE_SAMPLE_MASK = 63
  
     -- Now here is the beating heart of the system.
-    -- And what a beat it has! This Tick is proc-ing every 0.001 seconds.
+    -- Poll at 128 Hz while dragging. The frame constants above preserve the
+    -- original stabilization, flicker, and screen-refresh timing in seconds.
     local function TimerTick()
         local metrics
         local sample_start
@@ -302,8 +305,7 @@ do
             SetTrackerVisible(enabled[id]);
         end
  
-        -- This block only runs once every 512 ticks.
-        if (globalFrame&511)==1 then
+        if (globalFrame&(TRACKER_SCREEN_PERIOD_FRAMES-1))==1 then
             if BlzGetLocalClientWidth() ~= screenWidth then
                 MoveTracker(0,0);
             end
