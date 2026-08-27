@@ -10,6 +10,7 @@ OnInit.final("Units", function(Require)
     Require('Boss')
     Require('Items')
     Require('Damage')
+    Require('BossAbilities')
 
     GHOST_UNITS = {} ---@type unit[]
     UnitData = {}

@@ -266,6 +266,7 @@ dofile('content/abilities/bosses/slaughter_queen.lua')
 dofile('content/abilities/bosses/thanatos.lua')
 dofile('content/abilities/bosses/vengeful_paladin.lua')
 dofile('content/abilities/bosses/xallarath.lua')
+dofile('content/abilities/bosses/init.lua')
 
 dofile('gameplay/abilities/tools.lua')
 dofile('content/abilities/units/unit_spells.lua')

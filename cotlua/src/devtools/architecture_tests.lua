@@ -10,27 +10,7 @@ OnInit.final("ArchitectureTests", function(Require)
     Require('DevRuntimeLog')
     Require('ShopServiceDialogs')
     Require('Town')
-    Require('NagaAbilities')
-    Require('HellfireMagiAbilities')
-    Require('AbsoluteHorrorAbilities')
-    Require('ArkadenAbilities')
-    Require('DeathKnightAbilities')
-    Require('DemonPrinceAbilities')
-    Require('DragoonAbilities')
-    Require('EssenceOfDarknessAbilities')
-    Require('ForgottenMysticAbilities')
-    Require('GoddessesAbilities')
-    Require('HateAbilities')
-    Require('KnowledgeAbilities')
-    Require('LastDwarfAbilities')
-    Require('LegionAbilities')
-    Require('LoveAbilities')
-    Require('MinotaurAbilities')
-    Require('OrstedAbilities')
-    Require('SatanAbilities')
-    Require('SirenAbilities')
-    Require('SlaughterQueenAbilities')
-    Require('VengefulPaladinAbilities')
+    Require('BossAbilities')
 
     ArchitectureTests = {
         tests = {},
@@ -192,6 +172,22 @@ OnInit.final("ArchitectureTests", function(Require)
             if not Spells[FourCC(ids[index])] then
                 return false, "missing hellfire magi ability " .. ids[index]
             end
+        end
+        return true
+    end)
+
+    ArchitectureTests.register("hellfire magi passive and AI setup are attached", function()
+        local boss = Boss[BOSS_HELLFIRE]
+        if not boss or not boss.unit then
+            return false, "hellfire magi was not created"
+        end
+        if not EVENT_ENEMY_AI:has_unit_actions(boss.unit) then
+            return false, "hellfire magi has no enemy AI actions"
+        end
+
+        local expected = HERO_STATS[FourCC('U00G')].magic_resist * 0.35
+        if math.abs(Unit[boss.unit].mr - expected) > 0.0001 then
+            return false, "hellfire magi magic resistance setup was not applied"
         end
         return true
     end)
