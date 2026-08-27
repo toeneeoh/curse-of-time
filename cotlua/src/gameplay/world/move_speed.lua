@@ -12,6 +12,7 @@ OnInit.final("Movespeed", function(Require)
     local MARGIN_SQ = (0.01) ^ 2
     local REVERSE_DOT_THRESHOLD = -0.25
     local RECOVERY_TICKS = 4
+    local HIGH_SPEED_PROP_WINDOW = bj_PI
     local PROFILE_SAMPLE_MASK = 15
 
     -- Engine locals
@@ -71,6 +72,10 @@ OnInit.final("Movespeed", function(Require)
         count = count - 1
         removed.index = nil
         removed.active = false
+        if removed.prop_window and UnitTypeId(removed.unit) ~= 0 then
+            SetUnitPropWindow(removed.unit, removed.prop_window)
+        end
+        removed.prop_window = nil
 
         if count == 0 then
             PauseTimer(timer)
@@ -203,6 +208,7 @@ OnInit.final("Movespeed", function(Require)
                     dir_y = nil,
                     recovery = 0,
                     has_point = false,
+                    prop_window = nil,
                 }
                 tracked[u]   = d
 
@@ -218,6 +224,8 @@ OnInit.final("Movespeed", function(Require)
                 d.dir_x, d.dir_y = nil, nil
                 d.recovery = 0
                 d.has_point = false
+                d.prop_window = GetUnitPropWindow(u)
+                SetUnitPropWindow(u, HIGH_SPEED_PROP_WINDOW)
                 count = count + 1
                 list[count] = d
                 d.index = count
