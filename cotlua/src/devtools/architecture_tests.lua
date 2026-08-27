@@ -11,6 +11,7 @@ OnInit.final("ArchitectureTests", function(Require)
     Require('ShopServiceDialogs')
     Require('Town')
     Require('NagaAbilities')
+    Require('HellfireMagiAbilities')
 
     ArchitectureTests = {
         tests = {},
@@ -160,6 +161,17 @@ OnInit.final("ArchitectureTests", function(Require)
         for index = 1, #ids do
             if not Spells[FourCC(ids[index])] then
                 return false, "missing naga ability " .. ids[index]
+            end
+        end
+        return true
+    end)
+
+    ArchitectureTests.register("hellfire magi abilities are registered", function()
+        local ids = { 'A04A', 'A02M', 'A00G', 'A01T' }
+
+        for index = 1, #ids do
+            if not Spells[FourCC(ids[index])] then
+                return false, "missing hellfire magi ability " .. ids[index]
             end
         end
         return true

@@ -246,6 +246,7 @@ dofile('content/abilities/bosses/perfect_being.lua')
 dofile('content/abilities/bosses/thanatos.lua')
 dofile('content/abilities/bosses/xallarath.lua')
 dofile('content/abilities/bosses/naga.lua')
+dofile('content/abilities/bosses/hellfire_magi.lua')
 
 dofile('gameplay/abilities/tools.lua')
 dofile('content/abilities/units/unit_spells.lua')
