@@ -12,6 +12,25 @@ OnInit.final("ArchitectureTests", function(Require)
     Require('Town')
     Require('NagaAbilities')
     Require('HellfireMagiAbilities')
+    Require('AbsoluteHorrorAbilities')
+    Require('ArkadenAbilities')
+    Require('DeathKnightAbilities')
+    Require('DemonPrinceAbilities')
+    Require('DragoonAbilities')
+    Require('EssenceOfDarknessAbilities')
+    Require('ForgottenMysticAbilities')
+    Require('GoddessesAbilities')
+    Require('HateAbilities')
+    Require('KnowledgeAbilities')
+    Require('LastDwarfAbilities')
+    Require('LegionAbilities')
+    Require('LoveAbilities')
+    Require('MinotaurAbilities')
+    Require('OrstedAbilities')
+    Require('SatanAbilities')
+    Require('SirenAbilities')
+    Require('SlaughterQueenAbilities')
+    Require('VengefulPaladinAbilities')
 
     ArchitectureTests = {
         tests = {},
@@ -172,6 +191,25 @@ OnInit.final("ArchitectureTests", function(Require)
         for index = 1, #ids do
             if not Spells[FourCC(ids[index])] then
                 return false, "missing hellfire magi ability " .. ids[index]
+            end
+        end
+        return true
+    end)
+
+    ArchitectureTests.register("remaining boss abilities are registered", function()
+        local ids = {
+            'A06M', 'A05I', 'A08C',
+            'A08N', 'A0AO', 'A088',
+            'A00S', 'A062', 'A01Z', 'A085', 'A09J',
+            'A0DV', 'A0A2', 'A0FI', 'A065', 'A066',
+            'A06T', 'A0A8', 'A05B', 'A05W', 'A08M',
+            'A0AX', 'A0AC', 'A03W', 'A04Q', 'A040',
+            'A03M', 'A02Q', 'A03R', 'A0BH',
+        }
+
+        for index = 1, #ids do
+            if not Spells[FourCC(ids[index])] then
+                return false, "missing boss ability " .. ids[index]
             end
         end
         return true
