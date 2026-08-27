@@ -25,6 +25,19 @@ OnInit.global("DevRuntimeLog", function(Require)
         return table.concat(values, "    ")
     end
 
+    local function active_time(metrics)
+        local total = metrics.active_time
+        if metrics.started_at then
+            total = total + os.clock() - metrics.started_at
+        end
+        return total
+    end
+
+    local function average_sample_microseconds(metrics)
+        if metrics.samples == 0 then return 0. end
+        return metrics.sample_time / metrics.samples * 1000000.
+    end
+
     function DevLog.flush()
         if DevLog.enabled and not writing then
             writing = true
@@ -48,14 +61,21 @@ OnInit.global("DevRuntimeLog", function(Require)
         local events = RuntimeMetrics.events
         local enemy_ai = RuntimeMetrics.enemy_ai
         local timers = RuntimeMetrics.timer_queue
+        local mouse = RuntimeMetrics.mouse_tracker
+        local movespeed = RuntimeMetrics.movespeed
         DevLog.write("METRICS", string.format(
-            "%s init=%d/%d items=%d/%d/%d peak=%d events=%d callbacks=%d damage=%d ai=%d/%d timers=%d peak=%d mouse_ticks=%d",
+            "%s init=%d/%d items=%d/%d/%d peak=%d events=%d callbacks=%d damage=%d ai=%d/%d timers=%d peak=%d mouse=%s ticks=%d sessions=%d active_s=%.3f avg_us=%.2f max_us=%.2f period=%.5f movespeed=%d peak=%d ticks=%d updates=%d sessions=%d active_s=%.3f avg_us=%.2f max_us=%.2f period=%.5f",
             label or "snapshot",
             initializers.completed, initializers.started,
             items.live, items.created, items.destroyed, items.peak,
             events.triggers, events.callbacks, RuntimeMetrics.damage.events,
             enemy_ai.dispatches, enemy_ai.evaluations,
-            timers.active, timers.peak, RuntimeMetrics.mouse_tracker.ticks))
+            timers.active, timers.peak,
+            tostring(mouse.active), mouse.ticks, mouse.sessions, active_time(mouse),
+            average_sample_microseconds(mouse), mouse.max_sample_time * 1000000., mouse.period,
+            movespeed.active, movespeed.peak, movespeed.ticks, movespeed.unit_updates,
+            movespeed.sessions, active_time(movespeed), average_sample_microseconds(movespeed),
+            movespeed.max_sample_time * 1000000., movespeed.period))
     end
 
     if not DevLog.enabled then return end
@@ -77,4 +97,15 @@ OnInit.global("DevRuntimeLog", function(Require)
     if Debug.data.firstError then
         DevLog.write("EARLY_ERROR", Debug.data.firstError)
     end
+end, Debug and Debug.getLine())
+
+OnInit.final("DevMetricSnapshots", function()
+    if not DevLog.enabled then return end
+
+    local function snapshot()
+        DevLog.snapshot("periodic")
+        TimerQueue:callDelayed(30., snapshot)
+    end
+
+    TimerQueue:callDelayed(30., snapshot)
 end, Debug and Debug.getLine())

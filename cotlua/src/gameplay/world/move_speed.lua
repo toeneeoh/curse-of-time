@@ -10,6 +10,7 @@ OnInit.final("Movespeed", function(Require)
     local CONST     = { MAX = 522 }
     local PERIOD    = 0.00625
     local MARGIN_SQ = (0.01) ^ 2
+    local PROFILE_SAMPLE_MASK = 15
 
     -- Engine locals
     local GetX, GetY    = GetUnitX, GetUnitY
@@ -33,8 +34,27 @@ OnInit.final("Movespeed", function(Require)
 
     local function update_metrics()
         if RuntimeMetrics then
-            RuntimeMetrics.movespeed = RuntimeMetrics.movespeed or {}
-            RuntimeMetrics.movespeed.active = count
+            local metrics = RuntimeMetrics.movespeed
+            metrics.active = count
+            metrics.peak = math.max(metrics.peak, count)
+        end
+    end
+
+    local function start_metrics()
+        if DEV_ENABLED and RuntimeMetrics then
+            local metrics = RuntimeMetrics.movespeed
+            metrics.sessions = metrics.sessions + 1
+            metrics.started_at = os.clock()
+        end
+    end
+
+    local function stop_metrics()
+        if DEV_ENABLED and RuntimeMetrics then
+            local metrics = RuntimeMetrics.movespeed
+            if metrics.started_at then
+                metrics.active_time = metrics.active_time + os.clock() - metrics.started_at
+                metrics.started_at = nil
+            end
         end
     end
 
@@ -53,6 +73,7 @@ OnInit.final("Movespeed", function(Require)
 
         if count == 0 then
             PauseTimer(timer)
+            stop_metrics()
         end
         update_metrics()
     end
@@ -82,6 +103,17 @@ OnInit.final("Movespeed", function(Require)
 
     -- Movement loop
     local function update()
+        local metrics
+        local sample_start
+        if DEV_ENABLED and RuntimeMetrics then
+            metrics = RuntimeMetrics.movespeed
+            metrics.ticks = metrics.ticks + 1
+            metrics.unit_updates = metrics.unit_updates + count
+            if (metrics.ticks & PROFILE_SAMPLE_MASK) == 1 then
+                sample_start = os.clock()
+            end
+        end
+
         for i = count, 1, -1 do
             local d = list[i]
             local u = d.unit
@@ -123,6 +155,13 @@ OnInit.final("Movespeed", function(Require)
                 end
             end
         end
+
+        if sample_start then
+            local elapsed = os.clock() - sample_start
+            metrics.samples = metrics.samples + 1
+            metrics.sample_time = metrics.sample_time + elapsed
+            metrics.max_sample_time = math.max(metrics.max_sample_time, elapsed)
+        end
     end
 
     -- call whenever a unit's movespeed changes
@@ -160,6 +199,7 @@ OnInit.final("Movespeed", function(Require)
                 d.active = true
 
                 if count == 1 then
+                    start_metrics()
                     TimerStart(timer, PERIOD, true, update)
                 end
                 update_metrics()

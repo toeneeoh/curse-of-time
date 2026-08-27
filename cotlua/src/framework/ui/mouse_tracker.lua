@@ -279,12 +279,20 @@ do
 
     local enabled = __jarray(false)
     local id = GetPlayerId(GetLocalPlayer()) + 1
+    local PERIOD = 0.001
+    local PROFILE_SAMPLE_MASK = 63
  
     -- Now here is the beating heart of the system.
     -- And what a beat it has! This Tick is proc-ing every 0.001 seconds.
     local function TimerTick()
+        local metrics
+        local sample_start
         if DEV_ENABLED and RuntimeMetrics then
-            RuntimeMetrics.mouse_tracker.ticks = RuntimeMetrics.mouse_tracker.ticks + 1
+            metrics = RuntimeMetrics.mouse_tracker
+            metrics.ticks = metrics.ticks + 1
+            if (metrics.ticks & PROFILE_SAMPLE_MASK) == 1 then
+                sample_start = os.clock()
+            end
         end
         globalFrame = globalFrame+1;
 
@@ -319,6 +327,13 @@ do
         if trackerFlickerFrame <= globalFrame then
             UpdateTracker();
         end
+
+        if sample_start then
+            local elapsed = os.clock() - sample_start
+            metrics.samples = metrics.samples + 1
+            metrics.sample_time = metrics.sample_time + elapsed
+            metrics.max_sample_time = math.max(metrics.max_sample_time, elapsed)
+        end
     end
 
     function StartMouseTracker(pid, x, y)
@@ -328,17 +343,31 @@ do
             SetTrackerVisible(true);
             if not enabled[pid] then
                 enabled[pid] = true
-                RuntimeMetrics.mouse_tracker.active = true
-                TimerStart(timerTick, .001, true, TimerTick);
+                if RuntimeMetrics then
+                    local metrics = RuntimeMetrics.mouse_tracker
+                    metrics.active = true
+                    metrics.sessions = metrics.sessions + 1
+                    metrics.started_at = os.clock()
+                end
+                TimerStart(timerTick, PERIOD, true, TimerTick);
             end
         end
     end
     function PauseMouseTracker(pid)
         if GetLocalPlayer() == Player(pid - 1) then
             SetTrackerVisible(false);
-            enabled[pid] = false
-            RuntimeMetrics.mouse_tracker.active = false
-            PauseTimer(timerTick)
+            if enabled[pid] then
+                enabled[pid] = false
+                if RuntimeMetrics then
+                    local metrics = RuntimeMetrics.mouse_tracker
+                    metrics.active = false
+                    if metrics.started_at then
+                        metrics.active_time = metrics.active_time + os.clock() - metrics.started_at
+                        metrics.started_at = nil
+                    end
+                end
+                PauseTimer(timerTick)
+            end
         end
     end
 
