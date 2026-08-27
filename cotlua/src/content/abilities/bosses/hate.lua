@@ -1,5 +1,3 @@
--- Boss-owned abilities extracted from the legacy unit spell registry.
-
 OnInit.final("HateAbilities", function(Require)
     Require("Spells")
     Require("SpellTools")

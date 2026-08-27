@@ -1,5 +1,3 @@
--- Boss-owned abilities extracted from the legacy unit spell registry.
-
 OnInit.final("ArkadenAbilities", function(Require)
     Require("Spells")
     Require("SpellTools")
@@ -7,7 +5,6 @@ OnInit.final("ArkadenAbilities", function(Require)
     Require("EnemyAI")
     Require("TimerQueue")
 
-    local TQ = TimerQueue
     local TQ = TimerQueue
 
     local METAMORPHOSIS = Spell.define("A065")

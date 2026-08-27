@@ -1,5 +1,3 @@
--- Boss-owned abilities extracted from the legacy unit spell registry.
-
 OnInit.final("AbsoluteHorrorAbilities", function(Require)
     Require("Spells")
     Require("SpellTools")
@@ -7,7 +5,6 @@ OnInit.final("AbsoluteHorrorAbilities", function(Require)
     Require("EnemyAI")
     Require("TimerQueue")
 
-    local random = math.random
     local random = math.random
 
     local TRUE_STEALTH = Spell.define("A0AC")

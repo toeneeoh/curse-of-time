@@ -1,5 +1,3 @@
--- Boss-owned abilities extracted from the legacy unit spell registry.
-
 OnInit.final("LegionAbilities", function(Require)
     Require("Spells")
     Require("SpellTools")
@@ -7,7 +5,6 @@ OnInit.final("LegionAbilities", function(Require)
     Require("EnemyAI")
     Require("TimerQueue")
 
-    local TQ = TimerQueue
     local TQ = TimerQueue
 
     local REALITY_RIP = Spell.define('A06M')

@@ -1,5 +1,3 @@
--- Boss-owned abilities extracted from the legacy unit spell registry.
-
 OnInit.final("SatanAbilities", function(Require)
     Require("Spells")
     Require("SpellTools")
@@ -7,7 +5,6 @@ OnInit.final("SatanAbilities", function(Require)
     Require("EnemyAI")
     Require("TimerQueue")
 
-    local random = math.random
     local random = math.random
 
     local FLAME_ONSLAUGHT = Spell.define("A03R")
