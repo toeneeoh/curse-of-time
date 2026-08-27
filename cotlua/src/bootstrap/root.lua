@@ -220,6 +220,7 @@ dofile('content/abilities/heroes/warrior.lua')
 
 dofile('content/abilities/bosses/azazoth.lua')
 dofile('content/abilities/bosses/perfect_being.lua')
+dofile('content/abilities/bosses/thanatos.lua')
 
 dofile('gameplay/abilities/tools.lua')
 dofile('content/abilities/units/unit_spells.lua')
