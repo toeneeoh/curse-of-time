@@ -10,6 +10,7 @@ OnInit.final("ArchitectureTests", function(Require)
     Require('DevRuntimeLog')
     Require('ShopServiceDialogs')
     Require('Town')
+    Require('NagaAbilities')
 
     ArchitectureTests = {
         tests = {},
@@ -147,6 +148,19 @@ OnInit.final("ArchitectureTests", function(Require)
         end
         if not ShopAction.get('I0JS').cooldown then
             return false, "recharge action has no cooldown presentation"
+        end
+        return true
+    end)
+
+    ArchitectureTests.register("naga abilities are registered", function()
+        local ids = {
+            'A04V', 'A04W', 'A04K', 'A04R', 'A00O', 'A05C', 'A05K',
+        }
+
+        for index = 1, #ids do
+            if not Spells[FourCC(ids[index])] then
+                return false, "missing naga ability " .. ids[index]
+            end
         end
         return true
     end)
