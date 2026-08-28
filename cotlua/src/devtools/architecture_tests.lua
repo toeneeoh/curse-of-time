@@ -229,14 +229,14 @@ OnInit.final("ArchitectureTests", function(Require)
             end
         end
 
-        local control_ids = {
+        local dispatch_ids = {
             'A00I', 'A0KI', 'A00Y', 'A00B', 'A02T',
             'A031', 'A067', 'A0KX', 'A04N',
         }
 
-        for index = 1, #control_ids do
-            if type(UNIT_SPELLS[FourCC(control_ids[index])]) ~= "function" then
-                return false, "missing player ability control " .. control_ids[index]
+        for index = 1, #dispatch_ids do
+            if type(UNIT_SPELLS[FourCC(dispatch_ids[index])]) ~= "function" then
+                return false, "missing simple ability dispatch " .. dispatch_ids[index]
             end
         end
 

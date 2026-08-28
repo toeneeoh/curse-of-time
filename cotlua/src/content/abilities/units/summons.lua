@@ -3,6 +3,10 @@ OnInit.final("SummonAbilities", function(Require)
 
     local TQ = TimerQueue
 
+    UNIT_SPELLS[FourCC('A0KI')] = function(caster) -- meat golem taunt
+        Taunt(caster, 800.)
+    end
+
     BORROWED_LIFE = Spell.define('A071')
     do
         local thistype = BORROWED_LIFE
@@ -221,4 +225,3 @@ OnInit.final("SummonAbilities", function(Require)
         end
     end
 end, Debug and Debug.getLine())
-

@@ -144,10 +144,6 @@ OnInit.final("PlayerAbilityControls", function(Require)
             ChangeHotkeys(pid)
         end,
 
-        [FourCC('A0KI')] = function(caster, pid) -- meat golem taunt
-            Taunt(caster, 800.)
-        end,
-
         [FourCC('A00Y')] = function(_, pid) -- Item drop toggle
             if IS_ITEM_DROP[pid] then
                 DisplayTimedTextToPlayer(Player(pid - 1), 0, 0, 10, "Toggled Item Drops off.")
@@ -201,6 +197,5 @@ OnInit.final("PlayerAbilityControls", function(Require)
         end,
     }
 end, Debug and Debug.getLine())
-
 
 
