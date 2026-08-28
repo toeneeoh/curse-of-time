@@ -1220,10 +1220,11 @@ local function finish_cast(u)
     Unit[u]._casting = false
 end
 
-local function finish_pause(u, pause_override)
+local function finish_pause(u, pause_override, id)
     if not pause_override then
         PauseUnit(u, false)
     end
+    Unit[u]:traceEffects("cast-finish:" .. id)
     TQ:callDelayed(3., finish_cast, u) -- internal spacing between boss spell casts
 end
 
@@ -1242,6 +1243,7 @@ function CastSpell(u, id, dur, anim, timescale, pause_override)
     end
 
     Unit[u]._casting = true
+    Unit[u]:traceEffects("cast-start:" .. id)
     BlzStartUnitAbilityCooldown(u, id, BlzGetUnitAbilityCooldown(u, id, GetUnitAbilityLevel(u, id) - 1))
     DelayAnimation(BOSS_ID, u, dur, 0, 1., true)
     if anim ~= -1 then
@@ -1252,7 +1254,7 @@ function CastSpell(u, id, dur, anim, timescale, pause_override)
     if not pause_override then
         PauseUnit(u, true)
     end
-    TQ:callDelayed(dur, finish_pause, u, pause_override)
+    TQ:callDelayed(dur, finish_pause, u, pause_override, id)
 
     return true
 end
