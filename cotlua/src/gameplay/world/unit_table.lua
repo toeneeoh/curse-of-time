@@ -24,7 +24,9 @@ OnInit.final("UnitTable", function(Require)
     ---@field unit unit
     ---@field create function
     ---@field destroy function
+    ---@field destroyed boolean?
     ---@field onIndex fun(callback: fun(u: unit))
+    ---@field traceEffects fun(self: Unit, reason: string)
     ---@field hit_based_health boolean
     ---@field damage integer
     ---@field bonus_damage integer
@@ -641,6 +643,11 @@ OnInit.final("UnitTable", function(Require)
         end
 
         function thistype:destroy()
+            if self.destroyed then
+                return
+            end
+            self.destroyed = true
+
             if self.taunted then
                 DestroyGroup(self.taunted)
             end
@@ -650,17 +657,15 @@ OnInit.final("UnitTable", function(Require)
             end
 
             if self.effects then
-                for i = 1, #self.effects do
-                    trace_effect("unit-destroy", self, self.effects[i])
-                    DestroyEffect(self.effects[i].effect)
-                end
+                self:traceEffects("unit-destroy")
+                self:destroyEffects()
             end
         end
     end
 
     local function on_cleanup(source, _, id)
         -- if unit is removed
-        if id == ORDER_ID_UNDEFEND then
+        if id == ORDER_ID_UNDEFEND and GetUnitAbilityLevel(source, DETECT_LEAVE_ABILITY) == 0 then
             Unit[source]:destroy()
         end
     end

@@ -2050,32 +2050,6 @@ OnInit.final("Buffs", function(Require)
 
     local DEMON_SHIELD_MODEL = "war3mapImported\\DemonShieldTarget3A.mdx"
 
-    local function move_demon_shield(buff)
-        if buff.sfx then
-            BlzSetSpecialEffectPosition(buff.sfx, GetUnitX(buff.target), GetUnitY(buff.target), GetUnitZ(buff.target))
-            buff.sfx_timer = TQ:callDelayed(FPS_32, move_demon_shield, buff)
-        end
-    end
-
-    local function add_demon_shield(buff)
-        local x, y = GetUnitX(buff.target), GetUnitY(buff.target)
-        buff.sfx = AddSpecialEffect(DEMON_SHIELD_MODEL, x, y)
-        BlzPlaySpecialEffect(buff.sfx, ANIM_TYPE_STAND)
-        move_demon_shield(buff)
-    end
-
-    local function remove_demon_shield(buff)
-        if buff.sfx_timer then
-            TQ:disableCallback(buff.sfx_timer)
-            buff.sfx_timer = nil
-        end
-
-        if buff.sfx then
-            DestroyEffect(buff.sfx)
-            buff.sfx = nil
-        end
-    end
-
     ---@class AstralShieldBuff : Buff
     AstralShieldBuff = Buff.new()
     do
@@ -2088,13 +2062,14 @@ OnInit.final("Buffs", function(Require)
 
         function thistype:onRemove()
             Unit[self.target].mr = Unit[self.target].mr / self.mr
-            remove_demon_shield(self)
+            Unit[self.target]:removeEffect(self.sfx)
         end
 
         function thistype:onApply()
             self.mr = 0.333
             Unit[self.target].mr = Unit[self.target].mr * self.mr
-            add_demon_shield(self)
+            self.sfx = Unit[self.target]:addEffect(DEMON_SHIELD_MODEL, "origin")
+            self.sfx.anim = ANIM_TYPE_STAND
         end
     end
 
