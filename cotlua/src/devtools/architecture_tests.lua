@@ -11,6 +11,7 @@ OnInit.final("ArchitectureTests", function(Require)
     Require('ShopServiceDialogs')
     Require('Town')
     Require('BossAbilities')
+    Require('Buffs')
 
     ArchitectureTests = {
         tests = {},
@@ -240,6 +241,27 @@ OnInit.final("ArchitectureTests", function(Require)
             end
         end
 
+        return true
+    end)
+
+    ArchitectureTests.register("ownership buff modules are registered", function()
+        local names = {
+            'Disarm', 'FlamingBowBuff', 'InfusedWaterBuff', 'ResurgenceBuff',
+            'ArcaneBarrageBuff', 'OverloadBuff', 'InspireBuff', 'MagneticStanceBuff',
+            'EarthquakeDebuff', 'MarkedForDeathDebuff', 'RoyalPlateBuff',
+            'DemonicSacrificeBuff', 'JusticeAuraBuff', 'BloodMistBuff',
+            'ManaDrainDebuff', 'ParryBuff', 'UndyingRageBuff', 'FrostArmorBuff',
+            'NerveGasDebuff', 'RighteousMightBuff', 'FireElementBuff', 'HardHatBuff',
+            'SingleShotDebuff', 'DarkShieldBuff', 'AstralShieldBuff',
+            'ProtectedExistenceBuff', 'DivineLightBuff', 'DemonPrinceBloodlust',
+            'MeatGolemThunderClap', 'NagaThorns', 'HolyBlessing', 'Lava', 'WeatherBuff',
+        }
+
+        for index = 1, #names do
+            if type(_G[names[index]]) ~= "table" then
+                return false, "missing buff definition " .. names[index]
+            end
+        end
         return true
     end)
 
