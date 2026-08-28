@@ -44,6 +44,8 @@ OnInit.final("Dummy", function(Require)
     ---@field create function
     ---@field cast function
     ---@field source unit
+    ---@field spell_source unit?
+    ---@field spell_tag string?
     ---@field attack function
     ---@field lightning function
     Dummy = {} ---@type Dummy|Dummy[]
@@ -65,22 +67,35 @@ OnInit.final("Dummy", function(Require)
             TQ:callDelayed(FPS_32, attack_delay, source, target)
         end
 
-        ---@type fun(self: Dummy, owner: player, order: string, a: any, b: any)
-        function thistype:cast(owner, order, a, b)
+        ---Issues an immediate, unit-targeted, or point-targeted spell order.
+        ---When spell_source is supplied, native spell damage is attributed to
+        ---that unit instead of being suppressed as a dummy attack.
+        ---@param owner player
+        ---@param order string
+        ---@param a unit|number?
+        ---@param b number?
+        ---@param spell_source unit?
+        ---@param spell_tag string?
+        ---@return boolean
+        function thistype:cast(owner, order, a, b, spell_source, spell_tag)
             SetUnitOwner(self.unit, owner, true)
+            self.spell_source = spell_source
+            self.spell_tag = spell_tag
 
             -- self cast
             if a == nil then
-                IssueImmediateOrder(self.unit, order)
+                return IssueImmediateOrder(self.unit, order)
             -- target cast
-            elseif type(a == "userdata") then
+            elseif type(a) == "userdata" then
                 BlzSetUnitFacingEx(self.unit, bj_RADTODEG * atan(GetUnitY(a) - GetUnitY(self.unit), GetUnitX(a) - GetUnitX(self.unit)))
-                IssueTargetOrder(self.unit, order, a)
+                return IssueTargetOrder(self.unit, order, a)
             -- point cast
-            elseif type(a == "number") then
+            elseif type(a) == "number" then
                 BlzSetUnitFacingEx(self.unit, bj_RADTODEG * atan(b - GetUnitY(self.unit), a - GetUnitX(self.unit)))
-                IssuePointOrder(self.unit, order, a, b)
+                return IssuePointOrder(self.unit, order, a, b)
             end
+
+            return false
         end
 
         function thistype:lightning(x, y)
@@ -95,6 +110,8 @@ OnInit.final("Dummy", function(Require)
             UnitRemoveAbility(self.unit, self.abil)
             self.abil = 0
             self.source = nil
+            self.spell_source = nil
+            self.spell_tag = nil
 
             SetUnitAnimation(self.unit, "stand")
             SetUnitPropWindow(self.unit, bj_DEGTORAD * 180.)

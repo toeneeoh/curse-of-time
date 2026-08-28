@@ -151,15 +151,23 @@ OnInit.final("Damage", function(Require)
             BlzSetEventDamageType(MAGIC)
         end
 
-        -- dummy onhit
+        -- Dummy attacks are event probes and deal no native damage. Dummy
+        -- spell casts may opt into the normal pipeline with another unit as
+        -- their authoritative source.
         local dummy = Dummy[source]
 
         if dummy then
-            EVENT_DUMMY_ON_HIT:trigger(dummy.source, target)
-            blz_set_event_damage(0.00)
-            BlzSetUnitWeaponBooleanField(source, UNIT_WEAPON_BF_ATTACKS_ENABLED, 0, false) -- prevent dummies from attacking twice
+            if dummy.spell_source then
+                source = dummy.spell_source
+                source_tbl = Unit[source]
+                tag = tag or dummy.spell_tag
+            else
+                EVENT_DUMMY_ON_HIT:trigger(dummy.source, target)
+                blz_set_event_damage(0.00)
+                BlzSetUnitWeaponBooleanField(source, UNIT_WEAPON_BF_ATTACKS_ENABLED, 0, false) -- prevent dummies from attacking twice
 
-            return false
+                return false
+            end
         end
 
         -- source and target must be enemies for onhit and onstruck
