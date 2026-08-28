@@ -26,7 +26,6 @@ OnInit.final("UnitTable", function(Require)
     ---@field destroy function
     ---@field destroyed boolean?
     ---@field onIndex fun(callback: fun(u: unit))
-    ---@field traceEffects fun(self: Unit, reason: string)
     ---@field hit_based_health boolean
     ---@field damage integer
     ---@field bonus_damage integer
@@ -491,30 +490,6 @@ OnInit.final("UnitTable", function(Require)
             end,
         }
 
-        local effect_trace_id = 0
-
-        ---@param action string
-        ---@param unit_data Unit
-        ---@param entry table?
-        local function trace_effect(action, unit_data, entry)
-            if not DevLog or not DevLog.enabled then
-                return
-            end
-
-            local effect_id = entry and entry.effect and GetHandleId(entry.effect) or 0
-            DevLog.write("EFFECT", string.format(
-                "%s unit=%d type=%s trace=%d handle=%d model=%s attach=%s morphed=%s",
-                action,
-                GetHandleId(unit_data.unit),
-                GetObjectName(unit_data.id),
-                entry and entry.trace_id or 0,
-                effect_id,
-                entry and entry.model or "-",
-                entry and (unit_data.morphed and entry.attach_alternate or entry.attach) or "-",
-                tostring(unit_data.morphed == true)
-            ), true)
-        end
-
         local mt2 = {
             __index = function(tbl, key)
                 local val = rawget(tbl, key)
@@ -540,36 +515,20 @@ OnInit.final("UnitTable", function(Require)
         function Unit:addEffect(model, attachPoint, attachPointAlternate)
             self.effects = self.effects or {}
 
-            effect_trace_id = effect_trace_id + 1
-
             local data = {
                 model = model,
                 attach = attachPoint,
                 effect = AddSpecialEffectTarget(model, self.unit, self.morphed and attachPointAlternate or attachPoint),
                 attach_alternate = attachPointAlternate,
                 morphed = false,
-                trace_id = effect_trace_id,
                 proxy = {}
             }
 
             setmetatable(data, mt2)
 
             self.effects[#self.effects + 1] = data
-            trace_effect("add", self, data)
 
             return data
-        end
-
-        ---Writes the current tracked-effect handles to the development log.
-        ---@param reason string
-        function Unit:traceEffects(reason)
-            if not DevLog or not DevLog.enabled or not self.effects or #self.effects == 0 then
-                return
-            end
-
-            for _, sfx in ipairs(self.effects) do
-                trace_effect(reason, self, sfx)
-            end
         end
 
         function Unit:destroyEffects()
@@ -579,7 +538,6 @@ OnInit.final("UnitTable", function(Require)
 
             for _, sfx in ipairs(self.effects) do
                 if sfx.effect then
-                    trace_effect("destroy", self, sfx)
                     DestroyEffect(sfx.effect)
                     sfx.effect = nil
                 end
@@ -595,7 +553,6 @@ OnInit.final("UnitTable", function(Require)
                 if not sfx.effect then
                     local effect = self.morphed and sfx.attach_alternate or sfx.attach
                     sfx.effect = AddSpecialEffectTarget(sfx.model, self.unit, effect)
-                    trace_effect("recreate", self, sfx)
 
                     -- reapply attributes
                     for key, val in pairs(sfx.proxy) do
@@ -616,7 +573,6 @@ OnInit.final("UnitTable", function(Require)
             end
 
             if entry.effect then
-                trace_effect("remove", self, entry)
                 DestroyEffect(entry.effect)
                 entry.effect = nil
             end
@@ -631,13 +587,10 @@ OnInit.final("UnitTable", function(Require)
         end
 
         function Unit:morph(skin)
-            self:traceEffects("morph-before")
             self:destroyEffects()
 
             BlzSetUnitSkin(self.unit, skin)
             self.morphed = not self.morphed
-
-            trace_effect("morph-skin", self)
 
             TQ:callDelayed(0., Unit.applyEffects, self)
         end
@@ -657,7 +610,6 @@ OnInit.final("UnitTable", function(Require)
             end
 
             if self.effects then
-                self:traceEffects("unit-destroy")
                 self:destroyEffects()
             end
         end
