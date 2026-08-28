@@ -211,15 +211,9 @@ OnInit.final("Azazoth", function(Require)
         local thistype = ASTRAL_SHIELD
 
         local function onStruck(target)
-            if CastSpell(target, thistype.id, 1., SPELL_ANIM, 1.) then
+            if not AstralShieldBuff:has(nil, target) and CastSpell(target, thistype.id, 1., SPELL_ANIM, 1.) then
                 FloatingTextUnit(thistype.tag, target, 3, 70, 0, 12, 255, 255, 255, 0, true)
-                local buff = AstralShieldBuff:get(nil, target)
-                if buff then
-                    buff:refresh()
-                else
-                    buff = AstralShieldBuff:add(target, target)
-                end
-                buff:duration(13.)
+                AstralShieldBuff:add(target, target):duration(13.)
             end
         end
 

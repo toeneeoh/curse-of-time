@@ -20,7 +20,7 @@ OnInit.final("HellfireMagiAbilities", function(Require)
         local thistype = FROST_ARMOR
 
         local function onStruck(target)
-            if CastSpell(target, thistype.id, 1., 4, 1.) then
+            if not FrostArmorBuff:has(nil, target) and CastSpell(target, thistype.id, 1., 4, 1.) then
                 FrostArmorBuff:add(target, target):duration(10.)
             end
         end
