@@ -211,6 +211,38 @@ OnInit.final("ArchitectureTests", function(Require)
         return true
     end)
 
+    ArchitectureTests.register("unit and item abilities are registered", function()
+        local spell_ids = {
+            'A071', 'A06C', 'A04Z', 'A06O', 'A0B0', 'A02J', 'A0FV',
+            'ACfn', 'A0AJ', 'A02L', 'A01H', 'A015',
+            'Aarm', 'Abas', 'Zs00', 'Zs01', 'Zs02', 'Zs03', 'Zs04', 'Zs05', 'Zs06',
+            'A07G', 'A0B5', 'A0C0', 'A09O', 'Areg', 'Abon', 'Ahrt',
+            'A01F', 'A03D', 'A061', 'AIbk', 'A018', 'A01S',
+            'A083', 'A02A', 'A055', 'A0SX', 'A00E', 'A00Q', 'A0B9',
+            'A04I', 'A03G', 'Anrv', 'Arrv', 'A00D', 'A01G',
+            'Adt1', 'A03F', 'A03H', 'AIcd', 'AIta', 'A0E2', 'A0D3',
+        }
+
+        for index = 1, #spell_ids do
+            if not Spells[FourCC(spell_ids[index])] then
+                return false, "missing unit or item ability " .. spell_ids[index]
+            end
+        end
+
+        local control_ids = {
+            'A00I', 'A0KI', 'A00Y', 'A00B', 'A02T',
+            'A031', 'A067', 'A0KX', 'A04N',
+        }
+
+        for index = 1, #control_ids do
+            if type(UNIT_SPELLS[FourCC(control_ids[index])]) ~= "function" then
+                return false, "missing player ability control " .. control_ids[index]
+            end
+        end
+
+        return true
+    end)
+
     ---Runs registered safe assertions. Stateful shop, inventory, save and damage
     ---scenarios can register additional tests from development map commands.
     ---@return boolean, table
