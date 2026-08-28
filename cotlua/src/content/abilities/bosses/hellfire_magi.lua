@@ -43,7 +43,7 @@ OnInit.final("HellfireMagiAbilities", function(Require)
 
         local function onStruck(target, source)
             if CastSpell(target, thistype.id, 1., 4, 1.) then
-                TQ:callDelayed(1., cast, target, source, GetUnitAbilityLevel(target, thistype.id))
+                TQ:callDelayed(0.5, cast, target, source, GetUnitAbilityLevel(target, thistype.id))
             end
         end
 
@@ -65,7 +65,7 @@ OnInit.final("HellfireMagiAbilities", function(Require)
 
         local function onStruck(target, source)
             if CastSpell(target, thistype.id, 2., 4, 1.) then
-                TQ:callDelayed(2., cast, target, GetUnitX(source), GetUnitY(source), GetUnitAbilityLevel(target, thistype.id))
+                TQ:callDelayed(0.5, cast, target, GetUnitX(source), GetUnitY(source), GetUnitAbilityLevel(target, thistype.id))
             end
         end
 
