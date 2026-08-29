@@ -200,7 +200,7 @@ OnInit.final("SummonAbilities", function(Require)
                     end
                 end
 
-                TQ:callDelayed(0.05, pull, pid, dur)
+                TQ:callDelayed(0.05, pull, pid, caster, dur)
 
                 DestroyGroup(ug)
             end
