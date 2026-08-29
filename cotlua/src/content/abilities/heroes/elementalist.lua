@@ -313,12 +313,21 @@ OnInit.final("ElementalistSpells", function(Require)
 
         local function on_expire(source)
             local pid = GetPlayerId(GetOwningPlayer(source)) + 1
-            Unit[source]:removeEffect(thistype.sfx[pid])
+            local sfx = thistype.sfx[pid]
+
+            if sfx then
+                Unit[source]:removeEffect(sfx)
+                thistype.sfx[pid] = nil
+            end
             EVENT_ON_SHIELD_EXPIRE:unregister_unit_action(source, on_expire)
         end
 
         function thistype:onCast()
-            DestroyEffect(thistype.sfx[self.pid])
+            local sfx = thistype.sfx[self.pid]
+
+            if sfx then
+                Unit[self.caster]:removeEffect(sfx)
+            end
             thistype.sfx[self.pid] = Unit[self.caster]:addEffect("war3mapImported\\Archnathid Armor.mdx", "chest")
             thistype.sfx[self.pid].color = {160, 255, 160}
 
