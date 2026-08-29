@@ -81,7 +81,7 @@ OnInit.final("SummonAbilities", function(Require)
         }
 
         function thistype:onCast()
-            local golem = Unit[self.source]
+            local golem = Unit[self.caster]
 
             if GetUnitTypeId(self.target) == SUMMON_HOUND and GetOwningPlayer(self.target) == Player(self.pid - 1) and golem.devour_stacks < GetUnitAbilityLevel(Hero[self.pid], DEVOUR.id) + 1 then
                 DestroyEffect(AddSpecialEffectTarget("Abilities\\Spells\\Undead\\DeathCoil\\DeathCoilSpecialArt.mdl", self.target, "chest"))
