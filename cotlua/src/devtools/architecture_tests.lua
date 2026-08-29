@@ -42,6 +42,31 @@ OnInit.final("ArchitectureTests", function(Require)
         return true
     end)
 
+    ArchitectureTests.register("player event dispatch tolerates callback removal", function()
+        local event = PLAYER_EVENT.create()
+        local first_calls = 0
+        local second_calls = 0
+        local remove_self
+
+        remove_self = function(pid)
+            first_calls = first_calls + 1
+            event:unregister_action(pid, remove_self)
+        end
+        local function remain_registered()
+            second_calls = second_calls + 1
+        end
+
+        event:register_action(1, remove_self)
+        event:register_action(1, remain_registered)
+        event:trigger(1)
+        event:trigger(1)
+
+        if first_calls ~= 1 or second_calls ~= 2 then
+            return false, "player event mutation changed callback dispatch"
+        end
+        return true
+    end)
+
     ArchitectureTests.register("initializer trace is complete and unique", function()
         local seen = {}
 

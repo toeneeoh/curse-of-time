@@ -164,11 +164,19 @@ OnInit.final("Events", function()
             -- run any actions registered with the player
             local actions = self.actions[pid]
             if actions then
+                -- Cleanup callbacks commonly unregister themselves. Dispatch a
+                -- stable snapshot so mutations affect the next trigger instead
+                -- of skipping callbacks or exposing a nil array entry.
+                local pending = {}
                 for i = 1, #actions do
+                    pending[i] = actions[i]
+                end
+
+                for i = 1, #pending do
                     if DEV_ENABLED and RuntimeMetrics then
                         RuntimeMetrics.events.callbacks = RuntimeMetrics.events.callbacks + 1
                     end
-                    debug_try(actions[i], pid, ...)
+                    debug_try(pending[i], pid, ...)
                 end
             end
         end
