@@ -79,6 +79,7 @@ OnInit.final("SummonAbilities", function(Require)
                 golem.mr = golem.mr * (0.75 - golem.devour_stacks * 0.1)
             end,
         }
+        missile_template.__index = missile_template
 
         function thistype:onCast()
             local golem = Unit[self.caster]
@@ -153,6 +154,7 @@ OnInit.final("SummonAbilities", function(Require)
                 SetUnitAbilityLevel(self.source, BORROWED_LIFE.id, destroyer.devour_stacks)
             end,
         }
+        missile_template.__index = missile_template
 
         function thistype:onCast()
             local destroyer = Unit[self.caster]
