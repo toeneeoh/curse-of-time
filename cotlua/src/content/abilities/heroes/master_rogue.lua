@@ -1,6 +1,7 @@
 OnInit.final("RogueSpells", function(Require)
     Require('Spells')
     Require('SpellTools')
+    Require('Events')
 
     local atan = math.atan
 
@@ -22,9 +23,15 @@ OnInit.final("RogueSpells", function(Require)
             Unit[u].cd_flat = Unit[u].cd_flat + thistype.bonus[u]
         end
 
+        local function update_level(u, level)
+            SetUnitAbilityLevel(u, thistype.id, level // 50 + 1)
+            thistype.apply(u)
+        end
+
         function thistype.onSetup(u)
             Unit[u].cc_percent = 1.2
-            thistype.apply(u)
+            EVENT_HERO_LEVEL_CHANGED:register_unit_action(u, update_level)
+            update_level(u, GetHeroLevel(u))
         end
     end
 

@@ -1,6 +1,7 @@
 OnInit.final("PhoenixRangerSpells", function(Require)
     Require('Spells')
     Require('SpellTools')
+    Require('Events')
 
     local atan = math.atan
     local distance = MISSILE_DISTANCE
@@ -41,9 +42,17 @@ OnInit.final("PhoenixRangerSpells", function(Require)
             end
         end
 
+        local function update_level(u, level)
+            local ability_level = math.min(level // 50 + 1, 6)
+            SetUnitAbilityLevel(u, thistype.id, ability_level)
+            SetUnitAbilityLevel(u, multi_shot_ability, ability_level)
+        end
+
         function thistype.onSetup(u)
             EVENT_ON_ORDER:register_unit_action(u, on_order)
             EVENT_ON_REVIVE:register_unit_action(u, on_revive)
+            EVENT_HERO_LEVEL_CHANGED:register_unit_action(u, update_level)
+            update_level(u, GetHeroLevel(u))
         end
     end
 

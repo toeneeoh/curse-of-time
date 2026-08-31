@@ -1,6 +1,7 @@
 OnInit.final("ThunderbladeSpells", function(Require)
     Require('Spells')
     Require('SpellTools')
+    Require('Events')
 
     local TQ = TimerQueue
     local FPS_32 = FPS_32
@@ -32,6 +33,10 @@ OnInit.final("ThunderbladeSpells", function(Require)
             end
         end
 
+        local function update_level(u, level)
+            SetUnitAbilityLevel(u, thistype.id, level // 75 + 1)
+        end
+
         function thistype.onLearn(source, ablev, pid)
             local b = OverloadBuff:get(nil, source)
 
@@ -44,6 +49,8 @@ OnInit.final("ThunderbladeSpells", function(Require)
         function thistype.onSetup(u)
             EVENT_STAT_CHANGE:register_unit_action(u, manacost)
             EVENT_ON_ORDER:register_unit_action(u, on_order)
+            EVENT_HERO_LEVEL_CHANGED:register_unit_action(u, update_level)
+            update_level(u, GetHeroLevel(u))
         end
     end
 

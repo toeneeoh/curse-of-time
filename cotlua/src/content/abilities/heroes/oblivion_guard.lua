@@ -1,6 +1,7 @@
 OnInit.final("OblivionGuardSpells", function(Require)
     Require('Spells')
     Require('SpellTools')
+    Require('Events')
 
     local TQ = TimerQueue
 
@@ -53,6 +54,10 @@ OnInit.final("OblivionGuardSpells", function(Require)
             EVENT_ON_CLEANUP:unregister_action(pid, on_cleanup)
         end
 
+        local function update_level(u, level)
+            SetUnitAbilityLevel(u, thistype.id, level // 100 + 1)
+        end
+
         function thistype.onSetup(u)
             local pid = GetPlayerId(GetOwningPlayer(u)) + 1
             thistype.charges[pid] = MAX_CHARGES
@@ -63,6 +68,8 @@ OnInit.final("OblivionGuardSpells", function(Require)
 
             EVENT_ON_CLEANUP:register_action(pid, on_cleanup)
             EVENT_ON_STRUCK_AFTER_REDUCTIONS:register_unit_action(u, on_hit)
+            EVENT_HERO_LEVEL_CHANGED:register_unit_action(u, update_level)
+            update_level(u, GetHeroLevel(u))
         end
     end
 

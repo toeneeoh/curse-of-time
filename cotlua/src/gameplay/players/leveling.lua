@@ -6,6 +6,7 @@
 
 OnInit.final("Level", function(Require)
     Require('Users')
+    Require('Events')
 
     local old_set_level = SetHeroLevel
     SetHeroLevel = function(u, lvl, eye_candy)
@@ -22,30 +23,9 @@ OnInit.final("Level", function(Require)
         local p     = GetOwningPlayer(u)
         local pid   = GetPlayerId(p) + 1 ---@type integer 
         local level = GetHeroLevel(u) ---@type integer 
-        local uid   = GetUnitTypeId(u) ---@type integer 
 
         if u == Hero[pid] then
-            -- TODO: add custom level event
-            if uid == HERO_DARK_SUMMONER then -- summoning improvement level
-                SetUnitAbilityLevel(u, SUMMONINGIMPROVEMENT.id, level // 10 + 1)
-            elseif uid == HERO_DARK_SAVIOR then -- dark seal level
-                SetUnitAbilityLevel(u, DARKSEAL.id, level // 100 + 1)
-            elseif uid == HERO_SAVIOR then -- light seal level
-                SetUnitAbilityLevel(u, LIGHTSEAL.id, level // 100 + 1)
-            elseif uid == HERO_OBLIVION_GUARD then -- body of fire level
-                SetUnitAbilityLevel(u, BODYOFFIRE.id, level // 100 + 1)
-            elseif uid == HERO_PHOENIX_RANGER then -- multishot level
-                SetUnitAbilityLevel(u, FourCC('A05R'), math.min(level // 50 + 1, 6))
-                SetUnitAbilityLevel(u, FourCC('A0A3'), math.min(level // 50 + 1, 6))
-            elseif uid == HERO_THUNDERBLADE then -- overload level
-                SetUnitAbilityLevel(u, OVERLOAD.id, level // 75 + 1)
-            elseif uid == HERO_ASSASSIN then -- blade spin level
-                SetUnitAbilityLevel(u, BLADESPIN.id, IMinBJ(4, level // 100 + 1))
-                SetUnitAbilityLevel(u, BLADESPIN.id2, IMinBJ(4, level // 100 + 1))
-            elseif uid == HERO_MASTER_ROGUE then -- instant death level
-                SetUnitAbilityLevel(u, INSTANTDEATH.id, level // 50 + 1)
-                INSTANTDEATH.apply(u)
-            end
+            EVENT_HERO_LEVEL_CHANGED:trigger(u, level)
 
             -- update backpack level but disable XP gain
             SuspendHeroXP(Backpack[pid], false)

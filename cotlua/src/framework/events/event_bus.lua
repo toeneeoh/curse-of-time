@@ -211,6 +211,8 @@ OnInit.final("Events", function()
 
     -- event that is called when a unit's stat is changed (either from leveling, UnitTable, or UnitSetBonus)
     EVENT_STAT_CHANGE = EVENT.create() ---@type EVENT
+    -- event that is called after the player's active hero gains a level
+    EVENT_HERO_LEVEL_CHANGED = EVENT.create() ---@type EVENT
 
     -- damage events
     EVENT_DUMMY_ON_HIT               = EVENT.create() ---@type EVENT

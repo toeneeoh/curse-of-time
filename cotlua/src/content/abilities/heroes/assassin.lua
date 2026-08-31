@@ -1,6 +1,7 @@
 OnInit.final("AssassinSpells", function(Require)
     Require('Spells')
     Require('SpellTools')
+    Require('Events')
 
     local TQ = TimerQueue
     local FPS_32 = FPS_32
@@ -392,11 +393,19 @@ OnInit.final("AssassinSpells", function(Require)
             end
         end
 
+        local function update_level(u, level)
+            local ability_level = math.min(4, level // 100 + 1)
+            SetUnitAbilityLevel(u, thistype.id, ability_level)
+            SetUnitAbilityLevel(u, thistype.id2, ability_level)
+        end
+
         function thistype.onSetup(u)
             EVENT_ON_HIT:register_unit_action(u, on_hit)
             EVENT_ON_ATTACK:register_unit_action(u, on_attack)
             EVENT_ON_ORDER:register_unit_action(u, on_order)
             EVENT_STAT_CHANGE:register_unit_action(u, manacost)
+            EVENT_HERO_LEVEL_CHANGED:register_unit_action(u, update_level)
+            update_level(u, GetHeroLevel(u))
 
             TQ:callDelayed(0.01, UnitRemoveAbility, u, thistype.id)
         end

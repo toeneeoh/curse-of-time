@@ -1,6 +1,7 @@
 OnInit.final("SaviorSpells", function(Require)
     Require('Spells')
     Require('SpellTools')
+    Require('Events')
 
     local TQ = TimerQueue
     local distance = MISSILE_DISTANCE
@@ -15,6 +16,15 @@ OnInit.final("SaviorSpells", function(Require)
         thistype.values = {
             dur = 12.,
         }
+
+        local function update_level(u, level)
+            SetUnitAbilityLevel(u, thistype.id, level // 100 + 1)
+        end
+
+        function thistype.onSetup(u)
+            EVENT_HERO_LEVEL_CHANGED:register_unit_action(u, update_level)
+            update_level(u, GetHeroLevel(u))
+        end
 
         local on_expire = function(buff, sfx)
             buff.active = false

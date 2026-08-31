@@ -1,12 +1,22 @@
 OnInit.final("DarkSummonerSpells", function(Require)
     Require('Spells')
     Require('SpellTools')
+    Require('Events')
 
     ---@class SUMMONINGIMPROVEMENT : Spell
     ---@field apply function
     SUMMONINGIMPROVEMENT = Spell.define("A022")
     do
         local thistype = SUMMONINGIMPROVEMENT
+
+        local function update_level(u, level)
+            SetUnitAbilityLevel(u, thistype.id, level // 10 + 1)
+        end
+
+        function thistype.onSetup(u)
+            EVENT_HERO_LEVEL_CHANGED:register_unit_action(u, update_level)
+            update_level(u, GetHeroLevel(u))
+        end
 
         ---@type fun(pid: integer, summon: unit, str: integer, agi: integer, int: integer)
         function thistype.apply(pid, summon, str, agi, int)
