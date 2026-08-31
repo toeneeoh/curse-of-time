@@ -67,7 +67,8 @@ OnInit.global("Variables", function()
     HERO_VAMPIRE                       = FourCC('U003')
     HERO_TOTAL                         = 19
     SUMMON_DESTROYER                   = FourCC('E014')
-    SUMMON_HOUND                       = FourCC('H05F')
+    SUMMON_REAVER                      = FourCC('H05F')
+    SUMMON_HOUND                       = SUMMON_REAVER -- compatibility alias for generated map references
     SUMMON_GOLEM                       = FourCC('H05G')
 
     -- proficiencies
@@ -312,7 +313,7 @@ OnInit.global("Variables", function()
         int_gain     = 6.5,
         main         = "int",
         range        = "600",
-        skills       = {"A022", "A0KF", "A0KH", "A0KG", "A063", "A0K1"},
+        skills       = {"A022", "A0KF", "A0KH", "A0KG", "A0K1"},
         stars        = {2.5, 2.5, 1, 0, 2}
         },
         [HERO_BARD] = {

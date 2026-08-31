@@ -2,69 +2,345 @@ OnInit.final("DarkSummonerSpells", function(Require)
     Require('Spells')
     Require('SpellTools')
     Require('Events')
+    Require('Profile')
+    Require('SummonAbilities')
+
+    local MAX_TIER = 5
+    local MILESTONES = { 1, 20, 50, 100, 150, 200, 300, 400, 500 }
+    local SUMMON_TYPES = { SUMMON_REAVER, SUMMON_GOLEM, SUMMON_DESTROYER }
+    local IS_SUMMON_TYPE = {
+        [SUMMON_REAVER] = true,
+        [SUMMON_GOLEM] = true,
+        [SUMMON_DESTROYER] = true,
+    }
+    local essence_tiers = {} ---@type table<integer, table<integer, integer>>
+
+    ---@class SummonEssence
+    ---@field available fun(pid: integer): integer
+    ---@field unspent fun(pid: integer): integer
+    ---@field getTier fun(pid: integer, summon: unit|integer): integer
+    ---@field infuse fun(pid: integer, summon: unit): boolean
+    ---@field reclaim fun(pid: integer, summon: unit): boolean
+    ---@field apply fun(pid: integer, summon: unit)
+    ---@field pack fun(pid: integer): integer
+    ---@field load fun(pid: integer, packed: integer)
+    SummonEssence = {}
+
+    local function get_state(pid)
+        local state = essence_tiers[pid]
+        if not state then
+            state = {
+                [SUMMON_REAVER] = 0,
+                [SUMMON_GOLEM] = 0,
+                [SUMMON_DESTROYER] = 0,
+            }
+            essence_tiers[pid] = state
+        end
+        return state
+    end
+
+    local function get_summon_type(summon)
+        if type(summon) == "number" then
+            return summon
+        elseif summon then
+            return GetUnitTypeId(summon)
+        end
+        return 0
+    end
+
+    local function is_valid_summon(pid, summon)
+        return summon ~= nil
+            and IS_SUMMON_TYPE[GetUnitTypeId(summon)] == true
+            and GetOwningPlayer(summon) == Player(pid - 1)
+            and UnitAlive(summon)
+            and not IsUnitHidden(summon)
+    end
+
+    local function is_respec_area(pid)
+        local hero = Hero[pid]
+        return hero ~= nil and (
+            RectContainsUnit(gg_rct_Town_Main, hero)
+            or RectContainsUnit(gg_rct_Church, hero)
+            or RectContainsUnit(gg_rct_Tavern, hero))
+    end
+
+    local function persist(pid)
+        local profile = Profile[pid]
+        if profile and profile.hero then
+            profile.hero.summon_essence = SummonEssence.pack(pid)
+        end
+    end
+
+    local function message(pid, value)
+        DisplayTimedTextToPlayer(Player(pid - 1), 0, 0, 8., value)
+    end
+
+    function SummonEssence.available(pid)
+        local hero = Hero[pid]
+        local level = hero and GetHeroLevel(hero) or 1
+        local points = 0
+
+        for i = 1, #MILESTONES do
+            if level < MILESTONES[i] then break end
+            points = points + 1
+        end
+        return points
+    end
+
+    function SummonEssence.unspent(pid)
+        local state = get_state(pid)
+        local spent = state[SUMMON_REAVER] + state[SUMMON_GOLEM] + state[SUMMON_DESTROYER]
+        return math.max(0, SummonEssence.available(pid) - spent)
+    end
+
+    function SummonEssence.getTier(pid, summon)
+        return get_state(pid)[get_summon_type(summon)] or 0
+    end
+
+    function SummonEssence.pack(pid)
+        local state = get_state(pid)
+        return state[SUMMON_REAVER] + state[SUMMON_GOLEM] * 6 + state[SUMMON_DESTROYER] * 36
+    end
+
+    function SummonEssence.load(pid, packed)
+        packed = math.max(0, math.floor(packed or 0))
+
+        local state = get_state(pid)
+        state[SUMMON_REAVER] = math.min(MAX_TIER, packed % 6)
+        packed = packed // 6
+        state[SUMMON_GOLEM] = math.min(MAX_TIER, packed % 6)
+        packed = packed // 6
+        state[SUMMON_DESTROYER] = math.min(MAX_TIER, packed % 6)
+
+        local overflow = state[SUMMON_REAVER] + state[SUMMON_GOLEM]
+            + state[SUMMON_DESTROYER] - SummonEssence.available(pid)
+
+        for i = #SUMMON_TYPES, 1, -1 do
+            if overflow <= 0 then break end
+            local uid = SUMMON_TYPES[i]
+            local removed = math.min(overflow, state[uid])
+            state[uid] = state[uid] - removed
+            overflow = overflow - removed
+        end
+        persist(pid)
+    end
+
+    local function remove_tier_bonuses(summon)
+        local unit = Unit[summon]
+
+        unit.bonus_str = unit.bonus_str - (unit.essence_str or 0)
+        unit.bonus_agi = unit.bonus_agi - (unit.essence_agi or 0)
+        unit.bonus_int = unit.bonus_int - (unit.essence_int or 0)
+        unit.bonus_armor = unit.bonus_armor - (unit.essence_armor or 0)
+        unit.cc_flat = unit.cc_flat - (unit.essence_cc or 0)
+        unit.cd_flat = unit.cd_flat - (unit.essence_cd or 0)
+
+        unit.essence_str = 0
+        unit.essence_agi = 0
+        unit.essence_int = 0
+        unit.essence_armor = 0
+        unit.essence_cc = 0
+        unit.essence_cd = 0
+    end
+
+    local function add_allocation_controls(summon)
+        UnitAddAbility(summon, INFUSE_ESSENCE.id)
+        UnitAddAbility(summon, RECLAIM_ESSENCE.id)
+        UnitMakeAbilityPermanent(summon, true, INFUSE_ESSENCE.id)
+        UnitMakeAbilityPermanent(summon, true, RECLAIM_ESSENCE.id)
+        SetUnitAbilityLevel(summon, INFUSE_ESSENCE.id, 1)
+        SetUnitAbilityLevel(summon, RECLAIM_ESSENCE.id, 1)
+        UnitDisableAbility(summon, INFUSE_ESSENCE.id, false)
+        UnitDisableAbility(summon, RECLAIM_ESSENCE.id, false)
+    end
+
+    function SummonEssence.apply(pid, summon)
+        if not summon or not IS_SUMMON_TYPE[GetUnitTypeId(summon)] then return end
+
+        local uid = GetUnitTypeId(summon)
+        local tier = SummonEssence.getTier(pid, uid)
+        local unit = Unit[summon]
+
+        remove_tier_bonuses(summon)
+        add_allocation_controls(summon)
+
+        unit.essence_str = R2I(unit.str * 0.1 * tier)
+        unit.essence_agi = R2I(unit.agi * 0.1 * tier)
+        unit.essence_int = R2I(unit.int * 0.1 * tier)
+        unit.essence_armor = tier * 3
+
+        if uid == SUMMON_REAVER then
+            unit.essence_str = unit.essence_str + R2I(unit.str * 0.05 * tier)
+            unit.essence_armor = unit.essence_armor + tier * 2
+            SetUnitScale(summon, 1. + tier * 0.04, 1. + tier * 0.04, 1. + tier * 0.04)
+            BlzSetHeroProperName(summon, "Dread Reaver (Tier " .. tier .. ")")
+        elseif uid == SUMMON_GOLEM then
+            UnitRemoveAbility(summon, FourCC('A0KI'))
+            UnitRemoveAbility(summon, THUNDER_CLAP_GOLEM.id)
+            UnitRemoveAbility(summon, MAGNETIC_FORCE.id)
+            UnitRemoveAbility(summon, FourCC('A0IQ'))
+
+            unit.essence_str = unit.essence_str + R2I(unit.str * 0.1 * tier)
+            unit.essence_armor = unit.essence_armor + tier * 3
+            SetUnitScale(summon, 1. + tier * 0.05, 1. + tier * 0.05, 1. + tier * 0.05)
+            BlzSetHeroProperName(summon, "Meat Golem (Tier " .. tier .. ")")
+
+            if tier >= 2 then UnitAddAbility(summon, FourCC('A0KI')) end
+            if tier >= 3 then UnitAddAbility(summon, THUNDER_CLAP_GOLEM.id) end
+            if tier >= 4 then UnitAddAbility(summon, MAGNETIC_FORCE.id) end
+            if tier >= 5 then UnitAddAbility(summon, FourCC('A0IQ')) end
+        elseif uid == SUMMON_DESTROYER then
+            UnitRemoveAbility(summon, FourCC('A061'))
+            UnitRemoveAbility(summon, FourCC('A03B'))
+            UnitRemoveAbility(summon, FourCC('A0IQ'))
+            SetUnitAbilityLevel(summon, FourCC('A02D'), 1)
+
+            unit.essence_agi = unit.essence_agi + tier * 50
+            if tier >= 2 then UnitAddAbility(summon, FourCC('A061')) end
+            if tier >= 3 then
+                UnitAddAbility(summon, FourCC('A03B'))
+                unit.essence_cc = 25
+                unit.essence_cd = 200
+            end
+            if tier >= 4 then
+                SetUnitAbilityLevel(summon, FourCC('A02D'), 2)
+                UnitAddAbility(summon, FourCC('A0IQ'))
+            end
+            if tier >= 5 then
+                unit.essence_int = unit.essence_int + R2I(unit.int * 0.25)
+            end
+            BlzSetHeroProperName(summon, "Destroyer (Tier " .. tier .. ")")
+        end
+
+        unit.bonus_str = unit.bonus_str + unit.essence_str
+        unit.bonus_agi = unit.bonus_agi + unit.essence_agi
+        unit.bonus_int = unit.bonus_int + unit.essence_int
+        unit.bonus_armor = unit.bonus_armor + unit.essence_armor
+        unit.cc_flat = unit.cc_flat + unit.essence_cc
+        unit.cd_flat = unit.cd_flat + unit.essence_cd
+    end
+
+    function SummonEssence.infuse(pid, summon)
+        if not is_valid_summon(pid, summon) then
+            message(pid, "|cffff0000You must target one of your active summons.|r")
+            return false
+        end
+
+        local uid = GetUnitTypeId(summon)
+        local state = get_state(pid)
+        if state[uid] >= MAX_TIER then
+            message(pid, "|cffffcc00That summon is already tier 5.|r")
+            return false
+        elseif SummonEssence.unspent(pid) <= 0 then
+            message(pid, "|cffffcc00You have no unallocated Essence points.|r")
+            return false
+        end
+
+        state[uid] = state[uid] + 1
+        persist(pid)
+        SummonEssence.apply(pid, summon)
+        DestroyEffect(AddSpecialEffectTarget("Abilities\\Spells\\Other\\Charm\\CharmTarget.mdl", summon, "chest"))
+        FloatingTextUnit("Tier " .. state[uid], summon, 1, 75, 50, 12., 180, 110, 255, 0, true)
+        message(pid, "|cffb46effEssence infused.|r " .. SummonEssence.unspent(pid) .. " point(s) remain.")
+        return true
+    end
+
+    function SummonEssence.reclaim(pid, summon)
+        if not is_valid_summon(pid, summon) then
+            message(pid, "|cffff0000You must target one of your active summons.|r")
+            return false
+        elseif not is_respec_area(pid) then
+            message(pid, "|cffff0000Essence can only be reclaimed in town, the church, or the tavern.|r")
+            return false
+        end
+
+        local uid = GetUnitTypeId(summon)
+        local state = get_state(pid)
+        if state[uid] <= 0 then
+            message(pid, "|cffffcc00That summon has no Essence to reclaim.|r")
+            return false
+        end
+
+        state[uid] = state[uid] - 1
+        persist(pid)
+        SummonEssence.apply(pid, summon)
+        DestroyEffect(AddSpecialEffectTarget("Abilities\\Spells\\Human\\DispelMagic\\DispelMagicTarget.mdl", summon, "origin"))
+        message(pid, "|cffb46effEssence reclaimed.|r " .. SummonEssence.unspent(pid) .. " point(s) are available.")
+        return true
+    end
+
+    local function on_character_setup(pid)
+        if Hero[pid] and GetUnitTypeId(Hero[pid]) == HERO_DARK_SUMMONER then
+            SummonEssence.load(pid, Profile[pid].hero.summon_essence or 0)
+        end
+    end
+
+    for pid = 1, PLAYER_CAP do
+        EVENT_ON_SETUP:register_action(pid, on_character_setup)
+    end
 
     ---@class SUMMONINGIMPROVEMENT : Spell
-    ---@field apply function
+    ---@field apply fun(pid: integer, summon: unit, str: integer, agi: integer, int: integer)
     SUMMONINGIMPROVEMENT = Spell.define("A022")
     do
         local thistype = SUMMONINGIMPROVEMENT
 
         local function update_level(u, level)
             SetUnitAbilityLevel(u, thistype.id, level // 10 + 1)
+
+            for i = 1, #MILESTONES do
+                local pid = GetPlayerId(GetOwningPlayer(u)) + 1
+                if level == MILESTONES[i] and Profile[pid] and Profile[pid].playing then
+                    message(pid, "|cffb46effYou gained a Summon Essence point.|r "
+                        .. SummonEssence.unspent(pid) .. " point(s) are unallocated.")
+                    break
+                end
+            end
+        end
+
+        local function on_cleanup(pid)
+            essence_tiers[pid] = nil
+            EVENT_ON_CLEANUP:unregister_action(pid, on_cleanup)
         end
 
         function thistype.onSetup(u)
+            local pid = GetPlayerId(GetOwningPlayer(u)) + 1
+            essence_tiers[pid] = nil
+            get_state(pid)
+
+            SetPlayerAbilityAvailable(Player(pid - 1), FourCC('A063'), false)
             EVENT_HERO_LEVEL_CHANGED:register_unit_action(u, update_level)
+            EVENT_ON_CLEANUP:register_action(pid, on_cleanup)
             update_level(u, GetHeroLevel(u))
         end
 
-        ---@type fun(pid: integer, summon: unit, str: integer, agi: integer, int: integer)
         function thistype.apply(pid, summon, str, agi, int)
-            local ablev = GetUnitAbilityLevel(Hero[pid], SUMMONINGIMPROVEMENT.id) - 1  ---@type integer --summoning improvement
-            local uid = GetUnitTypeId(summon) ---@type integer 
+            local ablev = GetUnitAbilityLevel(Hero[pid], thistype.id) - 1
+            local unit = Unit[summon]
 
-            --stat ratios
-            Unit[summon].str = str
-            if uid ~= SUMMON_DESTROYER then
-                Unit[summon].agi = agi
-            else
+            unit.bonus_armor = unit.bonus_armor - (unit.summoning_improvement_armor or 0)
+            unit.summoning_improvement_armor = 0
+            unit.str = str
+
+            if GetUnitTypeId(summon) == SUMMON_DESTROYER then
                 BlzSetUnitArmor(summon, agi)
+            else
+                unit.agi = agi
             end
-            Unit[summon].int = int
-
-            local armor = 0
+            unit.int = int
 
             if ablev > 0 then
                 SetUnitMoveSpeed(summon, GetUnitDefaultMoveSpeed(summon) + ablev * 10.)
-
-                --armor bonus
-                armor = armor + R2I((Pow(ablev, 1.2) + (Pow(ablev, 4.) - Pow(ablev, 3.9)) / 90.) / 2. + ablev + 6.5)
-
-                --status bar buff
+                unit.summoning_improvement_armor = R2I(
+                    (Pow(ablev, 1.2) + (Pow(ablev, 4.) - Pow(ablev, 3.9)) / 90.) / 2. + ablev + 6.5)
                 UnitAddAbility(summon, FourCC('A06Q'))
                 SetUnitAbilityLevel(summon, FourCC('A06Q'), ablev)
+            else
+                SetUnitMoveSpeed(summon, GetUnitDefaultMoveSpeed(summon))
+                UnitRemoveAbility(summon, FourCC('A06Q'))
             end
 
-            if uid == SUMMON_GOLEM then --golem
-                if GetUnitAbilityLevel(Hero[pid], DEVOUR.id) > 0 then --golem devour ability
-                    UnitAddAbility(summon, DEVOUR_GOLEM.id)
-                    SetUnitAbilityLevel(summon, DEVOUR_GOLEM.id, GetUnitAbilityLevel(Hero[pid], DEVOUR.id))
-                end
-                if ablev >= 20 then
-                    UnitAddAbility(summon, FourCC('A0IQ'))
-                end
-            elseif uid == SUMMON_DESTROYER then --destroyer
-                if GetUnitAbilityLevel(Hero[pid], DEVOUR.id) > 0 then --destroyer devour ability
-                    UnitAddAbility(summon, FourCC('A04Z'))
-                    SetUnitAbilityLevel(summon, FourCC('A04Z'), GetUnitAbilityLevel(Hero[pid], DEVOUR.id))
-                end
-                if ablev >= 30 then
-                    UnitAddAbility(summon, FourCC('A0IQ'))
-                end
-            elseif uid == SUMMON_HOUND then --demon hound
-            end
-
-            Unit[summon].bonus_armor = Unit[summon].bonus_armor + armor
+            unit.bonus_armor = unit.bonus_armor + unit.summoning_improvement_armor
         end
 
         function thistype:onCast()
@@ -72,136 +348,95 @@ OnInit.final("DarkSummonerSpells", function(Require)
         end
     end
 
-    local is_destroyer_sacrificed = {} ---@type boolean[] 
+    local function prepare_summon(pid, summon, x, y, angle)
+        TimerList[pid]:stopAllTimers(summon)
+        ShowUnit(summon, true)
+        ReviveHero(summon, x, y, false)
+        SetUnitPosition(summon, x, y)
+        BlzSetUnitFacingEx(summon, angle)
+        Buff.dispelAll(summon)
+        TableRemove(PLAYER_SUMMONS, summon)
+        PLAYER_SUMMONS[#PLAYER_SUMMONS + 1] = summon
+        EVENT_ON_FATAL_DAMAGE:register_unit_action(summon, SummonExpire)
+        SetHeroLevel(summon, GetHeroLevel(Hero[pid]), false)
+    end
 
-    ---@class SUMMONDEMONHOUND : Spell
-    ---@field hounds function
+    local function finish_summon(pid, summon)
+        SummonEssence.apply(pid, summon)
+        SetWidgetLife(summon, BlzGetUnitMaxHP(summon))
+        SetUnitState(summon, UNIT_STATE_MANA, BlzGetUnitMaxMana(summon))
+        TimerQueue:callDelayed(2., DestroyEffect,
+            AddSpecialEffectTarget("Abilities\\Spells\\Undead\\Darksummoning\\DarkSummonTarget.mdl", summon, "origin"))
+    end
+
+    ---@class SUMMONDREADREAVER : Spell
     ---@field str function
     ---@field agi function
     ---@field int function
-    SUMMONDEMONHOUND = Spell.define("A0KF")
+    SUMMONDREADREAVER = Spell.define("A0KF")
     do
-        local thistype = SUMMONDEMONHOUND
-        local hounds = {} ---@type unit[][]
+        local thistype = SUMMONDREADREAVER
+        local reavers = {} ---@type unit[]
 
-        thistype.values = {
-            hounds = function(pid) local ablev = GetUnitAbilityLevel(Hero[pid], thistype.id) return 2 + ablev end,
-            str = function(pid) return 0.2 * (GetHeroInt(Hero[pid], true) + GetHeroStr(Hero[pid], true)) end,
-            agi = function(pid) return 0.075 * GetHeroInt(Hero[pid], true) end,
-            int = function(pid) return 0.25 * GetHeroInt(Hero[pid], true) end,
-        }
-
-        local function hound_duration(pt)
-            local summons = hounds[pt.pid]
-            pt.dur = pt.dur - 0.5
-
-            if pt.dur > 0 then
-                for _, hound in ipairs(summons) do
-                    SetUnitState(hound, UNIT_STATE_MANA, BlzGetUnitMaxMana(hound) * pt.dur / pt.time)
-                end
-                return true
-            end
-
-            for _, hound in ipairs(summons) do
-                SummonExpire(hound)
-            end
-            return false
+        BlzSetAbilityTooltip(thistype.id, "Summon Dread Reaver", 0)
+        for level = 1, #Spell.TOOLTIPS[thistype.id] do
+            Spell.TOOLTIPS[thistype.id][level] =
+                "Summons a permanent melee fighter that cleaves nearby enemies and can be specialized with Summon Essence."
         end
 
-        local function on_cleanup(pid)
-            for i = 1, 6 do
-                TableRemove(PLAYER_SUMMONS, hounds[pid * PLAYER_CAP + i])
-                hounds[pid * PLAYER_CAP + i] = nil
-            end
+        thistype.values = {
+            str = function(pid) return 0.35 * (GetHeroInt(Hero[pid], true) + GetHeroStr(Hero[pid], true)) end,
+            agi = function(pid) return 0.1 * GetHeroInt(Hero[pid], true) end,
+            int = function(pid) return 0.2 * GetHeroInt(Hero[pid], true) end,
+        }
 
+        local function on_cleanup(pid)
+            TableRemove(PLAYER_SUMMONS, reavers[pid])
+            reavers[pid] = nil
             EVENT_ON_CLEANUP:unregister_action(pid, on_cleanup)
         end
 
-        local function on_hit(source, target)
+        local function cleave(source, target, amount, amount_after_reduction, damage_type)
+            if damage_type ~= PHYSICAL or amount_after_reduction <= 0 then return end
+
             local pid = GetPlayerId(GetOwningPlayer(source)) + 1
+            local tier = SummonEssence.getTier(pid, source)
+            local group = CreateGroup()
+            local radius = (225. + tier * 15.) * LBOOST[pid]
+            local cleave_damage = amount_after_reduction * (0.2 + tier * 0.06)
 
-            --deadly bite
-            if GetRandomInt(0, 99) < 25 then
-                if is_destroyer_sacrificed[pid] then
-                    --aoe attack
-                    local ug = CreateGroup()
-                    MakeGroupInRange(pid, ug, GetUnitX(target), GetUnitY(target), 400. * LBOOST[pid], Condition(FilterEnemy))
-
-                    for u in each(ug) do
-                        DamageTarget(source, u, GetHeroInt(source, true) * 1.25 * BOOST[pid], ATTACK_TYPE_NORMAL, MAGIC, "Deadly Bite")
-                    end
-
-                    DestroyGroup(ug)
-                else
-                    DamageTarget(source, target, GetHeroInt(source, true) * LBOOST[pid], ATTACK_TYPE_NORMAL, MAGIC, "Deadly Bite")
+            MakeGroupInRange(pid, group, GetUnitX(target), GetUnitY(target), radius, Condition(FilterEnemy))
+            for enemy in each(group) do
+                if enemy ~= target then
+                    DamageTarget(source, enemy, cleave_damage, ATTACK_TYPE_NORMAL, PURE, "Dread Cleave")
                 end
-                DestroyEffect(AddSpecialEffect("Abilities\\Spells\\Undead\\DeathCoil\\DeathCoilSpecialArt.mdl", GetUnitX(target), GetUnitY(target)))
             end
+            DestroyGroup(group)
         end
 
         function thistype:onCast()
-            if not hounds[self.pid] then
-                hounds[self.pid] = {}
+            local angle = GetUnitFacing(self.caster)
+            local x = self.x + 150. * math.cos(bj_DEGTORAD * angle)
+            local y = self.y + 150. * math.sin(bj_DEGTORAD * angle)
+            local summon = reavers[self.pid]
+
+            if not summon then
+                summon = CreateUnit(Player(self.pid - 1), SUMMON_REAVER, x, y, angle)
+                reavers[self.pid] = summon
             end
 
-            self.angle = GetUnitFacing(self.caster)
-            self.x = self.x + 150 * math.cos(bj_DEGTORAD * self.angle)
-            self.y = self.y + 150 * math.sin(bj_DEGTORAD * self.angle)
-
-            for i = 1, self.hounds do
-                local summon = hounds[self.pid][i]
-
-                if summon then
-                    TimerList[self.pid]:stopAllTimers(SUMMON_HOUND)
-                    ShowUnit(summon, true)
-                    ReviveHero(summon, self.x, self.y, false)
-                    SetWidgetLife(summon, BlzGetUnitMaxHP(summon))
-                    SetUnitState(summon, UNIT_STATE_MANA, BlzGetUnitMaxMana(summon))
-                    SetUnitScale(summon, 0.85, 0.85, 0.85)
-                    SetUnitPosition(summon, self.x, self.y)
-                    BlzSetUnitFacingEx(summon, self.angle)
-                    SetUnitVertexColor(summon, 120, 60, 60, 255)
-                    Unit[summon].bonus_armor = 0
-                    SetUnitAbilityLevel(summon, FourCC('A06F'), 1)
-                else
-                    summon = CreateUnit(Player(self.pid - 1), SUMMON_HOUND, self.x, self.y, self.angle)
-                    hounds[self.pid][i] = summon
-                    Unit[summon].nomanaregen = true
-                end
-
-                TimerQueue:callDelayed(2., DestroyEffect, AddSpecialEffectTarget("Abilities\\Spells\\Undead\\Darksummoning\\DarkSummonTarget.mdl", summon, "origin"))
-
-                Buff.dispelAll(summon)
-                SUMMONINGIMPROVEMENT.apply(self.pid, summon, R2I(self.str * BOOST[self.pid]), R2I(self.agi * BOOST[self.pid]), R2I(self.int * BOOST[self.pid]))
-                EVENT_ON_HIT:register_unit_action(summon, on_hit)
-
-                if is_destroyer_sacrificed[self.pid] then
-                    SetUnitVertexColor(summon, 90, 90, 230, 255)
-                    SetUnitScale(summon, 1.15, 1.15, 1.15)
-                    SetUnitAbilityLevel(summon, FourCC('A06F'), 2)
-                end
-
-                Unit[summon].borrowed_life = 0
-                if GetUnitAbilityLevel(summon, FourCC('A06Q')) > 9 then
-                    Unit[summon].regen_max = (0.02 + 0.0005 * GetUnitAbilityLevel(summon, FourCC('A06Q')))
-                end
-                PLAYER_SUMMONS[#PLAYER_SUMMONS + 1] = summon
-                EVENT_ON_FATAL_DAMAGE:register_unit_action(summon, SummonExpire)
-                EVENT_ON_CLEANUP:register_action(self.pid, on_cleanup)
-                SetHeroLevel(summon, GetHeroLevel(self.caster), false)
-
-                -- heal fully
-                SetWidgetLife(summon, BlzGetUnitMaxHP(summon))
-            end
-
-            local pt = TimerList[self.pid]:add()
-            pt.dur = 60.
-            pt.time = 60.
-            pt.tag = SUMMON_HOUND
-            pt.count = self.hounds
-            pt:startLoop(0.5, hound_duration)
+            prepare_summon(self.pid, summon, x, y, angle)
+            SetUnitVertexColor(summon, 120, 60, 60, 255)
+            SUMMONINGIMPROVEMENT.apply(self.pid, summon,
+                R2I(self.str * BOOST[self.pid]), R2I(self.agi * BOOST[self.pid]), R2I(self.int * BOOST[self.pid]))
+            Unit[summon].regen_max = 0.02 + 0.0005 * GetUnitAbilityLevel(summon, FourCC('A06Q'))
+            EVENT_ON_HIT_AFTER_REDUCTIONS:register_unit_action(summon, cleave)
+            EVENT_ON_CLEANUP:register_action(self.pid, on_cleanup)
+            finish_summon(self.pid, summon)
         end
     end
+
+    SUMMONDEMONHOUND = SUMMONDREADREAVER
 
     ---@class SUMMONMEATGOLEM : Spell
     ---@field str function
@@ -209,7 +444,7 @@ OnInit.final("DarkSummonerSpells", function(Require)
     SUMMONMEATGOLEM = Spell.define("A0KH")
     do
         local thistype = SUMMONMEATGOLEM
-        local meatgolem = {} ---@type unit[] 
+        local golems = {} ---@type unit[]
 
         thistype.values = {
             str = function(pid) return 0.4 * (GetHeroInt(Hero[pid], true) + GetHeroStr(Hero[pid], true)) end,
@@ -217,262 +452,131 @@ OnInit.final("DarkSummonerSpells", function(Require)
         }
 
         local function on_cleanup(pid)
-            TableRemove(PLAYER_SUMMONS, meatgolem[pid])
-            meatgolem[pid] = nil
-
+            TableRemove(PLAYER_SUMMONS, golems[pid])
+            golems[pid] = nil
             EVENT_ON_CLEANUP:unregister_action(pid, on_cleanup)
         end
 
         function thistype:onCast()
-            local summon = meatgolem[self.pid]
+            local angle = GetUnitFacing(self.caster)
+            local x = self.x + 150. * math.cos(bj_DEGTORAD * angle)
+            local y = self.y + 150. * math.sin(bj_DEGTORAD * angle)
+            local summon = golems[self.pid]
 
-            TimerList[self.pid]:stopAllTimers('dvou')
-            self.angle = GetUnitFacing(self.caster)
-            self.x = self.x + 150 * math.cos(bj_DEGTORAD * self.angle)
-            self.y = self.y + 150 * math.sin(bj_DEGTORAD * self.angle)
-
-            if summon then
-                TimerList[self.pid]:stopAllTimers(summon)
-                ShowUnit(summon, true)
-                ReviveHero(summon, self.x, self.y, false)
-                SetWidgetLife(summon, BlzGetUnitMaxHP(summon))
-                SetUnitState(summon, UNIT_STATE_MANA, BlzGetUnitMaxMana(summon))
-                SetUnitScale(summon, 1., 1., 1.)
-                SetUnitPosition(summon, self.x, self.y)
-                BlzSetUnitFacingEx(summon, self.angle)
-                UnitRemoveAbility(summon, BORROWED_LIFE.id) -- borrowed life
-                UnitRemoveAbility(summon, THUNDER_CLAP_GOLEM.id) -- thunder clap
-                UnitRemoveAbility(summon, MAGNETIC_FORCE.id) -- magnetic force
-                UnitRemoveAbility(summon, DEVOUR_GOLEM.id) -- devour
-                Unit[summon].bonus_armor = 0
-                Unit[summon].bonus_str = 0
-            else
-                summon = CreateUnit(Player(self.pid - 1), SUMMON_GOLEM, self.x, self.y, self.angle)
-                meatgolem[self.pid] = summon
+            if not summon then
+                summon = CreateUnit(Player(self.pid - 1), SUMMON_GOLEM, x, y, angle)
+                golems[self.pid] = summon
             end
 
-            Buff.dispelAll(summon)
-            Unit[summon].devour_stacks = 0
-            Unit[summon].borrowed_life = 0
-            SUMMONINGIMPROVEMENT.apply(self.pid, summon, R2I(self.str * BOOST[self.pid]), R2I(self.agi * BOOST[self.pid]), 0)
-            Unit[summon].regen_max = (0.02 + 0.00025 * GetUnitAbilityLevel(summon, FourCC('A06Q')))
-
-            BlzSetHeroProperName(summon, "Meat Golem")
-            TimerQueue:callDelayed(2., DestroyEffect, AddSpecialEffectTarget("Abilities\\Spells\\Undead\\Darksummoning\\DarkSummonTarget.mdl", summon, "origin"))
-            PLAYER_SUMMONS[#PLAYER_SUMMONS + 1] = summon
-            EVENT_ON_FATAL_DAMAGE:register_unit_action(summon, SummonExpire)
+            prepare_summon(self.pid, summon, x, y, angle)
+            SUMMONINGIMPROVEMENT.apply(self.pid, summon,
+                R2I(self.str * BOOST[self.pid]), R2I(self.agi * BOOST[self.pid]), 0)
+            Unit[summon].regen_max = 0.02 + 0.00025 * GetUnitAbilityLevel(summon, FourCC('A06Q'))
             EVENT_ON_CLEANUP:register_action(self.pid, on_cleanup)
-            SetHeroLevel(summon, GetHeroLevel(self.caster), false)
-
-            -- heal fully
-            SetWidgetLife(summon, BlzGetUnitMaxHP(summon))
+            finish_summon(self.pid, summon)
         end
     end
 
     ---@class SUMMONDESTROYER : Spell
-    ---@field periodic function
     ---@field str function
     ---@field agi function
     ---@field int function
     SUMMONDESTROYER = Spell.define("A0KG")
     do
         local thistype = SUMMONDESTROYER
-        local destroyer = {} ---@type unit[] 
+        local destroyers = {} ---@type unit[]
 
         thistype.values = {
             str = function(pid) return 0.0666 * (GetHeroInt(Hero[pid], true) + GetHeroStr(Hero[pid], true)) end,
             agi = function(pid) return 0.005 * GetHeroInt(Hero[pid], true) end,
-            int = function(pid) local ablev = GetUnitAbilityLevel(Hero[pid], thistype.id) return 0.5 * GetHeroInt(Hero[pid], true) * ablev end,
+            int = function(pid) local ablev = GetUnitAbilityLevel(Hero[pid], thistype.id)
+                return 0.5 * GetHeroInt(Hero[pid], true) * ablev end,
         }
 
-        ---@type fun(pt: PlayerTimer): boolean
-        local function periodic(pt)
-            local base = 0
-
-            if Unit[destroyer[pt.pid]].devour_stacks == 5 then
-                base = 400
-            elseif Unit[destroyer[pt.pid]].devour_stacks >= 3 then
-                base = 200
-            end
-
-            Unit[destroyer[pt.pid]].agi = IMinBJ(GetHeroAgi(destroyer[pt.pid], false) + 50, 400)
-
-            if pt.x == GetUnitX(destroyer[pt.pid]) and pt.y == GetUnitY(destroyer[pt.pid]) then
-                return true
-            end
-
-            Unit[destroyer[pt.pid]].agi = base
-
-            return false
-        end
-
-        local function on_attack(source, target)
-            local pid = GetPlayerId(GetOwningPlayer(source)) + 1
-            local pt = TimerList[pid]:get('datk')
-
-            if not pt or pt.target ~= target then
-                TimerList[pid]:stopAllTimers('datk')
-                pt = TimerList[pid]:add()
-                pt.x = x
-                pt.y = y
-                pt.target = target
-                pt.tag = 'datk'
-
-                Unit[source].agi = 0
-                if Unit[source].devour_stacks == 5 then
-                    Unit[source].agi = 400
-                elseif Unit[source].devour_stacks >= 3 then
-                    Unit[source].agi = 200
-                end
-
-                pt:startLoop(1., periodic)
-            end
-        end
-
         local function on_cleanup(pid)
-            TableRemove(PLAYER_SUMMONS, destroyer[pid])
-            destroyer[pid] = nil
-
+            TableRemove(PLAYER_SUMMONS, destroyers[pid])
+            destroyers[pid] = nil
             EVENT_ON_CLEANUP:unregister_action(pid, on_cleanup)
         end
 
-        local function on_hit(source, target)
+        local function annihilation(source, target)
             local pid = GetPlayerId(GetOwningPlayer(source)) + 1
-            local chance = (15 and Unit[source].devour_stacks >= 4) or 10
+            local tier = SummonEssence.getTier(pid, source)
 
-            --annihilation strike
-            if GetRandomInt(0, 99) < chance then
-                DestroyEffect(AddSpecialEffect("Abilities\\Spells\\Undead\\DeathCoil\\DeathCoilSpecialArt.mdl", GetUnitX(target), GetUnitY(target)))
-                DamageTarget(source, target, GetHeroInt(source, true) * LBOOST[pid], ATTACK_TYPE_NORMAL, MAGIC, "Annihilation Strike")
+            if GetRandomInt(0, 99) < 10 + tier * 2 then
+                DestroyEffect(AddSpecialEffect("Abilities\\Spells\\Undead\\DeathCoil\\DeathCoilSpecialArt.mdl",
+                    GetUnitX(target), GetUnitY(target)))
+                DamageTarget(source, target, GetHeroInt(source, true) * (1. + tier * 0.2) * LBOOST[pid],
+                    ATTACK_TYPE_NORMAL, MAGIC, "Annihilation Strike")
             end
         end
-
 
         function thistype:onCast()
-            local summon = destroyer[self.pid]
+            local angle = GetUnitFacing(self.caster) + 180.
+            local x = self.x + 150. * math.cos(bj_DEGTORAD * angle)
+            local y = self.y + 150. * math.sin(bj_DEGTORAD * angle)
+            local summon = destroyers[self.pid]
 
-            TimerList[self.pid]:stopAllTimers('blif')
-            self.angle = GetUnitFacing(self.caster) + 180
-            self.x = self.x + 150 * math.cos(bj_DEGTORAD * self.angle)
-            self.y = self.y + 150 * math.sin(bj_DEGTORAD * self.angle)
-
-            if summon then
-                TimerList[self.pid]:stopAllTimers(summon)
-                ShowUnit(summon, true)
-                ReviveHero(summon, self.x, self.y, false)
-                SetWidgetLife(summon, BlzGetUnitMaxHP(summon))
-                SetUnitState(summon, UNIT_STATE_MANA, BlzGetUnitMaxMana(summon))
-                SetUnitPosition(summon, self.x, self.y)
-                BlzSetUnitFacingEx(summon, self.angle + 180)
-                SetUnitAbilityLevel(summon, FourCC('A02D'), 1)
-                SetUnitAbilityLevel(summon, FourCC('A06J'), 1)
-                UnitRemoveAbility(summon, FourCC('A061')) -- blink
-                UnitRemoveAbility(summon, FourCC('A03B')) -- crit
-                UnitRemoveAbility(summon, BORROWED_LIFE.id) -- borrowed life
-                UnitRemoveAbility(summon, FourCC('A04Z')) -- devour
-                Unit[summon].bonus_armor = 0
-                Unit[summon].bonus_str = 0
-                Unit[summon].bonus_agi = 0
-                Unit[summon].bonus_int = 0
-                Unit[summon].agi = 0
-            else
-                summon = CreateUnit(Player(self.pid - 1), SUMMON_DESTROYER, self.x, self.y, self.angle + 180)
-                destroyer[self.pid] = summon
+            if not summon then
+                summon = CreateUnit(Player(self.pid - 1), SUMMON_DESTROYER, x, y, angle + 180.)
+                destroyers[self.pid] = summon
             end
 
-            Buff.dispelAll(summon)
-            Unit[summon].borrowed_life = 0
-            Unit[summon].devour_stacks = 0
-            is_destroyer_sacrificed[self.pid] = false
-
-            BlzSetHeroProperName(summon, "Destroyer")
-            TimerQueue:callDelayed(2., DestroyEffect, AddSpecialEffectTarget("Abilities\\Spells\\Undead\\Darksummoning\\DarkSummonTarget.mdl", summon, "origin"))
-            SUMMONINGIMPROVEMENT.apply(self.pid, summon, R2I(self.str * BOOST[self.pid]), R2I(self.agi * BOOST[self.pid]), R2I(self.int * BOOST[self.pid]))
-            Unit[summon].regen_max = (0.02 + 0.0005 * GetUnitAbilityLevel(summon, FourCC('A06Q')))
-
-            -- revert hounds to normal
-            for i = 1, #PLAYER_SUMMONS do
-                local target = PLAYER_SUMMONS[i]
-                if GetOwningPlayer(target) == Player(self.pid - 1) and GetUnitTypeId(target) == SUMMON_HOUND then
-                    SetUnitVertexColor(target, 120, 60, 60, 255)
-                    SetUnitScale(target, 0.85, 0.85, 0.85)
-                    SetUnitAbilityLevel(target, FourCC('A06F'), 1)
-                end
-            end
-
-            PLAYER_SUMMONS[#PLAYER_SUMMONS + 1] = summon
-            EVENT_ON_FATAL_DAMAGE:register_unit_action(summon, SummonExpire)
-            EVENT_ON_HIT:register_unit_action(summon, on_hit)
-            EVENT_ON_ATTACK:register_unit_action(summon, on_attack)
+            prepare_summon(self.pid, summon, x, y, angle + 180.)
+            SUMMONINGIMPROVEMENT.apply(self.pid, summon,
+                R2I(self.str * BOOST[self.pid]), R2I(self.agi * BOOST[self.pid]), R2I(self.int * BOOST[self.pid]))
+            Unit[summon].regen_max = 0.02 + 0.0005 * GetUnitAbilityLevel(summon, FourCC('A06Q'))
+            EVENT_ON_HIT:register_unit_action(summon, annihilation)
             EVENT_ON_CLEANUP:register_action(self.pid, on_cleanup)
-            SetHeroLevel(summon, GetHeroLevel(self.caster), false)
-
-            -- heal fully
-            SetWidgetLife(summon, BlzGetUnitMaxHP(summon))
+            finish_summon(self.pid, summon)
         end
-    end
-
-    ---@class DEVOUR : Spell
-    DEVOUR = Spell.define("A063")
-    do
-        local thistype = DEVOUR
     end
 
     ---@class DEMONICSACRIFICE : Spell
-    ---@field pheal number
-    ---@field dur number
     DEMONICSACRIFICE = Spell.define("A0K1")
     do
         local thistype = DEMONICSACRIFICE
 
-        thistype.values = {
-            pheal = 30.,
-            dur = 15.,
-        }
+        for level = 1, #Spell.TOOLTIPS[thistype.id] do
+            Spell.TOOLTIPS[thistype.id][level] =
+                "Sacrifices up to 15% of your maximum health to heal a damaged owned summon for twice the health paid. Cannot reduce you below 1 health."
+        end
 
-        function thistype.preCast(pid, tpid, caster, target, x, y, targetX, targetY)
-            if GetOwningPlayer(target) ~= Player(pid - 1) then
+        local function can_sacrifice(pid, caster, target, show_message)
+            local valid = is_valid_summon(pid, target)
+                and GetWidgetLife(target) < BlzGetUnitMaxHP(target)
+                and GetWidgetLife(caster) > 1.
+
+            if not valid and show_message then
+                DisplayTextToPlayer(Player(pid - 1), 0, 0,
+                    "|cffff0000Target a damaged active summon while you have health to sacrifice.|r")
+            end
+            return valid
+        end
+
+        function thistype.preCast(pid, tpid, caster, target)
+            if not can_sacrifice(pid, caster, target, true) then
                 IssueImmediateOrderById(caster, ORDER_ID_STOP)
-                DisplayTextToPlayer(Player(pid - 1), 0, 0, "You must target your own summons!")
             end
         end
 
         function thistype:onCast()
-            -- demon hound
-            if GetUnitTypeId(self.target) == SUMMON_HOUND then
-                SummonExpire(self.target)
+            if not can_sacrifice(self.pid, self.caster, self.target, false) then return end
 
-                for i = 1, #PLAYER_SUMMONS do
-                    local target = PLAYER_SUMMONS[i]
-                    if GetOwningPlayer(target) == Player(self.pid - 1) then
-                        local heal = BlzGetUnitMaxHP(target) * self.pheal * 0.01 * BOOST[self.pid]
-                        HP(self.caster, target, heal, thistype.tag)
-                    end
-                end
-            -- meat golem
-            elseif GetUnitTypeId(self.target) == SUMMON_GOLEM then
-                if Unit[self.target].devour_stacks < 4 then
-                    SummonExpire(self.target)
-                end
+            local current_life = GetWidgetLife(self.caster)
+            local missing_life = BlzGetUnitMaxHP(self.target) - GetWidgetLife(self.target)
+            local heal_multiplier = math.max(0.01, Unit[self.target].regen_percent)
+            local payment = math.min(
+                BlzGetUnitMaxHP(self.caster) * 0.15,
+                current_life - 1.,
+                missing_life / (2. * heal_multiplier))
 
-                DemonicSacrificeBuff:add(self.caster, self.caster):duration(thistype.dur * LBOOST[self.pid])
+            if payment <= 0. then return end
 
-                TimerQueue:callDelayed(3., DestroyEffect, AddSpecialEffectTarget("Abilities\\Spells\\Orc\\AncestralSpirit\\AncestralSpiritCaster.mdl", self.target, "origin"))
-            -- destroyer
-            elseif GetUnitTypeId(self.target) == SUMMON_DESTROYER then
-                SummonExpire(self.target)
-                is_destroyer_sacrificed[self.pid] = true
-
-                for i = 1, #PLAYER_SUMMONS do
-                    local target = PLAYER_SUMMONS[i]
-                    if GetOwningPlayer(target) == Player(self.pid - 1) and GetUnitTypeId(target) == SUMMON_HOUND then
-                        SetUnitVertexColor(target, 90, 90, 230, 255)
-                        SetUnitScale(target, 1.15, 1.15, 1.15)
-                        DestroyEffect(AddSpecialEffectTarget("war3mapImported\\Call of Dread Purple.mdx", target, "origin"))
-                        SetUnitAbilityLevel(target, FourCC('A06F'), 2)
-                    end
-                end
-            end
+            SetWidgetLife(self.caster, current_life - payment)
+            HP(self.caster, self.target, payment * 2., thistype.tag)
+            DestroyEffect(AddSpecialEffectTarget(
+                "Abilities\\Spells\\Undead\\VampiricAura\\VampiricAuraTarget.mdl", self.target, "origin"))
         end
     end
 end, Debug and Debug.getLine())

@@ -49,8 +49,14 @@ OnInit.final("UnitTable", function(Require)
     ---@field mm number
     ---@field cc number
     ---@field cd number
-    ---@field borrowed_life number
-    ---@field devour_stacks number
+    ---@field cc_flat number
+    ---@field essence_str number?
+    ---@field essence_agi number?
+    ---@field essence_int number?
+    ---@field essence_armor number?
+    ---@field essence_cc number?
+    ---@field essence_cd number?
+    ---@field summoning_improvement_armor number?
     ---@field regen_flat number
     ---@field movespeed number
     ---@field overmovespeed number

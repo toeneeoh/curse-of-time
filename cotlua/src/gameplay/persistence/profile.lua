@@ -698,6 +698,7 @@ OnInit.final("Profile", function(Require)
     ---@field teleport integer
     ---@field reveal integer
     ---@field skin integer
+    ---@field summon_essence integer
     ---@field create function
     ---@field values function
     ---@field propagate function
@@ -985,6 +986,10 @@ OnInit.final("Profile", function(Require)
                 serialize_item(result, self.items[slot])
             end
 
+            -- Optional trailing data leaves all existing version-1 inventory
+            -- offsets intact; an older character payload simply reads zero.
+            result[#result + 1] = self.summon_essence or 0
+
             return result
         end
 
@@ -1058,6 +1063,8 @@ OnInit.final("Profile", function(Require)
             for slot = 1, MAX_INVENTORY_SLOTS do
                 self.saved_items[slot], index = deserialize_item(data, index)
             end
+
+            self.summon_essence = read_value(data, index)
 
             return true
         end

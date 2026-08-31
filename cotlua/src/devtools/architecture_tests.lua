@@ -121,6 +121,25 @@ OnInit.final("ArchitectureTests", function(Require)
         return true
     end)
 
+    ArchitectureTests.register("summon essence save extension is backward compatible", function()
+        local source = HeroData.create()
+        source.id = 1
+        source.summon_essence = 185
+
+        local current = source:values()
+        local decoded = HeroData.create()
+        if not decoded:propagate(current) or decoded.summon_essence ~= 185 then
+            return false, "summon essence did not round-trip"
+        end
+
+        current[#current] = nil
+        local previous = HeroData.create()
+        if not previous:propagate(current) or previous.summon_essence ~= 0 then
+            return false, "pre-extension character did not default summon essence to zero"
+        end
+        return true
+    end)
+
     ArchitectureTests.register("item lifecycle counters balance", function()
         local items = RuntimeMetrics.items
         if items.live ~= items.created - items.destroyed then
@@ -239,7 +258,7 @@ OnInit.final("ArchitectureTests", function(Require)
 
     ArchitectureTests.register("unit and item abilities are registered", function()
         local spell_ids = {
-            'A071', 'A06C', 'A04Z', 'A06O', 'A0B0', 'A02J', 'A0FV',
+            'A071', 'A06C', 'A06O', 'A0B0', 'A02J', 'A0FV',
             'ACfn', 'A0AJ', 'A02L', 'A01H', 'A015',
             'Aarm', 'Abas', 'Zs00', 'Zs01', 'Zs02', 'Zs03', 'Zs04', 'Zs05', 'Zs06',
             'A07G', 'A0B5', 'A0C0', 'A09O', 'Areg', 'Abon', 'Ahrt',
@@ -274,7 +293,7 @@ OnInit.final("ArchitectureTests", function(Require)
             'Disarm', 'FlamingBowBuff', 'InfusedWaterBuff', 'ResurgenceBuff',
             'ArcaneBarrageBuff', 'OverloadBuff', 'InspireBuff', 'MagneticStanceBuff',
             'EarthquakeDebuff', 'MarkedForDeathDebuff', 'RoyalPlateBuff',
-            'DemonicSacrificeBuff', 'JusticeAuraBuff', 'BloodMistBuff',
+            'JusticeAuraBuff', 'BloodMistBuff',
             'ManaDrainDebuff', 'ParryBuff', 'UndyingRageBuff', 'FrostArmorBuff',
             'NerveGasDebuff', 'RighteousMightBuff', 'FireElementBuff', 'HardHatBuff',
             'SingleShotDebuff', 'DarkShieldBuff', 'AstralShieldBuff',
