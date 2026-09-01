@@ -24,11 +24,11 @@ OnInit.final("DarkSummonerSpells", function(Require)
 
     local ESSENCE_TIER_TEXT = {
         [SUMMON_REAVER] = {
-            "Tier 1 - +15% STR, +10% AGI/INT, +5 Armor; Cleave: 26% damage / 240 radius.",
-            "Tier 2 - +30% STR, +20% AGI/INT, +10 Armor; Cleave: 32% damage / 255 radius.",
-            "Tier 3 - +45% STR, +30% AGI/INT, +15 Armor; Cleave: 38% / 270. Sacrifice: 0.90-0.70 BAT, +10-50% cleave, +20-100 radius.",
-            "Tier 4 - +60% STR, +40% AGI/INT, +20 Armor; Cleave: 44% / 285 and applies -10% damage for 4 seconds.",
-            "Tier 5 - +75% STR, +50% AGI/INT, +25 Armor; Cleave: 50% / 300. Sacrifice: 0.85-0.60 BAT, +15-75% cleave, +30-150 radius. Cleave heals up to 3% Max Health per attack.",
+            "Tier 1 - +15% STR, +10% AGI/INT, +5 Armor; Cleave: 26% damage / 650 length / 240 end width.",
+            "Tier 2 - +30% STR, +20% AGI/INT, +10 Armor; Cleave: 32% damage / 650 length / 255 end width.",
+            "Tier 3 - +45% STR, +30% AGI/INT, +15 Armor; Cleave: 38% / 650 / 270. Sacrifice: 0.90-0.70 BAT, +10-50% cleave, +20-100 end width.",
+            "Tier 4 - +60% STR, +40% AGI/INT, +20 Armor; Cleave: 44% / 650 / 285 and applies -10% damage for 4 seconds.",
+            "Tier 5 - +75% STR, +50% AGI/INT, +25 Armor; Cleave: 50% / 650 / 300. Sacrifice: 0.85-0.60 BAT, +15-75% cleave, +30-150 end width. Cleave heals up to 3% Max Health per attack.",
         },
         [SUMMON_GOLEM] = {
             "Tier 1 - +20% STR, +10% AGI, and +6 Armor.",
@@ -487,6 +487,9 @@ OnInit.final("DarkSummonerSpells", function(Require)
     do
         local thistype = SUMMONREAVER
         local reavers = {} ---@type unit[]
+        local CLEAVE_LENGTH = 650.
+        local CLEAVE_START_WIDTH = 150.
+        local CLEAVE_EFFECT = "UnbrilliantGloryWhite.mdx"
 
         thistype.values = {
             str = function(pid) return 0.25 * (GetHeroInt(Hero[pid], true) + GetHeroStr(Hero[pid], true)) end,
@@ -507,20 +510,51 @@ OnInit.final("DarkSummonerSpells", function(Require)
             local tier = SummonEssence.getTier(pid, source)
             local frenzy = ReaverBloodFrenzyBuff:get(nil, source)
             local group = CreateGroup()
-            local radius = 225. + tier * 15.
+            local end_width = 225. + tier * 15.
             local cleave_damage = amount_after_reduction * (0.2 + tier * 0.06)
             local healing = 0.
+            local source_x, source_y = GetUnitX(source), GetUnitY(source)
+            local dx, dy = GetUnitX(target) - source_x, GetUnitY(target) - source_y
+            local distance = math.sqrt(dx * dx + dy * dy)
+            local facing
 
             if frenzy then
-                radius = radius + frenzy.radius
+                end_width = end_width + frenzy.width
                 cleave_damage = cleave_damage * frenzy.cleave_multiplier
             end
 
-            radius = radius * LBOOST[pid]
+            if distance > 0.001 then
+                dx, dy = dx / distance, dy / distance
+                facing = math.atan(dy, dx)
+            else
+                facing = GetUnitFacing(source) * bj_DEGTORAD
+                dx, dy = math.cos(facing), math.sin(facing)
+            end
 
-            MakeGroupInRange(pid, group, GetUnitX(target), GetUnitY(target), radius, Condition(FilterEnemy))
+            local length = CLEAVE_LENGTH * LBOOST[pid]
+            local start_width = CLEAVE_START_WIDTH * LBOOST[pid]
+            end_width = end_width * LBOOST[pid]
+            local center_x = source_x + dx * length * 0.5
+            local center_y = source_y + dy * length * 0.5
+            local enum_radius = math.sqrt(length * length * 0.25 + end_width * end_width)
+
+            local effect = AddSpecialEffect(CLEAVE_EFFECT, GetUnitX(target), GetUnitY(target))
+            BlzSetSpecialEffectYaw(effect, facing)
+            DestroyEffect(effect)
+
+            MakeGroupInRange(pid, group, center_x, center_y, enum_radius, Condition(FilterEnemy))
             for enemy in each(group) do
-                if enemy ~= target then
+                local enemy_dx = GetUnitX(enemy) - source_x
+                local enemy_dy = GetUnitY(enemy) - source_y
+                local forward = enemy_dx * dx + enemy_dy * dy
+                local lateral = math.abs(enemy_dx * dy - enemy_dy * dx)
+                local allowed_width = start_width
+
+                if length > 0. then
+                    allowed_width = start_width + (end_width - start_width) * forward / length
+                end
+
+                if enemy ~= target and forward >= 0. and forward <= length and lateral <= allowed_width then
                     DamageTarget(source, enemy, cleave_damage, ATTACK_TYPE_NORMAL, PURE, "Dread Cleave")
                     if tier >= 4 then
                         DreadfulWoundsDebuff:add(source, enemy):duration(4. * LBOOST[pid])
@@ -719,6 +753,54 @@ OnInit.final("DarkSummonerSpells", function(Require)
             end
         end
 
+        local sacrifice_missile_template = {
+            selfInteractions = {
+                CAT_MoveArcedHoming,
+                CAT_Orient3D,
+                CAT_Decay,
+            },
+            interactions = {
+                unit = CAT_UnitCollisionCheck3D,
+            },
+            identifier = "missile",
+            collisionRadius = 10.,
+            onlyTarget = true,
+            collideZ = true,
+            visualZ = 70.,
+            speed = 900.,
+            arc = 0.15,
+            lifetime = 5.,
+            onUnitCollision = CAT_UnitImpact3D,
+            onUnitCallback = function(self, summon)
+                if not is_valid_summon(self.pid, summon) then return end
+
+                HP(self.source, summon, self.healing, thistype.tag)
+                apply_specialization(self.source, summon, self.tier, self.cost_percent, self.duration)
+                DestroyEffect(AddSpecialEffectTarget(
+                    "Abilities\\Spells\\Undead\\VampiricAura\\VampiricAuraTarget.mdl", summon, "origin"))
+            end,
+        }
+        sacrifice_missile_template.__index = sacrifice_missile_template
+
+        local function launch_sacrifice_missile(caster, summon, pid, healing, tier, cost_percent, dur)
+            local missile = setmetatable({}, sacrifice_missile_template)
+            missile.x = GetUnitX(caster)
+            missile.y = GetUnitY(caster)
+            missile.z = GetUnitZ(caster)
+            missile.visual = AddSpecialEffect(
+                "Abilities\\Spells\\Undead\\DeathCoil\\DeathCoilMissile.mdl", missile.x, missile.y)
+            missile.source = caster
+            missile.target = summon
+            missile.owner = Player(pid - 1)
+            missile.pid = pid
+            missile.healing = healing
+            missile.tier = tier
+            missile.cost_percent = cost_percent
+            missile.duration = dur
+
+            ALICE_Create(missile)
+        end
+
         local function cast_radius(pid, caster)
             local level = math.max(1, math.min(6, GetUnitAbilityLevel(caster, thistype.id)))
             return AOE_BY_LEVEL[level] * LBOOST[pid]
@@ -750,8 +832,8 @@ OnInit.final("DarkSummonerSpells", function(Require)
             debt_buff:addStack()
 
             if lethal then
-                -- Keep the caster alive until the pulse resolves so the final cast
-                -- still affects every summon before Warcraft runs death callbacks.
+                -- Create every outgoing projectile before Warcraft runs the
+                -- caster's death callbacks. The missiles then resolve independently.
                 SetWidgetLife(self.caster, 1.)
             else
                 SetWidgetLife(self.caster, current_life - payment)
@@ -766,10 +848,8 @@ OnInit.final("DarkSummonerSpells", function(Require)
                     heal_multiplier = heal_multiplier * 2.
                 end
 
-                HP(self.caster, summon, payment * heal_multiplier, thistype.tag)
-                apply_specialization(self.caster, summon, tier, cost_percent, dur)
-                DestroyEffect(AddSpecialEffectTarget(
-                    "Abilities\\Spells\\Undead\\VampiricAura\\VampiricAuraTarget.mdl", summon, "origin"))
+                launch_sacrifice_missile(
+                    self.caster, summon, self.pid, payment * heal_multiplier, tier, cost_percent, dur)
             end
 
             if lethal then

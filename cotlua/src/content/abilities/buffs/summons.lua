@@ -62,7 +62,7 @@ OnInit.final("BuffsSummons", function(Require)
         local thistype = ReaverBloodFrenzyBuff
         thistype.NAME            = "Blood Frenzy"
         thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNBloodLust.blp"
-        thistype.DESC            = "This unit has !$bat BAT, +^$cleave% cleave damage, and +$radius cleave radius"
+        thistype.DESC            = "This unit has !$bat BAT, +^$cleave% cleave damage, and +$width cleave end width"
         thistype.DISPEL_TYPE     = BUFF_POSITIVE
         thistype.STACK_TYPE      = BUFF_STACK_NONE
 
@@ -73,11 +73,11 @@ OnInit.final("BuffsSummons", function(Require)
             if tier >= 5 then
                 self.bat = 0.9125 - cost_percent * 0.003125
                 self.cleave_multiplier = 1. + cost_percent * 0.0075
-                self.radius = cost_percent * 1.5
+                self.width = cost_percent * 1.5
             else
                 self.bat = 0.95 - cost_percent * 0.0025
                 self.cleave_multiplier = 1. + cost_percent * 0.005
-                self.radius = cost_percent
+                self.width = cost_percent
             end
 
             self.cleave = (self.cleave_multiplier - 1.) * 100.
@@ -95,7 +95,7 @@ OnInit.final("BuffsSummons", function(Require)
             self.bat = 1.
             self.cleave = 0.
             self.cleave_multiplier = 1.
-            self.radius = 0.
+            self.width = 0.
             self.sfx = Unit[self.target]:addEffect(
                 "Abilities\\Spells\\Undead\\VampiricAura\\VampiricAuraTarget.mdl", "origin")
         end
