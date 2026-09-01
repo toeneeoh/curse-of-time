@@ -256,6 +256,21 @@ OnInit.final("DarkSummonerSpells", function(Require)
         BlzUnitDisableAbility(summon, RECLAIM_ESSENCE.id, false, false)
         BlzUnitHideAbility(summon, INFUSE_ESSENCE.id, false)
         BlzUnitHideAbility(summon, RECLAIM_ESSENCE.id, false)
+
+        local infuse = BlzGetUnitAbility(summon, INFUSE_ESSENCE.id)
+        local reclaim = BlzGetUnitAbility(summon, RECLAIM_ESSENCE.id)
+        if infuse then
+            BlzSetAbilityIntegerField(infuse, ABILITY_IF_BUTTON_POSITION_NORMAL_X, 1)
+            BlzSetAbilityIntegerField(infuse, ABILITY_IF_BUTTON_POSITION_NORMAL_Y, 1)
+        end
+        if reclaim then
+            BlzSetAbilityIntegerField(reclaim, ABILITY_IF_BUTTON_POSITION_NORMAL_X, 2)
+            BlzSetAbilityIntegerField(reclaim, ABILITY_IF_BUTTON_POSITION_NORMAL_Y, 1)
+        end
+
+        dev_log("allocation-controls unit=" .. GetObjectName(GetUnitTypeId(summon))
+            .. " infuse=" .. GetUnitAbilityLevel(summon, INFUSE_ESSENCE.id)
+            .. " reclaim=" .. GetUnitAbilityLevel(summon, RECLAIM_ESSENCE.id))
         UnitAddAbility(summon, ESSENCE_INFO)
         UnitMakeAbilityPermanent(summon, true, ESSENCE_INFO)
     end
@@ -537,6 +552,11 @@ OnInit.final("DarkSummonerSpells", function(Require)
         local CLEAVE_EFFECT = "UnbrilliantGloryWhite.mdx"
         local CLEAVE_EFFECT_FORWARD_OFFSET = 75.
         local CLEAVE_EFFECT_HEIGHT = 75.
+        local CLEAVE_DAMAGE_OPTIONS = {
+            attack = false,
+            pre_scaled_source = true,
+            suppress_source_events = true,
+        }
 
         thistype.values = {
             str = function(pid) return 0.25 * (GetHeroInt(Hero[pid], true) + GetHeroStr(Hero[pid], true)) end,
@@ -558,7 +578,7 @@ OnInit.final("DarkSummonerSpells", function(Require)
             EVENT_ON_CLEANUP:unregister_action(pid, on_cleanup)
         end
 
-        local function cleave(source, target, amount, amount_after_reduction, damage_type)
+        local function cleave(source, target, amount, amount_after_reduction, damage_type, attack_amount)
             if damage_type ~= PHYSICAL or amount_after_reduction <= 0 then return end
 
             local pid = GetPlayerId(GetOwningPlayer(source)) + 1
@@ -566,7 +586,7 @@ OnInit.final("DarkSummonerSpells", function(Require)
             local frenzy = ReaverBloodFrenzyBuff:get(nil, source)
             local group = CreateGroup()
             local end_width = 225. + tier * 15.
-            local cleave_damage = amount_after_reduction * (0.2 + tier * 0.06)
+            local cleave_damage = (attack_amount or amount.value) * (0.2 + tier * 0.06)
             local healing = 0.
             local source_x, source_y = GetUnitX(source), GetUnitY(source)
             local dx, dy = GetUnitX(target) - source_x, GetUnitY(target) - source_y
@@ -613,7 +633,8 @@ OnInit.final("DarkSummonerSpells", function(Require)
                 end
 
                 if enemy ~= target and forward >= 0. and forward <= length and lateral <= allowed_width then
-                    DamageTarget(source, enemy, cleave_damage, ATTACK_TYPE_NORMAL, PURE, "Dread Cleave")
+                    DamageTarget(source, enemy, cleave_damage, ATTACK_TYPE_NORMAL, PHYSICAL,
+                        "Dread Cleave", CLEAVE_DAMAGE_OPTIONS)
                     if tier >= 4 then
                         DreadfulWoundsDebuff:add(source, enemy):duration(4. * LBOOST[pid])
                     end

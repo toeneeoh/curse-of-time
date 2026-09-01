@@ -23,11 +23,27 @@ OnInit.final("Damage", function(Require)
     local DAMAGE_CONTEXT_DEPTH = 0
     local WEAPON_TYPE_WHOKNOWS = WEAPON_TYPE_WHOKNOWS
 
-    ---@type fun(source: unit, target: unit, dmg: number, attack_type: attacktype, damage_type: damagetype, tag: string|nil)
-    function DamageTarget(source, target, dmg, attack_type, damage_type, tag)
+    ---@class DamageOptions
+    ---@field attack boolean?
+    ---@field pre_scaled_source boolean?
+    ---@field suppress_source_events boolean?
+
+    ---@param source unit
+    ---@param target unit
+    ---@param dmg number
+    ---@param attack_type attacktype
+    ---@param damage_type damagetype
+    ---@param tag string|nil
+    ---@param options DamageOptions|nil
+    function DamageTarget(source, target, dmg, attack_type, damage_type, tag, options)
         DAMAGE_CONTEXT_DEPTH = DAMAGE_CONTEXT_DEPTH + 1
-        DAMAGE_CONTEXT[DAMAGE_CONTEXT_DEPTH] = { tag = tag, consumed = false }
-        UnitDamageTarget(source, target, dmg, true, false, attack_type, damage_type, WEAPON_TYPE_WHOKNOWS)
+        DAMAGE_CONTEXT[DAMAGE_CONTEXT_DEPTH] = {
+            tag = tag,
+            consumed = false,
+            options = options,
+        }
+        UnitDamageTarget(source, target, dmg, not options or options.attack ~= false,
+            false, attack_type, damage_type, WEAPON_TYPE_WHOKNOWS)
         DAMAGE_CONTEXT[DAMAGE_CONTEXT_DEPTH] = nil
         DAMAGE_CONTEXT_DEPTH = DAMAGE_CONTEXT_DEPTH - 1
     end
@@ -132,6 +148,10 @@ OnInit.final("Damage", function(Require)
         local damage_type = blz_get_event_damage_type()
         local crit        = 1.
         local context     = DAMAGE_CONTEXT[DAMAGE_CONTEXT_DEPTH]
+        local options     = context and context.options
+        local suppress_source_events = options and options.suppress_source_events
+        local pre_scaled_source = options and options.pre_scaled_source
+        local attack_amount
         local tag
         if context and not context.consumed then
             tag = context.tag
@@ -175,26 +195,35 @@ OnInit.final("Damage", function(Require)
 
             -- physical damage
             if damage_type == PHYSICAL then
-                local evade = target_tbl.evasion
+                if not suppress_source_events then
+                    local evade = target_tbl.evasion
 
-                -- evasion
-                if math.random(0, 99) < evade then
-                    FloatingTextUnit("Dodged!", target, 1, 90, 0, 9, 180, 180, 20, 0, true)
-                    amount.value = 0.00
-                else
-                    EVENT_ON_HIT_EVADE:trigger(source, target, amount)
+                    -- evasion
+                    if math.random(0, 99) < evade then
+                        FloatingTextUnit("Dodged!", target, 1, 90, 0, 9, 180, 180, 20, 0, true)
+                        amount.value = 0.00
+                    else
+                        EVENT_ON_HIT_EVADE:trigger(source, target, amount)
+                    end
+
+                    EVENT_ON_HIT:trigger(source, target)
+                    EVENT_ON_HIT_MULTIPLIER:trigger(source, target, amount)
+
+                    -- critical strike
+                    if math.random() * 100. < source_tbl.cc then
+                        crit = crit + source_tbl.cd * 0.01
+                    end
+
+                    -- apply crit multiplier
+                    amount.value = amount.value * crit
                 end
 
-                EVENT_ON_HIT:trigger(source, target)
-                EVENT_ON_HIT_MULTIPLIER:trigger(source, target, amount)
-
-                -- critical strike
-                if math.random() * 100. < source_tbl.cc then
-                    crit = crit + source_tbl.cd * 0.01
+                -- Cleave and similar secondary attacks use this value so the
+                -- primary target's defenses do not determine their base damage.
+                attack_amount = amount.value
+                if not pre_scaled_source then
+                    attack_amount = attack_amount * source_tbl.dm * source_tbl.pm
                 end
-
-                -- apply crit multiplier
-                amount.value = amount.value * crit
             end
 
             -- any other damage type
@@ -208,14 +237,20 @@ OnInit.final("Damage", function(Require)
             end
 
             -- source multipliers and target resistances
-            amount.value = amount.value * source_tbl.dm
+            if not pre_scaled_source then
+                amount.value = amount.value * source_tbl.dm
+            end
             amount.value = amount.value * target_tbl.dr
 
             if damage_type == PHYSICAL then
-                amount.value = amount.value * source_tbl.pm
+                if not pre_scaled_source then
+                    amount.value = amount.value * source_tbl.pm
+                end
                 amount.value = amount.value * target_tbl.pr
             elseif damage_type == MAGIC then
-                amount.value = amount.value * source_tbl.mm
+                if not pre_scaled_source then
+                    amount.value = amount.value * source_tbl.mm
+                end
                 amount.value = amount.value * target_tbl.mr
             end
         end
@@ -225,7 +260,10 @@ OnInit.final("Damage", function(Require)
         local amount_after_red = amount.value * armor_multiplier
 
         -- after reductions
-        EVENT_ON_HIT_AFTER_REDUCTIONS:trigger(source, target, amount, amount_after_red, damage_type)
+        if not suppress_source_events then
+            EVENT_ON_HIT_AFTER_REDUCTIONS:trigger(
+                source, target, amount, amount_after_red, damage_type, attack_amount)
+        end
         EVENT_ON_STRUCK_AFTER_REDUCTIONS:trigger(target, source, amount, amount_after_red, damage_type)
 
         -- pure damage on chaos armor
@@ -236,7 +274,9 @@ OnInit.final("Damage", function(Require)
         amount_after_red = amount.value * armor_multiplier
 
         -- final damage callbacks before applying engine damage
-        EVENT_ON_HIT_FINAL:trigger(source, target, amount, amount_after_red, damage_type)
+        if not suppress_source_events then
+            EVENT_ON_HIT_FINAL:trigger(source, target, amount, amount_after_red, damage_type)
+        end
         EVENT_ON_STRUCK_FINAL:trigger(target, source, amount, amount_after_red, damage_type)
 
         -- Final callbacks may mutate the base amount. Keep fatal checks, display,
