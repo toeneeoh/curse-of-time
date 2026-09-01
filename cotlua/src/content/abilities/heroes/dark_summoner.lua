@@ -8,12 +8,18 @@ OnInit.final("DarkSummonerSpells", function(Require)
 
     local MAX_TIER = 5
     local ESSENCE_INFO = FourCC('A063')
+    local SUMMON_DEATH_COOLDOWN = 30.
     local MILESTONES = { 1, 20, 50, 100, 150, 200, 300, 400, 500 }
     local SUMMON_TYPES = { SUMMON_REAVER, SUMMON_GOLEM, SUMMON_DESTROYER }
     local IS_SUMMON_TYPE = {
         [SUMMON_REAVER] = true,
         [SUMMON_GOLEM] = true,
         [SUMMON_DESTROYER] = true,
+    }
+    local SUMMON_SPELL = {
+        [SUMMON_REAVER] = FourCC('A0KF'),
+        [SUMMON_GOLEM] = FourCC('A0KH'),
+        [SUMMON_DESTROYER] = FourCC('A0KG'),
     }
     local essence_tiers = {} ---@type table<integer, table<integer, integer>>
 
@@ -111,6 +117,15 @@ OnInit.final("DarkSummonerSpells", function(Require)
     local function dev_log(value)
         if DevLog and DevLog.enabled then
             DevLog.write("SUMMONER", value, true)
+        end
+    end
+
+    ---@param spell Spell
+    ---@param count integer
+    ---@param make_tooltip fun(level: integer): string
+    local function set_extended_tooltips(spell, count, make_tooltip)
+        for level = 1, count do
+            Spell.TOOLTIPS[spell.id][level] = make_tooltip(level)
         end
     end
 
@@ -261,7 +276,7 @@ OnInit.final("DarkSummonerSpells", function(Require)
         if uid == SUMMON_REAVER then
             unit.essence_str = unit.essence_str + R2I(unit.str * 0.05 * tier)
             unit.essence_armor = unit.essence_armor + tier * 2
-            SetUnitScale(summon, 1. + tier * 0.04, 1. + tier * 0.04, 1. + tier * 0.04)
+            SetUnitScale(summon, 0.75 + tier * 0.04, 1. + tier * 0.04, 1. + tier * 0.04)
             BlzSetHeroProperName(summon, "Dread Reaver (Tier " .. tier .. ")")
         elseif uid == SUMMON_GOLEM then
             UnitRemoveAbility(summon, FourCC('A0KI'))
@@ -379,6 +394,18 @@ OnInit.final("DarkSummonerSpells", function(Require)
         SummonExpire(summon)
     end
 
+    local function on_summon_death(summon)
+        local pid = GetPlayerId(GetOwningPlayer(summon)) + 1
+        local hero = Hero[pid]
+        local spell_id = SUMMON_SPELL[GetUnitTypeId(summon)]
+
+        if hero and spell_id and GetUnitAbilityLevel(hero, spell_id) > 0 then
+            BlzStartUnitAbilityCooldown(hero, spell_id, SUMMON_DEATH_COOLDOWN)
+            dev_log("death-cooldown pid=" .. pid .. " spell=" .. GetObjectName(spell_id)
+                .. " seconds=" .. SUMMON_DEATH_COOLDOWN)
+        end
+    end
+
     local function on_character_setup(pid)
         if Hero[pid] and GetUnitTypeId(Hero[pid]) == HERO_DARK_SUMMONER then
             SummonEssence.load(pid, Profile[pid].hero.summon_essence or 0)
@@ -468,6 +495,7 @@ OnInit.final("DarkSummonerSpells", function(Require)
         TableRemove(PLAYER_SUMMONS, summon)
         PLAYER_SUMMONS[#PLAYER_SUMMONS + 1] = summon
         EVENT_ON_FATAL_DAMAGE:register_unit_action(summon, SummonEssence.onFatalDamage)
+        EVENT_ON_UNIT_DEATH:register_unit_action(summon, on_summon_death)
         SetHeroLevel(summon, GetHeroLevel(Hero[pid]), false)
     end
 
@@ -490,12 +518,22 @@ OnInit.final("DarkSummonerSpells", function(Require)
         local CLEAVE_LENGTH = 650.
         local CLEAVE_START_WIDTH = 150.
         local CLEAVE_EFFECT = "UnbrilliantGloryWhite.mdx"
+        local CLEAVE_EFFECT_FORWARD_OFFSET = 75.
+        local CLEAVE_EFFECT_HEIGHT = 75.
 
         thistype.values = {
             str = function(pid) return 0.25 * (GetHeroInt(Hero[pid], true) + GetHeroStr(Hero[pid], true)) end,
             agi = function(pid) return 0.1 * GetHeroInt(Hero[pid], true) end,
             int = function(pid) return 0.2 * GetHeroInt(Hero[pid], true) end,
         }
+
+        local tooltip = "Summons or recalls a permanent melee off-tank whose attributes scale with the Dark Summoner."
+            .. "\n\n|c00ff0b11Strength:|r [str=|c00ffcc0025%|r of the Summoner's Strength and Intelligence]"
+            .. "\n|c0000d23fAgility:|r [agi=|c00ffcc0010%|r of the Summoner's Intelligence]"
+            .. "\n|c000080ffIntelligence:|r [int=|c00ffcc0020%|r of the Summoner's Intelligence]"
+            .. "\n\n|cffffcc00Dread Cleave:|r Attacks cleave in a widening 650-range cone."
+            .. "\n|c000080c0Death Cooldown:|r 30 seconds"
+        set_extended_tooltips(thistype, 6, function() return tooltip end)
 
         local function on_cleanup(pid)
             TableRemove(PLAYER_SUMMONS, reavers[pid])
@@ -538,7 +576,10 @@ OnInit.final("DarkSummonerSpells", function(Require)
             local center_y = source_y + dy * length * 0.5
             local enum_radius = math.sqrt(length * length * 0.25 + end_width * end_width)
 
-            local effect = AddSpecialEffect(CLEAVE_EFFECT, GetUnitX(target), GetUnitY(target))
+            local effect = AddSpecialEffect(CLEAVE_EFFECT,
+                GetUnitX(target) + dx * CLEAVE_EFFECT_FORWARD_OFFSET,
+                GetUnitY(target) + dy * CLEAVE_EFFECT_FORWARD_OFFSET)
+            BlzSetSpecialEffectZ(effect, GetUnitZ(source) + CLEAVE_EFFECT_HEIGHT)
             BlzSetSpecialEffectYaw(effect, facing)
             DestroyEffect(effect)
 
@@ -583,7 +624,7 @@ OnInit.final("DarkSummonerSpells", function(Require)
             end
 
             prepare_summon(self.pid, summon, x, y, angle)
-            SetUnitVertexColor(summon, 200, 120, 120, 255)
+            SetUnitVertexColor(summon, 200, 200, 200, 255)
             SUMMONINGIMPROVEMENT.apply(self.pid, summon,
                 R2I(self.str * BOOST[self.pid]), R2I(self.agi * BOOST[self.pid]), R2I(self.int * BOOST[self.pid]))
             Unit[summon].regen_max = 0.02 + 0.0005 * GetUnitAbilityLevel(summon, FourCC('A06Q'))
@@ -607,6 +648,13 @@ OnInit.final("DarkSummonerSpells", function(Require)
             str = function(pid) return 0.4 * (GetHeroInt(Hero[pid], true) + GetHeroStr(Hero[pid], true)) end,
             agi = function(pid) return 0.6 * GetHeroInt(Hero[pid], true) end,
         }
+
+        local tooltip = "Summons or recalls a permanent melee tank whose attributes scale with the Dark Summoner."
+            .. "\n\n|c00ff0b11Strength:|r [str=|c00ffcc0040%|r of the Summoner's Strength and Intelligence]"
+            .. "\n|c0000d23fAgility:|r [agi=|c00ffcc0060%|r of the Summoner's Intelligence]"
+            .. "\n|cffffcc00Regeneration:|r Gains half the Max Health regeneration granted by Summoning Improvement"
+            .. "\n|c000080c0Death Cooldown:|r 30 seconds"
+        set_extended_tooltips(thistype, 1, function() return tooltip end)
 
         local function on_cleanup(pid)
             TableRemove(PLAYER_SUMMONS, golems[pid])
@@ -649,6 +697,16 @@ OnInit.final("DarkSummonerSpells", function(Require)
             int = function(pid) local ablev = GetUnitAbilityLevel(Hero[pid], thistype.id)
                 return 0.5 * GetHeroInt(Hero[pid], true) * ablev end,
         }
+
+        set_extended_tooltips(thistype, 5, function(level)
+            return "Summons or recalls a permanent ranged attacker whose attributes scale with the Dark Summoner."
+                .. "\n\n|c00ff0b11Strength:|r [str=|c00ffcc006.66%|r of the Summoner's Strength and Intelligence]"
+                .. "\n|cff9B9BEDArmor:|r [agi=|c00ffcc000.5%|r of the Summoner's Intelligence]"
+                .. "\n|c000080ffIntelligence:|r [int=|c00ffcc00" .. (level * 50)
+                .. "%|r of the Summoner's Intelligence]"
+                .. "\n\n|cffffcc00Annihilation:|r Attacks have a chance to deal bonus Magic damage based on Intelligence."
+                .. "\n|c000080c0Death Cooldown:|r 30 seconds"
+        end)
 
         local function on_cleanup(pid)
             TableRemove(PLAYER_SUMMONS, destroyers[pid])
