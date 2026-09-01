@@ -400,6 +400,7 @@ OnInit.final("DarkSummonerSpells", function(Require)
         local spell_id = SUMMON_SPELL[GetUnitTypeId(summon)]
 
         if hero and spell_id and GetUnitAbilityLevel(hero, spell_id) > 0 then
+            BlzUnitDisableAbility(hero, spell_id, false, false)
             BlzStartUnitAbilityCooldown(hero, spell_id, SUMMON_DEATH_COOLDOWN)
             dev_log("death-cooldown pid=" .. pid .. " spell=" .. GetObjectName(spell_id)
                 .. " seconds=" .. SUMMON_DEATH_COOLDOWN)
@@ -497,6 +498,11 @@ OnInit.final("DarkSummonerSpells", function(Require)
         EVENT_ON_FATAL_DAMAGE:register_unit_action(summon, SummonEssence.onFatalDamage)
         EVENT_ON_UNIT_DEATH:register_unit_action(summon, on_summon_death)
         SetHeroLevel(summon, GetHeroLevel(Hero[pid]), false)
+
+        local spell_id = SUMMON_SPELL[GetUnitTypeId(summon)]
+        if spell_id then
+            BlzUnitDisableAbility(Hero[pid], spell_id, true, false)
+        end
     end
 
     local function finish_summon(pid, summon)
@@ -527,7 +533,7 @@ OnInit.final("DarkSummonerSpells", function(Require)
             int = function(pid) return 0.2 * GetHeroInt(Hero[pid], true) end,
         }
 
-        local tooltip = "Summons or recalls a permanent melee off-tank whose attributes scale with the Dark Summoner."
+        local tooltip = "Summons a permanent melee off-tank whose attributes scale with the Dark Summoner."
             .. "\n\n|c00ff0b11Strength:|r [str=|c00ffcc0025%|r of the Summoner's Strength and Intelligence]"
             .. "\n|c0000d23fAgility:|r [agi=|c00ffcc0010%|r of the Summoner's Intelligence]"
             .. "\n|c000080ffIntelligence:|r [int=|c00ffcc0020%|r of the Summoner's Intelligence]"
@@ -649,7 +655,7 @@ OnInit.final("DarkSummonerSpells", function(Require)
             agi = function(pid) return 0.6 * GetHeroInt(Hero[pid], true) end,
         }
 
-        local tooltip = "Summons or recalls a permanent melee tank whose attributes scale with the Dark Summoner."
+        local tooltip = "Summons a permanent melee tank whose attributes scale with the Dark Summoner."
             .. "\n\n|c00ff0b11Strength:|r [str=|c00ffcc0040%|r of the Summoner's Strength and Intelligence]"
             .. "\n|c0000d23fAgility:|r [agi=|c00ffcc0060%|r of the Summoner's Intelligence]"
             .. "\n|cffffcc00Regeneration:|r Gains half the Max Health regeneration granted by Summoning Improvement"
@@ -699,7 +705,7 @@ OnInit.final("DarkSummonerSpells", function(Require)
         }
 
         set_extended_tooltips(thistype, 5, function(level)
-            return "Summons or recalls a permanent ranged attacker whose attributes scale with the Dark Summoner."
+            return "Summons a permanent ranged attacker whose attributes scale with the Dark Summoner."
                 .. "\n\n|c00ff0b11Strength:|r [str=|c00ffcc006.66%|r of the Summoner's Strength and Intelligence]"
                 .. "\n|cff9B9BEDArmor:|r [agi=|c00ffcc000.5%|r of the Summoner's Intelligence]"
                 .. "\n|c000080ffIntelligence:|r [int=|c00ffcc00" .. (level * 50)
@@ -755,12 +761,28 @@ OnInit.final("DarkSummonerSpells", function(Require)
         local HEAL_BY_LEVEL = { 1.5, 1.6, 1.7, 1.8, 1.9, 2. }
         local AOE_BY_LEVEL = { 1000., 1100., 1200., 1300., 1400., 1500. }
 
+        local function ability_level(caster)
+            return math.max(1, math.min(6, GetUnitAbilityLevel(caster, thistype.id)))
+        end
+
+        local function sacrifice_cost_percent(caster)
+            local debt_buff = BloodDebtBuff:get(nil, caster)
+            local debt = (debt_buff and debt_buff.charges) or 0
+            return math.min(100., 20. + math.min(MAX_DEBT, debt) * 10.)
+        end
+
+        local function heal_multiplier(caster)
+            return HEAL_BY_LEVEL[ability_level(caster)]
+        end
+
         thistype.values = {
             heal = function(_, caster)
-                return HEAL_BY_LEVEL[math.max(1, math.min(6, GetUnitAbilityLevel(caster, thistype.id)))]
+                local payment = math.min(GetWidgetLife(caster),
+                    BlzGetUnitMaxHP(caster) * sacrifice_cost_percent(caster) * 0.01)
+                return payment * heal_multiplier(caster)
             end,
             aoe = function(_, caster)
-                return AOE_BY_LEVEL[math.max(1, math.min(6, GetUnitAbilityLevel(caster, thistype.id)))]
+                return AOE_BY_LEVEL[ability_level(caster)]
             end,
             dur = 12.,
         }
@@ -860,8 +882,7 @@ OnInit.final("DarkSummonerSpells", function(Require)
         end
 
         local function cast_radius(pid, caster)
-            local level = math.max(1, math.min(6, GetUnitAbilityLevel(caster, thistype.id)))
-            return AOE_BY_LEVEL[level] * LBOOST[pid]
+            return AOE_BY_LEVEL[ability_level(caster)] * LBOOST[pid]
         end
 
         function thistype.preCast(pid, tpid, caster)
@@ -880,7 +901,7 @@ OnInit.final("DarkSummonerSpells", function(Require)
 
             local debt_buff = BloodDebtBuff:get(nil, self.caster)
             local debt = (debt_buff and debt_buff.charges) or 0
-            local cost_percent = math.min(100., 20. + math.min(MAX_DEBT, debt) * 10.)
+            local cost_percent = sacrifice_cost_percent(self.caster)
             local current_life = GetWidgetLife(self.caster)
             local payment = math.min(current_life, BlzGetUnitMaxHP(self.caster) * cost_percent * 0.01)
             local dur = self.dur * LBOOST[self.pid]
@@ -900,14 +921,14 @@ OnInit.final("DarkSummonerSpells", function(Require)
             for i = 1, #summons do
                 local summon = summons[i]
                 local tier = SummonEssence.getTier(self.pid, summon)
-                local heal_multiplier = self.heal * BOOST[self.pid]
+                local healing_multiplier = heal_multiplier(self.caster) * BOOST[self.pid]
 
                 if GetUnitTypeId(summon) == SUMMON_GOLEM and tier >= 3 then
-                    heal_multiplier = heal_multiplier * 2.
+                    healing_multiplier = healing_multiplier * 2.
                 end
 
                 launch_sacrifice_missile(
-                    self.caster, summon, self.pid, payment * heal_multiplier, tier, cost_percent, dur)
+                    self.caster, summon, self.pid, payment * healing_multiplier, tier, cost_percent, dur)
             end
 
             if lethal then
