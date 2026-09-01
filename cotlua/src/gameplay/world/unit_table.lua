@@ -53,7 +53,7 @@ OnInit.final("UnitTable", function(Require)
     ---@field essence_str number?
     ---@field essence_agi number?
     ---@field essence_int number?
-    ---@field essence_armor number?
+    ---@field essence_armor_percent number?
     ---@field essence_cc number?
     ---@field essence_cd number?
     ---@field summoning_improvement_armor number?

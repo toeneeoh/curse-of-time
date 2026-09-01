@@ -30,25 +30,25 @@ OnInit.final("DarkSummonerSpells", function(Require)
 
     local ESSENCE_TIER_TEXT = {
         [SUMMON_REAVER] = {
-            "Tier 1 - +15% STR, +10% AGI/INT, +5 Armor; Cleave: 26% damage / 650 length / 240 end width.",
-            "Tier 2 - +30% STR, +20% AGI/INT, +10 Armor; Cleave: 32% damage / 650 length / 255 end width.",
-            "Tier 3 - +45% STR, +30% AGI/INT, +15 Armor; Cleave: 38% / 650 / 270. Sacrifice: 0.90-0.70 BAT, +10-50% cleave, +20-100 end width.",
-            "Tier 4 - +60% STR, +40% AGI/INT, +20 Armor; Cleave: 44% / 650 / 285 and applies -10% damage for 4 seconds.",
-            "Tier 5 - +75% STR, +50% AGI/INT, +25 Armor; Cleave: 50% / 650 / 300. Sacrifice: 0.85-0.60 BAT, +15-75% cleave, +30-150 end width. Cleave heals up to 3% Max Health per attack.",
+            "Tier 1 - +15% STR and +5% Armor. Cleave: 26% damage / 650 length / 240 end width.",
+            "Tier 2 - +30% STR and +10% Armor. Cleave: 32% damage / 650 length / 255 end width.",
+            "Tier 3 - +45% STR and +15% Armor. Cleave: 38% damage / 650 length / 270 end width. Sacrifice: 0.90-0.70 BAT / +10-50% cleave damage / +20-100 end width.",
+            "Tier 4 - +60% STR and +20% Armor. Cleave: 44% damage / 650 length / 285 end width; applies -10% damage for 4 seconds.",
+            "Tier 5 - +75% STR and +25% Armor. Cleave: 50% damage / 650 length / 300 end width; heals up to 3% Max Health per attack. Sacrifice: 0.85-0.60 BAT / +15-75% cleave damage / +30-150 end width.",
         },
         [SUMMON_GOLEM] = {
-            "Tier 1 - +20% STR, +10% AGI, and +6 Armor.",
-            "Tier 2 - +40% STR, +20% AGI, +12 Armor; unlocks Taunt.",
-            "Tier 3 - +60% STR, +30% AGI, +18 Armor; unlocks Thunder Clap and doubles Sacrifice healing.",
-            "Tier 4 - +80% STR, +40% AGI, +24 Armor; unlocks Magnetic Force.",
-            "Tier 5 - +100% STR, +50% AGI, +30 Armor; Sacrifice grants 10% damage healing, capped at 1% Max Health per attack.",
+            "Tier 1 - +20% STR and +6% Armor.",
+            "Tier 2 - +40% STR and +12% Armor; unlocks Taunt.",
+            "Tier 3 - +60% STR and +18% Armor; unlocks Thunder Clap and doubles Sacrifice healing.",
+            "Tier 4 - +80% STR and +24% Armor; unlocks Magnetic Force.",
+            "Tier 5 - +100% STR and +30% Armor; Sacrifice grants 10% damage healing, capped at 1% Max Health per attack.",
         },
         [SUMMON_DESTROYER] = {
-            "Tier 1 - +10% STR/INT, +50 AGI, +3 Armor; Annihilation: 12% chance / 1.2x INT.",
-            "Tier 2 - +20% STR/INT, +100 AGI, +6 Armor; Blink; Annihilation: 14% / 1.4x INT.",
-            "Tier 3 - +30% STR/INT, +150 AGI, +9 Armor; +25% Crit / +200% Crit Damage; Annihilation: 16% / 1.6x INT. Sacrifice blocks 1 fatal hit.",
-            "Tier 4 - +40% STR/INT, +200 AGI, +12 Armor; Annihilation: 18% / 1.8x INT. Sacrifice blocks 2 fatal hits at 60%+ cost.",
-            "Tier 5 - +50% STR, +75% INT, +250 AGI, +15 Armor; Annihilation: 20% / 2x INT. Sacrifice blocks 1/2/3 fatal hits at 20/40/80%+ cost.",
+            "Tier 1 - +10% STR/INT, +50 AGI, and +3% Armor. Annihilation: 12% chance / 1.2x INT damage.",
+            "Tier 2 - +20% STR/INT, +100 AGI, and +6% Armor; unlocks Blink. Annihilation: 14% chance / 1.4x INT damage.",
+            "Tier 3 - +30% STR/INT, +150 AGI, and +9% Armor; +25% Crit / +200% Crit Damage. Annihilation: 16% chance / 1.6x INT damage. Sacrifice blocks 1 fatal hit.",
+            "Tier 4 - +40% STR/INT, +200 AGI, and +12% Armor. Annihilation: 18% chance / 1.8x INT damage. Sacrifice blocks 2 fatal hits at 60%+ cost.",
+            "Tier 5 - +50% STR, +75% INT, +250 AGI, and +15% Armor. Annihilation: 20% chance / 2x INT damage. Sacrifice blocks 1/2/3 fatal hits at 20/40/80%+ cost.",
         },
     }
 
@@ -233,14 +233,14 @@ OnInit.final("DarkSummonerSpells", function(Require)
         unit.bonus_str = unit.bonus_str - (unit.essence_str or 0)
         unit.bonus_agi = unit.bonus_agi - (unit.essence_agi or 0)
         unit.bonus_int = unit.bonus_int - (unit.essence_int or 0)
-        unit.bonus_armor = unit.bonus_armor - (unit.essence_armor or 0)
+        unit.armor_percent = unit.armor_percent - (unit.essence_armor_percent or 0.)
         unit.cc_flat = unit.cc_flat - (unit.essence_cc or 0)
         unit.cd_flat = unit.cd_flat - (unit.essence_cd or 0)
 
         unit.essence_str = 0
         unit.essence_agi = 0
         unit.essence_int = 0
-        unit.essence_armor = 0
+        unit.essence_armor_percent = 0.
         unit.essence_cc = 0
         unit.essence_cd = 0
     end
@@ -252,8 +252,10 @@ OnInit.final("DarkSummonerSpells", function(Require)
         UnitMakeAbilityPermanent(summon, true, RECLAIM_ESSENCE.id)
         SetUnitAbilityLevel(summon, INFUSE_ESSENCE.id, 1)
         SetUnitAbilityLevel(summon, RECLAIM_ESSENCE.id, 1)
-        UnitDisableAbility(summon, INFUSE_ESSENCE.id, false)
-        UnitDisableAbility(summon, RECLAIM_ESSENCE.id, false)
+        BlzUnitDisableAbility(summon, INFUSE_ESSENCE.id, false, false)
+        BlzUnitDisableAbility(summon, RECLAIM_ESSENCE.id, false, false)
+        BlzUnitHideAbility(summon, INFUSE_ESSENCE.id, false)
+        BlzUnitHideAbility(summon, RECLAIM_ESSENCE.id, false)
         UnitAddAbility(summon, ESSENCE_INFO)
         UnitMakeAbilityPermanent(summon, true, ESSENCE_INFO)
     end
@@ -268,14 +270,9 @@ OnInit.final("DarkSummonerSpells", function(Require)
         remove_tier_bonuses(summon)
         add_allocation_controls(summon)
 
-        unit.essence_str = R2I(unit.str * 0.1 * tier)
-        unit.essence_agi = R2I(unit.agi * 0.1 * tier)
-        unit.essence_int = R2I(unit.int * 0.1 * tier)
-        unit.essence_armor = tier * 3
-
         if uid == SUMMON_REAVER then
-            unit.essence_str = unit.essence_str + R2I(unit.str * 0.05 * tier)
-            unit.essence_armor = unit.essence_armor + tier * 2
+            unit.essence_str = R2I(unit.str * 0.15 * tier)
+            unit.essence_armor_percent = tier * 0.05
             SetUnitScale(summon, 0.75 + tier * 0.04, 1. + tier * 0.04, 1. + tier * 0.04)
             BlzSetHeroProperName(summon, "Dread Reaver (Tier " .. tier .. ")")
         elseif uid == SUMMON_GOLEM then
@@ -284,8 +281,8 @@ OnInit.final("DarkSummonerSpells", function(Require)
             UnitRemoveAbility(summon, MAGNETIC_FORCE.id)
             UnitRemoveAbility(summon, FourCC('A0IQ'))
 
-            unit.essence_str = unit.essence_str + R2I(unit.str * 0.1 * tier)
-            unit.essence_armor = unit.essence_armor + tier * 3
+            unit.essence_str = R2I(unit.str * 0.2 * tier)
+            unit.essence_armor_percent = tier * 0.06
             SetUnitScale(summon, 1. + tier * 0.05, 1. + tier * 0.05, 1. + tier * 0.05)
             BlzSetHeroProperName(summon, "Meat Golem (Tier " .. tier .. ")")
 
@@ -299,7 +296,10 @@ OnInit.final("DarkSummonerSpells", function(Require)
             UnitRemoveAbility(summon, FourCC('A0IQ'))
             SetUnitAbilityLevel(summon, FourCC('A02D'), 1)
 
-            unit.essence_agi = unit.essence_agi + tier * 50
+            unit.essence_str = R2I(unit.str * 0.1 * tier)
+            unit.essence_agi = tier * 50
+            unit.essence_int = R2I(unit.int * 0.1 * tier)
+            unit.essence_armor_percent = tier * 0.03
             if tier >= 2 then UnitAddAbility(summon, FourCC('A061')) end
             if tier >= 3 then
                 UnitAddAbility(summon, FourCC('A03B'))
@@ -319,7 +319,7 @@ OnInit.final("DarkSummonerSpells", function(Require)
         unit.bonus_str = unit.bonus_str + unit.essence_str
         unit.bonus_agi = unit.bonus_agi + unit.essence_agi
         unit.bonus_int = unit.bonus_int + unit.essence_int
-        unit.bonus_armor = unit.bonus_armor + unit.essence_armor
+        unit.armor_percent = unit.armor_percent + unit.essence_armor_percent
         unit.cc_flat = unit.cc_flat + unit.essence_cc
         unit.cd_flat = unit.cd_flat + unit.essence_cd
         refresh_essence_tooltip(pid, summon)
@@ -376,6 +376,24 @@ OnInit.final("DarkSummonerSpells", function(Require)
         return true
     end
 
+    local summon_cooldown_started = setmetatable({}, { __mode = 'k' })
+
+    local function start_summon_death_cooldown(summon)
+        if summon_cooldown_started[summon] then return end
+
+        local pid = GetPlayerId(GetOwningPlayer(summon)) + 1
+        local hero = Hero[pid]
+        local spell_id = SUMMON_SPELL[GetUnitTypeId(summon)]
+
+        if hero and spell_id and GetUnitAbilityLevel(hero, spell_id) > 0 then
+            summon_cooldown_started[summon] = true
+            BlzUnitDisableAbility(hero, spell_id, false, false)
+            BlzStartUnitAbilityCooldown(hero, spell_id, SUMMON_DEATH_COOLDOWN)
+            dev_log("death-cooldown pid=" .. pid .. " spell=" .. GetObjectName(spell_id)
+                .. " seconds=" .. SUMMON_DEATH_COOLDOWN)
+        end
+    end
+
     function SummonEssence.onFatalDamage(summon, source, amount)
         if GetUnitTypeId(summon) == SUMMON_DESTROYER then
             local guard = DestroyerContinuityBuff:get(nil, summon)
@@ -391,20 +409,12 @@ OnInit.final("DarkSummonerSpells", function(Require)
             end
         end
 
+        start_summon_death_cooldown(summon)
         SummonExpire(summon)
     end
 
     local function on_summon_death(summon)
-        local pid = GetPlayerId(GetOwningPlayer(summon)) + 1
-        local hero = Hero[pid]
-        local spell_id = SUMMON_SPELL[GetUnitTypeId(summon)]
-
-        if hero and spell_id and GetUnitAbilityLevel(hero, spell_id) > 0 then
-            BlzUnitDisableAbility(hero, spell_id, false, false)
-            BlzStartUnitAbilityCooldown(hero, spell_id, SUMMON_DEATH_COOLDOWN)
-            dev_log("death-cooldown pid=" .. pid .. " spell=" .. GetObjectName(spell_id)
-                .. " seconds=" .. SUMMON_DEATH_COOLDOWN)
-        end
+        start_summon_death_cooldown(summon)
     end
 
     local function on_character_setup(pid)
@@ -498,6 +508,7 @@ OnInit.final("DarkSummonerSpells", function(Require)
         EVENT_ON_FATAL_DAMAGE:register_unit_action(summon, SummonEssence.onFatalDamage)
         EVENT_ON_UNIT_DEATH:register_unit_action(summon, on_summon_death)
         SetHeroLevel(summon, GetHeroLevel(Hero[pid]), false)
+        summon_cooldown_started[summon] = nil
 
         local spell_id = SUMMON_SPELL[GetUnitTypeId(summon)]
         if spell_id then
@@ -538,7 +549,7 @@ OnInit.final("DarkSummonerSpells", function(Require)
             .. "\n|c0000d23fAgility:|r [agi=|c00ffcc0010%|r of the Summoner's Intelligence]"
             .. "\n|c000080ffIntelligence:|r [int=|c00ffcc0020%|r of the Summoner's Intelligence]"
             .. "\n\n|cffffcc00Dread Cleave:|r Attacks cleave in a widening 650-range cone."
-            .. "\n|c000080c0Death Cooldown:|r 30 seconds"
+            .. "\n|c000080c030 second death cooldown.|r"
         set_extended_tooltips(thistype, 6, function() return tooltip end)
 
         local function on_cleanup(pid)
@@ -659,7 +670,7 @@ OnInit.final("DarkSummonerSpells", function(Require)
             .. "\n\n|c00ff0b11Strength:|r [str=|c00ffcc0040%|r of the Summoner's Strength and Intelligence]"
             .. "\n|c0000d23fAgility:|r [agi=|c00ffcc0060%|r of the Summoner's Intelligence]"
             .. "\n|cffffcc00Regeneration:|r Gains half the Max Health regeneration granted by Summoning Improvement"
-            .. "\n|c000080c0Death Cooldown:|r 30 seconds"
+            .. "\n|c000080c030 second death cooldown.|r"
         set_extended_tooltips(thistype, 1, function() return tooltip end)
 
         local function on_cleanup(pid)
@@ -711,7 +722,7 @@ OnInit.final("DarkSummonerSpells", function(Require)
                 .. "\n|c000080ffIntelligence:|r [int=|c00ffcc00" .. (level * 50)
                 .. "%|r of the Summoner's Intelligence]"
                 .. "\n\n|cffffcc00Annihilation:|r Attacks have a chance to deal bonus Magic damage based on Intelligence."
-                .. "\n|c000080c0Death Cooldown:|r 30 seconds"
+                .. "\n|c000080c030 second death cooldown.|r"
         end)
 
         local function on_cleanup(pid)
