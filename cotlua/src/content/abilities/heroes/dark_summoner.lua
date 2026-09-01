@@ -4,6 +4,7 @@ OnInit.final("DarkSummonerSpells", function(Require)
     Require('Events')
     Require('Profile')
     Require('SummonAbilities')
+    Require('BuffsSummons')
 
     local MAX_TIER = 5
     local ESSENCE_INFO = FourCC('A063')
@@ -25,23 +26,23 @@ OnInit.final("DarkSummonerSpells", function(Require)
         [SUMMON_REAVER] = {
             "Tier 1 - +15% STR, +10% AGI/INT, +5 Armor; Cleave: 26% damage / 240 radius.",
             "Tier 2 - +30% STR, +20% AGI/INT, +10 Armor; Cleave: 32% damage / 255 radius.",
-            "Tier 3 - +45% STR, +30% AGI/INT, +15 Armor; Cleave: 38% damage / 270 radius.",
-            "Tier 4 - +60% STR, +40% AGI/INT, +20 Armor; Cleave: 44% damage / 285 radius.",
-            "Tier 5 - +75% STR, +50% AGI/INT, +25 Armor; Cleave: 50% damage / 300 radius.",
+            "Tier 3 - +45% STR, +30% AGI/INT, +15 Armor; Cleave: 38% / 270. Sacrifice: 0.90-0.70 BAT, +10-50% cleave, +20-100 radius.",
+            "Tier 4 - +60% STR, +40% AGI/INT, +20 Armor; Cleave: 44% / 285 and applies -10% damage for 4 seconds.",
+            "Tier 5 - +75% STR, +50% AGI/INT, +25 Armor; Cleave: 50% / 300. Sacrifice: 0.85-0.60 BAT, +15-75% cleave, +30-150 radius. Cleave heals up to 3% Max Health per attack.",
         },
         [SUMMON_GOLEM] = {
             "Tier 1 - +20% STR, +10% AGI, and +6 Armor.",
             "Tier 2 - +40% STR, +20% AGI, +12 Armor; unlocks Taunt.",
-            "Tier 3 - +60% STR, +30% AGI, +18 Armor; unlocks Thunder Clap.",
+            "Tier 3 - +60% STR, +30% AGI, +18 Armor; unlocks Thunder Clap and doubles Sacrifice healing.",
             "Tier 4 - +80% STR, +40% AGI, +24 Armor; unlocks Magnetic Force.",
-            "Tier 5 - +100% STR, +50% AGI, +30 Armor; gains an ascended appearance.",
+            "Tier 5 - +100% STR, +50% AGI, +30 Armor; Sacrifice grants 10% damage healing, capped at 1% Max Health per attack.",
         },
         [SUMMON_DESTROYER] = {
             "Tier 1 - +10% STR/INT, +50 AGI, +3 Armor; Annihilation: 12% chance / 1.2x INT.",
             "Tier 2 - +20% STR/INT, +100 AGI, +6 Armor; Blink; Annihilation: 14% / 1.4x INT.",
-            "Tier 3 - +30% STR/INT, +150 AGI, +9 Armor; +25% Crit / +200% Crit Damage; Annihilation: 16% / 1.6x INT.",
-            "Tier 4 - +40% STR/INT, +200 AGI, +12 Armor; Perfected Annihilation: 18% / 1.8x INT.",
-            "Tier 5 - +50% STR, +75% INT, +250 AGI, +15 Armor; Annihilation: 20% / 2x INT.",
+            "Tier 3 - +30% STR/INT, +150 AGI, +9 Armor; +25% Crit / +200% Crit Damage; Annihilation: 16% / 1.6x INT. Sacrifice blocks 1 fatal hit.",
+            "Tier 4 - +40% STR/INT, +200 AGI, +12 Armor; Annihilation: 18% / 1.8x INT. Sacrifice blocks 2 fatal hits at 60%+ cost.",
+            "Tier 5 - +50% STR, +75% INT, +250 AGI, +15 Armor; Annihilation: 20% / 2x INT. Sacrifice blocks 1/2/3 fatal hits at 20/40/80%+ cost.",
         },
     }
 
@@ -53,6 +54,7 @@ OnInit.final("DarkSummonerSpells", function(Require)
     ---@field reclaim fun(pid: integer, summon: unit): boolean
     ---@field apply fun(pid: integer, summon: unit)
     ---@field refreshTooltips fun(pid: integer)
+    ---@field onFatalDamage fun(summon: unit, source: unit, amount: table)
     ---@field pack fun(pid: integer): integer
     ---@field load fun(pid: integer, packed: integer)
     SummonEssence = {}
@@ -104,6 +106,12 @@ OnInit.final("DarkSummonerSpells", function(Require)
 
     local function message(pid, value)
         DisplayTimedTextToPlayer(Player(pid - 1), 0, 0, 8., value)
+    end
+
+    local function dev_log(value)
+        if DevLog and DevLog.enabled then
+            DevLog.write("SUMMONER", value, true)
+        end
     end
 
     function SummonEssence.available(pid)
@@ -353,6 +361,24 @@ OnInit.final("DarkSummonerSpells", function(Require)
         return true
     end
 
+    function SummonEssence.onFatalDamage(summon, source, amount)
+        if GetUnitTypeId(summon) == SUMMON_DESTROYER then
+            local guard = DestroyerContinuityBuff:get(nil, summon)
+            if guard and guard:consume() then
+                amount.value = 0.
+                amount.display = 0.
+                DestroyEffect(AddSpecialEffectTarget(
+                    "Abilities\\Spells\\Human\\DivineShield\\DivineShieldTarget.mdl", summon, "origin"))
+                FloatingTextUnit("Blocked!", summon, 1, 90, 0, 10., 130, 190, 255, 0, true)
+                dev_log("fatal-block pid=" .. (GetPlayerId(GetOwningPlayer(summon)) + 1)
+                    .. " remaining=" .. guard.charges)
+                return
+            end
+        end
+
+        SummonExpire(summon)
+    end
+
     local function on_character_setup(pid)
         if Hero[pid] and GetUnitTypeId(Hero[pid]) == HERO_DARK_SUMMONER then
             SummonEssence.load(pid, Profile[pid].hero.summon_essence or 0)
@@ -441,7 +467,7 @@ OnInit.final("DarkSummonerSpells", function(Require)
         Buff.dispelAll(summon)
         TableRemove(PLAYER_SUMMONS, summon)
         PLAYER_SUMMONS[#PLAYER_SUMMONS + 1] = summon
-        EVENT_ON_FATAL_DAMAGE:register_unit_action(summon, SummonExpire)
+        EVENT_ON_FATAL_DAMAGE:register_unit_action(summon, SummonEssence.onFatalDamage)
         SetHeroLevel(summon, GetHeroLevel(Hero[pid]), false)
     end
 
@@ -479,17 +505,36 @@ OnInit.final("DarkSummonerSpells", function(Require)
 
             local pid = GetPlayerId(GetOwningPlayer(source)) + 1
             local tier = SummonEssence.getTier(pid, source)
+            local frenzy = ReaverBloodFrenzyBuff:get(nil, source)
             local group = CreateGroup()
-            local radius = (225. + tier * 15.) * LBOOST[pid]
+            local radius = 225. + tier * 15.
             local cleave_damage = amount_after_reduction * (0.2 + tier * 0.06)
+            local healing = 0.
+
+            if frenzy then
+                radius = radius + frenzy.radius
+                cleave_damage = cleave_damage * frenzy.cleave_multiplier
+            end
+
+            radius = radius * LBOOST[pid]
 
             MakeGroupInRange(pid, group, GetUnitX(target), GetUnitY(target), radius, Condition(FilterEnemy))
             for enemy in each(group) do
                 if enemy ~= target then
                     DamageTarget(source, enemy, cleave_damage, ATTACK_TYPE_NORMAL, PURE, "Dread Cleave")
+                    if tier >= 4 then
+                        DreadfulWoundsDebuff:add(source, enemy):duration(4. * LBOOST[pid])
+                    end
+                    if tier >= 5 then
+                        healing = healing + cleave_damage * 0.1
+                    end
                 end
             end
             DestroyGroup(group)
+
+            if healing > 0. then
+                HP(source, source, math.min(healing, BlzGetUnitMaxHP(source) * 0.03), "Endless Carnage")
+            end
         end
 
         function thistype:onCast()
@@ -614,41 +659,127 @@ OnInit.final("DarkSummonerSpells", function(Require)
     DEMONICSACRIFICE = Spell.define("A0K1")
     do
         local thistype = DEMONICSACRIFICE
+        local MAX_DEBT = 8
+        local HEAL_BY_LEVEL = { 1.5, 1.6, 1.7, 1.8, 1.9, 2. }
+        local AOE_BY_LEVEL = { 1000., 1100., 1200., 1300., 1400., 1500. }
 
-        local function can_sacrifice(pid, caster, target, show_message)
-            local valid = is_valid_summon(pid, target)
-                and GetWidgetLife(target) < BlzGetUnitMaxHP(target)
-                and GetWidgetLife(caster) > 1.
+        thistype.values = {
+            heal = function(_, caster)
+                return HEAL_BY_LEVEL[math.max(1, math.min(6, GetUnitAbilityLevel(caster, thistype.id)))]
+            end,
+            aoe = function(_, caster)
+                return AOE_BY_LEVEL[math.max(1, math.min(6, GetUnitAbilityLevel(caster, thistype.id)))]
+            end,
+            dur = 12.,
+        }
 
-            if not valid and show_message then
-                DisplayTextToPlayer(Player(pid - 1), 0, 0,
-                    "|cffff0000Target a damaged active summon while you have health to sacrifice.|r")
+        local function collect_summons(pid, caster, radius)
+            local result = {}
+            local x, y = GetUnitX(caster), GetUnitY(caster)
+
+            for i = 1, #PLAYER_SUMMONS do
+                local summon = PLAYER_SUMMONS[i]
+                if is_valid_summon(pid, summon)
+                    and IsUnitInRangeXY(summon, x, y, radius) then
+                    result[#result + 1] = summon
+                end
             end
-            return valid
+
+            return result
         end
 
-        function thistype.preCast(pid, tpid, caster, target)
-            if not can_sacrifice(pid, caster, target, true) then
+        local function fatal_blocks(tier, cost_percent)
+            if tier < 3 then
+                return 0
+            elseif tier == 3 then
+                return 1
+            elseif tier == 4 then
+                return (cost_percent >= 60. and 2) or 1
+            elseif cost_percent >= 80. then
+                return 3
+            elseif cost_percent >= 40. then
+                return 2
+            end
+            return 1
+        end
+
+        local function apply_specialization(caster, summon, tier, cost_percent, dur)
+            if tier < 3 then return end
+
+            local uid = GetUnitTypeId(summon)
+            if uid == SUMMON_REAVER then
+                ReaverBloodFrenzyBuff:add(caster, summon):update(cost_percent, tier, dur)
+            elseif uid == SUMMON_GOLEM then
+                if tier >= 5 then
+                    GolemBloodforgedBuff:add(caster, summon):duration(dur)
+                end
+            elseif uid == SUMMON_DESTROYER then
+                local charges = fatal_blocks(tier, cost_percent)
+                DestroyerContinuityBuff:add(caster, summon):grant(charges, dur)
+            end
+        end
+
+        local function cast_radius(pid, caster)
+            local level = math.max(1, math.min(6, GetUnitAbilityLevel(caster, thistype.id)))
+            return AOE_BY_LEVEL[level] * LBOOST[pid]
+        end
+
+        function thistype.preCast(pid, tpid, caster)
+            if #collect_summons(pid, caster, cast_radius(pid, caster)) == 0 then
+                message(pid, "|cffff0000Demonic Sacrifice requires an active summon within range.|r")
                 IssueImmediateOrderById(caster, ORDER_ID_STOP)
             end
         end
 
         function thistype:onCast()
-            if not can_sacrifice(self.pid, self.caster, self.target, false) then return end
+            local summons = collect_summons(self.pid, self.caster, self.aoe * LBOOST[self.pid])
+            if #summons == 0 then
+                BlzEndUnitAbilityCooldown(self.caster, thistype.id)
+                return
+            end
 
+            local debt_buff = BloodDebtBuff:get(nil, self.caster)
+            local debt = (debt_buff and debt_buff.charges) or 0
+            local cost_percent = math.min(100., 20. + math.min(MAX_DEBT, debt) * 10.)
             local current_life = GetWidgetLife(self.caster)
-            local missing_life = BlzGetUnitMaxHP(self.target) - GetWidgetLife(self.target)
-            local payment = math.min(
-                BlzGetUnitMaxHP(self.caster) * 0.15,
-                current_life - 1.,
-                missing_life / 2.)
+            local payment = math.min(current_life, BlzGetUnitMaxHP(self.caster) * cost_percent * 0.01)
+            local dur = self.dur * LBOOST[self.pid]
+            local lethal = payment >= current_life
 
-            if payment <= 0. then return end
+            debt_buff = debt_buff or BloodDebtBuff:add(self.caster, self.caster)
+            debt_buff:addStack()
 
-            SetWidgetLife(self.caster, current_life - payment)
-            HP(self.caster, self.target, payment * 2., thistype.tag)
-            DestroyEffect(AddSpecialEffectTarget(
-                "Abilities\\Spells\\Undead\\VampiricAura\\VampiricAuraTarget.mdl", self.target, "origin"))
+            if lethal then
+                -- Keep the caster alive until the pulse resolves so the final cast
+                -- still affects every summon before Warcraft runs death callbacks.
+                SetWidgetLife(self.caster, 1.)
+            else
+                SetWidgetLife(self.caster, current_life - payment)
+            end
+
+            for i = 1, #summons do
+                local summon = summons[i]
+                local tier = SummonEssence.getTier(self.pid, summon)
+                local heal_multiplier = self.heal * BOOST[self.pid]
+
+                if GetUnitTypeId(summon) == SUMMON_GOLEM and tier >= 3 then
+                    heal_multiplier = heal_multiplier * 2.
+                end
+
+                HP(self.caster, summon, payment * heal_multiplier, thistype.tag)
+                apply_specialization(self.caster, summon, tier, cost_percent, dur)
+                DestroyEffect(AddSpecialEffectTarget(
+                    "Abilities\\Spells\\Undead\\VampiricAura\\VampiricAuraTarget.mdl", summon, "origin"))
+            end
+
+            if lethal then
+                KillUnit(self.caster)
+            end
+
+            dev_log(string.format(
+                "sacrifice pid=%d level=%d debt=%d cost=%.0f paid=%.0f targets=%d radius=%.0f duration=%.2f lethal=%s",
+                self.pid, self.ablev, debt, cost_percent, payment, #summons,
+                self.aoe * LBOOST[self.pid], dur, tostring(lethal)))
         end
     end
 end, Debug and Debug.getLine())
