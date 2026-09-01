@@ -50,6 +50,60 @@ OnInit.global("Preloader", function()
     preload("Abilities\\Spells\\Undead\\FrostArmor\\FrostArmorTarget.mdl")
     preload("Fonts\\diablo.ttf")
 
+    local summon_abilities = {
+        {
+            unit_id = SUMMON_REAVER,
+            abilities = {
+                FourCC('A06C'), -- Infuse Essence
+                FourCC('A071'), -- Reclaim Essence
+                FourCC('A063'), -- Summon Essence
+                FourCC('A06Q'), -- Summoning Improvement
+            },
+        },
+        {
+            unit_id = SUMMON_GOLEM,
+            abilities = {
+                FourCC('A06C'),
+                FourCC('A071'),
+                FourCC('A063'),
+                FourCC('A06Q'),
+                FourCC('A0KI'), -- Taunt
+                FourCC('A0B0'), -- Thunder Clap
+                FourCC('A06O'), -- Magnetic Force
+                FourCC('A0IQ'), -- Wing visual
+            },
+        },
+        {
+            unit_id = SUMMON_DESTROYER,
+            abilities = {
+                FourCC('A06C'),
+                FourCC('A071'),
+                FourCC('A063'),
+                FourCC('A06Q'),
+                FourCC('A02D'), -- Annihilation
+                FourCC('A06J'),
+                FourCC('A061'), -- Blink
+                FourCC('A03B'), -- Critical strike
+                FourCC('A0IQ'), -- Wing visual
+            },
+        },
+    }
+
+    -- Preload(path) warms model files, but not the unit and ability object data
+    -- Warcraft initializes on first creation. Create disposable summons before
+    -- gameplay hooks are installed so that cost is paid during map startup.
+    for i = 1, #summon_abilities do
+        local preload_data = summon_abilities[i]
+        local summon = CreateUnit(Player(PLAYER_NEUTRAL_PASSIVE), preload_data.unit_id, 0., 0., 0.)
+        ShowUnit(summon, false)
+
+        for j = 1, #preload_data.abilities do
+            UnitAddAbility(summon, preload_data.abilities[j])
+        end
+
+        RemoveUnit(summon)
+    end
+
     SetMapFlag(MAP_FOG_HIDE_TERRAIN, false)
     SetMapFlag(MAP_FOG_MAP_EXPLORED, true)
     SetMapFlag(MAP_FOG_ALWAYS_VISIBLE, false)
