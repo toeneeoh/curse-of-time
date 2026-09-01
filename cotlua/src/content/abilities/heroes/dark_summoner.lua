@@ -30,11 +30,11 @@ OnInit.final("DarkSummonerSpells", function(Require)
 
     local ESSENCE_TIER_TEXT = {
         [SUMMON_REAVER] = {
-            "Tier 1 - +15% STR and +5% Armor. Cleave: 26% damage / 650 length / 240 end width.",
-            "Tier 2 - +30% STR and +10% Armor. Cleave: 32% damage / 650 length / 255 end width.",
-            "Tier 3 - +45% STR and +15% Armor. Cleave: 38% damage / 650 length / 270 end width. Sacrifice: 0.90-0.70 BAT / +10-50% cleave damage / +20-100 end width.",
-            "Tier 4 - +60% STR and +20% Armor. Cleave: 44% damage / 650 length / 285 end width; applies -10% damage for 4 seconds.",
-            "Tier 5 - +75% STR and +25% Armor. Cleave: 50% damage / 650 length / 300 end width; heals up to 3% Max Health per attack. Sacrifice: 0.85-0.60 BAT / +15-75% cleave damage / +30-150 end width.",
+            "Tier 1 - +15% STR and +5% Armor. Cleave: 26% damage.",
+            "Tier 2 - +30% STR and +10% Armor. Cleave: 32% damage.",
+            "Tier 3 - +45% STR and +15% Armor. Cleave: 38% damage. Sacrifice: +10-30% base attack speed, +10-50% cleave damage, and +20-100 end width.",
+            "Tier 4 - +60% STR and +20% Armor. Cleave: 44% damage and applies -10% damage debuff to enemies for 4 seconds.",
+            "Tier 5 - +75% STR and +25% Armor. Cleave: 50% damage and heals up to 3% Max Health per attack. Sacrifice: +15-40% base attack speed, +15-75% cleave damage, and +30-150 end width.",
         },
         [SUMMON_GOLEM] = {
             "Tier 1 - +20% STR and +6% Armor.",
@@ -520,6 +520,8 @@ OnInit.final("DarkSummonerSpells", function(Require)
         SummonEssence.apply(pid, summon)
         SetWidgetLife(summon, BlzGetUnitMaxHP(summon))
         SetUnitState(summon, UNIT_STATE_MANA, BlzGetUnitMaxMana(summon))
+        SetUnitAnimation(summon, "birth")
+        QueueUnitAnimation(summon, "stand")
         TimerQueue:callDelayed(2., DestroyEffect,
             AddSpecialEffectTarget("Abilities\\Spells\\Undead\\Darksummoning\\DarkSummonTarget.mdl", summon, "origin"))
     end
@@ -605,6 +607,10 @@ OnInit.final("DarkSummonerSpells", function(Require)
             BlzSetSpecialEffectYaw(effect, facing)
             DestroyEffect(effect)
 
+            if tier >= 4 then
+                DreadfulWoundsDebuff:add(source, target):duration(4. * LBOOST[pid])
+            end
+
             MakeGroupInRange(pid, group, center_x, center_y, enum_radius, Condition(FilterEnemy))
             for enemy in each(group) do
                 local enemy_dx = GetUnitX(enemy) - source_x
@@ -675,7 +681,7 @@ OnInit.final("DarkSummonerSpells", function(Require)
         local tooltip = "Summons a permanent melee tank whose attributes scale with the Dark Summoner."
             .. "\n\n|c00ff0b11Strength:|r [str=|c00ffcc0040%|r of the Summoner's Strength and Intelligence]"
             .. "\n|c0000d23fAgility:|r [agi=|c00ffcc0060%|r of the Summoner's Intelligence]"
-            .. "\n|cffffcc00Regeneration:|r Gains half the Max Health regeneration granted by Summoning Improvement"
+            .. "\n\n|cffffcc00Regeneration:|r Gains half the Max Health regeneration granted by Summoning Improvement"
             .. "\n|c000080c030 second death cooldown.|r"
         set_extended_tooltips(thistype, 1, function() return tooltip end)
 
@@ -716,6 +722,7 @@ OnInit.final("DarkSummonerSpells", function(Require)
         local frenzy = setmetatable({}, { __mode = 'k' })
         local FRENZY_AGILITY_PER_SECOND = 50
         local FRENZY_MAX_AGILITY = 400
+        local FRENZY_POSITION_TOLERANCE_SQUARED = 32. * 32.
 
         thistype.values = {
             str = function(pid) return 0.0666 * (GetHeroInt(Hero[pid], true) + GetHeroStr(Hero[pid], true)) end,
@@ -747,11 +754,19 @@ OnInit.final("DarkSummonerSpells", function(Require)
             unit.bonus_agi = unit.bonus_agi + state.agility
         end
 
+        local function frenzy_moved(summon, state)
+            local dx = GetUnitX(summon) - state.x
+            local dy = GetUnitY(summon) - state.y
+            return dx * dx + dy * dy > FRENZY_POSITION_TOLERANCE_SQUARED
+        end
+
         local function frenzy_tick(summon)
             local state = frenzy[summon]
             if not state then return end
 
-            if not UnitAlive(summon) or IsUnitHidden(summon) or not UnitAlive(state.target) then
+            if not UnitAlive(summon) or IsUnitHidden(summon) or not UnitAlive(state.target)
+                or frenzy_moved(summon, state)
+            then
                 set_frenzy_agility(summon, state, 0)
                 frenzy[summon] = nil
                 return
@@ -787,7 +802,7 @@ OnInit.final("DarkSummonerSpells", function(Require)
 
         local function on_attack(source, target)
             local state = frenzy[source]
-            if state and state.target ~= target then
+            if state and (state.target ~= target or frenzy_moved(source, state)) then
                 reset_frenzy(source)
                 state = nil
             end
@@ -798,6 +813,8 @@ OnInit.final("DarkSummonerSpells", function(Require)
                     attacks = 0,
                     agility = 0,
                     idle_seconds = 0,
+                    x = GetUnitX(source),
+                    y = GetUnitY(source),
                 }
                 frenzy[source] = state
                 state.callback = TimerQueue:callDelayed(1., frenzy_tick, source)

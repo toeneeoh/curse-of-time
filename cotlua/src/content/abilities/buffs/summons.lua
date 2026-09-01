@@ -62,32 +62,32 @@ OnInit.final("BuffsSummons", function(Require)
         local thistype = ReaverBloodFrenzyBuff
         thistype.NAME            = "Blood Frenzy"
         thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNBloodLust.blp"
-        thistype.DESC            = "This unit has !$bat BAT, +^$cleave% cleave damage, and +$width cleave end width"
+        thistype.DESC            = "This unit has +^#bat% base attack speed, +^$cleave% cleave damage, and +$width cleave end width"
         thistype.DISPEL_TYPE     = BUFF_POSITIVE
         thistype.STACK_TYPE      = BUFF_STACK_NONE
 
         function thistype:update(cost_percent, tier, dur)
             local unit = Unit[self.target]
-            unit.bonus_bat = unit.bonus_bat / self.bat
+            unit.bonus_bat = unit.bonus_bat * self.bat
 
             if tier >= 5 then
-                self.bat = 0.9125 - cost_percent * 0.003125
+                self.bat = 1.0875 + cost_percent * 0.003125
                 self.cleave_multiplier = 1. + cost_percent * 0.0075
                 self.width = cost_percent * 1.5
             else
-                self.bat = 0.95 - cost_percent * 0.0025
+                self.bat = 1.05 + cost_percent * 0.0025
                 self.cleave_multiplier = 1. + cost_percent * 0.005
                 self.width = cost_percent
             end
 
             self.cleave = (self.cleave_multiplier - 1.) * 100.
-            unit.bonus_bat = unit.bonus_bat * self.bat
+            unit.bonus_bat = unit.bonus_bat / self.bat
             self:duration(dur)
             UnitRefreshBuff(self.target, self)
         end
 
         function thistype:onRemove()
-            Unit[self.target].bonus_bat = Unit[self.target].bonus_bat / self.bat
+            Unit[self.target].bonus_bat = Unit[self.target].bonus_bat * self.bat
             Unit[self.target]:removeEffect(self.sfx)
         end
 
