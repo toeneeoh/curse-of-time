@@ -68,7 +68,6 @@ OnInit.global("Variables", function()
     HERO_TOTAL                         = 19
     SUMMON_DESTROYER                   = FourCC('E014')
     SUMMON_REAVER                      = FourCC('H05F')
-    SUMMON_HOUND                       = SUMMON_REAVER -- compatibility alias for generated map references
     SUMMON_GOLEM                       = FourCC('H05G')
 
     -- proficiencies

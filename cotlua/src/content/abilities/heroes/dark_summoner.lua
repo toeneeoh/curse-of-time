@@ -6,6 +6,7 @@ OnInit.final("DarkSummonerSpells", function(Require)
     Require('SummonAbilities')
 
     local MAX_TIER = 5
+    local ESSENCE_INFO = FourCC('A063')
     local MILESTONES = { 1, 20, 50, 100, 150, 200, 300, 400, 500 }
     local SUMMON_TYPES = { SUMMON_REAVER, SUMMON_GOLEM, SUMMON_DESTROYER }
     local IS_SUMMON_TYPE = {
@@ -15,6 +16,35 @@ OnInit.final("DarkSummonerSpells", function(Require)
     }
     local essence_tiers = {} ---@type table<integer, table<integer, integer>>
 
+    local TIER_COMPLETE = "|cff66ff66"
+    local TIER_CURRENT = "|cffffcc00"
+    local TIER_LOCKED = "|cff777777"
+    local COLOR_END = "|r"
+
+    local ESSENCE_TIER_TEXT = {
+        [SUMMON_REAVER] = {
+            "Tier 1 - +15% STR, +10% AGI/INT, +5 Armor; Cleave: 26% damage / 240 radius.",
+            "Tier 2 - +30% STR, +20% AGI/INT, +10 Armor; Cleave: 32% damage / 255 radius.",
+            "Tier 3 - +45% STR, +30% AGI/INT, +15 Armor; Cleave: 38% damage / 270 radius.",
+            "Tier 4 - +60% STR, +40% AGI/INT, +20 Armor; Cleave: 44% damage / 285 radius.",
+            "Tier 5 - +75% STR, +50% AGI/INT, +25 Armor; Cleave: 50% damage / 300 radius.",
+        },
+        [SUMMON_GOLEM] = {
+            "Tier 1 - +20% STR, +10% AGI, and +6 Armor.",
+            "Tier 2 - +40% STR, +20% AGI, +12 Armor; unlocks Taunt.",
+            "Tier 3 - +60% STR, +30% AGI, +18 Armor; unlocks Thunder Clap.",
+            "Tier 4 - +80% STR, +40% AGI, +24 Armor; unlocks Magnetic Force.",
+            "Tier 5 - +100% STR, +50% AGI, +30 Armor; gains an ascended appearance.",
+        },
+        [SUMMON_DESTROYER] = {
+            "Tier 1 - +10% STR/INT, +50 AGI, +3 Armor; Annihilation: 12% chance / 1.2x INT.",
+            "Tier 2 - +20% STR/INT, +100 AGI, +6 Armor; Blink; Annihilation: 14% / 1.4x INT.",
+            "Tier 3 - +30% STR/INT, +150 AGI, +9 Armor; +25% Crit / +200% Crit Damage; Annihilation: 16% / 1.6x INT.",
+            "Tier 4 - +40% STR/INT, +200 AGI, +12 Armor; Perfected Annihilation: 18% / 1.8x INT.",
+            "Tier 5 - +50% STR, +75% INT, +250 AGI, +15 Armor; Annihilation: 20% / 2x INT.",
+        },
+    }
+
     ---@class SummonEssence
     ---@field available fun(pid: integer): integer
     ---@field unspent fun(pid: integer): integer
@@ -22,6 +52,7 @@ OnInit.final("DarkSummonerSpells", function(Require)
     ---@field infuse fun(pid: integer, summon: unit): boolean
     ---@field reclaim fun(pid: integer, summon: unit): boolean
     ---@field apply fun(pid: integer, summon: unit)
+    ---@field refreshTooltips fun(pid: integer)
     ---@field pack fun(pid: integer): integer
     ---@field load fun(pid: integer, packed: integer)
     SummonEssence = {}
@@ -97,6 +128,54 @@ OnInit.final("DarkSummonerSpells", function(Require)
         return get_state(pid)[get_summon_type(summon)] or 0
     end
 
+    local function tier_color(current_tier, displayed_tier)
+        if displayed_tier < current_tier then
+            return TIER_COMPLETE
+        elseif displayed_tier == current_tier then
+            return TIER_CURRENT
+        end
+        return TIER_LOCKED
+    end
+
+    local function refresh_essence_tooltip(pid, summon)
+        local uid = GetUnitTypeId(summon)
+        local lines = ESSENCE_TIER_TEXT[uid]
+        if not lines then return end
+
+        UnitAddAbility(summon, ESSENCE_INFO)
+        UnitMakeAbilityPermanent(summon, true, ESSENCE_INFO)
+
+        local ability = BlzGetUnitAbility(summon, ESSENCE_INFO)
+        if not ability then return end
+
+        local tier = SummonEssence.getTier(pid, uid)
+        local tooltip = "|cffffcc00Current Tier: " .. tier .. "/" .. MAX_TIER .. COLOR_END
+            .. "|n|cffb46effUnspent Essence: " .. SummonEssence.unspent(pid) .. COLOR_END .. "|n|n"
+
+        for displayed_tier = 1, MAX_TIER do
+            tooltip = tooltip .. tier_color(tier, displayed_tier) .. lines[displayed_tier] .. COLOR_END
+            if displayed_tier < MAX_TIER then
+                tooltip = tooltip .. "|n"
+            end
+        end
+
+        BlzSetAbilityStringLevelField(ability, ABILITY_SLF_TOOLTIP_NORMAL, 0,
+            "Summon Essence - Tier " .. tier .. "/" .. MAX_TIER)
+        BlzSetAbilityStringLevelField(ability, ABILITY_SLF_TOOLTIP_NORMAL_EXTENDED, 0, tooltip)
+    end
+
+    local function refresh_all_essence_tooltips(pid)
+        for i = 1, #PLAYER_SUMMONS do
+            local summon = PLAYER_SUMMONS[i]
+            if summon and GetOwningPlayer(summon) == Player(pid - 1)
+                and IS_SUMMON_TYPE[GetUnitTypeId(summon)] then
+                refresh_essence_tooltip(pid, summon)
+            end
+        end
+    end
+
+    SummonEssence.refreshTooltips = refresh_all_essence_tooltips
+
     function SummonEssence.pack(pid)
         local state = get_state(pid)
         return state[SUMMON_REAVER] + state[SUMMON_GOLEM] * 6 + state[SUMMON_DESTROYER] * 36
@@ -152,6 +231,8 @@ OnInit.final("DarkSummonerSpells", function(Require)
         SetUnitAbilityLevel(summon, RECLAIM_ESSENCE.id, 1)
         UnitDisableAbility(summon, INFUSE_ESSENCE.id, false)
         UnitDisableAbility(summon, RECLAIM_ESSENCE.id, false)
+        UnitAddAbility(summon, ESSENCE_INFO)
+        UnitMakeAbilityPermanent(summon, true, ESSENCE_INFO)
     end
 
     function SummonEssence.apply(pid, summon)
@@ -218,6 +299,7 @@ OnInit.final("DarkSummonerSpells", function(Require)
         unit.bonus_armor = unit.bonus_armor + unit.essence_armor
         unit.cc_flat = unit.cc_flat + unit.essence_cc
         unit.cd_flat = unit.cd_flat + unit.essence_cd
+        refresh_essence_tooltip(pid, summon)
     end
 
     function SummonEssence.infuse(pid, summon)
@@ -239,6 +321,7 @@ OnInit.final("DarkSummonerSpells", function(Require)
         state[uid] = state[uid] + 1
         persist(pid)
         SummonEssence.apply(pid, summon)
+        refresh_all_essence_tooltips(pid)
         DestroyEffect(AddSpecialEffectTarget("Abilities\\Spells\\Other\\Charm\\CharmTarget.mdl", summon, "chest"))
         FloatingTextUnit("Tier " .. state[uid], summon, 1, 75, 50, 12., 180, 110, 255, 0, true)
         message(pid, "|cffb46effEssence infused.|r " .. SummonEssence.unspent(pid) .. " point(s) remain.")
@@ -264,6 +347,7 @@ OnInit.final("DarkSummonerSpells", function(Require)
         state[uid] = state[uid] - 1
         persist(pid)
         SummonEssence.apply(pid, summon)
+        refresh_all_essence_tooltips(pid)
         DestroyEffect(AddSpecialEffectTarget("Abilities\\Spells\\Human\\DispelMagic\\DispelMagicTarget.mdl", summon, "origin"))
         message(pid, "|cffb46effEssence reclaimed.|r " .. SummonEssence.unspent(pid) .. " point(s) are available.")
         return true
@@ -291,6 +375,7 @@ OnInit.final("DarkSummonerSpells", function(Require)
             for i = 1, #MILESTONES do
                 local pid = GetPlayerId(GetOwningPlayer(u)) + 1
                 if level == MILESTONES[i] and Profile[pid] and Profile[pid].playing then
+                    refresh_all_essence_tooltips(pid)
                     message(pid, "|cffb46effYou gained a Summon Essence point.|r "
                         .. SummonEssence.unspent(pid) .. " point(s) are unallocated.")
                     break
@@ -308,7 +393,6 @@ OnInit.final("DarkSummonerSpells", function(Require)
             essence_tiers[pid] = nil
             get_state(pid)
 
-            SetPlayerAbilityAvailable(Player(pid - 1), FourCC('A063'), false)
             EVENT_HERO_LEVEL_CHANGED:register_unit_action(u, update_level)
             EVENT_ON_CLEANUP:register_action(pid, on_cleanup)
             update_level(u, GetHeroLevel(u))
@@ -369,23 +453,17 @@ OnInit.final("DarkSummonerSpells", function(Require)
             AddSpecialEffectTarget("Abilities\\Spells\\Undead\\Darksummoning\\DarkSummonTarget.mdl", summon, "origin"))
     end
 
-    ---@class SUMMONDREADREAVER : Spell
+    ---@class SUMMONREAVER : Spell
     ---@field str function
     ---@field agi function
     ---@field int function
-    SUMMONDREADREAVER = Spell.define("A0KF")
+    SUMMONREAVER = Spell.define("A0KF")
     do
-        local thistype = SUMMONDREADREAVER
+        local thistype = SUMMONREAVER
         local reavers = {} ---@type unit[]
 
-        BlzSetAbilityTooltip(thistype.id, "Summon Dread Reaver", 0)
-        for level = 1, #Spell.TOOLTIPS[thistype.id] do
-            Spell.TOOLTIPS[thistype.id][level] =
-                "Summons a permanent melee fighter that cleaves nearby enemies and can be specialized with Summon Essence."
-        end
-
         thistype.values = {
-            str = function(pid) return 0.35 * (GetHeroInt(Hero[pid], true) + GetHeroStr(Hero[pid], true)) end,
+            str = function(pid) return 0.25 * (GetHeroInt(Hero[pid], true) + GetHeroStr(Hero[pid], true)) end,
             agi = function(pid) return 0.1 * GetHeroInt(Hero[pid], true) end,
             int = function(pid) return 0.2 * GetHeroInt(Hero[pid], true) end,
         }
@@ -426,7 +504,7 @@ OnInit.final("DarkSummonerSpells", function(Require)
             end
 
             prepare_summon(self.pid, summon, x, y, angle)
-            SetUnitVertexColor(summon, 120, 60, 60, 255)
+            SetUnitVertexColor(summon, 200, 120, 120, 255)
             SUMMONINGIMPROVEMENT.apply(self.pid, summon,
                 R2I(self.str * BOOST[self.pid]), R2I(self.agi * BOOST[self.pid]), R2I(self.int * BOOST[self.pid]))
             Unit[summon].regen_max = 0.02 + 0.0005 * GetUnitAbilityLevel(summon, FourCC('A06Q'))
@@ -436,7 +514,7 @@ OnInit.final("DarkSummonerSpells", function(Require)
         end
     end
 
-    SUMMONDEMONHOUND = SUMMONDREADREAVER
+    SUMMONDEMONHOUND = SUMMONREAVER
 
     ---@class SUMMONMEATGOLEM : Spell
     ---@field str function
@@ -537,11 +615,6 @@ OnInit.final("DarkSummonerSpells", function(Require)
     do
         local thistype = DEMONICSACRIFICE
 
-        for level = 1, #Spell.TOOLTIPS[thistype.id] do
-            Spell.TOOLTIPS[thistype.id][level] =
-                "Sacrifices up to 15% of your maximum health to heal a damaged owned summon for twice the health paid. Cannot reduce you below 1 health."
-        end
-
         local function can_sacrifice(pid, caster, target, show_message)
             local valid = is_valid_summon(pid, target)
                 and GetWidgetLife(target) < BlzGetUnitMaxHP(target)
@@ -565,11 +638,10 @@ OnInit.final("DarkSummonerSpells", function(Require)
 
             local current_life = GetWidgetLife(self.caster)
             local missing_life = BlzGetUnitMaxHP(self.target) - GetWidgetLife(self.target)
-            local heal_multiplier = math.max(0.01, Unit[self.target].regen_percent)
             local payment = math.min(
                 BlzGetUnitMaxHP(self.caster) * 0.15,
                 current_life - 1.,
-                missing_life / (2. * heal_multiplier))
+                missing_life / 2.)
 
             if payment <= 0. then return end
 

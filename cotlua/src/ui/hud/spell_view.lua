@@ -183,15 +183,16 @@ OnInit.final("SpellView", function(Require)
         local abi = BlzGetUnitAbility(unit, skill)
         local level = GetUnitAbilityLevel(unit, skill)
         data.Used = true
-        data.Icon = BlzGetAbilityIcon(skill)
+        data.Icon = BlzGetAbilityStringLevelField(abi, ABILITY_SLF_ICON_NORMAL, math.max(0, level - 1))
+        if data.Icon == "" then data.Icon = BlzGetAbilityIcon(skill) end
         BlzFrameSetTexture(this.Frame[i].Icon, data.Icon, 0, false)
         if level > 0 then
             data.Mana = BlzGetUnitAbilityManaCost(unit, skill, level - 1)
             data.Cool = BlzGetUnitAbilityCooldown(unit, skill, level - 1)
             data.Range = R2I(BlzGetAbilityRealLevelField(abi, ABILITY_RLF_CAST_RANGE, level - 1))
             data.Area = R2I(BlzGetAbilityRealLevelField(abi, ABILITY_RLF_AREA_OF_EFFECT, level - 1))
-            data.Name = BlzGetAbilityTooltip(skill, level - 1)
-            data.Text = BlzGetAbilityExtendedTooltip(skill, level - 1)
+            data.Name = BlzGetAbilityStringLevelField(abi, ABILITY_SLF_TOOLTIP_NORMAL, level - 1)
+            data.Text = BlzGetAbilityStringLevelField(abi, ABILITY_SLF_TOOLTIP_NORMAL_EXTENDED, level - 1)
         else
             data.Name =  BlzGetAbilityResearchTooltip(skill, 0)
             data.Text = BlzGetAbilityResearchExtendedTooltip(skill, 0)
