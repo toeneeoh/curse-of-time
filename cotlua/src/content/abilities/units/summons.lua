@@ -1,7 +1,11 @@
 OnInit.final("SummonAbilities", function(Require)
     Require("Spells")
+    Require("SpellTools")
 
     local TQ = TimerQueue
+    local FPS_32 = FPS_32
+    local atan = math.atan
+    local valid_pull_target = VALID_PULL_TARGET
 
     UNIT_SPELLS[FourCC('A0KI')] = function(caster) -- meat golem taunt
         Taunt(caster, 800.)
@@ -17,7 +21,6 @@ OnInit.final("SummonAbilities", function(Require)
         BlzSetAbilityTooltip(thistype.id, "Reclaim Essence (-)", 0)
 
         function thistype:onCast()
-            if self.target then UnitRemoveAbility(self.target, FourCC('Basl')) end
             BlzEndUnitAbilityCooldown(self.caster, thistype.id)
 
             if SummonEssence then
@@ -36,7 +39,6 @@ OnInit.final("SummonAbilities", function(Require)
         BlzSetAbilityTooltip(thistype.id, "Infuse Essence (+)", 0)
 
         function thistype:onCast()
-            if self.target then UnitRemoveAbility(self.target, FourCC('Bfae')) end
             BlzEndUnitAbilityCooldown(self.caster, thistype.id)
 
             if SummonEssence then
@@ -48,32 +50,35 @@ OnInit.final("SummonAbilities", function(Require)
     MAGNETIC_FORCE = Spell.define('A06O')
     do
         local thistype = MAGNETIC_FORCE
+        local PULL_RADIUS = 600.
+        local MIN_DISTANCE = 200.
+        local PULL_FORCE = 500000.
+        local DURATION = 10.
 
-        ---@type fun(pid: integer, caster: unit, dur: number)
-        local function pull(pid, caster, dur)
-            dur = dur - 0.05
+        local function pull_force(target, _, x, y)
+            local target_x, target_y = GetUnitX(target), GetUnitY(target)
+            local distance = DistanceCoords(x, y, target_x, target_y)
 
-            if dur > 0 then
-                local ug = CreateGroup()
-
-                MakeGroupInRange(pid, ug, GetUnitX(caster), GetUnitY(caster), 600. * LBOOST[pid], Condition(FilterEnemy))
-
-                for target in each(ug) do
-                    local angle = math.atan(GetUnitY(caster) - GetUnitY(target), GetUnitX(caster) - GetUnitX(target))
-                    if GetUnitMoveSpeed(target) > 0 and IsTerrainWalkable(GetUnitX(target) + (7. * math.cos(angle)), GetUnitY(target) + (7. * math.sin(angle))) then
-                        SetUnitXBounded(target, GetUnitX(target) + (7. * math.cos(angle)))
-                        SetUnitYBounded(target, GetUnitY(target) + (7. * math.sin(angle)))
-                    end
-                end
-
-                TQ:callDelayed(0.05, pull, pid, caster, dur)
-
-                DestroyGroup(ug)
+            if distance > MIN_DISTANCE then
+                local angle = atan(y - target_y, x - target_x)
+                local strength = math.min(PULL_FORCE / (distance ^ 2), distance - MIN_DISTANCE)
+                SetUnitXBounded(target, target_x + strength * math.cos(angle))
+                SetUnitYBounded(target, target_y + strength * math.sin(angle))
             end
         end
 
+        local function pull(caster, pid, remaining)
+            if remaining <= 0. or not UnitAlive(caster) then return end
+
+            local x, y = GetUnitX(caster), GetUnitY(caster)
+            ALICE_ForAllObjectsInRangeDo(pull_force, x, y,
+                PULL_RADIUS * LBOOST[pid], "nonhero", valid_pull_target, caster, x, y)
+
+            TQ:callDelayed(FPS_32, pull, caster, pid, remaining - FPS_32)
+        end
+
         function thistype:onCast()
-            TQ:callDelayed(0.05, pull, self.pid, self.caster, 10)
+            pull(self.caster, self.pid, DURATION)
         end
     end
 

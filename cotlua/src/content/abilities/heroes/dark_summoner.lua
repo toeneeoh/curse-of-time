@@ -256,21 +256,6 @@ OnInit.final("DarkSummonerSpells", function(Require)
         BlzUnitDisableAbility(summon, RECLAIM_ESSENCE.id, false, false)
         BlzUnitHideAbility(summon, INFUSE_ESSENCE.id, false)
         BlzUnitHideAbility(summon, RECLAIM_ESSENCE.id, false)
-
-        local infuse = BlzGetUnitAbility(summon, INFUSE_ESSENCE.id)
-        local reclaim = BlzGetUnitAbility(summon, RECLAIM_ESSENCE.id)
-        if infuse then
-            BlzSetAbilityIntegerField(infuse, ABILITY_IF_BUTTON_POSITION_NORMAL_X, 1)
-            BlzSetAbilityIntegerField(infuse, ABILITY_IF_BUTTON_POSITION_NORMAL_Y, 1)
-        end
-        if reclaim then
-            BlzSetAbilityIntegerField(reclaim, ABILITY_IF_BUTTON_POSITION_NORMAL_X, 2)
-            BlzSetAbilityIntegerField(reclaim, ABILITY_IF_BUTTON_POSITION_NORMAL_Y, 1)
-        end
-
-        dev_log("allocation-controls unit=" .. GetObjectName(GetUnitTypeId(summon))
-            .. " infuse=" .. GetUnitAbilityLevel(summon, INFUSE_ESSENCE.id)
-            .. " reclaim=" .. GetUnitAbilityLevel(summon, RECLAIM_ESSENCE.id))
         UnitAddAbility(summon, ESSENCE_INFO)
         UnitMakeAbilityPermanent(summon, true, ESSENCE_INFO)
     end
@@ -728,6 +713,9 @@ OnInit.final("DarkSummonerSpells", function(Require)
     do
         local thistype = SUMMONDESTROYER
         local destroyers = {} ---@type unit[]
+        local frenzy = setmetatable({}, { __mode = 'k' })
+        local FRENZY_AGILITY_PER_SECOND = 50
+        local FRENZY_MAX_AGILITY = 400
 
         thistype.values = {
             str = function(pid) return 0.0666 * (GetHeroInt(Hero[pid], true) + GetHeroStr(Hero[pid], true)) end,
@@ -750,6 +738,73 @@ OnInit.final("DarkSummonerSpells", function(Require)
             TableRemove(PLAYER_SUMMONS, destroyers[pid])
             destroyers[pid] = nil
             EVENT_ON_CLEANUP:unregister_action(pid, on_cleanup)
+        end
+
+        local function set_frenzy_agility(summon, state, agility)
+            local unit = Unit[summon]
+            unit.bonus_agi = unit.bonus_agi - state.agility
+            state.agility = agility
+            unit.bonus_agi = unit.bonus_agi + state.agility
+        end
+
+        local function frenzy_tick(summon)
+            local state = frenzy[summon]
+            if not state then return end
+
+            if not UnitAlive(summon) or IsUnitHidden(summon) or not UnitAlive(state.target) then
+                set_frenzy_agility(summon, state, 0)
+                frenzy[summon] = nil
+                return
+            end
+
+            if state.attacks > 0 then
+                set_frenzy_agility(summon, state,
+                    math.min(FRENZY_MAX_AGILITY, state.agility + FRENZY_AGILITY_PER_SECOND))
+                state.attacks = 0
+                state.idle_seconds = 0
+            else
+                state.idle_seconds = state.idle_seconds + 1
+                if state.idle_seconds > math.max(1., Unit[summon].bat + 0.25) then
+                    set_frenzy_agility(summon, state, 0)
+                    frenzy[summon] = nil
+                    return
+                end
+            end
+
+            state.callback = TimerQueue:callDelayed(1., frenzy_tick, summon)
+        end
+
+        local function reset_frenzy(summon)
+            local state = frenzy[summon]
+            if not state then return end
+
+            if state.callback then
+                TimerQueue:disableCallback(state.callback)
+            end
+            set_frenzy_agility(summon, state, 0)
+            frenzy[summon] = nil
+        end
+
+        local function on_attack(source, target)
+            local state = frenzy[source]
+            if state and state.target ~= target then
+                reset_frenzy(source)
+                state = nil
+            end
+
+            if not state then
+                state = {
+                    target = target,
+                    attacks = 0,
+                    agility = 0,
+                    idle_seconds = 0,
+                }
+                frenzy[source] = state
+                state.callback = TimerQueue:callDelayed(1., frenzy_tick, source)
+            end
+
+            state.attacks = state.attacks + 1
+            state.idle_seconds = 0
         end
 
         local function annihilation(source, target)
@@ -776,10 +831,15 @@ OnInit.final("DarkSummonerSpells", function(Require)
             end
 
             prepare_summon(self.pid, summon, x, y, angle + 180.)
+            reset_frenzy(summon)
+            UnitAddAbility(summon, FourCC('A06J'))
+            UnitMakeAbilityPermanent(summon, true, FourCC('A06J'))
+            SetUnitAbilityLevel(summon, FourCC('A06J'), 1)
             SUMMONINGIMPROVEMENT.apply(self.pid, summon,
                 R2I(self.str * BOOST[self.pid]), R2I(self.agi * BOOST[self.pid]), R2I(self.int * BOOST[self.pid]))
             Unit[summon].regen_max = 0.02 + 0.0005 * GetUnitAbilityLevel(summon, FourCC('A06Q'))
             EVENT_ON_HIT:register_unit_action(summon, annihilation)
+            EVENT_ON_ATTACK:register_unit_action(summon, on_attack)
             EVENT_ON_CLEANUP:register_action(self.pid, on_cleanup)
             finish_summon(self.pid, summon)
         end
@@ -818,6 +878,11 @@ OnInit.final("DarkSummonerSpells", function(Require)
             end,
             dur = 12.,
         }
+
+        for level = 1, 6 do
+            Spell.TOOLTIPS[thistype.id][level] = string.gsub(
+                Spell.TOOLTIPS[thistype.id][level], "%]x", "x]")
+        end
 
         local function collect_summons(pid, caster, radius)
             local result = {}

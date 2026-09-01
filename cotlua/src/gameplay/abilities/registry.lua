@@ -191,7 +191,8 @@ OnInit.final("Spells", function(Require)
             if prefix == "[" then
                 local sb = Unit[u].spellboost
                 return HL(
-                    real_to_string(calc * (1 + sb - MIN_SPELLBOOST_VARIANCE)) .. " - " .. real_to_string(calc * (1 + sb + MAX_SPELLBOOST_VARIANCE)), color
+                    real_to_string(calc * (1 + sb + MIN_SPELLBOOST_VARIANCE)) .. " - "
+                        .. real_to_string(calc * (1 + sb + MAX_SPELLBOOST_VARIANCE)), color
                 )
 
             elseif prefix == "{" then
