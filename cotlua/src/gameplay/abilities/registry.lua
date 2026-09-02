@@ -34,6 +34,11 @@ OnInit.final("Spells", function(Require)
     local format = string.format
     local pattern = "(~?)(>?)([\\{%[])(%w-)=(.-)]"
     local gsub = string.gsub
+    local traced_tooltips = {
+        [FourCC('A01M')] = true,
+        [FourCC('A01O')] = true,
+        [FourCC('A01K')] = true,
+    }
 
     -- set by getTooltip before calling gsub
     local current_spell      ---@type Spell
@@ -268,6 +273,16 @@ OnInit.final("Spells", function(Require)
             if GetLocalPlayer() == GetOwningPlayer(u) then
                 BlzSetAbilityExtendedTooltip(sid, tooltip, ablev - 1)
                 BlzSetAbilityActivatedExtendedTooltip(sid, tooltip, ablev - 1)
+
+                if DevLog and DevLog.enabled and traced_tooltips[sid] then
+                    local ability = BlzGetUnitAbility(u, sid)
+                    local global_tooltip = BlzGetAbilityExtendedTooltip(sid, ablev - 1)
+                    local instance_tooltip = ability and BlzGetAbilityStringLevelField(
+                        ability, ABILITY_SLF_TOOLTIP_NORMAL_EXTENDED, ablev - 1) or "<missing>"
+                    DevLog.write("SPELL_TOOLTIP", format(
+                        "id=%d level=%d desired=%q global=%q instance=%q",
+                        sid, ablev, tooltip, global_tooltip, instance_tooltip))
+                end
             end
         end
 
