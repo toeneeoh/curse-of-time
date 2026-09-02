@@ -71,7 +71,6 @@ OnInit.final("Spells", function(Require)
     ---@field define function
     ---@field getTooltip function
     ---@field setTooltip function
-    ---@field tooltipLevel fun(pid: integer, u: unit): integer
     ---@field preCast function
     ---@field onCast function
     ---@field onLearn function
@@ -260,23 +259,15 @@ OnInit.final("Spells", function(Require)
             return result
         end
 
-        ---@param u unit
-        ---@param sid integer?
-        ---@param tooltip_level integer?
-        function thistype:setTooltip(u, sid, tooltip_level)
+        ---@type fun(self: Spell, u: unit, sid: integer?)
+        function thistype:setTooltip(u, sid)
             local ablev = GetUnitAbilityLevel(u, sid)
             local skill = self:create(u)
-            local source_level = tooltip_level
-                or (self.tooltipLevel and self.tooltipLevel(skill.pid, u))
-                or ablev
-            local tooltip = skill:getTooltip(u, source_level)
+            local tooltip = skill:getTooltip(u, ablev)
 
             if GetLocalPlayer() == GetOwningPlayer(u) then
                 local ability = BlzGetUnitAbility(u, sid)
                 if ability then
-                    BlzSetAbilityStringLevelField(
-                        ability, ABILITY_SLF_TOOLTIP_NORMAL, ablev - 1,
-                        BlzGetAbilityTooltip(sid, source_level - 1))
                     BlzSetAbilityStringLevelField(
                         ability, ABILITY_SLF_TOOLTIP_NORMAL_EXTENDED, ablev - 1, tooltip)
                 end

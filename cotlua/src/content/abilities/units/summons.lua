@@ -30,10 +30,8 @@ OnInit.final("SummonAbilities", function(Require)
         end
 
         function thistype:onCast()
-            local tier = SummonEssence.getTier(self.pid, SUMMON_REAVER)
-            local level = math.max(1, math.min(4, tier - 1))
-            local ms = MOVE_SPEED_PERCENT_BY_LEVEL[level]
-            local armor = ARMOR_PERCENT_BY_LEVEL[level]
+            local ms = MOVE_SPEED_PERCENT_BY_LEVEL[self.ablev]
+            local armor = ARMOR_PERCENT_BY_LEVEL[self.ablev]
             if not ms or not armor then return end
 
             local radius = self.aoe * LBOOST[self.pid]
