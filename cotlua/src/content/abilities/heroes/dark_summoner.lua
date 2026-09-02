@@ -8,7 +8,7 @@ OnInit.final("DarkSummonerSpells", function(Require)
 
     local MAX_TIER = 5
     local ESSENCE_INFO = FourCC('A063')
-    local REAVER_WAR_CRY = FourCC('A01M')
+    local REAVER_WAR_CRY_ID = FourCC('A01M')
     local ROSTER_COST = 2
     local INITIAL_ESSENCE = 3
     local SUMMON_DEATH_COOLDOWN = 30.
@@ -334,11 +334,15 @@ OnInit.final("DarkSummonerSpells", function(Require)
         add_allocation_controls(summon)
 
         if uid == SUMMON_REAVER then
-            UnitRemoveAbility(summon, REAVER_WAR_CRY)
+            UnitRemoveAbility(summon, REAVER_WAR_CRY_ID)
 
             unit.essence_str = R2I(unit.str * (REAVER_STR_BY_TIER[tier] or 0.))
             unit.essence_armor_percent = REAVER_ARMOR_BY_TIER[tier] or 0.
-            if tier >= 2 then UnitAddAbility(summon, REAVER_WAR_CRY) end
+            if tier >= 2 then
+                UnitAddAbility(summon, REAVER_WAR_CRY_ID)
+                SetUnitAbilityLevel(summon, REAVER_WAR_CRY_ID, tier - 1)
+                REAVER_WAR_CRY:setTooltip(summon, REAVER_WAR_CRY_ID)
+            end
             SetUnitScale(summon, 0.75 + tier * 0.04, 1. + tier * 0.04, 1. + tier * 0.04)
             BlzSetHeroProperName(summon, "Dread Reaver (Tier " .. tier .. ")")
         elseif uid == SUMMON_GOLEM then
