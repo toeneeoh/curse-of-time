@@ -165,10 +165,10 @@ OnInit.final("BuffsSummons", function(Require)
         end
     end
 
-    ---@class GolemBloodforgedBuff : Buff
-    GolemBloodforgedBuff = Buff.new()
+    ---@class SkullBruteBloodforgedBuff : Buff
+    SkullBruteBloodforgedBuff = Buff.new()
     do
-        local thistype = GolemBloodforgedBuff
+        local thistype = SkullBruteBloodforgedBuff
         thistype.NAME            = "Bloodforged"
         thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNReincarnation.blp"
         thistype.DESC            = "Attacks restore 0.5% Max Health"

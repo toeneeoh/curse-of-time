@@ -1488,7 +1488,7 @@ function SummonExpire(u)
     TimerList[pid]:stopAllTimers(u)
 
     if IsUnitHidden(u) == false then --important
-        if uid == SUMMON_DESTROYER or uid == SUMMON_REAVER or uid == SUMMON_GOLEM then
+        if uid == SUMMON_DESTROYER or uid == SUMMON_REAVER or uid == SUMMON_BRUTE then
             UnitRemoveAbility(u, FourCC('BNpa'))
             UnitRemoveAbility(u, FourCC('BNpm'))
             local pt = TimerList[pid]:add(u)
@@ -1536,7 +1536,7 @@ function RecallSummons(pid)
 
     for i = 1, #PLAYER_SUMMONS do
         local target = PLAYER_SUMMONS[i]
-        if GetOwningPlayer(target) == p and (GetUnitTypeId(target) == SUMMON_REAVER or GetUnitTypeId(target) == SUMMON_GOLEM or GetUnitTypeId(target) == SUMMON_DESTROYER) and IsUnitHidden(target) == false then
+        if GetOwningPlayer(target) == p and (GetUnitTypeId(target) == SUMMON_REAVER or GetUnitTypeId(target) == SUMMON_BRUTE or GetUnitTypeId(target) == SUMMON_DESTROYER) and IsUnitHidden(target) == false then
             SetUnitPosition(target, x, y)
             SetUnitPathing(target, false)
             SetUnitPathing(target, true)

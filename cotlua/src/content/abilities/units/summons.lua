@@ -177,9 +177,9 @@ OnInit.final("SummonAbilities", function(Require)
         end
     end
 
-    THUNDER_CLAP_GOLEM = Spell.define('A0B0')
+    SKULL_BRUTE_THUNDER_CLAP = Spell.define('A0B0')
     do
-        local thistype = THUNDER_CLAP_GOLEM
+        local thistype = SKULL_BRUTE_THUNDER_CLAP
 
         function thistype:onCast()
             local ug = CreateGroup()

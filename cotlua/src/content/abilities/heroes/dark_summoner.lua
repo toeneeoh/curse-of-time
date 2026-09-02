@@ -13,15 +13,15 @@ OnInit.final("DarkSummonerSpells", function(Require)
     local INITIAL_ESSENCE = 3
     local SUMMON_DEATH_COOLDOWN = 30.
     local MILESTONES = { 15, 50, 100, 150, 200, 250, 300, 350, 400, 450, 500 }
-    local SUMMON_TYPES = { SUMMON_REAVER, SUMMON_GOLEM, SUMMON_DESTROYER }
+    local SUMMON_TYPES = { SUMMON_REAVER, SUMMON_BRUTE, SUMMON_DESTROYER }
     local IS_SUMMON_TYPE = {
         [SUMMON_REAVER] = true,
-        [SUMMON_GOLEM] = true,
+        [SUMMON_BRUTE] = true,
         [SUMMON_DESTROYER] = true,
     }
     local SUMMON_SPELL = {
         [SUMMON_REAVER] = FourCC('A0KF'),
-        [SUMMON_GOLEM] = FourCC('A0KH'),
+        [SUMMON_BRUTE] = FourCC('A0KH'),
         [SUMMON_DESTROYER] = FourCC('A0KG'),
     }
     local essence_tiers = {} ---@type table<integer, table<integer, integer>>
@@ -29,8 +29,8 @@ OnInit.final("DarkSummonerSpells", function(Require)
 
     local REAVER_STR_BY_TIER = { 0.10, 0.22, 0.37, 0.55, 0.75 }
     local REAVER_ARMOR_BY_TIER = { 0.03, 0.07, 0.12, 0.18, 0.25 }
-    local GOLEM_STR_BY_TIER = { 0.12, 0.28, 0.48, 0.72, 1.00 }
-    local GOLEM_ARMOR_BY_TIER = { 0.04, 0.09, 0.15, 0.22, 0.30 }
+    local SKULL_BRUTE_STR_BY_TIER = { 0.12, 0.28, 0.48, 0.72, 1.00 }
+    local SKULL_BRUTE_ARMOR_BY_TIER = { 0.04, 0.09, 0.15, 0.22, 0.30 }
     local DESTROYER_STR_BY_TIER = { 0.06, 0.14, 0.24, 0.36, 0.50 }
     local DESTROYER_INT_BY_TIER = { 0.06, 0.14, 0.24, 0.40, 0.75 }
     local DESTROYER_AGI_BY_TIER = { 30, 70, 120, 180, 250 }
@@ -49,7 +49,7 @@ OnInit.final("DarkSummonerSpells", function(Require)
             "Tier 4 - +55% STR and +18% Armor. Cleave: 44% damage and improves Dreadful Wounds to -10% damage.",
             "Tier 5 - +75% STR and +25% Armor. Cleave: 50% damage and heals up to 3% Max Health per attack. Sacrifice: +15-40% base attack speed, +15-75% cleave damage, and +30-150 end width.",
         },
-        [SUMMON_GOLEM] = {
+        [SUMMON_BRUTE] = {
             "Tier 1 - +12% STR and +4% Armor.",
             "Tier 2 - +28% STR and +9% Armor; unlocks Taunt.",
             "Tier 3 - +48% STR and +15% Armor; unlocks Thunder Clap and doubles Sacrifice healing.",
@@ -86,7 +86,7 @@ OnInit.final("DarkSummonerSpells", function(Require)
         if not state then
             state = {
                 [SUMMON_REAVER] = 0,
-                [SUMMON_GOLEM] = 0,
+                [SUMMON_BRUTE] = 0,
                 [SUMMON_DESTROYER] = 0,
             }
             essence_tiers[pid] = state
@@ -182,7 +182,7 @@ OnInit.final("DarkSummonerSpells", function(Require)
 
     function SummonEssence.unspent(pid)
         local state = get_state(pid)
-        local spent = state[SUMMON_REAVER] + state[SUMMON_GOLEM] + state[SUMMON_DESTROYER]
+        local spent = state[SUMMON_REAVER] + state[SUMMON_BRUTE] + state[SUMMON_DESTROYER]
         return math.max(0, SummonEssence.available(pid) - SummonEssence.bound(pid) - spent)
     end
 
@@ -278,7 +278,7 @@ OnInit.final("DarkSummonerSpells", function(Require)
 
     function SummonEssence.pack(pid)
         local state = get_state(pid)
-        return state[SUMMON_REAVER] + state[SUMMON_GOLEM] * 6 + state[SUMMON_DESTROYER] * 36
+        return state[SUMMON_REAVER] + state[SUMMON_BRUTE] * 6 + state[SUMMON_DESTROYER] * 36
     end
 
     function SummonEssence.load(pid, packed)
@@ -287,11 +287,11 @@ OnInit.final("DarkSummonerSpells", function(Require)
         local state = get_state(pid)
         state[SUMMON_REAVER] = math.min(MAX_TIER, packed % 6)
         packed = packed // 6
-        state[SUMMON_GOLEM] = math.min(MAX_TIER, packed % 6)
+        state[SUMMON_BRUTE] = math.min(MAX_TIER, packed % 6)
         packed = packed // 6
         state[SUMMON_DESTROYER] = math.min(MAX_TIER, packed % 6)
 
-        local overflow = state[SUMMON_REAVER] + state[SUMMON_GOLEM]
+        local overflow = state[SUMMON_REAVER] + state[SUMMON_BRUTE]
             + state[SUMMON_DESTROYER] - SummonEssence.available(pid)
 
         for i = #SUMMON_TYPES, 1, -1 do
@@ -377,19 +377,19 @@ OnInit.final("DarkSummonerSpells", function(Require)
             TimerQueue:callDelayed(0., refresh_reaver_tooltips, summon)
             SetUnitScale(summon, 0.75 + tier * 0.04, 1. + tier * 0.04, 1. + tier * 0.04)
             BlzSetHeroProperName(summon, "Dread Reaver (Tier " .. tier .. ")")
-        elseif uid == SUMMON_GOLEM then
+        elseif uid == SUMMON_BRUTE then
             UnitRemoveAbility(summon, FourCC('A0KI'))
-            UnitRemoveAbility(summon, THUNDER_CLAP_GOLEM.id)
+            UnitRemoveAbility(summon, SKULL_BRUTE_THUNDER_CLAP.id)
             UnitRemoveAbility(summon, MAGNETIC_FORCE.id)
             UnitRemoveAbility(summon, FourCC('A0IQ'))
 
-            unit.essence_str = R2I(unit.str * (GOLEM_STR_BY_TIER[tier] or 0.))
-            unit.essence_armor_percent = GOLEM_ARMOR_BY_TIER[tier] or 0.
+            unit.essence_str = R2I(unit.str * (SKULL_BRUTE_STR_BY_TIER[tier] or 0.))
+            unit.essence_armor_percent = SKULL_BRUTE_ARMOR_BY_TIER[tier] or 0.
             SetUnitScale(summon, 1. + tier * 0.05, 1. + tier * 0.05, 1. + tier * 0.05)
             BlzSetHeroProperName(summon, "Skull Brute (Tier " .. tier .. ")")
 
             if tier >= 2 then UnitAddAbility(summon, FourCC('A0KI')) end
-            if tier >= 3 then UnitAddAbility(summon, THUNDER_CLAP_GOLEM.id) end
+            if tier >= 3 then UnitAddAbility(summon, SKULL_BRUTE_THUNDER_CLAP.id) end
             if tier >= 4 then UnitAddAbility(summon, MAGNETIC_FORCE.id) end
             if tier >= 5 then UnitAddAbility(summon, FourCC('A0IQ')) end
         elseif uid == SUMMON_DESTROYER then
@@ -831,7 +831,7 @@ OnInit.final("DarkSummonerSpells", function(Require)
     SUMMONSKULLBRUTE = Spell.define("A0KH")
     do
         local thistype = SUMMONSKULLBRUTE
-        local golems = {} ---@type unit[]
+        local skull_brutes = {} ---@type unit[]
 
         thistype.values = {
             str = function(pid) return 0.4 * (GetHeroInt(Hero[pid], true) + GetHeroStr(Hero[pid], true)) end,
@@ -846,13 +846,13 @@ OnInit.final("DarkSummonerSpells", function(Require)
         set_extended_tooltips(thistype, 1, function() return tooltip end)
 
         local function on_cleanup(pid)
-            TableRemove(PLAYER_SUMMONS, golems[pid])
-            golems[pid] = nil
+            TableRemove(PLAYER_SUMMONS, skull_brutes[pid])
+            skull_brutes[pid] = nil
             EVENT_ON_CLEANUP:unregister_action(pid, on_cleanup)
         end
 
         function thistype:onCast()
-            if not SummonEssence.reserve(self.pid, SUMMON_GOLEM) then
+            if not SummonEssence.reserve(self.pid, SUMMON_BRUTE) then
                 BlzEndUnitAbilityCooldown(self.caster, thistype.id)
                 return
             end
@@ -860,11 +860,11 @@ OnInit.final("DarkSummonerSpells", function(Require)
             local angle = GetUnitFacing(self.caster)
             local x = self.x + 150. * math.cos(bj_DEGTORAD * angle)
             local y = self.y + 150. * math.sin(bj_DEGTORAD * angle)
-            local summon = golems[self.pid]
+            local summon = skull_brutes[self.pid]
 
             if not summon then
-                summon = CreateUnit(Player(self.pid - 1), SUMMON_GOLEM, x, y, angle)
-                golems[self.pid] = summon
+                summon = CreateUnit(Player(self.pid - 1), SUMMON_BRUTE, x, y, angle)
+                skull_brutes[self.pid] = summon
             end
 
             prepare_summon(self.pid, summon, x, y, angle)
@@ -1107,9 +1107,9 @@ OnInit.final("DarkSummonerSpells", function(Require)
             local uid = GetUnitTypeId(summon)
             if uid == SUMMON_REAVER then
                 ReaverBloodFrenzyBuff:add(caster, summon):update(cost_percent, tier, dur)
-            elseif uid == SUMMON_GOLEM then
+            elseif uid == SUMMON_BRUTE then
                 if tier >= 5 then
-                    GolemBloodforgedBuff:add(caster, summon):duration(dur)
+                    SkullBruteBloodforgedBuff:add(caster, summon):duration(dur)
                 end
             elseif uid == SUMMON_DESTROYER then
                 local charges = fatal_blocks(tier, cost_percent)
@@ -1207,7 +1207,7 @@ OnInit.final("DarkSummonerSpells", function(Require)
                 local tier = SummonEssence.getTier(self.pid, summon)
                 local healing_multiplier = heal_multiplier(self.caster) * BOOST[self.pid]
 
-                if GetUnitTypeId(summon) == SUMMON_GOLEM and tier >= 3 then
+                if GetUnitTypeId(summon) == SUMMON_BRUTE and tier >= 3 then
                     healing_multiplier = healing_multiplier * 2.
                 end
 

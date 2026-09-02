@@ -63,7 +63,7 @@ OnInit.global("Preloader", function()
             },
         },
         {
-            unit_id = SUMMON_GOLEM,
+            unit_id = SUMMON_BRUTE,
             abilities = {
                 FourCC('A06C'),
                 FourCC('A071'),
