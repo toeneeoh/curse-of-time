@@ -224,10 +224,10 @@ OnInit.final("BuffsSummons", function(Require)
         end
     end
 
-    ---@class MeatGolemThunderClap : Buff
-    MeatGolemThunderClap = Buff.new()
+    ---@class SkullBruteThunderClap : Buff
+    SkullBruteThunderClap = Buff.new()
     do
-        local thistype = MeatGolemThunderClap
+        local thistype = SkullBruteThunderClap
         thistype.NAME            = "Thunder Clap"
         thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNThunderclap.blp"
         thistype.DESC            = "This unit has -^$ms% movespeed and -^$as% attack speed"

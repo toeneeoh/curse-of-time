@@ -102,7 +102,7 @@ OnInit.final("SummonAbilities", function(Require)
         end
     end
 
-    UNIT_SPELLS[FourCC('A0KI')] = function(caster) -- meat golem taunt
+    UNIT_SPELLS[FourCC('A0KI')] = function(caster) -- skull brute taunt
         Taunt(caster, 800.)
     end
 
@@ -186,7 +186,7 @@ OnInit.final("SummonAbilities", function(Require)
             MakeGroupInRange(self.pid, ug, self.x, self.y, 300., Condition(FilterEnemy))
 
             for target in each(ug) do
-                MeatGolemThunderClap:add(self.caster, target):duration(3.)
+                SkullBruteThunderClap:add(self.caster, target):duration(3.)
             end
 
             DestroyGroup(ug)

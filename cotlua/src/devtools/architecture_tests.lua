@@ -298,7 +298,7 @@ OnInit.final("ArchitectureTests", function(Require)
             'NerveGasDebuff', 'RighteousMightBuff', 'FireElementBuff', 'HardHatBuff',
             'SingleShotDebuff', 'DarkShieldBuff', 'AstralShieldBuff',
             'ProtectedExistenceBuff', 'DivineLightBuff', 'DemonPrinceBloodlust',
-            'MeatGolemThunderClap', 'NagaThorns', 'HolyBlessing', 'Lava', 'WeatherBuff',
+            'SkullBruteThunderClap', 'NagaThorns', 'HolyBlessing', 'Lava', 'WeatherBuff',
         }
 
         for index = 1, #names do

@@ -386,7 +386,7 @@ OnInit.final("DarkSummonerSpells", function(Require)
             unit.essence_str = R2I(unit.str * (GOLEM_STR_BY_TIER[tier] or 0.))
             unit.essence_armor_percent = GOLEM_ARMOR_BY_TIER[tier] or 0.
             SetUnitScale(summon, 1. + tier * 0.05, 1. + tier * 0.05, 1. + tier * 0.05)
-            BlzSetHeroProperName(summon, "Meat Golem (Tier " .. tier .. ")")
+            BlzSetHeroProperName(summon, "Skull Brute (Tier " .. tier .. ")")
 
             if tier >= 2 then UnitAddAbility(summon, FourCC('A0KI')) end
             if tier >= 3 then UnitAddAbility(summon, THUNDER_CLAP_GOLEM.id) end
@@ -825,12 +825,12 @@ OnInit.final("DarkSummonerSpells", function(Require)
 
     SUMMONDEMONHOUND = SUMMONREAVER
 
-    ---@class SUMMONMEATGOLEM : Spell
+    ---@class SUMMONSKULLBRUTE : Spell
     ---@field str function
     ---@field agi function
-    SUMMONMEATGOLEM = Spell.define("A0KH")
+    SUMMONSKULLBRUTE = Spell.define("A0KH")
     do
-        local thistype = SUMMONMEATGOLEM
+        local thistype = SUMMONSKULLBRUTE
         local golems = {} ---@type unit[]
 
         thistype.values = {
