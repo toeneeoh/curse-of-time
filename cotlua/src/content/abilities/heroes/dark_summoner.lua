@@ -336,6 +336,15 @@ OnInit.final("DarkSummonerSpells", function(Require)
         if uid == SUMMON_REAVER then
             UnitRemoveAbility(summon, REAVER_WAR_CRY_ID)
 
+            UnitAddAbility(summon, DREAD_CLEAVE_INFO.id)
+            UnitAddAbility(summon, DREADFUL_WOUNDS_INFO.id)
+            UnitMakeAbilityPermanent(summon, true, DREAD_CLEAVE_INFO.id)
+            UnitMakeAbilityPermanent(summon, true, DREADFUL_WOUNDS_INFO.id)
+            SetUnitAbilityLevel(summon, DREAD_CLEAVE_INFO.id, tier + 1)
+            SetUnitAbilityLevel(summon, DREADFUL_WOUNDS_INFO.id, tier + 1)
+            DREAD_CLEAVE_INFO:setTooltip(summon, DREAD_CLEAVE_INFO.id)
+            DREADFUL_WOUNDS_INFO:setTooltip(summon, DREADFUL_WOUNDS_INFO.id)
+
             unit.essence_str = R2I(unit.str * (REAVER_STR_BY_TIER[tier] or 0.))
             unit.essence_armor_percent = REAVER_ARMOR_BY_TIER[tier] or 0.
             if tier >= 2 then
@@ -763,8 +772,10 @@ OnInit.final("DarkSummonerSpells", function(Require)
 
             prepare_summon(self.pid, summon, x, y, angle)
             SetUnitVertexColor(summon, 200, 200, 200, 255)
+            -- Zero-stat hero object data displays one less than the value assigned through the stat system.
             SUMMONINGIMPROVEMENT.apply(self.pid, summon,
-                R2I(self.str * BOOST[self.pid]), R2I(self.agi * BOOST[self.pid]), R2I(self.int * BOOST[self.pid]))
+                R2I(self.str * BOOST[self.pid]) + 1, R2I(self.agi * BOOST[self.pid]) + 1,
+                R2I(self.int * BOOST[self.pid]) + 1)
             Unit[summon].regen_max = 0.02 + 0.0005 * GetUnitAbilityLevel(summon, FourCC('A06Q'))
             EVENT_ON_HIT_AFTER_REDUCTIONS:register_unit_action(summon, cleave)
             EVENT_ON_CLEANUP:register_action(self.pid, on_cleanup)

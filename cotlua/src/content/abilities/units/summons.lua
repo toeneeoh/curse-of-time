@@ -53,6 +53,54 @@ OnInit.final("SummonAbilities", function(Require)
         end
     end
 
+    ---@class DREAD_CLEAVE_INFO : Spell
+    DREAD_CLEAVE_INFO = Spell.define('A01O')
+    do
+        local thistype = DREAD_CLEAVE_INFO
+
+        thistype.values = {
+            length = 650.,
+            start_width = 150.,
+            end_width = function(pid)
+                return 225. + SummonEssence.getTier(pid, SUMMON_REAVER) * 15.
+            end,
+        }
+
+        for level = 1, 6 do
+            local tier = level - 1
+            local tooltip = "Attacks deal " .. (20 + tier * 6)
+                .. "% of their pre-armor damage as Physical damage to enemies in a widening cone behind the primary target."
+                .. "|n|n|cffffcc00Range:|r ~{length=650]"
+                .. "|n|cffffcc00Start Width:|r ~{start_width=150]"
+                .. "|n|cffffcc00End Width:|r ~{end_width=" .. (225 + tier * 15) .. "]"
+
+            if tier >= 5 then
+                tooltip = tooltip
+                    .. "|n|nDamage dealt by Dread Cleave heals the Reaver for 10%, up to 3% of its Max Health per attack."
+            end
+
+            Spell.TOOLTIPS[thistype.id][level] = tooltip
+        end
+    end
+
+    ---@class DREADFUL_WOUNDS_INFO : Spell
+    DREADFUL_WOUNDS_INFO = Spell.define('A01K')
+    do
+        local thistype = DREADFUL_WOUNDS_INFO
+
+        thistype.values = {
+            dur = 4.,
+        }
+
+        for level = 1, 6 do
+            local tier = level - 1
+            local reduction = tier >= 4 and 10 or 5
+            Spell.TOOLTIPS[thistype.id][level] = "The Reaver's attacks apply Dreadful Wounds to the primary target"
+                .. " and every enemy struck by Dread Cleave, reducing their damage by " .. reduction
+                .. "% for ~{dur=4] seconds."
+        end
+    end
+
     UNIT_SPELLS[FourCC('A0KI')] = function(caster) -- meat golem taunt
         Taunt(caster, 800.)
     end
