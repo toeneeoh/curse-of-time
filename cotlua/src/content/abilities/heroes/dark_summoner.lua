@@ -120,12 +120,15 @@ OnInit.final("DarkSummonerSpells", function(Require)
             and not IsUnitHidden(summon)
     end
 
-    local function is_respec_area(pid)
-        local hero = Hero[pid]
-        return hero ~= nil and (
-            RectContainsUnit(gg_rct_Town_Main, hero)
-            or RectContainsUnit(gg_rct_Church, hero)
-            or RectContainsUnit(gg_rct_Tavern, hero))
+    local function unit_is_in_respec_area(target)
+        return target ~= nil and (
+            RectContainsUnit(gg_rct_Town_Main, target)
+            or RectContainsUnit(gg_rct_Church, target)
+            or RectContainsUnit(gg_rct_Tavern, target))
+    end
+
+    local function is_respec_area(pid, summon)
+        return unit_is_in_respec_area(Hero[pid]) and unit_is_in_respec_area(summon)
     end
 
     local function persist(pid)
@@ -415,8 +418,8 @@ OnInit.final("DarkSummonerSpells", function(Require)
         if not is_valid_summon(pid, summon) then
             message(pid, "|cffff0000You must target one of your active summons.|r")
             return false
-        elseif not is_respec_area(pid) then
-            message(pid, "|cffff0000Essence can only be reclaimed in town, the church, or the tavern.|r")
+        elseif not is_respec_area(pid, summon) then
+            message(pid, "|cffff0000Both the Dark Summoner and the target summon must be in town, the church, or the tavern to reclaim Essence.|r")
             return false
         end
 

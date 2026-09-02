@@ -21,7 +21,7 @@ OnInit.final("SummonAbilities", function(Require)
         }
 
         Spell.TOOLTIPS[thistype.id][1] =
-            "Rallies nearby summons, granting them increased movespeed and armor for [dur] seconds."
+            "Rallies nearby allies, granting them increased movespeed and armor for [dur] seconds."
             .. "|n|n|cffffcc00Movespeed:|r 15/18/21/25%"
             .. "|n|cffffcc00Armor:|r 20/23/26/30%"
             .. "|n|cffffcc00Area:|r [aoe]"
@@ -35,18 +35,19 @@ OnInit.final("SummonAbilities", function(Require)
 
             local radius = self.aoe * LBOOST[self.pid]
             local duration = self.dur * LBOOST[self.pid]
-            for i = 1, #PLAYER_SUMMONS do
-                local summon = PLAYER_SUMMONS[i]
-                if summon and UnitAlive(summon) and not IsUnitHidden(summon)
-                    and GetOwningPlayer(summon) == Player(self.pid - 1)
-                    and IsUnitInRange(summon, self.caster, radius)
-                then
-                    ReaverWarCryBuff:add(self.caster, summon):update(ms, armor, duration)
+            local group = CreateGroup()
+            MakeGroupInRange(self.pid, group, GetUnitX(self.caster), GetUnitY(self.caster),
+                radius, Condition(FilterAlly))
+
+            for ally in each(group) do
+                if not IsUnitType(ally, UNIT_TYPE_STRUCTURE) then
+                    ReaverWarCryBuff:add(self.caster, ally):update(ms, armor, duration)
                 end
             end
+            DestroyGroup(group)
 
             DestroyEffect(AddSpecialEffectTarget(
-                "Abilities\\Spells\\NightElf\\BattleRoar\\RoarCaster.mdl", self.caster, "chest"))
+                "Abilities\\Spells\\NightElf\\BattleRoar\\RoarCaster.mdl", self.caster, "origin"))
         end
     end
 
@@ -60,7 +61,7 @@ OnInit.final("SummonAbilities", function(Require)
         local thistype = RECLAIM_ESSENCE
 
         Spell.TOOLTIPS[thistype.id][1] =
-            "Reclaim one Essence point from the target summon. At tier 0, dismiss the summon and refund its 2 bound Essence. This can only be done in town, the church, or the tavern."
+            "Reclaim one Essence point from the target summon. At tier 0, dismiss the summon and refund its 2 bound Essence. Both the Dark Summoner and the target summon must be in town, the church, or the tavern."
         BlzSetAbilityTooltip(thistype.id, "Reclaim Essence (-)", 0)
 
         function thistype:onCast()
