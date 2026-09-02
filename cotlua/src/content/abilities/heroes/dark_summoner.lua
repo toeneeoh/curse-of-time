@@ -649,15 +649,17 @@ OnInit.final("DarkSummonerSpells", function(Require)
         }
 
         thistype.values = {
-            str = function(pid) return 0.25 * (GetHeroInt(Hero[pid], true) + GetHeroStr(Hero[pid], true)) end,
-            agi = function(pid) return 0.1 * GetHeroInt(Hero[pid], true) end,
-            int = function(pid) return 0.2 * GetHeroInt(Hero[pid], true) end,
+            str = function(pid)
+                return math.max(20., 0.25 * (GetHeroInt(Hero[pid], true) + GetHeroStr(Hero[pid], true)))
+            end,
+            agi = function(pid) return math.max(10., 0.1 * GetHeroInt(Hero[pid], true)) end,
+            int = function(pid) return math.max(20., 0.2 * GetHeroInt(Hero[pid], true)) end,
         }
 
         local tooltip = "Summons a permanent melee off-tank whose attributes scale with the Dark Summoner."
-            .. "\n\n|c00ff0b11Strength:|r [str=|c00ffcc0025%|r of the Summoner's Strength and Intelligence]"
-            .. "\n|c0000d23fAgility:|r [agi=|c00ffcc0010%|r of the Summoner's Intelligence]"
-            .. "\n|c000080ffIntelligence:|r [int=|c00ffcc0020%|r of the Summoner's Intelligence]"
+            .. "\n\n|c00ff0b11Strength:|r [str=|c00ffcc0025%|r of the Summoner's Strength and Intelligence (minimum 20)]"
+            .. "\n|c0000d23fAgility:|r [agi=|c00ffcc0010%|r of the Summoner's Intelligence (minimum 10)]"
+            .. "\n|c000080ffIntelligence:|r [int=|c00ffcc0020%|r of the Summoner's Intelligence (minimum 20)]"
             .. "\n\n|cffffcc00Dread Cleave:|r Attacks cleave in a widening 650-range cone."
             .. "\n|cffffcc00Dreadful Wounds:|r Attacks reduce enemy damage by 5% for 4 seconds."
             .. "\n|c000080c030 second death cooldown.|r"
