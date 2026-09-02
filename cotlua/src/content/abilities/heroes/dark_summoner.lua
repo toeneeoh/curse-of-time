@@ -54,7 +54,7 @@ OnInit.final("DarkSummonerSpells", function(Require)
             "Tier 2 - +28% STR and +9% Armor; unlocks Taunt.",
             "Tier 3 - +48% STR and +15% Armor; unlocks Thunder Clap and doubles Sacrifice healing.",
             "Tier 4 - +72% STR and +22% Armor; unlocks Magnetic Force.",
-            "Tier 5 - +100% STR and +30% Armor; Sacrifice grants 10% damage healing, capped at 1% Max Health per attack.",
+            "Tier 5 - +100% STR and +30% Armor; during Sacrifice, attacks restore 0.5% Max Health.",
         },
         [SUMMON_DESTROYER] = {
             "Tier 1 - +6% STR/INT, +30 AGI, and +2% Armor. Annihilation: 12% chance / 1.2x INT damage.",
@@ -677,29 +677,42 @@ OnInit.final("DarkSummonerSpells", function(Require)
         local CLEAVE_EFFECT = "UnbrilliantGloryWhite.mdx"
         local CLEAVE_EFFECT_FORWARD_OFFSET = 75.
         local CLEAVE_EFFECT_HEIGHT = 75.
+        local AGI_PERCENT_BY_LEVEL = { 10, 15, 20, 25 }
+        local INT_PERCENT_BY_LEVEL = { 20, 35, 50, 65 }
         local CLEAVE_DAMAGE_OPTIONS = {
             attack = false,
             pre_scaled_source = true,
             suppress_source_events = true,
         }
 
+        local function get_level(pid)
+            return math.min(4, math.max(1, GetUnitAbilityLevel(Hero[pid], thistype.id)))
+        end
+
         thistype.values = {
             str = function(pid)
                 return math.max(20., 0.25 * (GetHeroInt(Hero[pid], true) + GetHeroStr(Hero[pid], true)))
             end,
-            agi = function(pid) return math.max(10., 0.1 * GetHeroInt(Hero[pid], true)) end,
-            int = function(pid) return math.max(20., 0.2 * GetHeroInt(Hero[pid], true)) end,
+            agi = function(pid)
+                return math.max(10., AGI_PERCENT_BY_LEVEL[get_level(pid)] * 0.01 * GetHeroInt(Hero[pid], true))
+            end,
+            int = function(pid)
+                return math.max(20., INT_PERCENT_BY_LEVEL[get_level(pid)] * 0.01 * GetHeroInt(Hero[pid], true))
+            end,
         }
 
-        local tooltip = "Summons a permanent melee off-tank whose attributes scale with the Dark Summoner."
-            .. "\n\n|c00ff0b11Strength:|r [str=|c00ffcc0025%|r of the Summoner's Strength and Intelligence (minimum 20)]"
-            .. "\n|c0000d23fAgility:|r [agi=|c00ffcc0010%|r of the Summoner's Intelligence (minimum 10)]"
-            .. "\n|c000080ffIntelligence:|r [int=|c00ffcc0020%|r of the Summoner's Intelligence (minimum 20)]"
-            .. "\n\n|cffffcc00Dread Cleave:|r Attacks cleave in a widening 650-range cone."
-            .. "\n|cffffcc00Dreadful Wounds:|r Attacks reduce enemy damage by 5%."
-            .. "\n|c000080c04 second duration.|r"
-            .. "\n|c000080c030 second death cooldown.|r"
-        set_extended_tooltips(thistype, 6, function() return tooltip end)
+        set_extended_tooltips(thistype, 4, function(level)
+            return "Summons a permanent melee off-tank whose attributes scale with the Dark Summoner."
+                .. "\n\n|c00ff0b11Strength:|r {str=|c00ffcc0025%|r of the Summoner's Strength and Intelligence (minimum 20)]"
+                .. "\n|c0000d23fAgility:|r {agi=|c00ffcc00" .. AGI_PERCENT_BY_LEVEL[level]
+                .. "%|r of the Summoner's Intelligence (minimum 10)]"
+                .. "\n|c000080ffIntelligence:|r {int=|c00ffcc00" .. INT_PERCENT_BY_LEVEL[level]
+                .. "%|r of the Summoner's Intelligence (minimum 20)]"
+                .. "\n\n|cffffcc00Dread Cleave:|r Attacks cleave in a widening 650-range cone."
+                .. "\n|cffffcc00Dreadful Wounds:|r Attacks reduce enemy damage by 5%."
+                .. "\n|c000080c04 second duration.|r"
+                .. "\n|c000080c030 second death cooldown.|r"
+        end)
 
         local function on_cleanup(pid)
             TableRemove(PLAYER_SUMMONS, reavers[pid])

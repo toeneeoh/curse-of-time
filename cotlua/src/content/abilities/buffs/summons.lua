@@ -171,16 +171,14 @@ OnInit.final("BuffsSummons", function(Require)
         local thistype = GolemBloodforgedBuff
         thistype.NAME            = "Bloodforged"
         thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNReincarnation.blp"
-        thistype.DESC            = "Attacks heal this unit for 10% of damage dealt, up to 1% Max Health per attack"
+        thistype.DESC            = "Attacks restore 0.5% Max Health"
         thistype.DISPEL_TYPE     = BUFF_POSITIVE
         thistype.STACK_TYPE      = BUFF_STACK_NONE
 
         local function on_hit(source, target, amount, amount_after_reduction)
             local buff = thistype:get(nil, source)
             if buff and amount_after_reduction > 0 then
-                HP(buff.source, source, math.min(
-                    amount_after_reduction * 0.1,
-                    BlzGetUnitMaxHP(source) * 0.01), "Bloodforged")
+                HP(buff.source, source, BlzGetUnitMaxHP(source) * 0.005, "Bloodforged")
             end
         end
 
