@@ -5,6 +5,11 @@ OnInit.final("MarksmanSpells", function(Require)
     local TQ = TimerQueue
     local FPS_32 = FPS_32
     local atan = math.atan
+    local active_helicopters = {} ---@type PlayerTimer[]
+
+    local function destroy_lightning(lightning)
+        DestroyLightning(lightning)
+    end
 
     ---@class SNIPERSTANCE : Spell
     ---@field enabled boolean[]
@@ -267,6 +272,11 @@ OnInit.final("MarksmanSpells", function(Require)
         end
 
         local function on_expire(pt)
+            local heli = active_helicopters[pt.pid]
+            if heli and heli.source == pt.source then
+                active_helicopters[pt.pid] = nil
+            end
+
             TimerList[pt.pid]:stopAllTimers(thistype.id)
 
             SoundHandler("Units\\Human\\Gyrocopter\\GyrocopterPissed6.flac", true, nil, pt.source)
@@ -309,6 +319,7 @@ OnInit.final("MarksmanSpells", function(Require)
             pt.source = heli
             pt.angle = math.random(1, 3) * 120. - 60
             pt:startLoop(0.25, attack)
+            active_helicopters[self.pid] = pt
 
             -- wander loop
             local pt2 = TimerList[self.pid]:add(thistype.id)
@@ -335,7 +346,10 @@ OnInit.final("MarksmanSpells", function(Require)
             local newangle = (180. - RAbsBJ(RAbsBJ(self.angle - GetUnitFacing(self.caster)) - 180.)) * 0.5
             self.angle = bj_DEGTORAD * (self.angle + GetRandomReal(-(newangle), newangle))
 
-            Dummy.create(self.x, self.y, FourCC('A05J'), 1, 1.):lightning(self.x + 1500. * math.cos(self.angle), self.y + 1500. * math.sin(self.angle))
+            local end_x = self.x + 1500. * math.cos(self.angle)
+            local end_y = self.y + 1500. * math.sin(self.angle)
+            local lightning = AddLightningEx("BULL", true, self.x, self.y, GetTerrainZ(self.x, self.y) + 60., end_x, end_y, GetTerrainZ(end_x, end_y) + 60.)
+            TQ:callDelayed(2., destroy_lightning, lightning)
             SoundHandler("war3mapImported\\xm1014-3.wav", false, Player(self.pid - 1))
 
             local ug = CreateGroup()
@@ -388,7 +402,7 @@ OnInit.final("MarksmanSpells", function(Require)
             collisionRadius = 20,
             onTerrainCollision = CAT_TerrainBounce,
             elasticity = 0.3,
-            friction = 950,
+            friction = 1200,
             lifetime = 4.,
             onExpire = function(self)
                 local ug = CreateGroup()
@@ -436,7 +450,7 @@ OnInit.final("MarksmanSpells", function(Require)
         rocket_template.__index = rocket_template
 
         local function rocket(heli, self)
-            if heli and heli.source then
+            if heli == active_helicopters[self.pid] and heli.source and UnitAlive(heli.source) then
                 local missile = setmetatable({}, rocket_template)
                 missile.x = GetUnitX(heli.source)
                 missile.y = GetUnitY(heli.source)
@@ -458,7 +472,7 @@ OnInit.final("MarksmanSpells", function(Require)
         end
 
         function thistype:onCast()
-            local heli = TimerList[self.pid]:get(ASSAULTHELICOPTER.id)
+            local heli = active_helicopters[self.pid]
 
             if heli then
                 DestroyEffect(AddSpecialEffect("Abilities\\Spells\\Human\\Flare\\FlareCaster.mdl", self.x, self.y))
@@ -473,7 +487,7 @@ OnInit.final("MarksmanSpells", function(Require)
                 missile.x = self.x
                 missile.y = self.y
                 missile.z = GetUnitZ(self.caster)
-                local vx, vy, vz = CAT_GetBallisticLaunchSpeedFromAngle(missile.x, missile.y, missile.z, self.targetX, self.targetY, GetTerrainZ(self.targetX, self.targetY), 70 * bj_DEGTORAD)
+                local vx, vy, vz = CAT_GetBallisticLaunchSpeedFromAngle(missile.x, missile.y, missile.z, self.targetX, self.targetY, GetTerrainZ(self.targetX, self.targetY), 65 * bj_DEGTORAD)
                 missile.vx = vx * 0.85
                 missile.vy = vy * 0.85
                 missile.vz = vz * 0.85
