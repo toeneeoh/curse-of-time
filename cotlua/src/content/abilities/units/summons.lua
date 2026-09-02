@@ -23,15 +23,17 @@ OnInit.final("SummonAbilities", function(Require)
         for level = 1, 4 do
             BlzSetAbilityTooltip(thistype.id, "War Cry - [|cffffcc00Level " .. level .. "|r]", level - 1)
             Spell.TOOLTIPS[thistype.id][level] =
-                "Rallies nearby allies, granting them increased movespeed and armor for ~{dur=8] seconds."
-                .. "|n|n|cffffcc00Movespeed:|r |cffffcc00" .. MOVE_SPEED_PERCENT_BY_LEVEL[level] .. "%|r"
-                .. "|n|cffffcc00Armor:|r |cffffcc00" .. ARMOR_PERCENT_BY_LEVEL[level] .. "%|r"
-                .. "|n|c000080c0~>{aoe=800] area.|r"
+                "Rallies nearby allies, increasing their movespeed by |cffffcc00"
+                .. MOVE_SPEED_PERCENT_BY_LEVEL[level] .. "%|r and armor by |cffffcc00"
+                .. ARMOR_PERCENT_BY_LEVEL[level] .. "%|r for ~{dur=8] seconds."
+                .. "|n|n|c000080c0~>{aoe=800] area.|r"
         end
 
         function thistype:onCast()
-            local ms = MOVE_SPEED_PERCENT_BY_LEVEL[self.ablev]
-            local armor = ARMOR_PERCENT_BY_LEVEL[self.ablev]
+            local tier = SummonEssence.getTier(self.pid, SUMMON_REAVER)
+            local level = math.max(1, math.min(4, tier - 1))
+            local ms = MOVE_SPEED_PERCENT_BY_LEVEL[level]
+            local armor = ARMOR_PERCENT_BY_LEVEL[level]
             if not ms or not armor then return end
 
             local radius = self.aoe * LBOOST[self.pid]

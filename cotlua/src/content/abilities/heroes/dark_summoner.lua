@@ -212,6 +212,14 @@ OnInit.final("DarkSummonerSpells", function(Require)
         return get_state(pid)[get_summon_type(summon)] or 0
     end
 
+    DREAD_CLEAVE_INFO.tooltipLevel = function(pid)
+        return SummonEssence.getTier(pid, SUMMON_REAVER) + 1
+    end
+    DREADFUL_WOUNDS_INFO.tooltipLevel = DREAD_CLEAVE_INFO.tooltipLevel
+    REAVER_WAR_CRY.tooltipLevel = function(pid)
+        return math.max(1, math.min(4, SummonEssence.getTier(pid, SUMMON_REAVER) - 1))
+    end
+
     local function tier_color(current_tier, displayed_tier)
         if displayed_tier < current_tier then
             return TIER_COMPLETE
@@ -340,10 +348,12 @@ OnInit.final("DarkSummonerSpells", function(Require)
     local function refresh_reaver_tooltips(summon)
         if not summon or GetUnitTypeId(summon) ~= SUMMON_REAVER then return end
 
-        DREAD_CLEAVE_INFO:setTooltip(summon, DREAD_CLEAVE_INFO.id)
-        DREADFUL_WOUNDS_INFO:setTooltip(summon, DREADFUL_WOUNDS_INFO.id)
+        local pid = GetPlayerId(GetOwningPlayer(summon)) + 1
+        local tier = SummonEssence.getTier(pid, SUMMON_REAVER)
+        DREAD_CLEAVE_INFO:setTooltip(summon, DREAD_CLEAVE_INFO.id, tier + 1)
+        DREADFUL_WOUNDS_INFO:setTooltip(summon, DREADFUL_WOUNDS_INFO.id, tier + 1)
         if GetUnitAbilityLevel(summon, REAVER_WAR_CRY_ID) > 0 then
-            REAVER_WAR_CRY:setTooltip(summon, REAVER_WAR_CRY_ID)
+            REAVER_WAR_CRY:setTooltip(summon, REAVER_WAR_CRY_ID, tier - 1)
         end
     end
 
@@ -364,14 +374,14 @@ OnInit.final("DarkSummonerSpells", function(Require)
             UnitAddAbility(summon, DREADFUL_WOUNDS_INFO.id)
             UnitMakeAbilityPermanent(summon, true, DREAD_CLEAVE_INFO.id)
             UnitMakeAbilityPermanent(summon, true, DREADFUL_WOUNDS_INFO.id)
-            SetUnitAbilityLevel(summon, DREAD_CLEAVE_INFO.id, tier + 1)
-            SetUnitAbilityLevel(summon, DREADFUL_WOUNDS_INFO.id, tier + 1)
+            SetUnitAbilityLevel(summon, DREAD_CLEAVE_INFO.id, 1)
+            SetUnitAbilityLevel(summon, DREADFUL_WOUNDS_INFO.id, 1)
 
             unit.essence_str = R2I(unit.str * (REAVER_STR_BY_TIER[tier] or 0.))
             unit.essence_armor_percent = REAVER_ARMOR_BY_TIER[tier] or 0.
             if tier >= 2 then
                 UnitAddAbility(summon, REAVER_WAR_CRY_ID)
-                SetUnitAbilityLevel(summon, REAVER_WAR_CRY_ID, tier - 1)
+                SetUnitAbilityLevel(summon, REAVER_WAR_CRY_ID, 1)
             end
             refresh_reaver_tooltips(summon)
             TimerQueue:callDelayed(0., refresh_reaver_tooltips, summon)
