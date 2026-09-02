@@ -260,6 +260,20 @@ OnInit.final("DarkSummonerSpells", function(Require)
         end
     end
 
+    local function sync_summon_levels(pid, level)
+        for i = 1, #PLAYER_SUMMONS do
+            local summon = PLAYER_SUMMONS[i]
+            if summon and GetOwningPlayer(summon) == Player(pid - 1)
+                and IS_SUMMON_TYPE[GetUnitTypeId(summon)] then
+                SuspendHeroXP(summon, false)
+                if GetHeroLevel(summon) ~= level then
+                    SetHeroLevel(summon, level, false)
+                end
+                SuspendHeroXP(summon, true)
+            end
+        end
+    end
+
     SummonEssence.refreshTooltips = refresh_all_essence_tooltips
 
     function SummonEssence.pack(pid)
@@ -552,10 +566,11 @@ OnInit.final("DarkSummonerSpells", function(Require)
         local thistype = SUMMONINGIMPROVEMENT
 
         local function update_level(u, level)
+            local pid = GetPlayerId(GetOwningPlayer(u)) + 1
             SetUnitAbilityLevel(u, thistype.id, level // 10 + 1)
+            sync_summon_levels(pid, level)
 
             for i = 1, #MILESTONES do
-                local pid = GetPlayerId(GetOwningPlayer(u)) + 1
                 if level == MILESTONES[i] and Profile[pid] and Profile[pid].playing then
                     refresh_all_essence_tooltips(pid)
                     message(pid, "|cffb46effYou gained a Summon Essence point.|r "
@@ -628,7 +643,9 @@ OnInit.final("DarkSummonerSpells", function(Require)
         PLAYER_SUMMONS[#PLAYER_SUMMONS + 1] = summon
         EVENT_ON_FATAL_DAMAGE:register_unit_action(summon, SummonEssence.onFatalDamage)
         EVENT_ON_UNIT_DEATH:register_unit_action(summon, on_summon_death)
+        SuspendHeroXP(summon, false)
         SetHeroLevel(summon, GetHeroLevel(Hero[pid]), false)
+        SuspendHeroXP(summon, true)
         summon_cooldown_started[summon] = nil
 
         local spell_id = SUMMON_SPELL[GetUnitTypeId(summon)]

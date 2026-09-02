@@ -21,13 +21,12 @@ OnInit.final("SummonAbilities", function(Require)
         }
 
         for level = 1, 4 do
-            local tier = level + 1
-            BlzSetAbilityTooltip(thistype.id, "War Cry (Tier " .. tier .. ")", level - 1)
+            BlzSetAbilityTooltip(thistype.id, "War Cry - [|cffffcc00Level " .. level .. "|r]", level - 1)
             Spell.TOOLTIPS[thistype.id][level] =
                 "Rallies nearby allies, granting them increased movespeed and armor for ~{dur=8] seconds."
-                .. "|n|n|cffffcc00Movespeed:|r " .. MOVE_SPEED_PERCENT_BY_LEVEL[level] .. "%"
-                .. "|n|cffffcc00Armor:|r " .. ARMOR_PERCENT_BY_LEVEL[level] .. "%"
-                .. "|n|cffffcc00Area:|r ~{aoe=800]"
+                .. "|n|n|cffffcc00Movespeed:|r |cffffcc00" .. MOVE_SPEED_PERCENT_BY_LEVEL[level] .. "%|r"
+                .. "|n|cffffcc00Armor:|r |cffffcc00" .. ARMOR_PERCENT_BY_LEVEL[level] .. "%|r"
+                .. "|n|c000080c0Area: ~>{aoe=800]|r"
         end
 
         function thistype:onCast()
@@ -67,16 +66,17 @@ OnInit.final("SummonAbilities", function(Require)
         }
 
         for level = 1, 6 do
+            BlzSetAbilityTooltip(thistype.id, "Dread Cleave - [|cffffcc00Level " .. level .. "|r]", level - 1)
             local tier = level - 1
-            local tooltip = "Attacks deal " .. (20 + tier * 6)
-                .. "% of their pre-armor damage as Physical damage to enemies in a widening cone behind the primary target."
-                .. "|n|n|cffffcc00Range:|r ~{length=650]"
-                .. "|n|cffffcc00Start Width:|r ~{startwidth=150]"
-                .. "|n|cffffcc00End Width:|r ~{endwidth=" .. (225 + tier * 15) .. "]"
+            local tooltip = "Attacks deal |cffffcc00" .. (20 + tier * 6)
+                .. "%|r of Physical damage to enemies in a widening cone behind the primary target."
+                .. "|n|n|c000080c0Range: ~>{length=650]|r"
+                .. "|n|c000080c0Start Width: ~>{startwidth=150]|r"
+                .. "|n|c000080c0End Width: ~>{endwidth=" .. (225 + tier * 15) .. "]|r"
 
             if tier >= 5 then
                 tooltip = tooltip
-                    .. "|n|nDamage dealt by Dread Cleave heals the Reaver for 10%, up to 3% of its Max Health per attack."
+                    .. "|n|nDamage dealt by Dread Cleave heals the Reaver for |cffffcc0010%|r, up to |cffffcc003%|r of its Max Health per attack."
             end
 
             Spell.TOOLTIPS[thistype.id][level] = tooltip
@@ -93,11 +93,12 @@ OnInit.final("SummonAbilities", function(Require)
         }
 
         for level = 1, 6 do
+            BlzSetAbilityTooltip(thistype.id, "Dreadful Wounds - [|cffffcc00Level " .. level .. "|r]", level - 1)
             local tier = level - 1
             local reduction = tier >= 4 and 10 or 5
             Spell.TOOLTIPS[thistype.id][level] = "The Reaver's attacks apply Dreadful Wounds to the primary target"
-                .. " and every enemy struck by Dread Cleave, reducing their damage by " .. reduction
-                .. "%.|n|c000080c0~>{dur=4] second duration.|r"
+                .. " and every enemy struck by Dread Cleave, reducing their damage by |cffffcc00" .. reduction
+                .. "%|r.|n|c000080c0~>{dur=4] second duration.|r"
         end
     end
 
