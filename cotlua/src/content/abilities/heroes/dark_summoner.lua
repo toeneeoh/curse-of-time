@@ -8,8 +8,11 @@ OnInit.final("DarkSummonerSpells", function(Require)
 
     local MAX_TIER = 5
     local ESSENCE_INFO = FourCC('A063')
+    local REAVER_WAR_CRY = FourCC('A0K2')
+    local ROSTER_COST = 2
+    local INITIAL_ESSENCE = 3
     local SUMMON_DEATH_COOLDOWN = 30.
-    local MILESTONES = { 1, 20, 50, 100, 150, 200, 300, 400, 500 }
+    local MILESTONES = { 15, 50, 100, 150, 200, 250, 300, 350, 400, 450, 500 }
     local SUMMON_TYPES = { SUMMON_REAVER, SUMMON_GOLEM, SUMMON_DESTROYER }
     local IS_SUMMON_TYPE = {
         [SUMMON_REAVER] = true,
@@ -22,6 +25,16 @@ OnInit.final("DarkSummonerSpells", function(Require)
         [SUMMON_DESTROYER] = FourCC('A0KG'),
     }
     local essence_tiers = {} ---@type table<integer, table<integer, integer>>
+    local essence_roster = {} ---@type table<integer, table<integer, boolean>>
+
+    local REAVER_STR_BY_TIER = { 0.10, 0.22, 0.37, 0.55, 0.75 }
+    local REAVER_ARMOR_BY_TIER = { 0.03, 0.07, 0.12, 0.18, 0.25 }
+    local GOLEM_STR_BY_TIER = { 0.12, 0.28, 0.48, 0.72, 1.00 }
+    local GOLEM_ARMOR_BY_TIER = { 0.04, 0.09, 0.15, 0.22, 0.30 }
+    local DESTROYER_STR_BY_TIER = { 0.06, 0.14, 0.24, 0.36, 0.50 }
+    local DESTROYER_INT_BY_TIER = { 0.06, 0.14, 0.24, 0.40, 0.75 }
+    local DESTROYER_AGI_BY_TIER = { 30, 70, 120, 180, 250 }
+    local DESTROYER_ARMOR_BY_TIER = { 0.02, 0.05, 0.08, 0.11, 0.15 }
 
     local TIER_COMPLETE = "|cff66ff66"
     local TIER_CURRENT = "|cffffcc00"
@@ -30,31 +43,34 @@ OnInit.final("DarkSummonerSpells", function(Require)
 
     local ESSENCE_TIER_TEXT = {
         [SUMMON_REAVER] = {
-            "Tier 1 - +15% STR and +5% Armor. Cleave: 26% damage.",
-            "Tier 2 - +30% STR and +10% Armor. Cleave: 32% damage.",
-            "Tier 3 - +45% STR and +15% Armor. Cleave: 38% damage. Sacrifice: +10-30% base attack speed, +10-50% cleave damage, and +20-100 end width.",
-            "Tier 4 - +60% STR and +20% Armor. Cleave: 44% damage and applies -10% damage debuff to enemies for 4 seconds.",
+            "Tier 1 - +10% STR and +3% Armor. Cleave: 26% damage.",
+            "Tier 2 - +22% STR and +7% Armor; unlocks War Cry. Cleave: 32% damage.",
+            "Tier 3 - +37% STR and +12% Armor. Cleave: 38% damage. Sacrifice: +10-30% base attack speed, +10-50% cleave damage, and +20-100 end width.",
+            "Tier 4 - +55% STR and +18% Armor. Cleave: 44% damage and improves Dreadful Wounds to -10% damage.",
             "Tier 5 - +75% STR and +25% Armor. Cleave: 50% damage and heals up to 3% Max Health per attack. Sacrifice: +15-40% base attack speed, +15-75% cleave damage, and +30-150 end width.",
         },
         [SUMMON_GOLEM] = {
-            "Tier 1 - +20% STR and +6% Armor.",
-            "Tier 2 - +40% STR and +12% Armor; unlocks Taunt.",
-            "Tier 3 - +60% STR and +18% Armor; unlocks Thunder Clap and doubles Sacrifice healing.",
-            "Tier 4 - +80% STR and +24% Armor; unlocks Magnetic Force.",
+            "Tier 1 - +12% STR and +4% Armor.",
+            "Tier 2 - +28% STR and +9% Armor; unlocks Taunt.",
+            "Tier 3 - +48% STR and +15% Armor; unlocks Thunder Clap and doubles Sacrifice healing.",
+            "Tier 4 - +72% STR and +22% Armor; unlocks Magnetic Force.",
             "Tier 5 - +100% STR and +30% Armor; Sacrifice grants 10% damage healing, capped at 1% Max Health per attack.",
         },
         [SUMMON_DESTROYER] = {
-            "Tier 1 - +10% STR/INT, +50 AGI, and +3% Armor. Annihilation: 12% chance / 1.2x INT damage.",
-            "Tier 2 - +20% STR/INT, +100 AGI, and +6% Armor; unlocks Blink. Annihilation: 14% chance / 1.4x INT damage.",
-            "Tier 3 - +30% STR/INT, +150 AGI, and +9% Armor; +25% Crit / +200% Crit Damage. Annihilation: 16% chance / 1.6x INT damage. Sacrifice blocks 1 fatal hit.",
-            "Tier 4 - +40% STR/INT, +200 AGI, and +12% Armor. Annihilation: 18% chance / 1.8x INT damage. Sacrifice blocks 2 fatal hits at 60%+ cost.",
+            "Tier 1 - +6% STR/INT, +30 AGI, and +2% Armor. Annihilation: 12% chance / 1.2x INT damage.",
+            "Tier 2 - +14% STR/INT, +70 AGI, and +5% Armor; unlocks Blink. Annihilation: 14% chance / 1.4x INT damage.",
+            "Tier 3 - +24% STR/INT, +120 AGI, and +8% Armor; +25% Crit / +200% Crit Damage. Annihilation: 16% chance / 1.6x INT damage. Sacrifice blocks 1 fatal hit.",
+            "Tier 4 - +36% STR, +40% INT, +180 AGI, and +11% Armor. Annihilation: 18% chance / 1.8x INT damage. Sacrifice blocks 2 fatal hits at 60%+ cost.",
             "Tier 5 - +50% STR, +75% INT, +250 AGI, and +15% Armor. Annihilation: 20% chance / 2x INT damage. Sacrifice blocks 1/2/3 fatal hits at 20/40/80%+ cost.",
         },
     }
 
     ---@class SummonEssence
     ---@field available fun(pid: integer): integer
+    ---@field bound fun(pid: integer): integer
     ---@field unspent fun(pid: integer): integer
+    ---@field reserve fun(pid: integer, summon_type: integer): boolean
+    ---@field dismiss fun(pid: integer, summon: unit): boolean
     ---@field getTier fun(pid: integer, summon: unit|integer): integer
     ---@field infuse fun(pid: integer, summon: unit): boolean
     ---@field reclaim fun(pid: integer, summon: unit): boolean
@@ -76,6 +92,15 @@ OnInit.final("DarkSummonerSpells", function(Require)
             essence_tiers[pid] = state
         end
         return state
+    end
+
+    local function get_roster(pid)
+        local roster = essence_roster[pid]
+        if not roster then
+            roster = {}
+            essence_roster[pid] = roster
+        end
+        return roster
     end
 
     local function get_summon_type(summon)
@@ -132,7 +157,7 @@ OnInit.final("DarkSummonerSpells", function(Require)
     function SummonEssence.available(pid)
         local hero = Hero[pid]
         local level = hero and GetHeroLevel(hero) or 1
-        local points = 0
+        local points = INITIAL_ESSENCE
 
         for i = 1, #MILESTONES do
             if level < MILESTONES[i] then break end
@@ -141,10 +166,43 @@ OnInit.final("DarkSummonerSpells", function(Require)
         return points
     end
 
+    function SummonEssence.bound(pid)
+        local roster = get_roster(pid)
+        local count = 0
+        for i = 1, #SUMMON_TYPES do
+            if roster[SUMMON_TYPES[i]] then
+                count = count + 1
+            end
+        end
+        return count * ROSTER_COST
+    end
+
     function SummonEssence.unspent(pid)
         local state = get_state(pid)
         local spent = state[SUMMON_REAVER] + state[SUMMON_GOLEM] + state[SUMMON_DESTROYER]
-        return math.max(0, SummonEssence.available(pid) - spent)
+        return math.max(0, SummonEssence.available(pid) - SummonEssence.bound(pid) - spent)
+    end
+
+    function SummonEssence.reserve(pid, summon_type)
+        local roster = get_roster(pid)
+        if roster[summon_type] then return true end
+
+        if SummonEssence.unspent(pid) < ROSTER_COST then
+            message(pid, "|cffff0000You need " .. ROSTER_COST
+                .. " unallocated Essence to summon that creature.|r")
+            return false
+        end
+
+        roster[summon_type] = true
+        if SummonEssence.refreshTooltips then
+            SummonEssence.refreshTooltips(pid)
+        end
+        dev_log("reserve pid=" .. pid .. " summon=" .. GetObjectName(summon_type)
+            .. " total=" .. SummonEssence.available(pid) .. " bound=" .. SummonEssence.bound(pid)
+            .. " unspent=" .. SummonEssence.unspent(pid))
+        message(pid, "|cffb46eff" .. ROSTER_COST .. " Essence bound to summon. "
+            .. SummonEssence.unspent(pid) .. " point(s) remain.|r")
+        return true
     end
 
     function SummonEssence.getTier(pid, summon)
@@ -173,7 +231,9 @@ OnInit.final("DarkSummonerSpells", function(Require)
 
         local tier = SummonEssence.getTier(pid, uid)
         local tooltip = "|cffffcc00Current Tier: " .. tier .. "/" .. MAX_TIER .. COLOR_END
-            .. "|n|cffb46effUnspent Essence: " .. SummonEssence.unspent(pid) .. COLOR_END .. "|n|n"
+            .. "|n|cffb46effTotal Essence: " .. SummonEssence.available(pid)
+            .. " | Bound: " .. SummonEssence.bound(pid)
+            .. " | Unspent: " .. SummonEssence.unspent(pid) .. COLOR_END .. "|n|n"
 
         for displayed_tier = 1, MAX_TIER do
             tooltip = tooltip .. tier_color(tier, displayed_tier) .. lines[displayed_tier] .. COLOR_END
@@ -271,8 +331,11 @@ OnInit.final("DarkSummonerSpells", function(Require)
         add_allocation_controls(summon)
 
         if uid == SUMMON_REAVER then
-            unit.essence_str = R2I(unit.str * 0.15 * tier)
-            unit.essence_armor_percent = tier * 0.05
+            UnitRemoveAbility(summon, REAVER_WAR_CRY)
+
+            unit.essence_str = R2I(unit.str * (REAVER_STR_BY_TIER[tier] or 0.))
+            unit.essence_armor_percent = REAVER_ARMOR_BY_TIER[tier] or 0.
+            if tier >= 2 then UnitAddAbility(summon, REAVER_WAR_CRY) end
             SetUnitScale(summon, 0.75 + tier * 0.04, 1. + tier * 0.04, 1. + tier * 0.04)
             BlzSetHeroProperName(summon, "Dread Reaver (Tier " .. tier .. ")")
         elseif uid == SUMMON_GOLEM then
@@ -281,8 +344,8 @@ OnInit.final("DarkSummonerSpells", function(Require)
             UnitRemoveAbility(summon, MAGNETIC_FORCE.id)
             UnitRemoveAbility(summon, FourCC('A0IQ'))
 
-            unit.essence_str = R2I(unit.str * 0.2 * tier)
-            unit.essence_armor_percent = tier * 0.06
+            unit.essence_str = R2I(unit.str * (GOLEM_STR_BY_TIER[tier] or 0.))
+            unit.essence_armor_percent = GOLEM_ARMOR_BY_TIER[tier] or 0.
             SetUnitScale(summon, 1. + tier * 0.05, 1. + tier * 0.05, 1. + tier * 0.05)
             BlzSetHeroProperName(summon, "Meat Golem (Tier " .. tier .. ")")
 
@@ -296,10 +359,10 @@ OnInit.final("DarkSummonerSpells", function(Require)
             UnitRemoveAbility(summon, FourCC('A0IQ'))
             SetUnitAbilityLevel(summon, FourCC('A02D'), 1)
 
-            unit.essence_str = R2I(unit.str * 0.1 * tier)
-            unit.essence_agi = tier * 50
-            unit.essence_int = R2I(unit.int * 0.1 * tier)
-            unit.essence_armor_percent = tier * 0.03
+            unit.essence_str = R2I(unit.str * (DESTROYER_STR_BY_TIER[tier] or 0.))
+            unit.essence_agi = DESTROYER_AGI_BY_TIER[tier] or 0
+            unit.essence_int = R2I(unit.int * (DESTROYER_INT_BY_TIER[tier] or 0.))
+            unit.essence_armor_percent = DESTROYER_ARMOR_BY_TIER[tier] or 0.
             if tier >= 2 then UnitAddAbility(summon, FourCC('A061')) end
             if tier >= 3 then
                 UnitAddAbility(summon, FourCC('A03B'))
@@ -309,9 +372,6 @@ OnInit.final("DarkSummonerSpells", function(Require)
             if tier >= 4 then
                 SetUnitAbilityLevel(summon, FourCC('A02D'), 2)
                 UnitAddAbility(summon, FourCC('A0IQ'))
-            end
-            if tier >= 5 then
-                unit.essence_int = unit.essence_int + R2I(unit.int * 0.25)
             end
             BlzSetHeroProperName(summon, "Destroyer (Tier " .. tier .. ")")
         end
@@ -363,8 +423,7 @@ OnInit.final("DarkSummonerSpells", function(Require)
         local uid = GetUnitTypeId(summon)
         local state = get_state(pid)
         if state[uid] <= 0 then
-            message(pid, "|cffffcc00That summon has no Essence to reclaim.|r")
-            return false
+            return SummonEssence.dismiss(pid, summon)
         end
 
         state[uid] = state[uid] - 1
@@ -377,9 +436,42 @@ OnInit.final("DarkSummonerSpells", function(Require)
     end
 
     local summon_cooldown_started = setmetatable({}, { __mode = 'k' })
+    local summon_dismissing = setmetatable({}, { __mode = 'k' })
+
+    function SummonEssence.dismiss(pid, summon)
+        if not is_valid_summon(pid, summon) then
+            message(pid, "|cffff0000You must target one of your active summons.|r")
+            return false
+        end
+
+        local uid = GetUnitTypeId(summon)
+        local roster = get_roster(pid)
+        local hero = Hero[pid]
+        local spell_id = SUMMON_SPELL[uid]
+
+        roster[uid] = nil
+        summon_dismissing[summon] = true
+        SummonExpire(summon)
+        summon_dismissing[summon] = nil
+        summon_cooldown_started[summon] = nil
+        TableRemove(PLAYER_SUMMONS, summon)
+
+        if hero and spell_id then
+            BlzUnitDisableAbility(hero, spell_id, false, false)
+            BlzEndUnitAbilityCooldown(hero, spell_id)
+        end
+
+        refresh_all_essence_tooltips(pid)
+        dev_log("dismiss pid=" .. pid .. " summon=" .. GetObjectName(uid)
+            .. " total=" .. SummonEssence.available(pid) .. " bound=" .. SummonEssence.bound(pid)
+            .. " unspent=" .. SummonEssence.unspent(pid))
+        message(pid, "|cffb46effSummon dismissed. " .. ROSTER_COST
+            .. " bound Essence refunded; " .. SummonEssence.unspent(pid) .. " point(s) remain.|r")
+        return true
+    end
 
     local function start_summon_death_cooldown(summon)
-        if summon_cooldown_started[summon] then return end
+        if summon_dismissing[summon] or summon_cooldown_started[summon] then return end
 
         local pid = GetPlayerId(GetOwningPlayer(summon)) + 1
         local hero = Hero[pid]
@@ -414,6 +506,7 @@ OnInit.final("DarkSummonerSpells", function(Require)
     end
 
     local function on_summon_death(summon)
+        if summon_dismissing[summon] then return end
         start_summon_death_cooldown(summon)
     end
 
@@ -449,13 +542,16 @@ OnInit.final("DarkSummonerSpells", function(Require)
 
         local function on_cleanup(pid)
             essence_tiers[pid] = nil
+            essence_roster[pid] = nil
             EVENT_ON_CLEANUP:unregister_action(pid, on_cleanup)
         end
 
         function thistype.onSetup(u)
             local pid = GetPlayerId(GetOwningPlayer(u)) + 1
             essence_tiers[pid] = nil
+            essence_roster[pid] = nil
             get_state(pid)
+            get_roster(pid)
 
             EVENT_HERO_LEVEL_CHANGED:register_unit_action(u, update_level)
             EVENT_ON_CLEANUP:register_action(pid, on_cleanup)
@@ -556,6 +652,7 @@ OnInit.final("DarkSummonerSpells", function(Require)
             .. "\n|c0000d23fAgility:|r [agi=|c00ffcc0010%|r of the Summoner's Intelligence]"
             .. "\n|c000080ffIntelligence:|r [int=|c00ffcc0020%|r of the Summoner's Intelligence]"
             .. "\n\n|cffffcc00Dread Cleave:|r Attacks cleave in a widening 650-range cone."
+            .. "\n|cffffcc00Dreadful Wounds:|r Attacks reduce enemy damage by 5% for 4 seconds."
             .. "\n|c000080c030 second death cooldown.|r"
         set_extended_tooltips(thistype, 6, function() return tooltip end)
 
@@ -574,6 +671,8 @@ OnInit.final("DarkSummonerSpells", function(Require)
             local group = CreateGroup()
             local end_width = 225. + tier * 15.
             local cleave_damage = (attack_amount or amount.value) * (0.2 + tier * 0.06)
+            local dreadful_wounds = (tier >= 4 and 0.10) or 0.05
+            local dreadful_duration = 4. * LBOOST[pid]
             local healing = 0.
             local source_x, source_y = GetUnitX(source), GetUnitY(source)
             local dx, dy = GetUnitX(target) - source_x, GetUnitY(target) - source_y
@@ -607,9 +706,7 @@ OnInit.final("DarkSummonerSpells", function(Require)
             BlzSetSpecialEffectYaw(effect, facing)
             DestroyEffect(effect)
 
-            if tier >= 4 then
-                DreadfulWoundsDebuff:add(source, target):duration(4. * LBOOST[pid])
-            end
+            DreadfulWoundsDebuff:add(source, target):update(dreadful_wounds, dreadful_duration)
 
             MakeGroupInRange(pid, group, center_x, center_y, enum_radius, Condition(FilterEnemy))
             for enemy in each(group) do
@@ -626,9 +723,7 @@ OnInit.final("DarkSummonerSpells", function(Require)
                 if enemy ~= target and forward >= 0. and forward <= length and lateral <= allowed_width then
                     DamageTarget(source, enemy, cleave_damage, ATTACK_TYPE_NORMAL, PHYSICAL,
                         "Dread Cleave", CLEAVE_DAMAGE_OPTIONS)
-                    if tier >= 4 then
-                        DreadfulWoundsDebuff:add(source, enemy):duration(4. * LBOOST[pid])
-                    end
+                    DreadfulWoundsDebuff:add(source, enemy):update(dreadful_wounds, dreadful_duration)
                     if tier >= 5 then
                         healing = healing + cleave_damage * 0.1
                     end
@@ -642,6 +737,11 @@ OnInit.final("DarkSummonerSpells", function(Require)
         end
 
         function thistype:onCast()
+            if not SummonEssence.reserve(self.pid, SUMMON_REAVER) then
+                BlzEndUnitAbilityCooldown(self.caster, thistype.id)
+                return
+            end
+
             local angle = GetUnitFacing(self.caster)
             local x = self.x + 150. * math.cos(bj_DEGTORAD * angle)
             local y = self.y + 150. * math.sin(bj_DEGTORAD * angle)
@@ -692,6 +792,11 @@ OnInit.final("DarkSummonerSpells", function(Require)
         end
 
         function thistype:onCast()
+            if not SummonEssence.reserve(self.pid, SUMMON_GOLEM) then
+                BlzEndUnitAbilityCooldown(self.caster, thistype.id)
+                return
+            end
+
             local angle = GetUnitFacing(self.caster)
             local x = self.x + 150. * math.cos(bj_DEGTORAD * angle)
             local y = self.y + 150. * math.sin(bj_DEGTORAD * angle)
@@ -837,6 +942,11 @@ OnInit.final("DarkSummonerSpells", function(Require)
         end
 
         function thistype:onCast()
+            if not SummonEssence.reserve(self.pid, SUMMON_DESTROYER) then
+                BlzEndUnitAbilityCooldown(self.caster, thistype.id)
+                return
+            end
+
             local angle = GetUnitFacing(self.caster) + 180.
             local x = self.x + 150. * math.cos(bj_DEGTORAD * angle)
             local y = self.y + 150. * math.sin(bj_DEGTORAD * angle)

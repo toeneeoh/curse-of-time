@@ -44,6 +44,7 @@ OnInit.global("Preloader", function()
     preload("war3mapImported\\Haunt_v2_Portrait.mdl")
     preload("Abilities\\Spells\\Undead\\DeathCoil\\DeathCoilSpecialArt.mdl")
     preload("Abilities\\Spells\\Undead\\Darksummoning\\DarkSummonTarget.mdx")
+    preload("Abilities\\Spells\\NightElf\\BattleRoar\\RoarCaster.mdl")
     preload("war3mapImported\\BlackWingVR.mdx")
     preload("Abilities\\Spells\\Other\\Charm\\CharmTarget.mdl")
     preload("Abilities\\Spells\\Human\\FlameStrike\\FlameStrikeDamageTarget.mdl")
@@ -58,6 +59,7 @@ OnInit.global("Preloader", function()
                 FourCC('A071'), -- Reclaim Essence
                 FourCC('A063'), -- Summon Essence
                 FourCC('A06Q'), -- Summoning Improvement
+                FourCC('A0K2'), -- War Cry
             },
         },
         {

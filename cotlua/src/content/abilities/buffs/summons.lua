@@ -101,6 +101,40 @@ OnInit.final("BuffsSummons", function(Require)
         end
     end
 
+    ---@class ReaverWarCryBuff : Buff
+    ReaverWarCryBuff = Buff.new()
+    do
+        local thistype = ReaverWarCryBuff
+        thistype.NAME            = "War Cry"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNBattleRoar.blp"
+        thistype.DESC            = "This unit has +^$ms% movespeed and +^$armor% armor"
+        thistype.DISPEL_TYPE     = BUFF_POSITIVE
+        thistype.STACK_TYPE      = BUFF_STACK_NONE
+
+        function thistype:update(ms, armor, dur)
+            local unit = Unit[self.target]
+            unit.ms_percent = unit.ms_percent - self.ms
+            unit.armor_percent = unit.armor_percent - self.armor
+            self.ms = ms
+            self.armor = armor
+            unit.ms_percent = unit.ms_percent + self.ms
+            unit.armor_percent = unit.armor_percent + self.armor
+            self:duration(dur)
+            UnitRefreshBuff(self.target, self)
+        end
+
+        function thistype:onRemove()
+            local unit = Unit[self.target]
+            unit.ms_percent = unit.ms_percent - self.ms
+            unit.armor_percent = unit.armor_percent - self.armor
+        end
+
+        function thistype:onApply()
+            self.ms = 0.
+            self.armor = 0.
+        end
+    end
+
     ---@class DreadfulWoundsDebuff : Buff
     DreadfulWoundsDebuff = Buff.new()
     do
@@ -111,14 +145,23 @@ OnInit.final("BuffsSummons", function(Require)
         thistype.DISPEL_TYPE     = BUFF_NEGATIVE
         thistype.STACK_TYPE      = BUFF_STACK_NONE
 
+        function thistype:update(reduction, dur)
+            local unit = Unit[self.target]
+            unit.dm = unit.dm / self.multiplier
+            self.multiplier = 1. - reduction
+            self.damage = self.multiplier
+            unit.dm = unit.dm * self.multiplier
+            self:duration(dur)
+            UnitRefreshBuff(self.target, self)
+        end
+
         function thistype:onRemove()
             Unit[self.target].dm = Unit[self.target].dm / self.multiplier
         end
 
         function thistype:onApply()
-            self.damage = 10.
-            self.multiplier = 0.9
-            Unit[self.target].dm = Unit[self.target].dm * self.multiplier
+            self.damage = 1.
+            self.multiplier = 1.
         end
     end
 
