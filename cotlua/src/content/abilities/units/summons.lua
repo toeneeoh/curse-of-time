@@ -97,7 +97,7 @@ OnInit.final("SummonAbilities", function(Require)
             local reduction = tier >= 4 and 10 or 5
             Spell.TOOLTIPS[thistype.id][level] = "The Reaver's attacks apply Dreadful Wounds to the primary target"
                 .. " and every enemy struck by Dread Cleave, reducing their damage by " .. reduction
-                .. "% for ~{dur=4] seconds."
+                .. "%.|n|c000080c0~>{dur=4] second duration.|r"
         end
     end
 

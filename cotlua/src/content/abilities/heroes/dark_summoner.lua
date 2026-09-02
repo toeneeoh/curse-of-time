@@ -670,7 +670,8 @@ OnInit.final("DarkSummonerSpells", function(Require)
             .. "\n|c0000d23fAgility:|r [agi=|c00ffcc0010%|r of the Summoner's Intelligence (minimum 10)]"
             .. "\n|c000080ffIntelligence:|r [int=|c00ffcc0020%|r of the Summoner's Intelligence (minimum 20)]"
             .. "\n\n|cffffcc00Dread Cleave:|r Attacks cleave in a widening 650-range cone."
-            .. "\n|cffffcc00Dreadful Wounds:|r Attacks reduce enemy damage by 5% for 4 seconds."
+            .. "\n|cffffcc00Dreadful Wounds:|r Attacks reduce enemy damage by 5%."
+            .. "\n|c000080c04 second duration.|r"
             .. "\n|c000080c030 second death cooldown.|r"
         set_extended_tooltips(thistype, 6, function() return tooltip end)
 
