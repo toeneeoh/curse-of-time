@@ -60,8 +60,8 @@ OnInit.final("SummonAbilities", function(Require)
 
         thistype.values = {
             length = 650.,
-            start_width = 150.,
-            end_width = function(pid)
+            startwidth = 150.,
+            endwidth = function(pid)
                 return 225. + SummonEssence.getTier(pid, SUMMON_REAVER) * 15.
             end,
         }
@@ -71,8 +71,8 @@ OnInit.final("SummonAbilities", function(Require)
             local tooltip = "Attacks deal " .. (20 + tier * 6)
                 .. "% of their pre-armor damage as Physical damage to enemies in a widening cone behind the primary target."
                 .. "|n|n|cffffcc00Range:|r ~{length=650]"
-                .. "|n|cffffcc00Start Width:|r ~{start_width=150]"
-                .. "|n|cffffcc00End Width:|r ~{end_width=" .. (225 + tier * 15) .. "]"
+                .. "|n|cffffcc00Start Width:|r ~{startwidth=150]"
+                .. "|n|cffffcc00End Width:|r ~{endwidth=" .. (225 + tier * 15) .. "]"
 
             if tier >= 5 then
                 tooltip = tooltip
