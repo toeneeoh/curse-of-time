@@ -59,7 +59,7 @@ OnInit.global("Preloader", function()
                 FourCC('A071'), -- Reclaim Essence
                 FourCC('A063'), -- Summon Essence
                 FourCC('A06Q'), -- Summoning Improvement
-                FourCC('A0K2'), -- War Cry
+                FourCC('A01M'), -- War Cry
             },
         },
         {

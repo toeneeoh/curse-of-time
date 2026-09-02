@@ -9,7 +9,7 @@ OnInit.final("SummonAbilities", function(Require)
     local valid_pull_target = VALID_PULL_TARGET
 
     ---@class REAVER_WAR_CRY : Spell
-    REAVER_WAR_CRY = Spell.define('A0K2')
+    REAVER_WAR_CRY = Spell.define('A01M')
     do
         local thistype = REAVER_WAR_CRY
         local MOVE_SPEED_BY_TIER = { [2] = 0.15, [3] = 0.18, [4] = 0.21, [5] = 0.25 }

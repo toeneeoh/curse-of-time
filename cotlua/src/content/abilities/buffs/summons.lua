@@ -141,7 +141,7 @@ OnInit.final("BuffsSummons", function(Require)
         local thistype = DreadfulWoundsDebuff
         thistype.NAME            = "Dreadful Wounds"
         thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNHowlOfTerror.blp"
-        thistype.DESC            = "This unit deals -^#damage% damage"
+        thistype.DESC            = "This unit deals -$damage% damage"
         thistype.DISPEL_TYPE     = BUFF_NEGATIVE
         thistype.STACK_TYPE      = BUFF_STACK_NONE
 
@@ -149,7 +149,7 @@ OnInit.final("BuffsSummons", function(Require)
             local unit = Unit[self.target]
             unit.dm = unit.dm / self.multiplier
             self.multiplier = 1. - reduction
-            self.damage = self.multiplier
+            self.damage = reduction * 100.
             unit.dm = unit.dm * self.multiplier
             self:duration(dur)
             UnitRefreshBuff(self.target, self)
@@ -160,7 +160,7 @@ OnInit.final("BuffsSummons", function(Require)
         end
 
         function thistype:onApply()
-            self.damage = 1.
+            self.damage = 0.
             self.multiplier = 1.
         end
     end

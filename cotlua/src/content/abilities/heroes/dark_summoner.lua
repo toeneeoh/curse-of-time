@@ -8,7 +8,7 @@ OnInit.final("DarkSummonerSpells", function(Require)
 
     local MAX_TIER = 5
     local ESSENCE_INFO = FourCC('A063')
-    local REAVER_WAR_CRY = FourCC('A0K2')
+    local REAVER_WAR_CRY = FourCC('A01M')
     local ROSTER_COST = 2
     local INITIAL_ESSENCE = 3
     local SUMMON_DEATH_COOLDOWN = 30.
