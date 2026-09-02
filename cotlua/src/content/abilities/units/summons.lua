@@ -26,7 +26,7 @@ OnInit.final("SummonAbilities", function(Require)
                 "Rallies nearby allies, granting them increased movespeed and armor for ~{dur=8] seconds."
                 .. "|n|n|cffffcc00Movespeed:|r |cffffcc00" .. MOVE_SPEED_PERCENT_BY_LEVEL[level] .. "%|r"
                 .. "|n|cffffcc00Armor:|r |cffffcc00" .. ARMOR_PERCENT_BY_LEVEL[level] .. "%|r"
-                .. "|n|c000080c0Area: ~>{aoe=800]|r"
+                .. "|n|c000080c0~>{aoe=800] area.|r"
         end
 
         function thistype:onCast()
@@ -70,9 +70,9 @@ OnInit.final("SummonAbilities", function(Require)
             local tier = level - 1
             local tooltip = "Attacks deal |cffffcc00" .. (20 + tier * 6)
                 .. "%|r of Physical damage to enemies in a widening cone behind the primary target."
-                .. "|n|n|c000080c0Range: ~>{length=650]|r"
-                .. "|n|c000080c0Start Width: ~>{startwidth=150]|r"
-                .. "|n|c000080c0End Width: ~>{endwidth=" .. (225 + tier * 15) .. "]|r"
+                .. "|n|n|c000080c0~>{length=650] range.|r"
+                .. "|n|c000080c0~>{startwidth=150] start width.|r"
+                .. "|n|c000080c0~>{endwidth=" .. (225 + tier * 15) .. "] end width.|r"
 
             if tier >= 5 then
                 tooltip = tooltip
