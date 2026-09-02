@@ -15,6 +15,7 @@ OnInit.final("Spells", function(Require)
     Require("Users")
     Require("UnitEvent")
     Require("UnitTable")
+    Require("Mouse")
 
     -- this only exists to update mana costs if a spell is readded for any reason
     local OldUnitAddAbility = UnitAddAbility
@@ -153,10 +154,22 @@ OnInit.final("Spells", function(Require)
         end
 
         local alt_down = {} ---@type boolean[]
+        local function update_player_tooltips(pid)
+            local hero = Hero[pid]
+            local selected = PLAYER_SELECTED_UNIT[pid]
+
+            if hero then
+                UpdateSpellTooltips(hero)
+            end
+            if selected and selected ~= hero then
+                UpdateSpellTooltips(selected)
+            end
+        end
+
         local function extended_spell_tooltip(pid, is_down)
             if alt_down[pid] ~= is_down then
                 alt_down[pid] = is_down
-                UpdateSpellTooltips(Hero[pid])
+                update_player_tooltips(pid)
             end
         end
 
