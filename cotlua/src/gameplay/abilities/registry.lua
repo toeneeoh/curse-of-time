@@ -166,6 +166,12 @@ OnInit.final("Spells", function(Require)
             end
         end
 
+        local function update_selected_tooltips(_, selected)
+            if selected then
+                UpdateSpellTooltips(selected)
+            end
+        end
+
         local function extended_spell_tooltip(pid, is_down)
             if alt_down[pid] ~= is_down then
                 alt_down[pid] = is_down
@@ -175,6 +181,12 @@ OnInit.final("Spells", function(Require)
 
         RegisterHotkeyToFunc('ALT', nil, extended_spell_tooltip, nil, true)
         RegisterHotkeyToFunc('ALT+ALT', nil, extended_spell_tooltip, nil, true)
+
+        local user = User.first
+        while user do
+            EVENT_ON_SELECT:register_action(user.id, update_selected_tooltips)
+            user = user.next
+        end
 
         local function tooltip_replacer(defaultflag, colorflag, prefix, tag, content)
             local self = current_spell

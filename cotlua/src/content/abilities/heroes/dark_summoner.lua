@@ -323,6 +323,16 @@ OnInit.final("DarkSummonerSpells", function(Require)
         UnitMakeAbilityPermanent(summon, true, ESSENCE_INFO)
     end
 
+    local function refresh_reaver_tooltips(summon)
+        if not summon or GetUnitTypeId(summon) ~= SUMMON_REAVER then return end
+
+        DREAD_CLEAVE_INFO:setTooltip(summon, DREAD_CLEAVE_INFO.id)
+        DREADFUL_WOUNDS_INFO:setTooltip(summon, DREADFUL_WOUNDS_INFO.id)
+        if GetUnitAbilityLevel(summon, REAVER_WAR_CRY_ID) > 0 then
+            REAVER_WAR_CRY:setTooltip(summon, REAVER_WAR_CRY_ID)
+        end
+    end
+
     function SummonEssence.apply(pid, summon)
         if not summon or not IS_SUMMON_TYPE[GetUnitTypeId(summon)] then return end
 
@@ -342,16 +352,15 @@ OnInit.final("DarkSummonerSpells", function(Require)
             UnitMakeAbilityPermanent(summon, true, DREADFUL_WOUNDS_INFO.id)
             SetUnitAbilityLevel(summon, DREAD_CLEAVE_INFO.id, tier + 1)
             SetUnitAbilityLevel(summon, DREADFUL_WOUNDS_INFO.id, tier + 1)
-            DREAD_CLEAVE_INFO:setTooltip(summon, DREAD_CLEAVE_INFO.id)
-            DREADFUL_WOUNDS_INFO:setTooltip(summon, DREADFUL_WOUNDS_INFO.id)
 
             unit.essence_str = R2I(unit.str * (REAVER_STR_BY_TIER[tier] or 0.))
             unit.essence_armor_percent = REAVER_ARMOR_BY_TIER[tier] or 0.
             if tier >= 2 then
                 UnitAddAbility(summon, REAVER_WAR_CRY_ID)
                 SetUnitAbilityLevel(summon, REAVER_WAR_CRY_ID, tier - 1)
-                REAVER_WAR_CRY:setTooltip(summon, REAVER_WAR_CRY_ID)
             end
+            refresh_reaver_tooltips(summon)
+            TimerQueue:callDelayed(0., refresh_reaver_tooltips, summon)
             SetUnitScale(summon, 0.75 + tier * 0.04, 1. + tier * 0.04, 1. + tier * 0.04)
             BlzSetHeroProperName(summon, "Dread Reaver (Tier " .. tier .. ")")
         elseif uid == SUMMON_GOLEM then
