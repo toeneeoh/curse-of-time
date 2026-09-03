@@ -1088,7 +1088,7 @@ OnInit.final("DarkSummonerSpells", function(Require)
         set_extended_tooltips(thistype, 6, function(level)
             return "Unleashes the Dark Summoner's full power, empowering all active summons within "
                 .. "|cffffcc00>{aoe=" .. AOE_BY_LEVEL[level] .. "]|r area. Ascended summons deal "
-                .. "|cffffcc00>[damage=" .. DAMAGE_BY_LEVEL[level] .. "]%|r increased damage, take "
+                .. "|cffffcc00>{damage=" .. DAMAGE_BY_LEVEL[level] .. "]%|r increased damage, take "
                 .. "|cffffcc00" .. REDUCTION_BY_LEVEL[level] .. "%|r less damage, and gain "
                 .. "|cffffcc00" .. ATTACK_SPEED_BY_LEVEL[level] .. "%|r base attack speed."
                 .. "|n|n|cff0080c0>{dur=15] second duration.|r"
@@ -1116,14 +1116,24 @@ OnInit.final("DarkSummonerSpells", function(Require)
                 return
             end
 
-            local damage = self.damage * BOOST[self.pid] * 0.01
+            local damage = self.damage * LBOOST[self.pid] * 0.01
             local reduction = REDUCTION_BY_LEVEL[level] * 0.01
             local attack_speed = ATTACK_SPEED_BY_LEVEL[level] * 0.01
             local dur = self.dur * LBOOST[self.pid]
 
+            local cast_sfx = AddSpecialEffect(
+                "war3mapImported\\AnnihilationBlast.mdx", GetUnitX(self.caster), GetUnitY(self.caster))
+            BlzSetSpecialEffectScale(cast_sfx, 1.35)
+            BlzSetSpecialEffectColor(cast_sfx, 180, 80, 255)
+            DestroyEffect(cast_sfx)
+            SoundHandler("Units\\NightElf\\HeroDemonHunter\\DemonHunterMorph1.flac", true, nil, self.caster)
+
             for i = 1, #summons do
-                UnholyAscensionBuff:add(self.caster, summons[i]):update(
+                local summon = summons[i]
+                UnholyAscensionBuff:add(self.caster, summon):update(
                     damage, reduction, attack_speed, dur)
+                DestroyEffect(AddSpecialEffectTarget(
+                    "Abilities\\Spells\\Undead\\Darksummoning\\DarkSummonTarget.mdx", summon, "origin"))
             end
 
             dev_log(string.format(

@@ -60,7 +60,7 @@ OnInit.final("BuffBar", function(Require)
         --   ^ = percentage
         --   ! = no rounding
         --   @ = abs value
-        return (buff.DESC:gsub("(%@?)(%!?)(%^?)([%$#])(%w+)", function(absolute, round, caret, prefix, key)
+        return (buff.DESC:gsub("(%@?)(%!?)(%^?)([%$#])([%w_]+)", function(absolute, round, caret, prefix, key)
             local v = buff[key]
             if v == nil then
                 return key
