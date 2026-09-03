@@ -221,7 +221,7 @@ OnInit.global("Variables", function()
         main         = "str",
         range        = "Melee",
         skills       = {"A07C", "A038", "A0KU", "A0AT", "A0GG", "A08R"},
-        stars        = {2, 3, 2, 1, 3}
+        stars        = {2, 3, 2, 1, 2.5}
         },
         [HERO_DARK_SAVIOR] = {
         model        = "DarkSaviorSprite.mdx",
@@ -244,7 +244,7 @@ OnInit.global("Variables", function()
         main         = "int",
         range        = "Melee",
         skills       = {"A0GO", "A08Z", "A019", "A074", "A013", "A00C"},
-        stars        = {1, 3, 3, 1, 1}
+        stars        = {1, 3, 3, 0.5, 1.5}
         },
         [HERO_CRUSADER] = {
         model        = "CrusaderSprite.mdx",
@@ -312,7 +312,7 @@ OnInit.global("Variables", function()
         int_gain     = 6.5,
         main         = "int",
         range        = "600",
-        skills       = {"A022", "A0KF", "A0KH", "A0KG", "A0K1"},
+        skills       = {"A022", "A0KF", "A0KH", "A0KG", "A0K1", "A002"},
         stars        = {2.5, 2.5, 1, 0, 2}
         },
         [HERO_BARD] = {
@@ -496,7 +496,7 @@ OnInit.global("Variables", function()
         int_gain     = 0.5,
         main         = "agi",
         range        = "650",
-        skills       = {"A002", "A06I", "A06U", "A05D", "A0J4", "A06V"},
+        skills       = {"A01Q", "A06I", "A06U", "A05D", "A0J4", "A06V"},
         stars        = {0, 3, 2, 0, 0}
         },
         [HERO_PHOENIX_RANGER] = {

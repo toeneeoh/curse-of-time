@@ -13,7 +13,7 @@ OnInit.final("MarksmanSpells", function(Require)
 
     ---@class SNIPERSTANCE : Spell
     ---@field enabled boolean[]
-    SNIPERSTANCE = Spell.define("A002")
+    SNIPERSTANCE = Spell.define("A01Q")
     do
         local thistype = SNIPERSTANCE
         thistype.enabled = {}

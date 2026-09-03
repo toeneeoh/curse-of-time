@@ -232,7 +232,8 @@ OnInit.final("DarkSaviorSpells", function(Require)
         }
 
         local function on_order(source, target, id)
-            if id == ORDER_ID_MANA_SHIELD and GetUnitAbilityLevel(source, thistype.id) > 0 then
+            local ablev = GetUnitAbilityLevel(source, thistype.id)
+            if id == ORDER_ID_MANA_SHIELD and ablev > 0 then
                 UnitDisableAbility(source, thistype.id, true)
                 UnitDisableAbility(source, thistype.id, false)
                 BlzStartUnitAbilityCooldown(source, thistype.id, 2.)
@@ -242,7 +243,7 @@ OnInit.final("DarkSaviorSpells", function(Require)
                 if buff then
                     DarkShieldBuff:dispel(nil, source)
                 else
-                    DarkShieldBuff:add(source, source)
+                    DarkShieldBuff:add(source, source, ablev)
                 end
             end
         end

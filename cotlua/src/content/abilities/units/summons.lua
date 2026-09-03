@@ -70,14 +70,16 @@ OnInit.final("SummonAbilities", function(Require)
             local tier = level - 1
             local tooltip = "Attacks deal |cffffcc00" .. (20 + tier * 6)
                 .. "%|r of Physical damage to enemies in a widening cone behind the primary target."
-                .. "|n|n|c000080c0~>{length=650] range.|r"
-                .. "|n|c000080c0~>{startwidth=150] start width.|r"
-                .. "|n|c000080c0~>{endwidth=" .. (225 + tier * 15) .. "] end width.|r"
 
             if tier >= 5 then
                 tooltip = tooltip
                     .. "|n|nDamage dealt by Dread Cleave heals the Reaver for |cffffcc0010%|r, up to |cffffcc003%|r of its Max Health per attack."
             end
+
+            tooltip = tooltip
+                .. "|n|n|c000080c0~>{length=650] range.|r"
+                .. "|n|c000080c0~>{startwidth=150] start width.|r"
+                .. "|n|c000080c0~>{endwidth=" .. (225 + tier * 15) .. "] end width.|r"
 
             Spell.TOOLTIPS[thistype.id][level] = tooltip
         end

@@ -101,6 +101,59 @@ OnInit.final("BuffsSummons", function(Require)
         end
     end
 
+    ---@class UnholyAscensionBuff : Buff
+    UnholyAscensionBuff = Buff.new()
+    do
+        local thistype = UnholyAscensionBuff
+        thistype.NAME            = "Unholy Ascension"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNUnholyFrenzy.blp"
+        thistype.DESC            = "This unit deals +^$damage% damage, has +^$reduction% damage resist, and +^$attack_speed% base attack speed"
+        thistype.DISPEL_TYPE     = BUFF_POSITIVE
+        thistype.STACK_TYPE      = BUFF_STACK_NONE
+
+        function thistype:update(damage, reduction, attack_speed, dur)
+            local unit = Unit[self.target]
+
+            unit.dm = unit.dm / self.damage_multiplier
+            unit.dr = unit.dr / self.reduction_multiplier
+            unit.bonus_bat = unit.bonus_bat * self.attack_speed_multiplier
+
+            self.damage = damage
+            self.reduction = reduction
+            self.attack_speed = attack_speed
+            self.damage_multiplier = 1. + damage
+            self.reduction_multiplier = 1. - reduction
+            self.attack_speed_multiplier = 1. + attack_speed
+
+            unit.dm = unit.dm * self.damage_multiplier
+            unit.dr = unit.dr * self.reduction_multiplier
+            unit.bonus_bat = unit.bonus_bat / self.attack_speed_multiplier
+
+            self:duration(dur)
+            UnitRefreshBuff(self.target, self)
+        end
+
+        function thistype:onRemove()
+            local unit = Unit[self.target]
+
+            unit.dm = unit.dm / self.damage_multiplier
+            unit.dr = unit.dr / self.reduction_multiplier
+            unit.bonus_bat = unit.bonus_bat * self.attack_speed_multiplier
+            unit:removeEffect(self.sfx)
+        end
+
+        function thistype:onApply()
+            self.damage = 0.
+            self.reduction = 0.
+            self.attack_speed = 0.
+            self.damage_multiplier = 1.
+            self.reduction_multiplier = 1.
+            self.attack_speed_multiplier = 1.
+            self.sfx = Unit[self.target]:addEffect(
+                "Abilities\\Spells\\Undead\\UnholyFrenzy\\UnholyFrenzyTarget.mdl", "origin")
+        end
+    end
+
     ---@class ReaverWarCryBuff : Buff
     ReaverWarCryBuff = Buff.new()
     do

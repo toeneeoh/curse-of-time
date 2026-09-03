@@ -929,7 +929,7 @@ modifiers:
             SetupDefaultHotkeys(pid)
         end
 
-        dev_cmds["go"](p, pid, {"go", "dark savior"})
+        dev_cmds["go"](p, pid, {"go", "dark summoner"})
 
         SetUnitXBounded(Hero[pid], x)
         SetUnitYBounded(Hero[pid], y)

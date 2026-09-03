@@ -120,6 +120,21 @@ OnInit.final("DarkSummonerSpells", function(Require)
             and not IsUnitHidden(summon)
     end
 
+    local function collect_summons(pid, caster, radius)
+        local result = {}
+        local x, y = GetUnitX(caster), GetUnitY(caster)
+
+        for i = 1, #PLAYER_SUMMONS do
+            local summon = PLAYER_SUMMONS[i]
+            if is_valid_summon(pid, summon)
+                and IsUnitInRangeXY(summon, x, y, radius) then
+                result[#result + 1] = summon
+            end
+        end
+
+        return result
+    end
+
     local function unit_is_in_respec_area(target)
         return target ~= nil and (
             RectContainsUnit(gg_rct_Town_Main, target)
@@ -359,6 +374,7 @@ OnInit.final("DarkSummonerSpells", function(Require)
 
         if uid == SUMMON_REAVER then
             UnitRemoveAbility(summon, REAVER_WAR_CRY_ID)
+            UnitRemoveAbility(summon, FourCC('A0IQ'))
 
             UnitAddAbility(summon, DREAD_CLEAVE_INFO.id)
             UnitAddAbility(summon, DREADFUL_WOUNDS_INFO.id)
@@ -376,6 +392,11 @@ OnInit.final("DarkSummonerSpells", function(Require)
             refresh_reaver_tooltips(summon)
             TimerQueue:callDelayed(0., refresh_reaver_tooltips, summon)
             SetUnitScale(summon, 0.75 + tier * 0.04, 1. + tier * 0.04, 1. + tier * 0.04)
+
+            if tier >= 5 then
+                UnitAddAbility(summon, FourCC('A0IQ'))
+            end
+
             BlzSetHeroProperName(summon, "Dread Reaver (Tier " .. tier .. ")")
         elseif uid == SUMMON_BRUTE then
             UnitRemoveAbility(summon, FourCC('A0KI'))
@@ -410,6 +431,8 @@ OnInit.final("DarkSummonerSpells", function(Require)
             end
             if tier >= 4 then
                 SetUnitAbilityLevel(summon, FourCC('A02D'), 2)
+            end
+            if tier >= 5 then
                 UnitAddAbility(summon, FourCC('A0IQ'))
             end
             BlzSetHeroProperName(summon, "Destroyer (Tier " .. tier .. ")")
@@ -644,7 +667,10 @@ OnInit.final("DarkSummonerSpells", function(Require)
         EVENT_ON_FATAL_DAMAGE:register_unit_action(summon, SummonEssence.onFatalDamage)
         EVENT_ON_UNIT_DEATH:register_unit_action(summon, on_summon_death)
         SuspendHeroXP(summon, false)
-        SetHeroLevel(summon, GetHeroLevel(Hero[pid]), false)
+        local level = GetHeroLevel(Hero[pid])
+        if level ~= GetHeroLevel(summon) then
+            SetHeroLevel(summon, level, false)
+        end
         SuspendHeroXP(summon, true)
         summon_cooldown_started[summon] = nil
 
@@ -814,8 +840,8 @@ OnInit.final("DarkSummonerSpells", function(Require)
             SetUnitVertexColor(summon, 200, 200, 200, 255)
             -- Zero-stat hero object data displays one less than the value assigned through the stat system.
             SUMMONINGIMPROVEMENT.apply(self.pid, summon,
-                R2I(self.str * BOOST[self.pid]) + 1, R2I(self.agi * BOOST[self.pid]) + 1,
-                R2I(self.int * BOOST[self.pid]) + 1)
+                R2I(self.str * LBOOST[self.pid] + 0.5), R2I(self.agi * LBOOST[self.pid] + 0.5),
+                R2I(self.int * LBOOST[self.pid] + 0.5))
             Unit[summon].regen_max = 0.02 + 0.0005 * GetUnitAbilityLevel(summon, FourCC('A06Q'))
             EVENT_ON_HIT_AFTER_REDUCTIONS:register_unit_action(summon, cleave)
             EVENT_ON_CLEANUP:register_action(self.pid, on_cleanup)
@@ -839,8 +865,8 @@ OnInit.final("DarkSummonerSpells", function(Require)
         }
 
         local tooltip = "Summons a permanent melee tank whose attributes scale with the Dark Summoner."
-            .. "\n\n|c00ff0b11Strength:|r [str=|c00ffcc0040%|r of the Summoner's Strength and Intelligence]"
-            .. "\n|c0000d23fAgility:|r [agi=|c00ffcc0060%|r of the Summoner's Intelligence]"
+            .. "\n\n|c00ff0b11Strength:|r {str=|c00ffcc0040%|r of the Summoner's Strength and Intelligence]"
+            .. "\n|c0000d23fAgility:|r {agi=|c00ffcc0060%|r of the Summoner's Intelligence]"
             .. "\n\n|cffffcc00Regeneration:|r Gains half the Max Health regeneration granted by Summoning Improvement"
             .. "\n|c000080c030 second death cooldown.|r"
         set_extended_tooltips(thistype, 1, function() return tooltip end)
@@ -869,7 +895,7 @@ OnInit.final("DarkSummonerSpells", function(Require)
 
             prepare_summon(self.pid, summon, x, y, angle)
             SUMMONINGIMPROVEMENT.apply(self.pid, summon,
-                R2I(self.str * BOOST[self.pid]), R2I(self.agi * BOOST[self.pid]), 0)
+                R2I(self.str * LBOOST[self.pid]), R2I(self.agi * LBOOST[self.pid]), 0)
             Unit[summon].regen_max = 0.02 + 0.00025 * GetUnitAbilityLevel(summon, FourCC('A06Q'))
             EVENT_ON_CLEANUP:register_action(self.pid, on_cleanup)
             finish_summon(self.pid, summon)
@@ -898,9 +924,9 @@ OnInit.final("DarkSummonerSpells", function(Require)
 
         set_extended_tooltips(thistype, 5, function(level)
             return "Summons a permanent ranged attacker whose attributes scale with the Dark Summoner."
-                .. "\n\n|c00ff0b11Strength:|r [str=|c00ffcc006.66%|r of the Summoner's Strength and Intelligence]"
-                .. "\n|cff9B9BEDArmor:|r [agi=|c00ffcc000.5%|r of the Summoner's Intelligence]"
-                .. "\n|c000080ffIntelligence:|r [int=|c00ffcc00" .. (level * 50)
+                .. "\n\n|c00ff0b11Strength:|r {str=|c00ffcc006.66%|r of the Summoner's Strength and Intelligence]"
+                .. "\n|cff9B9BEDArmor:|r {agi=|c00ffcc000.5%|r of the Summoner's Intelligence]"
+                .. "\n|c000080ffIntelligence:|r {int=|c00ffcc00" .. (level * 50)
                 .. "%|r of the Summoner's Intelligence]"
                 .. "\n\n|cffffcc00Annihilation:|r Attacks have a chance to deal bonus Magic damage based on Intelligence."
                 .. "\n|c000080c030 second death cooldown.|r"
@@ -1023,12 +1049,86 @@ OnInit.final("DarkSummonerSpells", function(Require)
             UnitMakeAbilityPermanent(summon, true, FourCC('A06J'))
             SetUnitAbilityLevel(summon, FourCC('A06J'), 1)
             SUMMONINGIMPROVEMENT.apply(self.pid, summon,
-                R2I(self.str * BOOST[self.pid]), R2I(self.agi * BOOST[self.pid]), R2I(self.int * BOOST[self.pid]))
+                R2I(self.str * LBOOST[self.pid]), R2I(self.agi * LBOOST[self.pid]), R2I(self.int * LBOOST[self.pid]))
             Unit[summon].regen_max = 0.02 + 0.0005 * GetUnitAbilityLevel(summon, FourCC('A06Q'))
             EVENT_ON_HIT:register_unit_action(summon, annihilation)
             EVENT_ON_ATTACK:register_unit_action(summon, on_attack)
             EVENT_ON_CLEANUP:register_action(self.pid, on_cleanup)
             finish_summon(self.pid, summon)
+        end
+    end
+
+    ---@class UNHOLYASCENSION : Spell
+    ---@field damage number
+    ---@field aoe number
+    ---@field dur number
+    UNHOLYASCENSION = Spell.define("A002")
+    do
+        local thistype = UNHOLYASCENSION
+        local DAMAGE_BY_LEVEL = { 30, 40, 50, 60, 70, 80 }
+        local REDUCTION_BY_LEVEL = { 10, 12, 14, 16, 18, 20 }
+        local ATTACK_SPEED_BY_LEVEL = { 10, 12, 14, 16, 18, 20 }
+        local AOE_BY_LEVEL = { 1000, 1100, 1200, 1300, 1400, 1500 }
+        local COOLDOWN_BY_LEVEL = { 120, 110, 100, 90, 80, 70 }
+
+        local function ability_level(caster)
+            return math.max(1, math.min(6, GetUnitAbilityLevel(caster, thistype.id)))
+        end
+
+        thistype.values = {
+            damage = function(_, caster)
+                return DAMAGE_BY_LEVEL[ability_level(caster)]
+            end,
+            aoe = function(_, caster)
+                return AOE_BY_LEVEL[ability_level(caster)]
+            end,
+            dur = 15.,
+        }
+
+        set_extended_tooltips(thistype, 6, function(level)
+            return "Unleashes the Dark Summoner's full power, empowering all active summons within "
+                .. "|cffffcc00>{aoe=" .. AOE_BY_LEVEL[level] .. "]|r area. Ascended summons deal "
+                .. "|cffffcc00>[damage=" .. DAMAGE_BY_LEVEL[level] .. "]%|r increased damage, take "
+                .. "|cffffcc00" .. REDUCTION_BY_LEVEL[level] .. "%|r less damage, and gain "
+                .. "|cffffcc00" .. ATTACK_SPEED_BY_LEVEL[level] .. "%|r base attack speed."
+                .. "|n|n|cff0080c0>{dur=15] second duration.|r"
+                .. "|n|cff0080c0" .. COOLDOWN_BY_LEVEL[level] .. " second cooldown.|r"
+        end)
+
+        local function cast_radius(pid, caster)
+            return AOE_BY_LEVEL[ability_level(caster)] * LBOOST[pid]
+        end
+
+        function thistype.preCast(pid, tpid, caster)
+            if #collect_summons(pid, caster, cast_radius(pid, caster)) == 0 then
+                message(pid, "|cffff0000Unholy Ascension requires an active summon within range.|r")
+                IssueImmediateOrderById(caster, ORDER_ID_STOP)
+            end
+        end
+
+        function thistype:onCast()
+            local level = ability_level(self.caster)
+            local radius = self.aoe * LBOOST[self.pid]
+            local summons = collect_summons(self.pid, self.caster, radius)
+
+            if #summons == 0 then
+                BlzEndUnitAbilityCooldown(self.caster, thistype.id)
+                return
+            end
+
+            local damage = self.damage * BOOST[self.pid] * 0.01
+            local reduction = REDUCTION_BY_LEVEL[level] * 0.01
+            local attack_speed = ATTACK_SPEED_BY_LEVEL[level] * 0.01
+            local dur = self.dur * LBOOST[self.pid]
+
+            for i = 1, #summons do
+                UnholyAscensionBuff:add(self.caster, summons[i]):update(
+                    damage, reduction, attack_speed, dur)
+            end
+
+            dev_log(string.format(
+                "ascension pid=%d level=%d targets=%d damage=%.2f reduction=%.2f attack_speed=%.2f radius=%.0f duration=%.2f",
+                self.pid, level, #summons, damage, reduction, attack_speed, radius, dur))
         end
     end
 
@@ -1069,21 +1169,6 @@ OnInit.final("DarkSummonerSpells", function(Require)
         for level = 1, 6 do
             Spell.TOOLTIPS[thistype.id][level] = string.gsub(
                 Spell.TOOLTIPS[thistype.id][level], "%]x", "x]")
-        end
-
-        local function collect_summons(pid, caster, radius)
-            local result = {}
-            local x, y = GetUnitX(caster), GetUnitY(caster)
-
-            for i = 1, #PLAYER_SUMMONS do
-                local summon = PLAYER_SUMMONS[i]
-                if is_valid_summon(pid, summon)
-                    and IsUnitInRangeXY(summon, x, y, radius) then
-                    result[#result + 1] = summon
-                end
-            end
-
-            return result
         end
 
         local function fatal_blocks(tier, cost_percent)
