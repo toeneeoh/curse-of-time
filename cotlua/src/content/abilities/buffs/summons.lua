@@ -106,7 +106,7 @@ OnInit.final("BuffsSummons", function(Require)
     do
         local thistype = UnholyAscensionBuff
         thistype.NAME            = "Unholy Ascension"
-        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNUnholyFrenzy.blp"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNAnnihilation.blp"
         thistype.DESC            = "This unit deals +^$damage% damage, has +^$reduction% damage resist, and +^$attack_speed% base attack speed"
         thistype.DISPEL_TYPE     = BUFF_POSITIVE
         thistype.STACK_TYPE      = BUFF_STACK_NONE
