@@ -149,8 +149,8 @@ OnInit.final("BuffsSummons", function(Require)
             self.damage_multiplier = 1.
             self.reduction_multiplier = 1.
             self.attack_speed_multiplier = 1.
-            self.sfx = Unit[self.target]:addEffect(
-                "Abilities\\Spells\\Undead\\UnholyFrenzy\\UnholyFrenzyTarget.mdl", "origin")
+            DestroyEffect(AddSpecialEffectTarget("Blood Wing.mdx", self.target, "origin"))
+            self.sfx = Unit[self.target]:addEffect("war3mapImported\\Blood Presence.mdx", "head")
         end
     end
 

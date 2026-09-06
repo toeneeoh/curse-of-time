@@ -1068,7 +1068,7 @@ OnInit.final("DarkSummonerSpells", function(Require)
         local DAMAGE_BY_LEVEL = { 30, 40, 50, 60, 70, 80 }
         local REDUCTION_BY_LEVEL = { 10, 12, 14, 16, 18, 20 }
         local ATTACK_SPEED_BY_LEVEL = { 10, 12, 14, 16, 18, 20 }
-        local AOE_BY_LEVEL = { 1000, 1100, 1200, 1300, 1400, 1500 }
+        local AOE_BY_LEVEL = { 500, 600, 700, 800, 900, 1000 }
         local COOLDOWN_BY_LEVEL = { 120, 110, 100, 90, 80, 70 }
 
         local function ability_level(caster)
@@ -1121,10 +1121,9 @@ OnInit.final("DarkSummonerSpells", function(Require)
             local attack_speed = ATTACK_SPEED_BY_LEVEL[level] * 0.01
             local dur = self.dur * LBOOST[self.pid]
 
-            local cast_sfx = AddSpecialEffect(
-                "war3mapImported\\AnnihilationBlast.mdx", GetUnitX(self.caster), GetUnitY(self.caster))
-            BlzSetSpecialEffectScale(cast_sfx, 1.35)
-            BlzSetSpecialEffectColor(cast_sfx, 180, 80, 255)
+            local cast_sfx = AddSpecialEffect("unholy_ascension.mdl", GetUnitX(self.caster), GetUnitY(self.caster))
+            BlzSetSpecialEffectScale(cast_sfx, radius / 300.)
+            --BlzSetSpecialEffectColor(cast_sfx, 180, 80, 255)
             DestroyEffect(cast_sfx)
             SoundHandler("Units\\NightElf\\HeroDemonHunter\\DemonHunterMorph1.flac", true, nil, self.caster)
 
@@ -1132,8 +1131,6 @@ OnInit.final("DarkSummonerSpells", function(Require)
                 local summon = summons[i]
                 UnholyAscensionBuff:add(self.caster, summon):update(
                     damage, reduction, attack_speed, dur)
-                DestroyEffect(AddSpecialEffectTarget(
-                    "Abilities\\Spells\\Undead\\Darksummoning\\DarkSummonTarget.mdx", summon, "origin"))
             end
 
             dev_log(string.format(
