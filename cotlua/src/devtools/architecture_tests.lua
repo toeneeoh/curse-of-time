@@ -111,6 +111,10 @@ OnInit.final("ArchitectureTests", function(Require)
             or type(reselect) ~= "function" then
             return false, "frame helper exports are unavailable"
         end
+        if type(SoundHandler) ~= "function" or type(DelayAnimation) ~= "function"
+            or type(UnitDisableAbility) ~= "function" or type(HighestStat) ~= "function" then
+            return false, "unit and audio helper exports are unavailable"
+        end
         return true
     end)
 

@@ -13,6 +13,9 @@ OnInit.global("Helper", function(Require)
     Require('Groups')
     Require('TextHelpers')
     Require('FrameHelpers')
+    Require('Audio')
+    Require('UnitAnimation')
+    Require('UnitHelpers')
 
     local TQ = TimerQueue
     local floor, sin, cos, min, max, random = math.floor, math.sin, math.cos, math.min, math.max, math.random
@@ -29,45 +32,6 @@ local RealToString = RealToString
 ---@return boolean
 function IsUnitStunned(u)
     return (Stun:has(nil, u) or Freeze:has(nil, u) or KnockUp:has(nil, u) or GetUnitAbilityLevel(u, FourCC('BPSE')) > 0 or GetUnitAbilityLevel(u, FourCC('BSTN')) > 0)
-end
-
----@type fun(u: unit, id: integer, disable: boolean)
-function UnitDisableAbility(u, id, disable)
-    local ablev = GetUnitAbilityLevel(u, id) ---@type integer 
-
-    if ablev == 0 then
-        return
-    end
-
-    UnitRemoveAbility(u, id)
-    UnitAddAbility(u, id)
-    SetUnitAbilityLevel(u, id, ablev)
-    BlzUnitDisableAbility(u, id, disable, false)
-    BlzUnitHideAbility(u, id, true)
-end
-
----@param u unit
----@param show boolean
-function ToggleCommandCard(u, show)
-    local classification = BlzGetUnitIntegerField(u, UNIT_IF_UNIT_CLASSIFICATION) ---@type integer 
-    local ward = GetHandleId(UNIT_CATEGORY_WARD) ---@type integer 
-
-    if (BlzBitAnd(classification, ward) > 0 and show) or (BlzBitAnd(classification, ward) == 0 and not show) then
-        BlzSetUnitIntegerField(u, UNIT_IF_UNIT_CLASSIFICATION, BlzBitXor(classification, ward))
-    end
-end
-
----@type fun(path: string, is3D: boolean, p: player|nil, u: unit|nil)
-function SoundHandler(path, is3D, p, u)
-    local ss = ((p and GetLocalPlayer() ~= p) and "") or path ---@type string 
-    local s = CreateSound(ss, false, is3D, is3D, 12700, 12700, "")
-
-    if u ~= nil then
-        AttachSoundToUnit(s, u)
-    end
-
-    StartSound(s)
-    KillSoundWhenDone(s)
 end
 
 local similar_units = {
@@ -155,81 +119,6 @@ function RemovePlayerUnits(pid)
     end
 
     DestroyGroup(ug)
-end
-
-local stat_map = {
-    "str",
-    "int",
-    "agi",
-}
-
-local literal_stat_map = {
-    "Strength",
-    "Intelligence",
-    "Agility",
-}
-
----@param hero unit
----@param include_bonus boolean
----@return integer
-function HighestStat(hero, include_bonus)
-    local str = GetHeroStr(hero, include_bonus) ---@type integer 
-    local int = GetHeroInt(hero, include_bonus) ---@type integer 
-    local agi = GetHeroAgi(hero, include_bonus) ---@type integer 
-
-    if str >= agi and str >= int then
-        return 1
-    elseif int >= str and int >= agi then
-        return 2
-    else
-        return 3
-    end
-end
-
-function HighestStatName(hero, literal, include_bonus)
-    if literal then
-        return literal_stat_map[HighestStat(hero, include_bonus)]
-    else
-        return stat_map[HighestStat(hero, include_bonus)]
-    end
-end
-
----@param hero unit
----@return integer
-function MainStat(hero) -- returns integer signifying primary attribute
-    return BlzGetUnitIntegerField(hero, UNIT_IF_PRIMARY_ATTRIBUTE)
-end
-
----@type fun(pt: PlayerTimer)
-function DelayAnimationExpire(pt)
-    if pt.pause then
-        BlzPauseUnitEx(pt.target, false)
-    end
-
-    if pt.dur > 0. then
-        SetUnitTimeScale(pt.target, pt.dur)
-    end
-
-    if UnitAlive(pt.target) then
-        SetUnitAnimationByIndex(pt.target, pt.index)
-    end
-end
-
----@type fun(pid: integer, u: unit, delay: number, index: integer, timescale: number, pause: boolean)
-function DelayAnimation(pid, u, delay, index, timescale, pause)
-    local pt = TimerList[pid]:add() ---@type PlayerTimer
-
-    pt.target = u
-    pt.index = index
-    pt.pause = false
-    pt.dur = timescale
-
-    if pause then
-        BlzPauseUnitEx(u, true)
-        pt.pause = true
-    end
-
-    pt:after(delay, DelayAnimationExpire)
 end
 
 --#region TODO: move lighting stuff somewhere?
@@ -648,7 +537,7 @@ local StatTable = {
     GetHeroStr,
     GetHeroInt,
     GetHeroAgi,
-    function() return 0 end,
+    function(_, _) return 0 end,
 }
 
 ---@type fun(stat: integer, u: unit, bonuses: boolean): integer
