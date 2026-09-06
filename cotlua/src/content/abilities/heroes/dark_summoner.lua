@@ -675,13 +675,13 @@ OnInit.final("DarkSummonerSpells", function(Require)
             unit.int = int
 
             if ablev > 0 then
-                SetUnitMoveSpeed(summon, GetUnitDefaultMoveSpeed(summon) + ablev * 10.)
+                unit.ms_flat = GetUnitDefaultMoveSpeed(summon) + ablev * 10.
                 unit.summoning_improvement_armor = R2I(
                     (Pow(ablev, 1.2) + (Pow(ablev, 4.) - Pow(ablev, 3.9)) / 90.) / 2. + ablev + 6.5)
                 UnitAddAbility(summon, FourCC('A06Q'))
                 SetUnitAbilityLevel(summon, FourCC('A06Q'), ablev)
             else
-                SetUnitMoveSpeed(summon, GetUnitDefaultMoveSpeed(summon))
+                unit.ms_flat = GetUnitDefaultMoveSpeed(summon)
                 UnitRemoveAbility(summon, FourCC('A06Q'))
             end
 
