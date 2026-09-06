@@ -10,6 +10,7 @@ OnInit.final("Dungeons", function(Require)
     Require('ItemEventRegistry')
     Require('Death')
     Require('Gluebutton')
+    Require('WorldTransitions')
 
     QUEUE_DUNGEON = false
     QUEUE_GROUP   = {} ---@type player[]

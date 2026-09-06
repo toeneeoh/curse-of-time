@@ -14,6 +14,7 @@ OnInit.final("SaveLoad", function(Require)
     Require('Profile')
     Require('Items')
     Require('SaveSchema')
+    Require('PersistencePaths')
 
     --[[ profile load order
             slot code hash checksums

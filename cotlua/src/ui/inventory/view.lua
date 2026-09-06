@@ -10,6 +10,7 @@ OnInit.final("Inventory", function(Require)
     Require('Users')
     Require('Frames')
     Require('Currency')
+    Require('PlayerSync')
 
     local INVENTORY_WIDTH   = 0.1981
     local INVENTORY_HEIGHT  = 0.232

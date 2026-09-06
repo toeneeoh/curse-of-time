@@ -2,7 +2,7 @@
 -- of creating an item.
 
 OnInit.final("ShopActions", function(Require)
-    Require('Helper')
+    Require('ItemHelpers')
 
     ShopAction = {}
     local registry = {}

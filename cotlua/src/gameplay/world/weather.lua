@@ -5,7 +5,8 @@
 ]]
 
 OnInit.final("Weather", function(Require)
-    Require('Helper')
+    Require('Groups')
+    Require('WorldDestructables')
     Require('Buffs')
 
     local CURRENT_WEATHER

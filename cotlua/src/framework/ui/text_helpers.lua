@@ -100,4 +100,10 @@ OnInit.global("TextHelpers", function(Require)
         local seconds = fmod(R2I(time), 60)
         return (minutes > 0 and minutes .. " minutes") or seconds .. " seconds"
     end
+
+    ---Highlights a string with the standard value color when enabled.
+    ---@type fun(value: string, enabled: boolean): string
+    function HL(value, enabled)
+        return (enabled and ("|cffffcc00" .. value .. "|r")) or value
+    end
 end)

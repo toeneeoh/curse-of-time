@@ -2,6 +2,7 @@ OnInit.final("SummonAbilities", function(Require)
     Require("Spells")
     Require("SpellTools")
     Require("BuffsSummons")
+    Require("Taunt")
 
     local TQ = TimerQueue
     local FPS_32 = FPS_32

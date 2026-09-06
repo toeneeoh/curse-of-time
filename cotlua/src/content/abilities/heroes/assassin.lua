@@ -2,6 +2,7 @@ OnInit.final("AssassinSpells", function(Require)
     Require('Spells')
     Require('SpellTools')
     Require('Events')
+    Require('CombatStatus')
 
     local TQ = TimerQueue
     local FPS_32 = FPS_32

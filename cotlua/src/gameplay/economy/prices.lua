@@ -6,7 +6,7 @@
 
 OnInit.final("Prices", function(Require)
     Require('Currency')
-    Require('Helper')
+    Require('ItemHelpers')
 
     local PRICES = {}
     local AVAILABILITY = {}

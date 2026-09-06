@@ -50,16 +50,15 @@ The first extracted domain APIs are:
 - `NotifyItemChanged(pid)`, which publishes synchronized item mutations to UI
   subscribers without making item runtime depend on inventory or shop frames.
 
-The legacy helper adapter now delegates its low-level utility families to
-`framework/collections/table_helpers.lua` and
-`framework/wc3/{geometry,effects,groups}.lua`. Presentation-only formatting and
-frame access live in `framework/ui/{text_helpers,frame_helpers}.lua`. Their
-unit-native companions live in
-`framework/wc3/{audio,unit_animation,unit_helpers}.lua`. Their existing global
-function names remain available for compatibility, while `Helper` explicitly
-requires the extracted resources. Remaining functions stay in the adapter until
-their gameplay or UI owners can absorb them without introducing reverse
-dependencies.
+The former general-purpose helper module has been removed. Its low-level utility
+families live in `framework/collections/table_helpers.lua`,
+`framework/wc3/{geometry,effects,groups,audio,unit_animation,unit_helpers}.lua`,
+and `framework/ui/{text_helpers,frame_helpers,floating_text}.lua`. Gameplay
+operations are owned by focused modules under `gameplay/abilities`,
+`gameplay/combat`, `gameplay/economy`, `gameplay/items`, `gameplay/persistence`,
+`gameplay/players`, and `gameplay/world`. Existing global function names remain
+available to preserve map-script compatibility, but initializers now require the
+resource that owns the relevant family instead of a broad `Helper` resource.
 
 ## Persistence format
 
@@ -113,6 +112,5 @@ Get-ChildItem cotlua/src -Recurse -Filter *.lua | ForEach-Object {
 ```
 
 Folder moves must preserve `InitTrace` module names, phases, and completion
-order. The remaining `framework/wc3/legacy_helpers.lua` is an explicit
-migration seam: split its symbol groups by ownership only after runtime callers
-have been characterized.
+order. Compatibility globals should be retired only after runtime callers have
+been characterized and migrated to owned APIs.

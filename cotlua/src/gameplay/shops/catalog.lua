@@ -1,7 +1,7 @@
 -- Immutable shop item descriptors and recipe-component relationships.
 
 OnInit.final("ShopCatalog", function(Require)
-    Require('Helper')
+    Require('ItemHelpers')
     Require('Items')
     Require('Variables')
 

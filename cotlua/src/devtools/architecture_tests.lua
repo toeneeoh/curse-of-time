@@ -12,7 +12,19 @@ OnInit.final("ArchitectureTests", function(Require)
     Require('Town')
     Require('BossAbilities')
     Require('Buffs')
-    Require('Helper')
+    Require('TableHelpers')
+    Require('Geometry')
+    Require('Effects')
+    Require('Groups')
+    Require('TextHelpers')
+    Require('FrameHelpers')
+    Require('Audio')
+    Require('UnitAnimation')
+    Require('UnitHelpers')
+    Require('ItemHelpers')
+    Require('AbilityCasting')
+    Require('PlayerLifecycle')
+    Require('SummonHelpers')
 
     ArchitectureTests = {
         tests = {},
@@ -88,7 +100,7 @@ OnInit.final("ArchitectureTests", function(Require)
         return true
     end)
 
-    ArchitectureTests.register("legacy helper families remain available after extraction", function()
+    ArchitectureTests.register("owned helper families remain available", function()
         local values = { "first", "second", "third" }
         TableRemove(values, "second")
 
@@ -114,6 +126,10 @@ OnInit.final("ArchitectureTests", function(Require)
         if type(SoundHandler) ~= "function" or type(DelayAnimation) ~= "function"
             or type(UnitDisableAbility) ~= "function" or type(HighestStat) ~= "function" then
             return false, "unit and audio helper exports are unavailable"
+        end
+        if type(GetItem) ~= "function" or type(CastSpell) ~= "function"
+            or type(PlayerCleanup) ~= "function" or type(SummonExpire) ~= "function" then
+            return false, "gameplay helper exports are unavailable"
         end
         return true
     end)

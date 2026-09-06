@@ -1,5 +1,5 @@
 OnInit.global("SimpleButton", function(Require)
-    Require('Helper')
+    Require('FrameHelpers')
 
     ---@class SimpleButton
     ---@field frame framehandle

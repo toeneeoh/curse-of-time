@@ -7,6 +7,7 @@ OnInit.final("Currency", function(Require)
     Require('Users')
     Require('Frames')
     Require('ItemEventRegistry')
+    Require('EconomyEffects')
 
     local CURRENCY = __jarray(0) ---@type integer[]
     local PLAT_VALUE = 1000000
