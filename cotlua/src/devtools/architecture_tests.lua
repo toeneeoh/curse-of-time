@@ -104,6 +104,13 @@ OnInit.final("ArchitectureTests", function(Require)
         if type(HideEffect) ~= "function" or type(Fade) ~= "function" or type(FadeSFX) ~= "function" then
             return false, "effect helper exports are unavailable"
         end
+        if RealToString(1234567) ~= "1,234,567" or HealthGradient(1, true) ~= "|cffFF0000" then
+            return false, "text helper compatibility changed"
+        end
+        if type(GetMainSelectedUnit) ~= "function" or type(FrameAddSimpleTooltip) ~= "function"
+            or type(reselect) ~= "function" then
+            return false, "frame helper exports are unavailable"
+        end
         return true
     end)
 

@@ -52,10 +52,12 @@ The first extracted domain APIs are:
 
 The legacy helper adapter now delegates its low-level utility families to
 `framework/collections/table_helpers.lua` and
-`framework/wc3/{geometry,effects,groups}.lua`. Their existing global function
-names remain available for compatibility, while `Helper` explicitly requires
-the extracted resources. Remaining functions stay in the adapter until their
-gameplay or UI owners can absorb them without introducing reverse dependencies.
+`framework/wc3/{geometry,effects,groups}.lua`. Presentation-only formatting and
+frame access live in `framework/ui/{text_helpers,frame_helpers}.lua`. Their
+existing global function names remain available for compatibility, while
+`Helper` explicitly requires the extracted resources. Remaining functions stay
+in the adapter until their gameplay or UI owners can absorb them without
+introducing reverse dependencies.
 
 ## Persistence format
 

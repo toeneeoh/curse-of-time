@@ -11,128 +11,15 @@ OnInit.global("Helper", function(Require)
     Require('Geometry')
     Require('Effects')
     Require('Groups')
+    Require('TextHelpers')
+    Require('FrameHelpers')
 
     local TQ = TimerQueue
-    local floor, fmod, sin, cos, min, max, random = math.floor, math.fmod, math.sin, math.cos, math.min, math.max, math.random
-    local tostring, type, sub, concat, pack = tostring, type, string.sub, table.concat, string.pack
+    local floor, sin, cos, min, max, random = math.floor, math.sin, math.cos, math.min, math.max, math.random
+    local type, pack = type, string.pack
     local Player, FourCC, GetFilterUnit, GetOwningPlayer, GetUnitTypeId, UnitAlive = Player, FourCC, GetFilterUnit, GetOwningPlayer, GetUnitTypeId, UnitAlive
     local GetUnitX, GetUnitY, BlzGetUnitMaxHP, IsUnitAlly, GetUnitAbilityLevel, GetLocalPlayer = GetUnitX, GetUnitY, BlzGetUnitMaxHP, IsUnitAlly, GetUnitAbilityLevel, GetLocalPlayer
     local CreateTextTag, SetTextTagPermanent, SetTextTagColor, SetTextTagLifespan, SetTextTagFadepoint, SetTextTagText, SetTextTagPos = CreateTextTag, SetTextTagPermanent, SetTextTagColor, SetTextTagLifespan, SetTextTagFadepoint, SetTextTagText, SetTextTagPos
-
---[[Tasyen/Bribes's GetMainSelectedUnit]]
-function GetMainSelectedUnit(...)
-    --initialize on the first call...        group frame:      bottom UI:               console:
-    local containerFrame = BlzFrameGetChild(BlzFrameGetChild(BlzFrameGetParent(BlzGetFrameByName("SimpleInfoPanelUnitDetail", 0)), 5), 0)
-
-    local function getUnitSortValue(unit)
-                --heroes use handleId                                    units use type ID
-        return IsUnitType(unit, UNIT_TYPE_HERO) and GetHandleId(unit) or GetUnitTypeId(unit)
-    end
-    local units
-    local function getUnitAt(index)
-        return units[index + 1]
-    end
-    local filter        = Filter(function()
-        local unit      = GetFilterUnit()
-        local prio      = BlzGetUnitRealField(unit, UNIT_RF_PRIORITY)
-        local pos       = #units + 1
-        -- compare the current unit with already found, to place it in the right slot
-        for i = 1, pos - 1 do
-            local value = units[i]
-            -- higher prio than this; take it's slot                    equal prio and better colisions Value
-            if BlzGetUnitRealField(value, UNIT_RF_PRIORITY) < prio or (BlzGetUnitRealField(value, UNIT_RF_PRIORITY) == prio and getUnitSortValue(value) > getUnitSortValue(unit)) then
-                pos = i
-                break
-            end
-        end
-        table.insert(units, pos, unit)
-    end)
-    -- give each frame a unique ID
-    local frames = {}
-    for int = 0, BlzFrameGetChildrenCount(containerFrame) - 1 do
-        local buttonContainer = BlzFrameGetChild(containerFrame, int)
-        frames[int + 1] = BlzFrameGetChild(buttonContainer, 0)
-    end
-    ---@param atIndex? integer
-    ---@param async? boolean --if no atIndex is specified but this is true, returns the local current main selected unit's index. Beware: using it in a sync gamestate relevant manner breaks the game.
-    function GetMainSelectedUnit(atIndex, async) --re-declare itself once it was called the first time.
-        if async and not atIndex then
-            -- local player is in group selection?
-            if BlzFrameIsVisible(containerFrame) then
-                -- find the first visible yellow Background Frame
-                for i = 1, #frames do
-                    local frame = frames[i]
-
-                    if BlzFrameIsVisible(frame) then
-                        atIndex = i - 1
-                        break
-                    end
-                end
-            end
-        end
-        local whichFilter
-        local getUnit   = FirstOfGroup
-        if atIndex then
-            units       = {}
-            whichFilter = filter
-            getUnit     = getUnitAt
-        end
-        GroupEnumUnitsSelected(bj_lastCreatedGroup, GetLocalPlayer(), whichFilter)
-        return getUnit(atIndex or bj_lastCreatedGroup)
-    end
-    return GetMainSelectedUnit(...) --return the product of the newly-declared function.
-end
-
--- formats a number to a string with commas (no decimals)
----@param value number
----@return string
-function RealToString(value)
-    -- let Lua handle giant values directly
-    if value >= INT_32_LIMIT then
-        return tostring(value)
-    end
-
-    -- handle sign
-    local negative = false
-    if value < 0 then
-        negative = true
-        value = -value
-    end
-
-    -- round to nearest int
-    local s = tostring(floor(value + 0.5))
-    local len = #s
-
-    -- fast path: no commas needed
-    if len <= 3 then
-        return negative and ("-" .. s) or s
-    end
-
-    -- split "head" group and remaining 3-digit groups
-    local first = len % 3
-    if first == 0 then first = 3 end
-
-    local parts = {}
-    local idx = 1
-
-    -- first group (1–3 digits, no leading comma)
-    parts[idx] = sub(s, 1, first)
-    idx = idx + 1
-
-    -- remaining groups in chunks of 3 with commas
-    for i = first + 1, len, 3 do
-        parts[idx] = ","
-        parts[idx + 1] = sub(s, i, i + 2)
-        idx = idx + 2
-    end
-
-    local out = concat(parts)
-    if negative then
-        out = "-" .. out
-    end
-
-    return out
-end
 
 local RealToString = RealToString
 
@@ -159,64 +46,6 @@ function UnitDisableAbility(u, id, disable)
     BlzUnitHideAbility(u, id, true)
 end
 
----@param position integer
----@param returnHex boolean
----@return integer|string, integer|nil, integer|nil
-function HealthGradient(position, returnHex)
-    -- Ensure the position is within the valid range [1, 100]
-    position = min(100, max(1, position))
-
-    -- Define color stops and their corresponding positions
-    local colorStops = {
-        {1,   {255, 0, 0}},
-        {10,  {255, 0, 0}},
-        {70,  {242, 255, 64}},
-        {100, {8, 200, 2}}
-    }
-
-    -- Find the two color stops between which the position falls
-    local startStop, endStop
-    for i = 1, #colorStops - 1 do
-        if position <= colorStops[i + 1][1] then
-            startStop = colorStops[i]
-            endStop = colorStops[i + 1]
-            break
-        end
-    end
-
-    -- Interpolate between the two color stops based on position
-    local t = (position - startStop[1]) / (endStop[1] - startStop[1])
-    local interpolatedColor = {
-        math.floor(startStop[2][1] + t * (endStop[2][1] - startStop[2][1])),
-        math.floor(startStop[2][2] + t * (endStop[2][2] - startStop[2][2])),
-        math.floor(startStop[2][3] + t * (endStop[2][3] - startStop[2][3]))
-    }
-
-    if returnHex then
-        -- Convert RGB values to hexadecimal string
-        local hexString = string.format("|cff%02X%02X%02X", interpolatedColor[1], interpolatedColor[2], interpolatedColor[3])
-        return hexString
-    else
-        return interpolatedColor[1], interpolatedColor[2], interpolatedColor[3]
-    end
-end
-
----@type fun(tbl: table, text: string)
-function DisplayTextToTable(tbl, text)
-    for i = 1, #tbl do
-        local p = (type(tbl[i]) == "number" and Player(tbl[i] - 1)) or tbl[i]
-        DisplayTextToPlayer(p, 0, 0, text)
-    end
-end
-
----@type fun(tbl: table, dur: number, text: string)
-function DisplayTimedTextToTable(tbl, dur, text)
-    for i = 1, #tbl do
-        local p = (type(tbl[i]) == "number" and Player(tbl[i] - 1)) or tbl[i]
-        DisplayTimedTextToPlayer(p, 0, 0, dur, text)
-    end
-end
-
 ---@param u unit
 ---@param show boolean
 function ToggleCommandCard(u, show)
@@ -239,15 +68,6 @@ function SoundHandler(path, is3D, p, u)
 
     StartSound(s)
     KillSoundWhenDone(s)
-end
-
----@param time number
----@return string
-function RemainingTimeString(time)
-    local minutes = time // 60
-    local seconds = fmod(R2I(time), 60)
-
-    return (minutes > 0 and (minutes) .. " minutes") or (seconds) .. " seconds"
 end
 
 local similar_units = {
@@ -1294,64 +1114,6 @@ function RecallSummons(pid)
             BlzSetUnitFacingEx(target, GetUnitFacing(Hero[pid]))
         end
     end
-end
-
----@param u unit
-function reselect(u)
-    if (GetLocalPlayer() == GetOwningPlayer(u)) then
-        ClearSelection()
-        SelectUnit(u, true)
-    end
-end
-
-local frame_create_context = 0
-
----@return integer
-function NextFrameCreateContext()
-    frame_create_context = frame_create_context + 1
-    return frame_create_context
-end
-
----@type fun(frame: framehandle, title: string, text: string, simple: boolean, point1: framepointtype|nil, point2: framepointtype|nil, x: number|nil, y: number|nil, margin: number|nil): table
-function FrameAddSimpleTooltip(frame, title, text, simple, point1, point2, x, y, margin)
-    local self = {}
-    point1 = point1 or FRAMEPOINT_TOP
-    point2 = point2 or FRAMEPOINT_BOTTOM
-    x = x or 0.
-    y = y or -0.008
-    margin = margin or 0.008
-
-    if simple then
-        self.frame = BlzCreateFrame("Leaderboard", frame, 0, 0)
-        self.tooltip = BlzCreateFrameByType("TEXT", "", self.frame, "", 0)
-        BlzFrameSetPoint(self.tooltip, point1, frame, point2, x, y)
-        BlzFrameSetPoint(self.frame, FRAMEPOINT_TOPLEFT, self.tooltip, FRAMEPOINT_TOPLEFT, -(margin), margin)
-        BlzFrameSetPoint(self.frame, FRAMEPOINT_BOTTOMRIGHT, self.tooltip, FRAMEPOINT_BOTTOMRIGHT, margin, -(margin))
-    else
-        local context = NextFrameCreateContext()
-        self.frame = BlzCreateFrame("TooltipBoxFrame", frame, 0, context)
-        self.box = BlzGetFrameByName("TooltipBox", context)
-        self.line = BlzGetFrameByName("TooltipSeperator", context)
-        self.tooltip = BlzGetFrameByName("TooltipText", context)
-        self.iconFrame = BlzGetFrameByName("TooltipIcon", context)
-        self.nameFrame = BlzGetFrameByName("TooltipName", context)
-
-        BlzFrameSetPoint(self.tooltip, FRAMEPOINT_CENTER, BlzGetFrameByName("CommandButton_3", 0), FRAMEPOINT_TOPLEFT, -0.09, 0.045)
-        BlzFrameSetSize(self.iconFrame, 0.009, 0.009)
-        BlzFrameSetTexture(self.iconFrame, "trans32.blp", 0, true)
-        BlzFrameSetText(self.nameFrame, title)
-        BlzFrameSetPoint(self.box, FRAMEPOINT_TOPLEFT, self.iconFrame, FRAMEPOINT_TOPLEFT, -0.005, 0.005)
-        BlzFrameSetPoint(self.box, FRAMEPOINT_BOTTOMRIGHT, self.tooltip, FRAMEPOINT_BOTTOMRIGHT, 0.005, -0.005)
-        BlzFrameSetSize(self.tooltip, 0.275, 0)
-        BlzFrameClearAllPoints(self.nameFrame)
-        BlzFrameSetPoint(self.nameFrame, FRAMEPOINT_TOPLEFT, self.iconFrame, FRAMEPOINT_TOPLEFT, 0, 0)
-        BlzFrameSetScale(self.nameFrame, 0.77)
-    end
-
-    BlzFrameSetText(self.tooltip, text)
-    BlzFrameSetTooltip(frame, self.frame)
-
-    return self
 end
 
 ---@type fun(tbl: table, fadedur: number, fade: boolean)
