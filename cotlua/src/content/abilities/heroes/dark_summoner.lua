@@ -75,6 +75,7 @@ OnInit.final("DarkSummonerSpells", function(Require)
     ---@field infuse fun(pid: integer, summon: unit): boolean
     ---@field reclaim fun(pid: integer, summon: unit): boolean
     ---@field apply fun(pid: integer, summon: unit)
+    ---@field refreshScaling fun(pid: integer, summon: unit)
     ---@field refreshTooltips fun(pid: integer)
     ---@field onFatalDamage fun(summon: unit, source: unit, amount: table)
     ---@field pack fun(pid: integer): integer
@@ -275,11 +276,21 @@ OnInit.final("DarkSummonerSpells", function(Require)
         end
     end
 
+    local refresh_summon_scaling
+
     local function sync_summon_levels(pid, level)
+        local resources = {}
+
         for i = 1, #PLAYER_SUMMONS do
             local summon = PLAYER_SUMMONS[i]
             if summon and GetOwningPlayer(summon) == Player(pid - 1)
                 and IS_SUMMON_TYPE[GetUnitTypeId(summon)] then
+                if UnitAlive(summon) and not IsUnitHidden(summon) then
+                    resources[summon] = {
+                        life = GetWidgetLife(summon),
+                        mana = GetUnitState(summon, UNIT_STATE_MANA),
+                    }
+                end
                 SuspendHeroXP(summon, false)
                 if GetHeroLevel(summon) ~= level then
                     SetHeroLevel(summon, level, false)
@@ -287,6 +298,8 @@ OnInit.final("DarkSummonerSpells", function(Require)
                 SuspendHeroXP(summon, true)
             end
         end
+
+        return resources
     end
 
     SummonEssence.refreshTooltips = refresh_all_essence_tooltips
@@ -352,6 +365,43 @@ OnInit.final("DarkSummonerSpells", function(Require)
         UnitMakeAbilityPermanent(summon, true, ESSENCE_INFO)
     end
 
+    local function add_tier_bonuses(summon, tier)
+        local uid = GetUnitTypeId(summon)
+        local unit = Unit[summon]
+
+        if uid == SUMMON_REAVER then
+            unit.essence_str = R2I(unit.str * (REAVER_STR_BY_TIER[tier] or 0.))
+            unit.essence_armor_percent = REAVER_ARMOR_BY_TIER[tier] or 0.
+        elseif uid == SUMMON_BRUTE then
+            unit.essence_str = R2I(unit.str * (SKULL_BRUTE_STR_BY_TIER[tier] or 0.))
+            unit.essence_armor_percent = SKULL_BRUTE_ARMOR_BY_TIER[tier] or 0.
+        elseif uid == SUMMON_DESTROYER then
+            unit.essence_str = R2I(unit.str * (DESTROYER_STR_BY_TIER[tier] or 0.))
+            unit.essence_agi = DESTROYER_AGI_BY_TIER[tier] or 0
+            unit.essence_int = R2I(unit.int * (DESTROYER_INT_BY_TIER[tier] or 0.))
+            unit.essence_armor_percent = DESTROYER_ARMOR_BY_TIER[tier] or 0.
+            if tier >= 3 then
+                unit.essence_cc = 25
+                unit.essence_cd = 200
+            end
+        end
+
+        unit.bonus_str = unit.bonus_str + unit.essence_str
+        unit.bonus_agi = unit.bonus_agi + unit.essence_agi
+        unit.bonus_int = unit.bonus_int + unit.essence_int
+        unit.armor_percent = unit.armor_percent + unit.essence_armor_percent
+        unit.cc_flat = unit.cc_flat + unit.essence_cc
+        unit.cd_flat = unit.cd_flat + unit.essence_cd
+    end
+
+    function SummonEssence.refreshScaling(pid, summon)
+        if not summon or not IS_SUMMON_TYPE[GetUnitTypeId(summon)] then return end
+
+        remove_tier_bonuses(summon)
+        add_tier_bonuses(summon, SummonEssence.getTier(pid, summon))
+        refresh_essence_tooltip(pid, summon)
+    end
+
     local function refresh_reaver_tooltips(summon)
         if not summon or GetUnitTypeId(summon) ~= SUMMON_REAVER then return end
 
@@ -383,8 +433,6 @@ OnInit.final("DarkSummonerSpells", function(Require)
             SetUnitAbilityLevel(summon, DREAD_CLEAVE_INFO.id, tier + 1)
             SetUnitAbilityLevel(summon, DREADFUL_WOUNDS_INFO.id, tier + 1)
 
-            unit.essence_str = R2I(unit.str * (REAVER_STR_BY_TIER[tier] or 0.))
-            unit.essence_armor_percent = REAVER_ARMOR_BY_TIER[tier] or 0.
             if tier >= 2 then
                 UnitAddAbility(summon, REAVER_WAR_CRY_ID)
                 SetUnitAbilityLevel(summon, REAVER_WAR_CRY_ID, tier - 1)
@@ -404,8 +452,6 @@ OnInit.final("DarkSummonerSpells", function(Require)
             UnitRemoveAbility(summon, MAGNETIC_FORCE.id)
             UnitRemoveAbility(summon, FourCC('A0IQ'))
 
-            unit.essence_str = R2I(unit.str * (SKULL_BRUTE_STR_BY_TIER[tier] or 0.))
-            unit.essence_armor_percent = SKULL_BRUTE_ARMOR_BY_TIER[tier] or 0.
             SetUnitScale(summon, 1. + tier * 0.05, 1. + tier * 0.05, 1. + tier * 0.05)
             BlzSetHeroProperName(summon, "Skull Brute (Tier " .. tier .. ")")
 
@@ -419,15 +465,9 @@ OnInit.final("DarkSummonerSpells", function(Require)
             UnitRemoveAbility(summon, FourCC('A0IQ'))
             SetUnitAbilityLevel(summon, FourCC('A02D'), 1)
 
-            unit.essence_str = R2I(unit.str * (DESTROYER_STR_BY_TIER[tier] or 0.))
-            unit.essence_agi = DESTROYER_AGI_BY_TIER[tier] or 0
-            unit.essence_int = R2I(unit.int * (DESTROYER_INT_BY_TIER[tier] or 0.))
-            unit.essence_armor_percent = DESTROYER_ARMOR_BY_TIER[tier] or 0.
             if tier >= 2 then UnitAddAbility(summon, FourCC('A061')) end
             if tier >= 3 then
                 UnitAddAbility(summon, FourCC('A03B'))
-                unit.essence_cc = 25
-                unit.essence_cd = 200
             end
             if tier >= 4 then
                 SetUnitAbilityLevel(summon, FourCC('A02D'), 2)
@@ -438,12 +478,7 @@ OnInit.final("DarkSummonerSpells", function(Require)
             BlzSetHeroProperName(summon, "Destroyer (Tier " .. tier .. ")")
         end
 
-        unit.bonus_str = unit.bonus_str + unit.essence_str
-        unit.bonus_agi = unit.bonus_agi + unit.essence_agi
-        unit.bonus_int = unit.bonus_int + unit.essence_int
-        unit.armor_percent = unit.armor_percent + unit.essence_armor_percent
-        unit.cc_flat = unit.cc_flat + unit.essence_cc
-        unit.cd_flat = unit.cd_flat + unit.essence_cd
+        add_tier_bonuses(summon, tier)
         refresh_essence_tooltip(pid, summon)
     end
 
@@ -591,7 +626,10 @@ OnInit.final("DarkSummonerSpells", function(Require)
         local function update_level(u, level)
             local pid = GetPlayerId(GetOwningPlayer(u)) + 1
             SetUnitAbilityLevel(u, thistype.id, level // 10 + 1)
-            sync_summon_levels(pid, level)
+            local resources = sync_summon_levels(pid, level)
+            if refresh_summon_scaling then
+                refresh_summon_scaling(pid, resources)
+            end
 
             for i = 1, #MILESTONES do
                 if level == MILESTONES[i] and Profile[pid] and Profile[pid].playing then
@@ -1058,6 +1096,39 @@ OnInit.final("DarkSummonerSpells", function(Require)
         end
     end
 
+    refresh_summon_scaling = function(pid, resources)
+        local hero = Hero[pid]
+        if not hero then return end
+
+        for i = 1, #PLAYER_SUMMONS do
+            local summon = PLAYER_SUMMONS[i]
+            if summon and GetOwningPlayer(summon) == Player(pid - 1)
+                and UnitAlive(summon) and not IsUnitHidden(summon) then
+                local uid = GetUnitTypeId(summon)
+                local spell = Spells[SUMMON_SPELL[uid]]
+
+                if spell then
+                    local values = spell:create(hero)
+                    local rounding = (uid == SUMMON_REAVER and 0.5) or 0.
+                    SUMMONINGIMPROVEMENT.apply(pid, summon,
+                        R2I((values.str or 0.) * LBOOST[pid] + rounding),
+                        R2I((values.agi or 0.) * LBOOST[pid] + rounding),
+                        R2I((values.int or 0.) * LBOOST[pid] + rounding))
+                    Unit[summon].regen_max = 0.02 + ((uid == SUMMON_BRUTE and 0.00025) or 0.0005)
+                        * GetUnitAbilityLevel(summon, FourCC('A06Q'))
+                    SummonEssence.refreshScaling(pid, summon)
+
+                    local previous = resources and resources[summon]
+                    if previous then
+                        SetWidgetLife(summon, math.min(previous.life, BlzGetUnitMaxHP(summon)))
+                        SetUnitState(summon, UNIT_STATE_MANA,
+                            math.min(previous.mana, BlzGetUnitMaxMana(summon)))
+                    end
+                end
+            end
+        end
+    end
+
     ---@class UNHOLYASCENSION : Spell
     ---@field damage number
     ---@field aoe number
@@ -1072,7 +1143,7 @@ OnInit.final("DarkSummonerSpells", function(Require)
         local COOLDOWN_BY_LEVEL = { 120, 110, 100, 90, 80, 70 }
         local NOVA_MODEL_RADIUS = 158.64
         local NOVA_EFFECT_SCALE_DIVISOR = 140.
-        local NOVA_TIME_SCALE = 2.
+        local NOVA_TIME_SCALE = 1.75
         local NOVA_VISIBLE_AT = 0.08 / NOVA_TIME_SCALE
         local NOVA_EXPANSION_TIME = 0.95 / NOVA_TIME_SCALE
         local NOVA_TICK = 0.015625
