@@ -7,27 +7,17 @@
 OnInit.global("Helper", function(Require)
     Require('Variables')
     Require('TimerQueue')
+    Require('TableHelpers')
+    Require('Geometry')
+    Require('Effects')
+    Require('Groups')
 
     local TQ = TimerQueue
-    local FPS_32 = FPS_32
     local floor, fmod, sin, cos, min, max, random = math.floor, math.fmod, math.sin, math.cos, math.min, math.max, math.random
     local tostring, type, sub, concat, pack = tostring, type, string.sub, table.concat, string.pack
     local Player, FourCC, GetFilterUnit, GetOwningPlayer, GetUnitTypeId, UnitAlive = Player, FourCC, GetFilterUnit, GetOwningPlayer, GetUnitTypeId, UnitAlive
     local GetUnitX, GetUnitY, BlzGetUnitMaxHP, IsUnitAlly, GetUnitAbilityLevel, GetLocalPlayer = GetUnitX, GetUnitY, BlzGetUnitMaxHP, IsUnitAlly, GetUnitAbilityLevel, GetLocalPlayer
     local CreateTextTag, SetTextTagPermanent, SetTextTagColor, SetTextTagLifespan, SetTextTagFadepoint, SetTextTagText, SetTextTagPos = CreateTextTag, SetTextTagPermanent, SetTextTagColor, SetTextTagLifespan, SetTextTagFadepoint, SetTextTagText, SetTextTagPos
-    local ABIL_AVUL = ABIL_AVUL
-    local ABIL_ALOC = ABIL_ALOC
-
----@type fun(val: number, a: number, b: number): number
-function MathClamp(val, a, b)
-    if val < a then
-        return a
-    elseif val > b then
-        return a
-    end
-
-    return val
-end
 
 --[[Tasyen/Bribes's GetMainSelectedUnit]]
 function GetMainSelectedUnit(...)
@@ -148,27 +138,6 @@ local RealToString = RealToString
 
 --misc helper functions
 
----@type fun(n: integer, t: table): table
-function pickN(n, t)
-    local seen = {}
-    local out = {}
-    while #out < n do
-        local r = random(1, #t)
-        if not seen[r] then
-            seen[r] = true
-            out[#out + 1] = t[r]
-        end
-    end
-    return out
-end
-
----@type fun(sfx: effect)
-function HideEffect(sfx)
-    BlzSetSpecialEffectScale(sfx, 0.)
-    BlzSetSpecialEffectPosition(sfx, 30000., 30000., 0.)
-    DestroyEffect(sfx)
-end
-
 ---@param u unit
 ---@return boolean
 function IsUnitStunned(u)
@@ -232,29 +201,6 @@ function HealthGradient(position, returnHex)
     end
 end
 
---Returns index if found otherwise false
----@type fun(tbl:table, val: any): integer | boolean
-function TableHas(tbl, val)
-    for i = 1, #tbl do
-        if tbl[i] == val then
-            return i
-        end
-    end
-
-    return false
-end
-
----@type fun(tbl: table, val: any)
-function TableRemove(tbl, val)
-    for i = 1, #tbl do
-        if tbl[i] == val then
-            tbl[i] = tbl[#tbl]
-            tbl[#tbl] = nil
-            break
-        end
-    end
-end
-
 ---@type fun(tbl: table, text: string)
 function DisplayTextToTable(tbl, text)
     for i = 1, #tbl do
@@ -269,32 +215,6 @@ function DisplayTimedTextToTable(tbl, dur, text)
         local p = (type(tbl[i]) == "number" and Player(tbl[i] - 1)) or tbl[i]
         DisplayTimedTextToPlayer(p, 0, 0, dur, text)
     end
-end
-
-local passedValue = {}
-
----@type fun(pid: integer, g: group, r: rect, b: boolexpr)
-function MakeGroupInRect(pid, g, r, b)
-    passedValue[#passedValue + 1] = pid
-    GroupEnumUnitsInRect(g, r, b)
-    passedValue[#passedValue] = nil
-end
-
----@type fun(pid: integer, g: group, x: number, y: number, radius: number, b: boolexpr)
-function MakeGroupInRange(pid, g, x, y, radius, b)
-    passedValue[#passedValue + 1] = pid
-    GroupEnumUnitsInRange(g, x, y, radius, b)
-    passedValue[#passedValue] = nil
-end
-
----@type fun(pid: integer, g: group, x: number, y: number, radius: number, b: boolexpr)
-function GroupEnumUnitsInRangeEx(pid, g, x, y, radius, b)
-    local ug = CreateGroup()
-
-    MakeGroupInRange(pid, ug, x, y, radius, b)
-    BlzGroupAddGroupFast(ug, g)
-
-    DestroyGroup(ug)
 end
 
 ---@param u unit
@@ -328,68 +248,6 @@ function RemainingTimeString(time)
     local seconds = fmod(R2I(time), 60)
 
     return (minutes > 0 and (minutes) .. " minutes") or (seconds) .. " seconds"
-end
-
----@type fun(u: unit): boolean
-function IsDummy(u)
-    local id = GetUnitTypeId(u)
-
-    return (id == DUMMY_CASTER or id == DUMMY_VISION)
-end
-
----@return boolean
-function ischar()
-    local pid = GetPlayerId(GetOwningPlayer(GetFilterUnit())) + 1 ---@type integer 
-
-    return (GetFilterUnit() == Hero[pid] and UnitAlive(Hero[pid]))
-end
-
----@return boolean
-function ishostile()
-    local i =GetPlayerId(GetOwningPlayer(GetFilterUnit())) ---@type integer 
-
-    return (UnitAlive(GetFilterUnit()) and GetUnitAbilityLevel(GetFilterUnit(),ABIL_AVUL) == 0 and (i ==10 or i ==11 or i ==PLAYER_NEUTRAL_AGGRESSIVE))
-end
-
----@return boolean
-function isplayerAlly()
-    return (UnitAlive(GetFilterUnit()) and GetPlayerId(GetOwningPlayer(GetFilterUnit())) <= PLAYER_CAP and IsUnitType(GetFilterUnit(), UNIT_TYPE_HERO) == true and GetUnitTypeId(GetFilterUnit()) ~= BACKPACK)
-end
-
----@return boolean
-function isplayerunitRegion()
-    local u = GetFilterUnit()
-
-    return (UnitAlive(u) and GetPlayerId(GetOwningPlayer(u)) <= PLAYER_CAP and not IsDummy(u))
-end
-
----@return boolean
-function isplayerunit()
-    local u = GetFilterUnit()
-
-    return (UnitAlive(u) and GetPlayerId(GetOwningPlayer(u)) <= PLAYER_CAP and GetUnitAbilityLevel(u, ABIL_AVUL) == 0 and not IsDummy(u))
-end
-
----@return boolean
-function ishostileEnemy()
-    local u = GetFilterUnit()
-    local i = GetPlayerId(GetOwningPlayer(u)) ---@type integer 
-
-    return
-    (UnitAlive(u) and
-    GetUnitAbilityLevel(u, ABIL_AVUL) == 0 and
-    i <= PLAYER_CAP and
-    not IsDummy(u))
-end
-
----@return boolean
-function isalive()
-    local u = GetFilterUnit()
-
-    return
-    (UnitAlive(u) and
-    GetUnitAbilityLevel(u, ABIL_AVUL) == 0
-    and not IsDummy(u))
 end
 
 local similar_units = {
@@ -727,21 +585,6 @@ function PlayerCleanup(pid)
     end
 end
 
----@param u1 unit
----@param u2 unit
----@return number
-function UnitDistance(u1, u2)
-    local dx = GetUnitX(u2) - GetUnitX(u1) ---@type number 
-    local dy = GetUnitY(u2) - GetUnitY(u1) ---@type number 
-
-    return SquareRoot(dx * dx + dy * dy)
-end
-
----@type fun(x: number, y: number, x2: number, y2: number):number
-function DistanceCoords(x, y, x2, y2)
-    return SquareRoot((x - x2) * (x - x2) + (y - y2) * (y - y2))
-end
-
 ---@type fun(p: player, p2: player, show: boolean)
 function ShowHeroPanel(p, p2, show)
     if show == true then
@@ -993,39 +836,6 @@ function GetHeroStat(stat, u, bonuses)
     return StatTable[stat](u, bonuses)
 end
 
----@type fun(p0_x: number, p0_y: number, p1_x: number, p1_y: number, p2_x: number, p2_y: number, p3_x: number, p3_y: number): location | nil
-function GetLineIntersection(p0_x, p0_y, p1_x, p1_y, p2_x, p2_y, p3_x, p3_y)
-    local s1_x = p1_x - p0_x ---@type number 
-    local s1_y = p1_y - p0_y ---@type number 
-    local s2_x = p3_x - p2_x ---@type number 
-    local s2_y = p3_y - p2_y ---@type number 
-    local s    = (-s1_y * (p0_x - p2_x) + s1_x * (p0_y - p2_y)) / (-s2_x * s1_y + s1_x * s2_y) ---@type number 
-    local t    = (s2_x * (p0_y - p2_y) - s2_y * (p0_x - p2_x)) // (-s2_x * s1_y + s1_x * s2_y) ---@type number 
-    local i_x  = 0. ---@type number 
-    local i_y  = 0. ---@type number 
-
-    if (s >= 0.0 and s <= 1.0 and t >= 0.0 and t <= 1.0) then
-        -- collision
-        i_x = p0_x + (t * s1_x)
-        i_y = p0_y + (t * s1_y)
-
-        return {i_x, i_y}
-    end
-
-    --no collision
-    return nil
-end
-
----@type fun(x: number, y: number, x2: number, y2: number, minX: number, minY: number, maxX: number, maxY: number): boolean
-function LineContainsRect(x, y, x2, y2, minX, minY, maxX, maxY)
-    local leftSide   = GetLineIntersection(x, y, x2, y2, minX, minY, minX, maxY) ---@type table 
-    local rightSide  = GetLineIntersection(x, y, x2, y2, maxX, minY, maxX, maxY) ---@type table 
-    local bottomSide = GetLineIntersection(x, y, x2, y2, minX, minY, maxX, minY) ---@type table 
-    local topSide    = GetLineIntersection(x, y, x2, y2, minX, maxY, maxX, maxY) ---@type table 
-
-    return (leftSide ~= nil or rightSide ~= nil or bottomSide ~= nil or topSide ~= nil)
-end
-
 ---@param pid integer
 function ToggleAutoAttack(pid)
     if IS_AUTO_ATTACK_OFF[pid] then
@@ -1227,13 +1037,6 @@ local function finish_pause(u, pause_override)
     TQ:callDelayed(3., finish_cast, u) -- internal spacing between boss spell casts
 end
 
----@param whichRect rect
----@return number x
----@return number y
-function GetRandomXYInRect(whichRect)
-	return GetRandomReal(GetRectMinX(whichRect), GetRectMaxX(whichRect)), GetRandomReal(GetRectMinY(whichRect), GetRectMaxY(whichRect))
-end
-
 --- Helper for boss casting
 ---@type fun(u: unit, id: integer, dur: number, anim: integer, timescale: number, pause_override: boolean?): boolean
 function CastSpell(u, id, dur, anim, timescale, pause_override)
@@ -1368,58 +1171,6 @@ function MP(source, mp)
     end
 end
 
-local function apply_fade(u, dur, fade, amount)
-    local r = BlzGetUnitIntegerField(u, UNIT_IF_TINTING_COLOR_RED) ---@type integer 
-    local g = BlzGetUnitIntegerField(u, UNIT_IF_TINTING_COLOR_BLUE) ---@type integer 
-    local b = BlzGetUnitIntegerField(u, UNIT_IF_TINTING_COLOR_GREEN) ---@type integer 
-
-    if GetUnitAbilityLevel(u, FourCC('Bmag')) > 0 then --magnetic stance
-        r = 255 g = 25 b = 25
-    end
-
-    amount = amount + (255 / (dur * 32))
-
-    if fade then
-        SetUnitVertexColor(u, r, g, b, math.floor(max(255 - amount, 0)))
-    else
-        SetUnitVertexColor(u, r, g, b, math.floor(min(255, amount)))
-    end
-
-    if amount < 255 and UnitAlive(u) then
-        TQ:callDelayed(FPS_32, apply_fade, u, dur, fade, amount)
-    end
-end
-
----@type fun(u: unit, dur: number, fade: boolean)
-function Fade(u, dur, fade)
-    TQ:callDelayed(0, apply_fade, u, dur, fade, 0)
-end
-
-local function apply_sfx_fade(sfx, fade, count)
-    count = count - 1
-
-    if count > 0 then
-        if fade == true then
-            BlzSetSpecialEffectAlpha(sfx, count * 7)
-        else
-            BlzSetSpecialEffectAlpha(sfx, 255 - count * 7)
-        end
-
-        TQ:callDelayed(FPS_32, apply_sfx_fade, sfx, fade, count)
-    end
-end
-
----@type fun(sfx: effect, fade: boolean)
-function FadeSFX(sfx, fade)
-    local count = 40 ---@type number
-
-    if fade == false then
-        BlzSetSpecialEffectAlpha(sfx, 0)
-    end
-
-    TQ:callDelayed(FPS_32, apply_sfx_fade, sfx, fade, count)
-end
-
 local shop_id = FourCC('n01F')
 
 function MoveShopkeeper()
@@ -1551,72 +1302,6 @@ function reselect(u)
         ClearSelection()
         SelectUnit(u, true)
     end
-end
-
----@return boolean
-function FilterEnemyDead()
-    local u = GetFilterUnit()
-
-    return GetUnitAbilityLevel(u, ABIL_AVUL) == 0 and
-    GetUnitAbilityLevel(u, ABIL_ALOC) == 0 and
-    not IsDummy(u) and
-    IsUnitAlly(u, Player(passedValue[#passedValue] - 1)) == false
-end
-
----@type fun():boolean
-function FilterEnemy()
-    local u = GetFilterUnit()
-
-    return UnitAlive(u) and
-    IsUnitEnemy(u, Player(passedValue[#passedValue] - 1)) and
-    GetUnitAbilityLevel(u, ABIL_AVUL) == 0 and
-    GetUnitAbilityLevel(u, ABIL_ALOC) == 0 and
-    not IsDummy(u)
-end
-
----@return boolean
-function FilterAllyHero()
-    local u = GetFilterUnit()
-
-    return UnitAlive(u) and
-    IsUnitAlly(u, Player(passedValue[#passedValue] - 1)) == true and
-    IsUnitType(u, UNIT_TYPE_HERO) == true and
-    GetUnitAbilityLevel(u, ABIL_AVUL) == 0 and
-    GetUnitAbilityLevel(u, ABIL_ALOC) == 0 and
-    not IsDummy(u)
-end
-
----@return boolean
-function FilterAlly()
-    local u = GetFilterUnit()
-
-    return UnitAlive(u) and
-    GetUnitAbilityLevel(u, ABIL_AVUL) == 0 and
-    GetUnitAbilityLevel(u, ABIL_ALOC) == 0 and
-    not IsDummy(u) and
-    IsUnitAlly(u, Player(passedValue[#passedValue] - 1)) == true
-end
-
----@return boolean
-function FilterEnemyAwake()
-    local u = GetFilterUnit()
-
-    return UnitAlive(u) and
-    GetUnitAbilityLevel(u, ABIL_AVUL) == 0 and
-    GetUnitAbilityLevel(u, ABIL_ALOC) == 0 and
-    not IsDummy(u) and
-    IsUnitAlly(u, Player(passedValue[#passedValue] - 1)) == false and
-    UnitIsSleeping(u) == false
-end
-
----@return boolean
-function FilterAlive()
-    local u = GetFilterUnit()
-
-    return UnitAlive(u) and
-    GetUnitAbilityLevel(u, ABIL_AVUL) == 0 and
-    GetUnitAbilityLevel(u, ABIL_ALOC) == 0 and
-    not IsDummy(u)
 end
 
 local frame_create_context = 0

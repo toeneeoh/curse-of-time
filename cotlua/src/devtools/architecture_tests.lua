@@ -12,6 +12,7 @@ OnInit.final("ArchitectureTests", function(Require)
     Require('Town')
     Require('BossAbilities')
     Require('Buffs')
+    Require('Helper')
 
     ArchitectureTests = {
         tests = {},
@@ -83,6 +84,25 @@ OnInit.final("ArchitectureTests", function(Require)
 
         if RuntimeMetrics.initializers.started ~= RuntimeMetrics.initializers.completed then
             return false, "initializer start/completion counters differ"
+        end
+        return true
+    end)
+
+    ArchitectureTests.register("legacy helper families remain available after extraction", function()
+        local values = { "first", "second", "third" }
+        TableRemove(values, "second")
+
+        if #values ~= 2 or TableHas(values, "second") then
+            return false, "table helper compatibility changed"
+        end
+        if DistanceCoords(0., 0., 3., 4.) ~= 5. then
+            return false, "geometry helper compatibility changed"
+        end
+        if type(MakeGroupInRange) ~= "function" or type(FilterEnemy) ~= "function" then
+            return false, "group helper exports are unavailable"
+        end
+        if type(HideEffect) ~= "function" or type(Fade) ~= "function" or type(FadeSFX) ~= "function" then
+            return false, "effect helper exports are unavailable"
         end
         return true
     end)

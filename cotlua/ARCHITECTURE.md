@@ -50,6 +50,13 @@ The first extracted domain APIs are:
 - `NotifyItemChanged(pid)`, which publishes synchronized item mutations to UI
   subscribers without making item runtime depend on inventory or shop frames.
 
+The legacy helper adapter now delegates its low-level utility families to
+`framework/collections/table_helpers.lua` and
+`framework/wc3/{geometry,effects,groups}.lua`. Their existing global function
+names remain available for compatibility, while `Helper` explicitly requires
+the extracted resources. Remaining functions stay in the adapter until their
+gameplay or UI owners can absorb them without introducing reverse dependencies.
+
 ## Persistence format
 
 The rawcode/index mapping lives in `src/config/save_schema.lua`. Entries in
