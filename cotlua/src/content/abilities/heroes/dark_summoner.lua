@@ -1068,8 +1068,16 @@ OnInit.final("DarkSummonerSpells", function(Require)
         local DAMAGE_BY_LEVEL = { 30, 40, 50, 60, 70, 80 }
         local REDUCTION_BY_LEVEL = { 10, 12, 14, 16, 18, 20 }
         local ATTACK_SPEED_BY_LEVEL = { 10, 12, 14, 16, 18, 20 }
-        local AOE_BY_LEVEL = { 500, 600, 700, 800, 900, 1000 }
+        local AOE_BY_LEVEL = { 500, 550, 600, 650, 700, 750 }
         local COOLDOWN_BY_LEVEL = { 120, 110, 100, 90, 80, 70 }
+        local NOVA_MODEL_RADIUS = 158.64
+        local NOVA_EFFECT_SCALE_DIVISOR = 140.
+        local NOVA_TIME_SCALE = 2.
+        local NOVA_VISIBLE_AT = 0.08 / NOVA_TIME_SCALE
+        local NOVA_EXPANSION_TIME = 0.95 / NOVA_TIME_SCALE
+        local NOVA_TICK = 0.015625
+        local NOVA_KEY_TIMES = { 0., 0.20, 0.45, 0.70, 0.95 }
+        local NOVA_KEY_SCALES = { 0.08, 0.28, 0.52, 0.76, 1. }
 
         local function ability_level(caster)
             return math.max(1, math.min(6, GetUnitAbilityLevel(caster, thistype.id)))
@@ -1099,6 +1107,51 @@ OnInit.final("DarkSummonerSpells", function(Require)
             return AOE_BY_LEVEL[ability_level(caster)] * LBOOST[pid]
         end
 
+        local function nova_scale_at(elapsed)
+            local model_time = elapsed * NOVA_TIME_SCALE
+
+            for i = 2, #NOVA_KEY_TIMES do
+                local right_time = NOVA_KEY_TIMES[i]
+                if model_time <= right_time then
+                    local left_time = NOVA_KEY_TIMES[i - 1]
+                    local alpha = (model_time - left_time) / (right_time - left_time)
+                    local left_scale = NOVA_KEY_SCALES[i - 1]
+                    return left_scale + (NOVA_KEY_SCALES[i] - left_scale) * alpha
+                end
+            end
+
+            return 1.
+        end
+
+        local function advance_nova(wave)
+            local effect_scale = wave.radius / NOVA_EFFECT_SCALE_DIVISOR
+            local visual_front = NOVA_MODEL_RADIUS * effect_scale * nova_scale_at(wave.elapsed)
+            local gameplay_front = math.min(wave.radius, visual_front)
+
+            for i = 1, #wave.summons do
+                local summon = wave.summons[i]
+                if not wave.affected[summon]
+                    and is_valid_summon(wave.pid, summon)
+                    and IsUnitInRangeXY(summon, wave.x, wave.y, gameplay_front) then
+                    wave.affected[summon] = true
+                    wave.hit_count = wave.hit_count + 1
+                    UnholyAscensionBuff:add(wave.caster, summon):update(
+                        wave.damage, wave.reduction, wave.attack_speed, wave.duration)
+                end
+            end
+
+            if wave.elapsed < NOVA_EXPANSION_TIME then
+                local next_elapsed = math.min(NOVA_EXPANSION_TIME, wave.elapsed + NOVA_TICK)
+                local delay = next_elapsed - wave.elapsed
+                wave.elapsed = next_elapsed
+                TimerQueue:callDelayed(delay, advance_nova, wave)
+            else
+                dev_log(string.format(
+                    "ascension resolved pid=%d targets=%d radius=%.0f expansion=%.3f",
+                    wave.pid, wave.hit_count, wave.radius, NOVA_EXPANSION_TIME))
+            end
+        end
+
         function thistype.preCast(pid, tpid, caster)
             if #collect_summons(pid, caster, cast_radius(pid, caster)) == 0 then
                 message(pid, "|cffff0000Unholy Ascension requires an active summon within range.|r")
@@ -1122,19 +1175,31 @@ OnInit.final("DarkSummonerSpells", function(Require)
             local dur = self.dur * LBOOST[self.pid]
 
             local cast_sfx = AddSpecialEffect("unholy_ascension.mdl", GetUnitX(self.caster), GetUnitY(self.caster))
-            BlzSetSpecialEffectScale(cast_sfx, radius / 300.)
+            BlzSetSpecialEffectScale(cast_sfx, radius / NOVA_EFFECT_SCALE_DIVISOR)
+            BlzSetSpecialEffectTimeScale(cast_sfx, NOVA_TIME_SCALE)
             --BlzSetSpecialEffectColor(cast_sfx, 180, 80, 255)
             DestroyEffect(cast_sfx)
             SoundHandler("Units\\NightElf\\HeroDemonHunter\\DemonHunterMorph1.flac", true, nil, self.caster)
 
-            for i = 1, #summons do
-                local summon = summons[i]
-                UnholyAscensionBuff:add(self.caster, summon):update(
-                    damage, reduction, attack_speed, dur)
-            end
+            local wave = {
+                caster = self.caster,
+                pid = self.pid,
+                x = GetUnitX(self.caster),
+                y = GetUnitY(self.caster),
+                radius = radius,
+                elapsed = NOVA_VISIBLE_AT,
+                summons = summons,
+                affected = {},
+                hit_count = 0,
+                damage = damage,
+                reduction = reduction,
+                attack_speed = attack_speed,
+                duration = dur,
+            }
+            TimerQueue:callDelayed(NOVA_VISIBLE_AT, advance_nova, wave)
 
             dev_log(string.format(
-                "ascension pid=%d level=%d targets=%d damage=%.2f reduction=%.2f attack_speed=%.2f radius=%.0f duration=%.2f",
+                "ascension cast pid=%d level=%d candidates=%d damage=%.2f reduction=%.2f attack_speed=%.2f radius=%.0f duration=%.2f",
                 self.pid, level, #summons, damage, reduction, attack_speed, radius, dur))
         end
     end
