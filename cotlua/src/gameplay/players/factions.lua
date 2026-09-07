@@ -9,6 +9,7 @@ OnInit.final("Faction", function(Require)
     Require('Buffs')
     Require('Shop')
     Require('Items')
+    Require('Prompt')
     local fl_type = FourCC('n000')
     local Faction, Quest
 

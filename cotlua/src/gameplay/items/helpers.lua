@@ -1,6 +1,7 @@
 OnInit.global("ItemHelpers", function(Require)
     Require('Variables')
     Require('TableHelpers')
+    Require('Users')
 
     local dummy_items = {
         FourCC('I00D'),

@@ -12,7 +12,7 @@ OnInit.final("Dummy", function(Require)
     Require("Events")
     Require("Units")
     Require('Frames')
-    Require('CircularArrayList')
+    Require('CircularArray')
 
     local TQ = TimerQueue
     local atan = math.atan

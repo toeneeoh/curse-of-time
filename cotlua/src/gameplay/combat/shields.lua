@@ -5,6 +5,10 @@
 ]]
 
 OnInit.global("Shield", function(Require)
+    Require('TableHelpers')
+    Require('TimerQueue')
+    Require('Variables')
+
     local FPS_64 = FPS_32 * 0.5
     local TQ = TimerQueue
 

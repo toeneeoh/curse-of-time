@@ -118,6 +118,17 @@ Get-ChildItem cotlua/src -Recurse -Filter *.lua | ForEach-Object {
 }
 ```
 
+Named resources and manifest ownership can be checked without launching the
+map:
+
+```powershell
+pwsh -File cotlua/tools/check_architecture.ps1
+```
+
+This fails on missing or duplicate manifest entries, duplicate initializer
+names, unresolved literal requirements, global-to-final phase inversions, and
+reintroduction of the retired `Helper` dependency.
+
 Folder moves must preserve `InitTrace` module names, phases, and completion
 order. Compatibility globals should be retired only after runtime callers have
 been characterized and migrated to owned APIs.

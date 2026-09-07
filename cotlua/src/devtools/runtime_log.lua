@@ -3,6 +3,7 @@
 OnInit.global("DevRuntimeLog", function(Require)
     Require('Variables')
     Require('FileIO')
+    Require('TimerQueue')
 
     DevLog = {
         enabled = DEV_LOG_ENABLED and FileIO.enabled,

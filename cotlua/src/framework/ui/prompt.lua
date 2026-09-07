@@ -1,4 +1,4 @@
-OnInit.global("Prompt", function(Require)
+OnInit.final("Prompt", function(Require)
 
     Require("SimpleButton")
 

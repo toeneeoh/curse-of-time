@@ -5,6 +5,8 @@ OnInit.global("PlayerLifecycle", function(Require)
     Require('UnitHelpers')
     Require('Progression')
     Require('FrameHelpers')
+    Require('PlayerTimer')
+    Require('Users')
 
     local stat_functions = {
         GetHeroStr,
