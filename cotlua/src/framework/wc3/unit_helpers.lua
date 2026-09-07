@@ -44,8 +44,8 @@ OnInit.global("UnitHelpers", function()
     end
 
     ---@param hero unit
-    ---@param literal boolean
-    ---@param include_bonus boolean
+    ---@param literal boolean?
+    ---@param include_bonus boolean?
     ---@return string
     function HighestStatName(hero, literal, include_bonus)
         if literal then
