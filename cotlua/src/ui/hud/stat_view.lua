@@ -5,6 +5,8 @@
 ]]
 
 OnInit.final("StatView", function(Require)
+    Require('StatValues')
+
     ---@class STAT_WINDOW
     ---@field display function
     ---@field refresh function

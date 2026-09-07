@@ -25,6 +25,10 @@ OnInit.final("ArchitectureTests", function(Require)
     Require('AbilityCasting')
     Require('PlayerLifecycle')
     Require('SummonHelpers')
+    Require('Rawcodes')
+    Require('ItemSchema')
+    Require('StatSchema')
+    Require('StatValues')
 
     ArchitectureTests = {
         tests = {},
@@ -96,6 +100,24 @@ OnInit.final("ArchitectureTests", function(Require)
 
         if RuntimeMetrics.initializers.started ~= RuntimeMetrics.initializers.completed then
             return false, "initializer start/completion counters differ"
+        end
+        return true
+    end)
+
+    ArchitectureTests.register("configuration schemas preserve compatibility", function()
+        if DUMMY_CASTER ~= FourCC('e011') or SUMMON_BRUTE ~= FourCC('H05G') then
+            return false, "rawcode exports changed"
+        end
+        if ITEM_LEVEL ~= 1 or PLAYER_TIME ~= TOTAL_STATS or TOTAL_STATS ~= 44 then
+            return false, "serialized item stat indexes changed"
+        end
+        if #LIMIT_STRING ~= 28 or TIER_NAME[25] ~= "|cff999999Devourer|r" then
+            return false, "item metadata changed"
+        end
+        if STAT_TAG[ITEM_DAMAGE].syntax ~= "damage"
+            or type(STAT_TAG[ITEM_DAMAGE].getter) ~= "function"
+            or type(STAT_TAG[ITEM_DAMAGE_RESIST].breakdown) ~= "function" then
+            return false, "stat schema or runtime values are unavailable"
         end
         return true
     end)
