@@ -4,6 +4,8 @@ OnInit.final("Colosseum", function(Require)
     Require('ItemEventRegistry')
     Require('ALICE')
     Require('SpellTools')
+    Require('Progression')
+    Require('Currency')
 
     local GetRectCenterXY = function(whichRect)
         return { x = GetRectCenterX(whichRect), y = GetRectCenterY(whichRect) }
@@ -21,7 +23,7 @@ OnInit.final("Colosseum", function(Require)
         GetRectCenterXY(gg_rct_Colosseum_Monster_Spawn_2),
         GetRectCenterXY(gg_rct_Colosseum_Monster_Spawn_3),
     }
-    local Encounter, Augment
+    local Encounter, Augment, BossAffix
 
     local function colo_get_random_location(inward_offset)
         inward_offset = inward_offset or 0
@@ -37,9 +39,6 @@ OnInit.final("Colosseum", function(Require)
         "nban",
         "nsty",
         "nwlt",
-    }
-    local ranged_skins = {
-        "nska",
     }
     local elite_skins = {
         "e000",
@@ -58,16 +57,20 @@ OnInit.final("Colosseum", function(Require)
     local unit_count = 0
     local is_entry_open = false
     local colo_active = false
-    local start_timer ---@type integer
-    local timer_frame ---@type TimerFrame
+    local start_timer ---@type integer?
+    local augment_pick_timer ---@type integer?
+    local timer_frame ---@type TimerFrame?
 
     -- formula data
     local total_level = 0
     local average_level = 0
-    local max_level = 0
-    local player_mult = 0
+    local party_health_mult = 1
+    local party_damage_mult = 1
     local num_spawned = 0
-    local gold_earned = 0
+    local base_coins = 0
+    local bonus_coins = __jarray(0) ---@type integer[]
+    local bonus_drop_chance = __jarray(0) ---@type number[]
+    local rewarded = {} ---@type boolean[]
     local advance_wave, end_colosseum, colo_cleanup, colo_on_death ---@type function
 
     -- constants
@@ -76,11 +79,11 @@ OnInit.final("Colosseum", function(Require)
     local BASE_HP = 50
     local BASE_ARMOR = 0.75
     local GOLD_DROP_CHANCE = 10
-    local EXTRA_DROP_CHANCE = 0
 
     local BOSS_HP = 500
     local BOSS_DAMAGE = 50
     local BOSS_ARMOR = 2
+    local COIN_GOLD_MULTIPLIER = 5
 
     -- unit stats
     local stat_hp = 0
@@ -88,6 +91,34 @@ OnInit.final("Colosseum", function(Require)
     local stat_armor = 0
 
     local coin_effect
+
+    local wave_formations = {
+        {
+            name = "Horde",
+            roles = {
+                { count_min = 8, count_max = 10, hp = 0.75, damage = 0.8, armor = 0.8, speed = 0.08 },
+            },
+        },
+        {
+            name = "Hunters",
+            roles = {
+                { count_min = 5, count_max = 7, hp = 0.9, damage = 1.1, armor = 0.9, speed = 0.2 },
+            },
+        },
+        {
+            name = "Bruisers",
+            roles = {
+                { count_min = 2, count_max = 3, hp = 1.8, damage = 1.35, armor = 1.5, speed = -0.05 },
+            },
+        },
+        {
+            name = "Vanguard",
+            roles = {
+                { count_min = 2, count_max = 2, hp = 1.6, damage = 0.9, armor = 1.5, speed = -0.05 },
+                { count_min = 4, count_max = 5, hp = 0.7, damage = 1.2, armor = 0.75, speed = 0.15 },
+            },
+        },
+    }
 
     do
         local MODEL = "Objects\\InventoryItems\\PotofGold\\PotofGold.mdl"
@@ -138,12 +169,156 @@ OnInit.final("Colosseum", function(Require)
         end
     end
 
+    BossAffix = {}
+    do
+        local list = {}
+        local active = {}
+        local callbacks = {}
+        local indicators = {}
+        local boss
+        local generation = 0
+
+        local function schedule(delay, callback, ...)
+            local id = TimerQueue:callDelayed(delay, callback, generation, ...)
+            callbacks[#callbacks + 1] = id
+            return id
+        end
+
+        local function remove_indicator(indicator)
+            if indicator.active then
+                indicator.active = false
+                DestroyEffect(indicator.effect)
+            end
+        end
+
+        local function damage_area(x, y, radius, health_fraction, tag)
+            if not boss then
+                return
+            end
+
+            for _, pid in ipairs(players) do
+                local hero = Hero[pid]
+                if hero and UnitAlive(hero) and IsUnitInRangeXY(hero, x, y, radius) then
+                    DamageTarget(boss, hero, BlzGetUnitMaxHP(hero) * health_fraction, ATTACK_TYPE_NORMAL, MAGIC, tag)
+                end
+            end
+        end
+
+        local function detonate(expected_generation, indicator, radius, health_fraction, tag)
+            if expected_generation ~= generation or not indicator.active then
+                return
+            end
+
+            remove_indicator(indicator)
+            local effect = AddSpecialEffect("Abilities\\Spells\\Human\\FlameStrike\\FlameStrike1.mdl", indicator.x, indicator.y)
+            BlzSetSpecialEffectScale(effect, math.max(0.75, radius / 250.))
+            DestroyEffect(effect)
+            damage_area(indicator.x, indicator.y, radius, health_fraction, tag)
+        end
+
+        local function warn_area(x, y, radius, delay, health_fraction, tag)
+            local indicator = {
+                active = true,
+                effect = AddSpecialEffect("Indicators\\circle.mdl", x, y),
+                x = x,
+                y = y,
+            }
+            BlzSetSpecialEffectScale(indicator.effect, radius / 500.)
+            indicators[#indicators + 1] = indicator
+            schedule(delay, detonate, indicator, radius, health_fraction, tag)
+        end
+
+        function BossAffix.create(name, start)
+            list[#list + 1] = { name = name, start = start }
+        end
+
+        function BossAffix.stop()
+            generation = generation + 1
+
+            for _, id in ipairs(callbacks) do
+                TimerQueue:disableCallback(id)
+            end
+            callbacks = {}
+
+            for _, indicator in ipairs(indicators) do
+                remove_indicator(indicator)
+            end
+            indicators = {}
+            active = {}
+            boss = nil
+        end
+
+        function BossAffix.start(which_boss)
+            BossAffix.stop()
+            boss = which_boss
+
+            local count = wave >= 10 and 2 or 1
+            active = pickN(count, list)
+            local names = {}
+
+            for _, affix in ipairs(active) do
+                names[#names + 1] = affix.name
+                affix.start(schedule, warn_area)
+            end
+
+            DisplayTextToTable(players, "|cffffcc00Boss abilities:|r " .. table.concat(names, ", "))
+        end
+
+        BossAffix.create("Marked for Destruction", function(queue, warn)
+            local function cast(expected_generation)
+                if expected_generation ~= generation or not boss or not UnitAlive(boss) then
+                    return
+                end
+                for _, pid in ipairs(players) do
+                    local hero = Hero[pid]
+                    if hero and UnitAlive(hero) then
+                        warn(GetUnitX(hero), GetUnitY(hero), 225., 2., 0.3, "Marked for Destruction")
+                    end
+                end
+                queue(8., cast)
+            end
+            queue(4., cast)
+        end)
+
+        BossAffix.create("Nova", function(queue, warn)
+            local function cast(expected_generation)
+                if expected_generation ~= generation or not boss or not UnitAlive(boss) then
+                    return
+                end
+                warn(GetUnitX(boss), GetUnitY(boss), 500., 2.5, 0.35, "Colosseum Nova")
+                queue(10., cast)
+            end
+            queue(5., cast)
+        end)
+
+        BossAffix.create("Unstable Ground", function(queue, warn)
+            local function cast(expected_generation)
+                if expected_generation ~= generation or not boss or not UnitAlive(boss) then
+                    return
+                end
+                for _ = 1, 3 do
+                    local x, y = colo_get_random_location(250.)
+                    warn(x, y, 275., 3., 0.25, "Unstable Ground")
+                end
+                queue(12., cast)
+            end
+            queue(4., cast)
+        end)
+    end
+
     local on_kill = function(killed)
         unit_count = unit_count - 1
-        if random() * 100 < (GOLD_DROP_CHANCE + EXTRA_DROP_CHANCE) + (5 / num_spawned) * 18 then
+        if random() * 100 < GOLD_DROP_CHANCE + (5 / num_spawned) * 18 then
             SoundHandler("Abilities\\Spells\\Items\\ResourceItems\\ReceiveGold.flac", true, nil, killed)
-            gold_earned = gold_earned + 1
+            base_coins = base_coins + 1
             coin_effect(killed)
+        end
+
+        for _, pid in ipairs(players) do
+            if bonus_drop_chance[pid] > 0 and random() * 100 < bonus_drop_chance[pid] then
+                bonus_coins[pid] = bonus_coins[pid] + 1
+                coin_effect(killed, 1)
+            end
         end
 
         if unit_count <= 0 then
@@ -156,7 +331,8 @@ OnInit.final("Colosseum", function(Require)
     end
 
     local on_boss_kill = function(killed)
-        gold_earned = gold_earned + 5
+        BossAffix.stop()
+        base_coins = base_coins + 5
         coin_effect(killed, 10)
 
         wave = wave + 1
@@ -166,10 +342,13 @@ OnInit.final("Colosseum", function(Require)
         if wave <= MAX_WAVES then
             Augment.display()
 
-            TimerQueue:callDelayed(59.75, Augment.defaultPick)
+            if augment_pick_timer then
+                TimerQueue:disableCallback(augment_pick_timer)
+            end
+            augment_pick_timer = TimerQueue:callDelayed(59.75, Augment.defaultPick)
             timer_frame = TimerFrame.create("Wave " .. wave .. " beginning in:", 60, advance_wave, players)
         else
-            end_colosseum()
+            end_colosseum(true)
         end
     end
 
@@ -200,36 +379,51 @@ OnInit.final("Colosseum", function(Require)
         BlzSetUnitSkin(u, FourCC(skin))
         local spawn = 2
         local wave_mult = (0.95 + wave * 0.05)
-        local dmg = R2I(stat_dmg + total_level * BOSS_DAMAGE * wave_mult * player_mult)
-        local hp = R2I(stat_hp + total_level * BOSS_HP * wave_mult * player_mult)
-        local armor = stat_armor + total_level * BOSS_ARMOR * wave_mult * player_mult
+        local player_count = #players
+        local dmg = R2I(stat_dmg / player_count + average_level * BOSS_DAMAGE * wave_mult * party_damage_mult)
+        local hp = R2I(stat_hp / player_count + average_level * BOSS_HP * wave_mult * party_health_mult)
+        local armor = stat_armor / player_count + average_level * BOSS_ARMOR * wave_mult
 
         setup_unit(u, spawn, skin, dmg, hp, armor)
+        BossAffix.start(u)
 
         EVENT_ON_UNIT_DEATH:register_unit_action(u, on_boss_kill)
         colo_enemies[#colo_enemies + 1] = u
     end
 
     local spawn_units = function()
-        num_spawned = random(2, 10)
+        local formation = wave_formations[random(1, #wave_formations)]
+        local spawned_roles = {}
+        num_spawned = 0
+
+        for _, role in ipairs(formation.roles) do
+            local count = random(role.count_min, role.count_max)
+            spawned_roles[#spawned_roles + 1] = { role = role, count = count }
+            num_spawned = num_spawned + count
+        end
+
         unit_count = num_spawned
         local num_mult = 10 / num_spawned
         local wave_mult = (0.95 + wave * 0.05)
-        local skin = melee_skins[random(1, #melee_skins)]
+        DisplayTextToTable(players, "|cffffcc00Wave " .. wave .. ":|r " .. formation.name)
 
-        for _ = 1, num_spawned do
-            local spawn = random(1, 3)
-            local u = BlzCreateUnitWithSkin(PLAYER_BOSS, unit_id, colo_x, colo_y, 270., FourCC(skin))
-            local dmg = R2I(stat_dmg + total_level * BASE_DAMAGE * wave_mult * player_mult * num_mult)
-            local hp = R2I(stat_hp + total_level * BASE_HP * wave_mult * player_mult * num_mult)
-            local armor = stat_armor + total_level * BASE_ARMOR * wave_mult * player_mult
+        for _, entry in ipairs(spawned_roles) do
+            local role = entry.role
+            local skin = melee_skins[random(1, #melee_skins)]
 
-            setup_unit(u, spawn, skin, dmg, hp, armor)
+            for _ = 1, entry.count do
+                local spawn = random(1, 3)
+                local u = BlzCreateUnitWithSkin(PLAYER_BOSS, unit_id, colo_x, colo_y, 270., FourCC(skin))
+                local dmg = R2I((stat_dmg / #players + average_level * BASE_DAMAGE * wave_mult * party_damage_mult * num_mult) * role.damage)
+                local hp = R2I((stat_hp / #players + average_level * BASE_HP * wave_mult * party_health_mult * num_mult) * role.hp)
+                local armor = (stat_armor / #players + average_level * BASE_ARMOR * wave_mult) * role.armor
 
-            Unit[u].ms_percent = Unit[u].ms_percent + 0.05 * wave
+                setup_unit(u, spawn, skin, dmg, hp, armor)
+                Unit[u].ms_percent = Unit[u].ms_percent + 0.05 * wave + role.speed
 
-            EVENT_ON_UNIT_DEATH:register_unit_action(u, on_kill)
-            colo_enemies[#colo_enemies + 1] = u
+                EVENT_ON_UNIT_DEATH:register_unit_action(u, on_kill)
+                colo_enemies[#colo_enemies + 1] = u
+            end
         end
     end
 
@@ -245,9 +439,15 @@ OnInit.final("Colosseum", function(Require)
     end
 
     local begin_colosseum = function()
-        EXTRA_DROP_CHANCE = 0
+        start_timer = nil
+        if #players == 0 then
+            end_colosseum(false)
+            return
+        end
+
         average_level = total_level / #players
-        player_mult = 1 + .5 * (#players - 1)
+        party_health_mult = 1 + 0.65 * (#players - 1)
+        party_damage_mult = 1 + 0.1 * (#players - 1)
         colo_active = true
         is_entry_open = false
         SoundHandler("Sound\\Interface\\BattleNetDoorsStereo2.flac", false)
@@ -259,8 +459,25 @@ OnInit.final("Colosseum", function(Require)
     end
 
     -- reward gold to player at whatever current value is
-    local colo_reward = function(pid)
-        DisplayTextToPlayer(Player(pid - 1), 0., 0., "You have been awarded " .. gold_earned .. " coins")
+    local colo_reward = function(pid, cleared)
+        if rewarded[pid] then
+            return
+        end
+
+        rewarded[pid] = true
+        local coins = base_coins + bonus_coins[pid]
+        local level = math.max(1, math.min(MAX_LEVEL, math.floor(average_level)))
+        local gold = math.floor(coins * GOLD_TABLE[level] * COIN_GOLD_MULTIPLIER)
+
+        if gold > 0 then
+            AwardGold(pid, gold, true)
+        end
+
+        if cleared then
+            AddCurrency(pid, HONOR, 1)
+        end
+
+        DisplayTextToPlayer(Player(pid - 1), 0., 0., "Colosseum reward: " .. coins .. " coins" .. (cleared and " and 1 Honor." or "."))
     end
 
     local function colo_on_cleanup(pid)
@@ -270,7 +487,7 @@ OnInit.final("Colosseum", function(Require)
         SetCamera(pid, MAIN_MAP.rect)
         RevivePlayer(pid, TOWN_CENTER_X, TOWN_CENTER_Y, 1, 1)
         DisableItems(pid, false)
-        colo_reward(pid)
+        colo_reward(pid, false)
         colo_cleanup(pid)
     end
 
@@ -299,7 +516,6 @@ OnInit.final("Colosseum", function(Require)
 
         -- adjust difficulty
         total_level = total_level + GetUnitLevel(Hero[pid])
-        max_level = (GetUnitLevel(Hero[pid]) > max_level and max_level) or max_level
         stat_hp = stat_hp + Unit[Hero[pid]].str + Unit[Hero[pid]].agi + Unit[Hero[pid]].int
         stat_armor = stat_armor + (Unit[Hero[pid]].agi + Unit[Hero[pid]].int) * 0.1
         stat_dmg = stat_dmg + Unit[Hero[pid]].str + Unit[Hero[pid]].agi
@@ -310,7 +526,9 @@ OnInit.final("Colosseum", function(Require)
 
         -- skip 60 second wait if all players join
         if #players >= User.AmountPlaying then
-            TimerQueue:disableCallback(start_timer)
+            if start_timer then
+                TimerQueue:disableCallback(start_timer)
+            end
             begin_colosseum()
         end
 
@@ -318,34 +536,50 @@ OnInit.final("Colosseum", function(Require)
         EVENT_GRAVE_DEATH:register_unit_action(Hero[pid], colo_on_death)
     end
 
-    end_colosseum = function()
+    end_colosseum = function(cleared)
+        BossAffix.stop()
+        if start_timer then
+            TimerQueue:disableCallback(start_timer)
+            start_timer = nil
+        end
+        if augment_pick_timer then
+            TimerQueue:disableCallback(augment_pick_timer)
+            augment_pick_timer = nil
+        end
         if timer_frame then
             timer_frame:destroy()
+            timer_frame = nil
         end
         Augment.destroy()
         Encounter.destroy()
 
         colo_active = false
-        wave = 1
-        total_level = 0
-        stat_hp = 0
-        stat_armor = 0
-        stat_damage = 0
+        is_entry_open = false
 
         -- reenable items and reward remaining players
         for _, pid in ipairs(players) do
             MoveHero(pid, TOWN_CENTER_X, TOWN_CENTER_Y)
             DisableItems(pid, false)
-            colo_reward(pid)
+            colo_reward(pid, cleared == true)
 
-            EVENT_ON_CLEANUP:unregister_action(pid, colo_on_death)
+            EVENT_ON_CLEANUP:unregister_action(pid, colo_on_cleanup)
             EVENT_GRAVE_DEATH:unregister_unit_action(Hero[pid], colo_on_death)
         end
+
+        wave = 1
+        total_level = 0
+        stat_hp = 0
+        stat_armor = 0
+        stat_dmg = 0
+        average_level = 0
+        party_health_mult = 1
+        party_damage_mult = 1
 
         for _, u in ipairs(colo_enemies) do
             RemoveUnit(u)
         end
         colo_enemies = {}
+        players = {}
     end
 
     ---@class Encounter
@@ -657,7 +891,11 @@ OnInit.final("Colosseum", function(Require)
     do
         local thistype = Augment
         local active = {}
-        local list = {}
+        local by_category = {
+            offense = {},
+            defense = {},
+            utility = {},
+        }
         local player_choices = {}
         local wave_offset -- lazy augment indexing
 
@@ -737,6 +975,10 @@ OnInit.final("Colosseum", function(Require)
                 end
             end
             if all_players_selected and timer_frame then
+                if augment_pick_timer then
+                    TimerQueue:disableCallback(augment_pick_timer)
+                    augment_pick_timer = nil
+                end
                 timer_frame.time = 5
             end
 
@@ -774,7 +1016,7 @@ OnInit.final("Colosseum", function(Require)
                 end
 
                 -- call cleanup for all active augments for player
-                for _, augment in ipairs(active[pid]) do
+                for _, augment in ipairs(active[pid] or {}) do
                     local f = augment["cleanup"]
                     if f then
                         f(pid)
@@ -789,6 +1031,7 @@ OnInit.final("Colosseum", function(Require)
 
         -- assigns undecisive players an augment choice
         function thistype.defaultPick()
+            augment_pick_timer = nil
             for _, pid in ipairs(players) do
                 if not augment_chosen[pid] then
                     local index = math.random(1, 3)
@@ -800,6 +1043,11 @@ OnInit.final("Colosseum", function(Require)
 
                     if GetLocalPlayer() == Player(pid - 1) then
                         BlzFrameSetVisible(frame, false)
+                    end
+
+                    local choice = player_choices[pid][index + wave_offset]
+                    if choice.on_pick then
+                        choice.on_pick(pid)
                     end
                 end
             end
@@ -822,9 +1070,18 @@ OnInit.final("Colosseum", function(Require)
             for _, pid in ipairs(players) do
                 -- initialize / reset active player table
                 active[pid] = {}
+                player_choices[pid] = {}
 
-                -- populate all 9 augment choices for each player
-                player_choices[pid] = pickN(9, list)
+                local offense = pickN(3, by_category.offense)
+                local defense = pickN(3, by_category.defense)
+                local utility = pickN(3, by_category.utility)
+
+                for round = 1, 3 do
+                    local choices = pickN(3, { offense[round], defense[round], utility[round] })
+                    for _, choice in ipairs(choices) do
+                        player_choices[pid][#player_choices[pid] + 1] = choice
+                    end
+                end
             end
         end
 
@@ -846,22 +1103,23 @@ OnInit.final("Colosseum", function(Require)
             end
         end
 
-        ---@type fun(name: string, desc: string, icon: string): Augment
-        function thistype.create(name, desc, icon)
+        ---@type fun(name: string, desc: string, icon: string, category?: string): Augment
+        function thistype.create(name, desc, icon, category)
             local self = {}
 
             self.name = name
             self.desc = desc
             self.icon = icon
+            self.category = category or "utility"
 
-            list[#list + 1] = self
+            by_category[self.category][#by_category[self.category] + 1] = self
 
             return self
         end
     end
 
     --#region augment setup
-    local punching_bag = Augment.create("Punching Bag", "At the start of each wave, spawn a punching bag in the center of the arena that taunts enemies. Health scaling is based off enemy scaling.", "trans32.blp")
+    local punching_bag = Augment.create("Punching Bag", "At the start of each wave, spawn a punching bag in the center of the arena that taunts enemies. Health scaling is based off enemy scaling.", "trans32.blp", "defense")
     do
         local bags = {}
         local callback
@@ -897,7 +1155,7 @@ OnInit.final("Colosseum", function(Require)
                 bags[pid] = bag
             end
 
-            local hp = R2I(stat_hp + total_level * BASE_HP * player_mult * 50)
+            local hp = R2I(stat_hp / #players + average_level * BASE_HP * party_health_mult * 50)
             BlzSetUnitMaxHP(bag, hp)
             SetWidgetLife(bag, hp)
 
@@ -906,7 +1164,7 @@ OnInit.final("Colosseum", function(Require)
             end
         end
     end
-    local radiance = Augment.create("Radiance", "Your hero gains a damaging aura in a |cffffcc00".."900".."|r AoE, dealing |cffffcc00".."1 x Highest Attribute".."|r magic damage every second.", "trans32.blp")
+    local radiance = Augment.create("Radiance", "Your hero gains a damaging aura in a |cffffcc00".."900".."|r AoE, dealing |cffffcc00".."1 x Highest Attribute".."|r magic damage every second.", "trans32.blp", "offense")
     do
         radiance.cleanup = function(pid)
             RadianceBuff:dispel(nil, Hero[pid])
@@ -919,15 +1177,15 @@ OnInit.final("Colosseum", function(Require)
             RadianceBuff:add(Hero[pid], Hero[pid])
         end
     end
-    local raining_gold = Augment.create("Raining Gold", "At the start of each wave, |cffffcc00".."1".."|r gold drop is given immediately.", "trans32.blp")
+    local raining_gold = Augment.create("Raining Gold", "At the start of each wave, |cffffcc00".."1".."|r personal gold drop is given immediately.", "trans32.blp", "utility")
     do
         raining_gold.start_wave = function(pid)
             SoundHandler("Abilities\\Spells\\Items\\ResourceItems\\ReceiveGold.flac", true, nil, Hero[pid])
-            gold_earned = gold_earned + 1
+            bonus_coins[pid] = bonus_coins[pid] + 1
             coin_effect(Hero[pid])
         end
     end
-    local speed_demon = Augment.create("Speed Demon", "Your hero's movespeed is always set to |cffffcc00".."600".."|r.", "trans32.blp")
+    local speed_demon = Augment.create("Speed Demon", "Your hero's movespeed is always set to |cffffcc00".."600".."|r.", "trans32.blp", "utility")
     do
         speed_demon.cleanup = function(pid)
             SpeedDemonBuff:dispel(nil, Hero[pid])
@@ -936,7 +1194,7 @@ OnInit.final("Colosseum", function(Require)
             SpeedDemonBuff:add(Hero[pid], Hero[pid])
         end
     end
-    local attribute_expert = Augment.create("Attribute Expert", "Your hero gains a |cffffcc00" .. "75%|r" .. " increase to your base |cffffcc00Highest Attribute|r.", "trans32.blp")
+    local attribute_expert = Augment.create("Attribute Expert", "Your hero gains a |cffffcc00" .. "75%|r" .. " increase to your base |cffffcc00Highest Attribute|r.", "trans32.blp", "offense")
     do
         attribute_expert.cleanup = function(pid)
             AttributeExpertBuff:dispel(nil, Hero[pid])
@@ -945,7 +1203,20 @@ OnInit.final("Colosseum", function(Require)
             AttributeExpertBuff:add(Hero[pid], Hero[pid])
         end
     end
-    local healing_expert = Augment.create("Healing Expert", "At the end of each wave, fully restore health, mana, and potion charges.", "trans32.blp")
+    local battle_trance = Augment.create("Battle Trance", "Your hero gains |cffffcc0025%|r attack damage and |cffffcc0025%|r Spellboost.", "ReplaceableTextures\\CommandButtons\\BTNBloodLust.blp", "offense")
+    do
+        battle_trance.on_pick = function(pid)
+            local unit = Unit[Hero[pid]]
+            unit.damage_percent = unit.damage_percent + 0.25
+            unit.spellboost = unit.spellboost + 0.25
+        end
+        battle_trance.cleanup = function(pid)
+            local unit = Unit[Hero[pid]]
+            unit.damage_percent = unit.damage_percent - 0.25
+            unit.spellboost = unit.spellboost - 0.25
+        end
+    end
+    local healing_expert = Augment.create("Healing Expert", "At the end of each wave, fully restore health, mana, and potion charges.", "trans32.blp", "defense")
     do
         healing_expert.end_wave = function(pid)
             HP(Hero[pid], Hero[pid], BlzGetUnitMaxHP(Hero[pid]), "Healing Expert")
@@ -963,7 +1234,7 @@ OnInit.final("Colosseum", function(Require)
             healing_expert.end_wave(pid)
         end
     end
-    local protector = Augment.create("Protector", "At the start of each wave, grant a stackable |cffffcc00" .. "30%|r" .. " max health shield to all players that lasts |cffffcc00" .. "20|r" .. " minutes.", "trans32.blp")
+    local protector = Augment.create("Protector", "At the start of each wave, grant a stackable |cffffcc00" .. "30%|r" .. " max health shield to all players that lasts |cffffcc00" .. "20|r" .. " minutes.", "trans32.blp", "defense")
     do
         protector.cleanup = function(pid)
             local shield = Shield[Hero[pid]] ---@type Shield
@@ -977,13 +1248,13 @@ OnInit.final("Colosseum", function(Require)
             Shield.add(Hero[pid], BlzGetUnitMaxHP(Hero[pid]) * 0.3, 1200)
         end
     end
-    local gambler = Augment.create("Gambler", "Increases the base chance for a gold drop by |cffffcc00" .. "5%|r.")
+    local gambler = Augment.create("Gambler", "Increases your personal chance for an additional coin drop by |cffffcc00" .. "5%|r.", "ReplaceableTextures\\CommandButtons\\BTNChestOfGold.blp", "utility")
     do
         gambler.on_pick = function(pid)
-            EXTRA_DROP_CHANCE = EXTRA_DROP_CHANCE + 5
+            bonus_drop_chance[pid] = bonus_drop_chance[pid] + 5
         end
     end
-    local defensive_bubble = Augment.create("Defensive Bubble", "At the start of each wave, spawn a defensive bubble in a random location near the center of the arena, providing a |cffffcc00" .. "30%|r" .. " damage reduction buff in a |cffffcc00300|r AoE to allies that stand inside.")
+    local defensive_bubble = Augment.create("Defensive Bubble", "At the start of each wave, spawn a defensive bubble in a random location near the center of the arena, providing a |cffffcc00" .. "30%|r" .. " damage reduction buff in a |cffffcc00300|r AoE to allies that stand inside.", "ReplaceableTextures\\CommandButtons\\BTNLightningShield.blp", "defense")
     do
         local model = "war3mapImported\\Ubershield Void.mdl"
         local bubbles = {}
@@ -1062,6 +1333,10 @@ OnInit.final("Colosseum", function(Require)
             local itm = GetItemFromPlayer(pid, ticket_id)
             if itm then
                 players = {} -- reset players table
+                rewarded = {}
+                bonus_coins = __jarray(0)
+                bonus_drop_chance = __jarray(0)
+                base_coins = 0
                 DisplayTextToForce(FORCE_PLAYING, User[pid - 1].nameColored .. " has opened the Colosseum for all players to enter. The gate will close in 60 seconds.")
                 is_entry_open = true
                 itm:destroy()
