@@ -24,6 +24,21 @@ OnInit.final("Colosseum", function(Require)
     }
     local Encounter, Augment, BossAffix
 
+    -- Colosseum balance rationale:
+    -- This is a paced, 20-wave reward mode rather than the continuous swarm
+    -- pressure planned for Struggle. Normal waves use curated formations; the
+    -- inverse unit-count multiplier keeps their total baseline health and damage
+    -- comparable while role modifiers make hordes, hunters, and bruisers play
+    -- differently. Enemy stats snapshot the entrants' average level and stats.
+    -- Extra players add 65% health and 10% damage each, enough to require group
+    -- effort without repeating the old superlinear party scaling. Every fifth
+    -- wave is a boss, where affixes and avoidable mechanics supply the difficulty.
+    -- Coins are paid even on failure, so each is worth 25,000 + 8 * level^2 gold:
+    -- about 1.305 platinum at level 400 and 2.025 platinum at level 500. A typical
+    -- full level-500 run therefore remains below the guaranteed Naga dungeon gold
+    -- reward, while an early failure cannot generate hundreds of platinum. Honor
+    -- is deliberately separate, character-owned progression awarded only on clear.
+
     local function colo_get_random_location(inward_offset)
         inward_offset = inward_offset or 0
         local x, y = colo_x + math.random(- ARENA_RADIUS + inward_offset, ARENA_RADIUS - inward_offset), colo_y + math.random(- ARENA_RADIUS + inward_offset, ARENA_RADIUS - inward_offset)

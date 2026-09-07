@@ -24,6 +24,8 @@ OnInit.final("Dev", function(Require)
 
     Require('TimerQueue')
     Require('Variables')
+    Require('Items')
+    Require('ItemHelpers')
     local pack, find, lower = string.pack, string.find, string.lower
     local searchable = {} ---@type boolean[]
     local dev_cmds, wipe_item_stats, find_item, event_setup
@@ -110,6 +112,44 @@ modifiers:
 
     local function NOCD(source)
         TimerQueue:callDelayed(0.1, reset_cd, source)
+    end
+
+    -- Six legal, non-conflicting level-400 pieces for a solo Vampire baseline.
+    -- The build favors dagger damage, sustain, and mobility without relying on
+    -- the legacy level-400 divine items that predate the current item formulas.
+    local vampire_colosseum_loadout = {
+        FourCC('I0CI'), -- Dimensional Set Dagger
+        FourCC('I0BE'), -- Azazoth's Doom Dagger
+        FourCC('I0BK'), -- Azazoth's Leather Armor
+        FourCC('I0OB'), -- Torture Jewel
+        FourCC('I04E'), -- Thanatos's Wings
+        FourCC('I0MR'), -- Thanatos's Boots of Rift Walking
+    }
+
+    local function grant_vampire_colosseum_loadout(pid)
+        local hero = Hero[pid]
+
+        if not hero or GetUnitTypeId(hero) ~= HERO_VAMPIRE then
+            DisplayTextToPlayer(Player(pid - 1), 0., 0., "Select Vampire before using -test; no test items were created.")
+            return
+        end
+
+        local equipped = 0
+        for _, item_id in ipairs(vampire_colosseum_loadout) do
+            local itm = ItemRuntime.create(item_id, GetUnitX(hero), GetUnitY(hero))
+            local max_level = ItemData[item_id][ITEM_UPGRADE_MAX]
+
+            if max_level > 0 then
+                itm:lvl(max_level)
+            end
+
+            PlayerAddItem(pid, itm)
+            if itm.equipped then
+                equipped = equipped + 1
+            end
+        end
+
+        DisplayTextToPlayer(Player(pid - 1), 0., 0., "Vampire Colosseum loadout equipped: " .. equipped .. "/6 items.")
     end
 
     local boost_mt = {
@@ -358,6 +398,7 @@ modifiers:
             FogMaskEnable(false)
             FogEnable(false)
             ExperienceControl(pid)
+            grant_vampire_colosseum_loadout(pid)
         end,
         ["heal"] = function(p, pid, args)
             SetWidgetLife(PLAYER_SELECTED_UNIT[pid], BlzGetUnitMaxHP(PLAYER_SELECTED_UNIT[pid]))
