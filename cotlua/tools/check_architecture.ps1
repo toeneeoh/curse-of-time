@@ -98,6 +98,11 @@ if ($currencySource -match '\b(BlzCreateFrame|BlzFrame|GetLocalPlayer|RESOURCE_B
     $failures.Add('Currency gameplay module contains HUD presentation logic')
 }
 
+$factionSource = Get-Content -LiteralPath (Join-Path $sourcePath 'gameplay\players\factions.lua') -Raw
+if ($factionSource -match '\b(BlzCreateFrame|BlzFrame|GetLocalPlayer|PromptFrame|SimpleButton)') {
+    $failures.Add('Faction gameplay module contains presentation logic')
+}
+
 $shopDomainFiles = @(
     'gameplay\shops\quote.lua',
     'gameplay\shops\transaction.lua'

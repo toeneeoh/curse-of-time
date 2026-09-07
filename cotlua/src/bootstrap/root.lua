@@ -320,6 +320,7 @@ dofile('ui/inventory/potion.lua')
 dofile('ui/hud/buff_bar.lua')
 dofile('ui/shop/shop.lua')
 dofile('ui/dialogs/shop_service_dialogs.lua')
+dofile('ui/dialogs/faction_view.lua')
 
 dofile('gameplay/world/boss.lua')
 dofile('content/abilities/buffs/common.lua')

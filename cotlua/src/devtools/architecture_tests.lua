@@ -40,6 +40,7 @@ OnInit.final("ArchitectureTests", function(Require)
     Require('HelpText')
     Require('HintConfig')
     Require('CurrencyDisplay')
+    Require('FactionView')
 
     ArchitectureTests = {
         tests = {},
@@ -330,6 +331,13 @@ OnInit.final("ArchitectureTests", function(Require)
                     return false, values[1] .. " stock state is missing"
                 end
             end
+        end
+        return true
+    end)
+
+    ArchitectureTests.register("faction presentation is bound through its adapter", function()
+        if not Faction.isViewBound() then
+            return false, "faction view adapter was not bound"
         end
         return true
     end)
