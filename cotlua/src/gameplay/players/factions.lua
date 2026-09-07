@@ -7,19 +7,11 @@
 OnInit.final("Faction", function(Require)
     Require('Events')
     Require('Buffs')
-    Require('Shop')
+    Require('FactionShop')
     Require('Items')
     Require('Prompt')
     local fl_type = FourCC('n000')
     local Faction, Quest
-
-    -- faction shop
-
-    local shop_id = FourCC('n004')
-    CreateShop(shop_id, 1000.)
-    local misc = ShopAddCategory(shop_id, "ReplaceableTextures\\CommandButtons\\BTNCrystalBall.blp", "Miscellaneous")
-    SetItemPrice('I00K', {faction = 100})
-    ShopAddItem(shop_id, 'I00K:0', misc)
 
     ---@class Faction
     ---@field name string

@@ -6,7 +6,8 @@
 
 OnInit.final("Recipe", function(Require)
     Require('Units')
-    Require('Shop')
+    Require('ShopRegistry')
+    Require('ShopCatalog')
     Require('Prices')
     Require('Items')
 

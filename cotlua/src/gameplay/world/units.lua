@@ -8,6 +8,7 @@
 OnInit.final("Units", function(Require)
     Require('BossSchema')
     Require('Shop')
+    Require('EvilShopkeeperShop')
     Require('Boss')
     Require('Items')
     Require('Damage')
@@ -463,36 +464,6 @@ OnInit.final("Units", function(Require)
         EVENT_ON_UNIT_DEATH:register_unit_action(evilshopkeeper, function(u)
             ItemRuntime.create(FourCC('I045'), GetUnitX(u), GetUnitY(u)) -- bloodstained cloak
         end)
-
-
-        -- evil shopkeeper initialization
-        local id3 = FourCC('n01F')  ---@type integer -- evil shopkeeper
-        local sword, heavy, dagger, bow, staff, plate, fullplate, leather, cloth, misc
-        evilshop = CreateShop(id3, 1000.)
-
-        sword = ShopAddCategory(id3, "ReplaceableTextures\\CommandButtons\\BTNThoriumMelee.blp", "Sword")
-        heavy = ShopAddCategory(id3, "ReplaceableTextures\\CommandButtons\\BTNImprovedStrengthOfTheMoon.tga", "Heavy")
-        dagger = ShopAddCategory(id3, "ReplaceableTextures\\CommandButtons\\BTNDaggerOfEscape.blp", "Dagger")
-        bow = ShopAddCategory(id3, "ReplaceableTextures\\CommandButtons\\BTNScoutsBow.blp", "Bow")
-        staff = ShopAddCategory(id3, "ReplaceableTextures\\CommandButtons\\BTNWitchDoctorAdept.blp", "Staff")
-        plate = ShopAddCategory(id3, "ReplaceableTextures\\CommandButtons\\BTNAdvancedMoonArmor.blp", "Plate")
-        fullplate = ShopAddCategory(id3, "ReplaceableTextures\\CommandButtons\\BTNArmorGolem.blp", "Fullplate")
-        leather = ShopAddCategory(id3, "ReplaceableTextures\\CommandButtons\\BTNLeatherUpgradeOne.blp", "Leather")
-        cloth = ShopAddCategory(id3, "ReplaceableTextures\\CommandButtons\\BTNMantleOfIntelligence.blp", "Cloth")
-        misc = ShopAddCategory(id3, "ReplaceableTextures\\CommandButtons\\BTNCrystalBall.blp", "Miscellaneous")
-
-        ShopAddItem(id3, 'I02B:0', sword)
-        ShopAddItem(id3, 'I02C:0', plate)
-        ShopAddItem(id3, 'I0EY:0', bow)
-        ShopAddItem(id3, 'I074:0', dagger)
-        ShopAddItem(id3, 'I03U:0', staff)
-        ShopAddItem(id3, 'I07F:0', cloth)
-        ShopAddItem(id3, 'I03P:0', heavy)
-        ShopAddItem(id3, 'I0F9:0', misc)
-        ShopAddItem(id3, 'I079:0', heavy)
-        ShopAddItem(id3, 'I0FC:0', heavy)
-        ShopAddItem(id3, 'I00A:0', misc)
-
         MoveShopkeeper()
     end
 

@@ -139,6 +139,23 @@ foreach ($file in $sourceFiles) {
     }
 }
 
+# Shop inventory is declarative content. Keeping registration calls in one
+# subtree prevents world and player runtime modules from acquiring UI/catalog
+# responsibilities again.
+$shopRegistrationPattern = [regex]'\b(CreateShop|ShopAddCategory|ShopAddItem)\s*\('
+foreach ($file in $sourceFiles) {
+    $source = Get-Content -LiteralPath $file.FullName -Raw
+    if (-not $shopRegistrationPattern.IsMatch($source)) {
+        continue
+    }
+
+    $relativePath = [IO.Path]::GetRelativePath($sourcePath, $file.FullName)
+    $contentPrefix = "content$([IO.Path]::DirectorySeparatorChar)shops$([IO.Path]::DirectorySeparatorChar)"
+    if (-not $relativePath.StartsWith($contentPrefix)) {
+        $failures.Add("Shop registration outside content/shops: $relativePath")
+    }
+}
+
 if ($failures.Count -gt 0) {
     Write-Host "Architecture check failed with $($failures.Count) problem(s):"
     foreach ($failure in $failures) {

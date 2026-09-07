@@ -4,6 +4,11 @@ OnInit.final("ArchitectureTests", function(Require)
     Require('Events')
     Require('InventoryService')
     Require('ShopTransaction')
+    Require('ShopRegistry')
+    Require('TownShops')
+    Require('FactionShop')
+    Require('EvilShopkeeperShop')
+    Require('Recipe')
     Require('TimerQueue')
     Require('Profile')
     Require('SaveSchema')
@@ -282,6 +287,36 @@ OnInit.final("ArchitectureTests", function(Require)
         end
         if not ShopAction.get('I0JS').cooldown then
             return false, "recharge action has no cooldown presentation"
+        end
+        return true
+    end)
+
+    ArchitectureTests.register("shop catalogs are registered independently of their views", function()
+        local expected = {
+            { 'n01A', 12, 40 },
+            { 'n01B', 0, 11 },
+            { 'n032', 2, 0 },
+            { 'n004', 1, 1 },
+            { 'n01F', 10, 11 },
+            { 'n02C', 12 },
+            { 'n09D', 11 },
+        }
+
+        for index = 1, #expected do
+            local values = expected[index]
+            local definition = ShopRegistry.get(FourCC(values[1]))
+            if not definition then
+                return false, "missing shop definition " .. values[1]
+            end
+            if #definition.categories ~= values[2] then
+                return false, values[1] .. " category count changed"
+            end
+            if values[3] and #definition.items ~= values[3] then
+                return false, values[1] .. " item count changed"
+            end
+            if not definition.view then
+                return false, values[1] .. " has no bound shop view"
+            end
         end
         return true
     end)
