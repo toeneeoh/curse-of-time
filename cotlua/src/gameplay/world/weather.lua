@@ -5,6 +5,7 @@
 ]]
 
 OnInit.final("Weather", function(Require)
+    Require('MainMap')
     Require('Groups')
     Require('WorldDestructables')
     Require('Buffs')

@@ -8,6 +8,7 @@ OnInit.final("MapSetup", function(Require)
     Require('Users')
     Require('Variables')
     Require('Profile')
+    Require('HintConfig')
 
     -- ally enemies and bosses
     SetPlayerAllianceStateBJ(PLAYER_BOSS, PLAYER_CREEP, bj_ALLIANCE_ALLIED)

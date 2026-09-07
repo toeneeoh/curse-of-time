@@ -1,4 +1,5 @@
 OnInit.global("Shopkeeper", function(Require)
+    Require('MainMap')
     Require('Variables')
     Require('TimerQueue')
 

@@ -5,6 +5,7 @@
 ]]
 
 OnInit.final("Training", function(Require)
+    Require('MainMap')
     Require('Events')
     Require('ItemEventRegistry')
     Require('Units')

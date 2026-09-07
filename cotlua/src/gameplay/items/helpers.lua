@@ -1,4 +1,5 @@
 OnInit.global("ItemHelpers", function(Require)
+    Require('HeroDefinitions')
     Require('Variables')
     Require('TableHelpers')
     Require('Users')

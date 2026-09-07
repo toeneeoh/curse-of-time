@@ -32,8 +32,12 @@ serialized item-stat order and immutable item metadata; and
 `config/stat_schema.lua` owns stat labels and tooltip parsing syntax. Runtime
 stat getters and breakdowns live in `ui/hud/stat_values.lua`, where their
 dependencies on profiles, progression, unit state, and world queries are
-explicit. `config/variables.lua` remains the compatibility resource
-for world state and hero definitions that have not yet moved to an owner.
+explicit. Hero definitions and stable boss indexes live in
+`config/hero_definitions.lua` and `config/boss_schema.lua`. Main-map geometry,
+player help text, hint configuration, and prestige state are owned by their
+world, player, UI, and progression subsystems. `config/variables.lua` remains
+the compatibility resource for the smaller set of shared runtime state that
+does not yet have a narrower owner.
 
 ## Runtime diagnostics
 

@@ -5,6 +5,8 @@
 ]]
 
 OnInit.final("Dev", function(Require)
+    Require('HeroDefinitions')
+    Require('BossSchema')
     DEV_ENABLED            = true
     PROFILE_SAVE_VERSION   = 0x40000000
     CHARACTER_SAVE_VERSION = 0x40000000

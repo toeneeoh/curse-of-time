@@ -1,4 +1,6 @@
 OnInit.final("Colosseum", function(Require)
+    Require('MainMap')
+    Require('BossSchema')
     Require('ItemEventRegistry')
     Require('ALICE')
     Require('SpellTools')

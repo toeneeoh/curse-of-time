@@ -1,6 +1,7 @@
 -- Naga dungeon boss abilities and their damage-driven casting behavior.
 
 OnInit.final("NagaAbilities", function(Require)
+    Require('BossSchema')
     Require("Spells")
     Require("Buffs")
     Require("EnemyAI")

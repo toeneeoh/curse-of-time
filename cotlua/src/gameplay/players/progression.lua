@@ -4,6 +4,20 @@ OnInit.global("Progression", function(Require)
     Require('WorldUnitQueries')
     Require('FloatingText')
 
+    PrestigeTable = array2d(0) ---@type table
+    EXPERIENCE_TABLE = {}
+    GOLD_TABLE = {}
+    BASE_XP_RATE = __jarray(0) ---@type number[]
+
+    for level = 1, MAX_LEVEL do
+        EXPERIENCE_TABLE[level] = math.floor(20 + 13. * level * 1.4 ^ (level / 20))
+        GOLD_TABLE[level] = EXPERIENCE_TABLE[level] ^ 0.94
+    end
+
+    for level = 0, 400 do
+        BASE_XP_RATE[level] = (level <= 1 and 100) or (BASE_XP_RATE[level - 1] * 0.988)
+    end
+
     ---@param level integer
     ---@return integer
     function RequiredXP(level)

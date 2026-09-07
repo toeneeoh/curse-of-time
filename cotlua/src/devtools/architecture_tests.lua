@@ -29,6 +29,11 @@ OnInit.final("ArchitectureTests", function(Require)
     Require('ItemSchema')
     Require('StatSchema')
     Require('StatValues')
+    Require('HeroDefinitions')
+    Require('BossSchema')
+    Require('MainMap')
+    Require('HelpText')
+    Require('HintConfig')
 
     ArchitectureTests = {
         tests = {},
@@ -118,6 +123,21 @@ OnInit.final("ArchitectureTests", function(Require)
             or type(STAT_TAG[ITEM_DAMAGE].getter) ~= "function"
             or type(STAT_TAG[ITEM_DAMAGE_RESIST].breakdown) ~= "function" then
             return false, "stat schema or runtime values are unavailable"
+        end
+        if HERO_TOTAL ~= 19 or HERO_STATS[HERO_DARK_SUMMONER].skills[6] ~= "A002" then
+            return false, "hero definitions changed"
+        end
+        if BOSS_TAUREN ~= 1 or BOSS_XALLARATH ~= 28 then
+            return false, "boss registry indexes changed"
+        end
+        if MAIN_MAP.rect ~= gg_rct_Main_Map
+            or MAIN_MAP.centerX ~= (MAIN_MAP.minX + MAIN_MAP.maxX) / 2.
+            or MAIN_MAP.centerY ~= (MAIN_MAP.minY + MAIN_MAP.maxY) / 2. then
+            return false, "main map geometry changed"
+        end
+        if #INFO_STRING ~= 6 or #HINT_TOOLTIP ~= 16 or not FORCE_HINT
+            or type(PrestigeTable) ~= "table" then
+            return false, "help, hint, or progression compatibility changed"
         end
         return true
     end)

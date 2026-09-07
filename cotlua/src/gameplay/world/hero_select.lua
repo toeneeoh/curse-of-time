@@ -1,4 +1,5 @@
 OnInit.final("HeroSelect", function(Require)
+    Require('HeroDefinitions')
     Require('Users')
     Require('Variables')
     Require('Spells')

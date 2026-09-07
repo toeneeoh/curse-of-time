@@ -1,4 +1,5 @@
 OnInit.final("GoddessesAbilities", function(Require)
+    Require('BossSchema')
     Require("Spells")
     Require("SpellTools")
     Require("Buffs")

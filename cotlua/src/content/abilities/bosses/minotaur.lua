@@ -1,4 +1,5 @@
 OnInit.final("MinotaurAbilities", function(Require)
+    Require('BossSchema')
     Require("Spells")
     Require("SpellTools")
     Require("Buffs")

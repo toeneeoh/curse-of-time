@@ -1,5 +1,6 @@
 OnInit.final("StatValues", function(Require)
     Require('StatSchema')
+    Require('HeroDefinitions')
     Require('Progression')
     Require('TextHelpers')
     Require('UnitTable')

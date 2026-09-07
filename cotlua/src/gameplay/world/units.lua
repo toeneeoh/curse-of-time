@@ -6,6 +6,7 @@
 ]]
 
 OnInit.final("Units", function(Require)
+    Require('BossSchema')
     Require('Shop')
     Require('Boss')
     Require('Items')

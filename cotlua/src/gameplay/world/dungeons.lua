@@ -5,6 +5,7 @@
 ]]
 
 OnInit.final("Dungeons", function(Require)
+    Require('BossSchema')
     Require('Variables')
     Require('Units')
     Require('ItemEventRegistry')

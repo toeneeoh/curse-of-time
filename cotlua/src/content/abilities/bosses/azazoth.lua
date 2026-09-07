@@ -1,4 +1,5 @@
 OnInit.final("Azazoth", function(Require)
+    Require('BossSchema')
     Require("Spells")
 
     -- model animation indexes

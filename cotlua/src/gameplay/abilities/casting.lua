@@ -1,4 +1,5 @@
 OnInit.global("AbilityCasting", function(Require)
+    Require('BossSchema')
     Require('Variables')
     Require('TimerQueue')
     Require('UnitAnimation')

@@ -1,4 +1,5 @@
 OnInit.final("ItemActiveAbilities", function(Require)
+    Require('BossSchema')
     Require("Spells")
 
     local PALADIN_BOOK = Spell.define('A083')

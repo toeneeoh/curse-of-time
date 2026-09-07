@@ -1,4 +1,5 @@
 OnInit.final("Thanatos", function(Require)
+    Require('BossSchema')
     Require("Spells")
     Require("SpellTools")
 

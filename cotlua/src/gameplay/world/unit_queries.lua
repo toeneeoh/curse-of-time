@@ -1,4 +1,5 @@
 OnInit.global("WorldUnitQueries", function(Require)
+    Require('BossSchema')
     Require('Variables')
 
     local similar_units = {

@@ -1,4 +1,5 @@
 OnInit.final("LoveAbilities", function(Require)
+    Require('BossSchema')
     Require("Spells")
     Require("SpellTools")
     Require("Buffs")

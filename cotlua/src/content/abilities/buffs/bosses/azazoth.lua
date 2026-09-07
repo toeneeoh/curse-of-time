@@ -1,4 +1,5 @@
 OnInit.final("BuffsBossesAzazoth", function(Require)
+    Require('BossSchema')
     Require('BuffSystem')
     Require('UnitTable')
     Require('SpellTools')

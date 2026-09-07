@@ -6,6 +6,7 @@
 ]]
 
 OnInit.final("UnitTable", function(Require)
+    Require('HeroDefinitions')
     Require('TimerQueue')
     Require('WorldBounds')
     Require('Events')

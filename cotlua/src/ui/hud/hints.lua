@@ -1,6 +1,7 @@
 OnInit.final("Hints", function(Require)
     Require('MapSetup')
     Require('TimerQueue')
+    Require('HintConfig')
 
     local function display_hint()
         local next_hint = GetRandomInt(2, #HINT_TOOLTIP)

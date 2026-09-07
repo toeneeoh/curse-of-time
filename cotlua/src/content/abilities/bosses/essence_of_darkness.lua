@@ -1,4 +1,5 @@
 OnInit.final("EssenceOfDarknessAbilities", function(Require)
+    Require('BossSchema')
     Require("Spells")
     Require("SpellTools")
     Require("Buffs")

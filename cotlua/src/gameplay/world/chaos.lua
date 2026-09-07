@@ -5,6 +5,7 @@
 ]]
 
 OnInit.final("Chaos", function(Require)
+    Require('BossSchema')
     Require('Units')
     Require('Boss')
     Require('ItemEventRegistry')

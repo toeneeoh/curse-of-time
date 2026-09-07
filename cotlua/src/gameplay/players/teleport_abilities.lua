@@ -1,4 +1,5 @@
 OnInit.final("TeleportAbilities", function(Require)
+    Require('MainMap')
     Require("Spells")
 
     local TQ = TimerQueue
@@ -117,6 +118,5 @@ OnInit.final("TeleportAbilities", function(Require)
         end
     end
 end, Debug and Debug.getLine())
-
 
 

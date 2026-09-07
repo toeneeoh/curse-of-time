@@ -6,6 +6,7 @@
 ]]
 
 OnInit.final("Regions", function(Require)
+    Require('MainMap')
     Require('WorldBounds')
 
     AREAS          = { ---@type rect[]

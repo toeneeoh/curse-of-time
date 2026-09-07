@@ -5,6 +5,8 @@
 ]]
 
 OnInit.final("Boss", function(Require)
+    Require('MainMap')
+    Require('BossSchema')
     Require('Variables')
     Require('ItemEventRegistry')
     Require('TimerQueue')

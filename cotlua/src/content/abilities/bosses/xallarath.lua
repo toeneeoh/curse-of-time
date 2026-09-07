@@ -1,4 +1,5 @@
 OnInit.final("Xallarath", function(Require)
+    Require('BossSchema')
     Require("Spells")
     Require("SpellTools")
 

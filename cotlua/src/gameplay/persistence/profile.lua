@@ -21,6 +21,8 @@
 ]]
 
 OnInit.final("Profile", function(Require)
+    Require('HeroDefinitions')
+    Require('MainMap')
     MAX_INVENTORY_SLOTS = 26 ---@type integer 
     BACKPACK_INDEX      = 9
     POTION_INDEX        = 7

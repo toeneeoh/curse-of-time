@@ -5,6 +5,8 @@
 ]]
 
 OnInit.final("Quests", function(Require)
+    Require('MainMap')
+    Require('Progression')
     Require('ItemEventRegistry')
     Require('Units')
 

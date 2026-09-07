@@ -6,6 +6,7 @@
 ]]
 
 OnInit.final("Death", function(Require)
+    Require('MainMap')
     Require('DropTable')
     Require('Units')
     Require('Spells')

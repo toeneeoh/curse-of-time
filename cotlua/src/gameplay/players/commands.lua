@@ -8,6 +8,7 @@ OnInit.final("Commands", function(Require)
     Require('Users')
     Require('Profile')
     Require('Frames')
+    Require('HelpText')
 
     local vote_yay  = 0
     local vote_nay  = 0
