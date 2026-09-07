@@ -16,6 +16,7 @@ OnInit.final("Shop", function(Require)
     Require('ItemEventRegistry')
     Require('ShopCatalog')
     Require('ShopActions')
+    Require('ShopRegistry')
 
     -- Credits:
     --      Taysen: FDF file
@@ -116,31 +117,6 @@ OnInit.final("Shop", function(Require)
     ---@return boolean
     local function IsCraftable(shop, pid, si)
         return ShopQuote.isCraftable(shop, si, pid)
-    end
-
-    ---@type fun(id: integer, aoe: number):Shop
-    function CreateShop(id, aoe)
-        return Shop.create(id, aoe)
-    end
-
-    ---@type fun(id: integer, itm: string|integer, num: integer)
-    function ShopSetStock(id, itm, num)
-        Shop.setStock(id, itm, num)
-    end
-
-    ---@type fun(id: integer, icon: string, description: string):integer
-    function ShopAddCategory(id, icon, description)
-        return Shop.addCategory(id, icon, description)
-    end
-
-    ---@type fun(id: integer, itemId: string|integer, categories: integer)
-    function ShopAddItem(id, itemId, categories)
-        Shop.addItem(id, itemId, categories)
-    end
-
-    ---@type fun(whichItem: string|integer, compstring: string)
-    function ItemAddComponents(whichItem, compstring)
-        ShopItem.addComponents(whichItem, compstring)
     end
 
     --[[ ----------------------------------------------------------------------------------------- ]]
@@ -1754,5 +1730,12 @@ OnInit.final("Shop", function(Require)
 
     RegisterItemChangedAction(Shop.refresh)
     RegisterShopActionChangedAction(Shop.refresh)
+
+    ShopRegistry.bind({
+        create = Shop.create,
+        setStock = Shop.setStock,
+        addCategory = Shop.addCategory,
+        addItem = Shop.addItem,
+    })
 
 end, Debug and Debug.getLine())

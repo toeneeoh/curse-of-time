@@ -79,6 +79,12 @@ OnInit.final("ShopCatalog", function(Require)
         end
     end
 
+    ---@param which_item string|integer
+    ---@param component_string string
+    function ItemAddComponents(which_item, component_string)
+        ShopItem.addComponents(which_item, component_string)
+    end
+
     ---@param id integer|string
     ---@param category integer
     ---@param max_level boolean?
