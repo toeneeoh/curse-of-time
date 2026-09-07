@@ -7,8 +7,13 @@ OnInit.final("DropTable", function()
     ItemDrops = array2d(0)
     Rates     = __jarray(0)
 
+    local COLOSSEUM_TICKET = FourCC('I008')
+    local COLOSSEUM_TICKET_CHANCE = 0.0025
+    local COLOSSEUM_ELITE_TICKET_CHANCE = 0.01
+
     ---@class DropTable
     ---@field pickItem function
+    ---@field rollColosseumTicket fun(self: DropTable, x: number, y: number, chance: number): boolean
     DropTable = {}
     do
         local thistype = DropTable
@@ -61,6 +66,20 @@ OnInit.final("DropTable", function()
             return ItemDrops[id][i]
         end
 
+        ---Rolls an explicit ticket chance. Callers define eligibility by invoking
+        ---this only from permanent overworld creep and boss reward pathways.
+        ---@param x number
+        ---@param y number
+        ---@param chance number
+        ---@return boolean
+        function thistype:rollColosseumTicket(x, y, chance)
+            if math.random() < chance then
+                ItemRuntime.create(COLOSSEUM_TICKET, x, y, 600.)
+                return true
+            end
+            return false
+        end
+
         ---@type fun(id: integer, ...)
         local function setup_rates(id, ...)
             local t = table.pack(...)
@@ -92,11 +111,10 @@ OnInit.final("DropTable", function()
                 ItemRuntime.create(FourCC('I04Z'), x, y, 600.)
             end
 
-            -- colosseum ticket (1%)
-            rand = math.random()
-            if rand < 0.01 then
-                ItemRuntime.create(FourCC('I008'), x, y, 600.)
-            end
+            local ticket_chance = IsUnitType(killed, UNIT_TYPE_HERO)
+                and COLOSSEUM_ELITE_TICKET_CHANCE
+                or COLOSSEUM_TICKET_CHANCE
+            thistype:rollColosseumTicket(x, y, ticket_chance)
         end
 
         local id = 69 -- destructables

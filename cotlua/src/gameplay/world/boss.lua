@@ -11,6 +11,7 @@ OnInit.final("Boss", function(Require)
     Require('ItemEventRegistry')
     Require('TimerQueue')
     Require('Users')
+    Require('DropTable')
 
     local TQ = TimerQueue
     local dead_gods = 0
@@ -424,6 +425,8 @@ OnInit.final("Boss", function(Require)
             else
                 boss_drop(self, Rates[self.id], x, y)
             end
+
+            DropTable:rollColosseumTicket(x, y, 0.05)
 
             local count = self.crystal * self.difficulty ---@type integer 
 

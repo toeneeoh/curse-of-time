@@ -41,6 +41,7 @@ OnInit.final("ArchitectureTests", function(Require)
     Require('HintConfig')
     Require('CurrencyDisplay')
     Require('FactionView')
+    Require('DropTable')
 
     ArchitectureTests = {
         tests = {},
@@ -338,6 +339,13 @@ OnInit.final("ArchitectureTests", function(Require)
     ArchitectureTests.register("faction presentation is bound through its adapter", function()
         if not Faction.isViewBound() then
             return false, "faction view adapter was not bound"
+        end
+        return true
+    end)
+
+    ArchitectureTests.register("colosseum ticket rewards use the drop table service", function()
+        if type(DropTable.rollColosseumTicket) ~= "function" then
+            return false, "colosseum ticket roll API is missing"
         end
         return true
     end)
