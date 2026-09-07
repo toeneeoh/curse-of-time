@@ -1,5 +1,5 @@
 --[[
-    shield.lua
+    shields.lua
 
     A library for applying stackable shields to units with visual effects and individual expiration timers
 ]]

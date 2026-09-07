@@ -1,5 +1,5 @@
 --[[
-    movespeed.lua
+    move_speed.lua
 
     A module that implements unit movespeeds above the 522 game limit.
 ]]

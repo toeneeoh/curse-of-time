@@ -1,5 +1,5 @@
 --[[
-    statview.lua
+    stat_view.lua
 
     This module defines the stat window for detailed information on heroes / units
 ]]

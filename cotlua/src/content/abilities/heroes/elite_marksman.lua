@@ -1,4 +1,4 @@
-OnInit.final("MarksmanSpells", function(Require)
+OnInit.final("EliteMarksmanSpells", function(Require)
     Require('Spells')
     Require('SpellTools')
 

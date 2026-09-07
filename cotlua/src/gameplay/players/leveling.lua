@@ -1,5 +1,5 @@
 --[[
-    level.lua
+    leveling.lua
 
     Handles the EVENT_PLAYER_HERO_LEVEL event
 ]]

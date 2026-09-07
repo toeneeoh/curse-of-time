@@ -1,5 +1,5 @@
 --[[
-    codegen.lua
+    code_gen.lua
 
     Credits: Original JASS by TriggerHappy
 

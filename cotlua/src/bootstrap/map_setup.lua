@@ -1,5 +1,5 @@
 --[[
-    mapsetup.lua
+    map_setup.lua
 
     A library that executes any necessary map initialization after players have loaded in.
 ]]

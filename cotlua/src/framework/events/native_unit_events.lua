@@ -1,5 +1,5 @@
 --[[
-    unitevent.lua
+    native_unit_events.lua
 
     This module provide a simple way to register a player unit event to function
     for all players without redundant trigger objects.

@@ -101,4 +101,3 @@ OnInit.final("EnemyUnitAbilities", function(Require)
         end
     end
 end, Debug and Debug.getLine())
-

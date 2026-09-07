@@ -1,4 +1,4 @@
-OnInit.final("SirenAbilities", function(Require)
+OnInit.final("SirenOfTheTidesAbilities", function(Require)
     Require("Spells")
     Require("SpellTools")
     Require("Buffs")

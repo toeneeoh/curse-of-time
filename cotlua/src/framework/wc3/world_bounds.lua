@@ -1,5 +1,5 @@
 --[[
-    worldbounds.lua
+    world_bounds.lua
     https://www.hiveworkshop.com/threads/330669/
 
     Description:

@@ -101,6 +101,44 @@ foreach ($file in $sourceFiles) {
     }
 }
 
+# First-party resource names use PascalCase equivalents of their snake_case
+# filenames. A resource may add contextual words needed for uniqueness, such
+# as warrior.lua -> WarriorSpells, but the filename must remain recognizable.
+# Vendor names are retained exactly as supplied upstream.
+foreach ($file in $sourceFiles) {
+    $relativePath = [IO.Path]::GetRelativePath($sourcePath, $file.FullName)
+    if ($relativePath.StartsWith("vendor$([IO.Path]::DirectorySeparatorChar)")) {
+        continue
+    }
+
+    $source = Get-Content -LiteralPath $file.FullName -Raw
+    $baseName = [IO.Path]::GetFileNameWithoutExtension($file.Name)
+    $normalizedBase = $baseName.Replace('_', '').ToLowerInvariant()
+
+    foreach ($match in $initializerPattern.Matches($source)) {
+        $resourceName = $match.Groups[2].Value
+        $normalizedResource = $resourceName.Replace('_', '').ToLowerInvariant()
+        if (-not (
+            $normalizedResource.Contains($normalizedBase) -or
+            $normalizedBase.Contains($normalizedResource)
+        )) {
+            $failures.Add(
+                "Initializer '$resourceName' does not match filename '$($file.Name)' in $relativePath"
+            )
+        }
+    }
+
+    $introLines = ($source -split "`r?`n") | Select-Object -First 5
+    foreach ($line in $introLines) {
+        $label = $line.Trim()
+        if ($label -match '^[A-Za-z0-9_ -]+\.lua$' -and $label -cne $file.Name) {
+            $failures.Add(
+                "Introductory filename '$label' should be '$($file.Name)' in $relativePath"
+            )
+        }
+    }
+}
+
 if ($failures.Count -gt 0) {
     Write-Host "Architecture check failed with $($failures.Count) problem(s):"
     foreach ($failure in $failures) {
@@ -110,7 +148,7 @@ if ($failures.Count -gt 0) {
 }
 
 Write-Host (
-    "Architecture check passed: {0} manifest entries, {1} named initializers, no phase inversions." -f
+    "Architecture check passed: {0} manifest entries, {1} named initializers, naming and phases valid." -f
     $manifestEntries.Count,
     $providers.Count
 )

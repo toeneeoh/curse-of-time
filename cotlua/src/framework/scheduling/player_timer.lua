@@ -1,5 +1,5 @@
 --[[
-    playertimer.lua
+    player_timer.lua
 
     defines more specialized timers for use with spells and other unique situations where stronger
     callback control is required.

@@ -1,5 +1,5 @@
 --[[
-    gamestatus.lua
+    game_status.lua
 
     A library that determines whether the game is in a single-player, replay, or multi-player state
 ]]

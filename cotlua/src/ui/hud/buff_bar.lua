@@ -1,5 +1,5 @@
 --[[
-    buffbar.lua
+    buff_bar.lua
 
     Adds custom UI for buff status on units
 ]]

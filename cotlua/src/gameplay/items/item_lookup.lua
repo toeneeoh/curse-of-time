@@ -1,5 +1,5 @@
 --[[
-    itemlookup.lua
+    item_lookup.lua
 
     A library that handles item events (buying / picking up)
 ]]

@@ -1,5 +1,5 @@
 --[[
-    faction.lua
+    factions.lua
 
     Implementation of factions
 ]]

@@ -19,13 +19,20 @@ loaded does not mean its API has initialized.
   reorganized internally.
 - Bootstrap owns initialization phases and the source manifest.
 
+First-party source filenames use `snake_case`; named `OnInit` resources use
+the corresponding `PascalCase`. A resource may add a contextual suffix needed
+for uniqueness (`warrior.lua` provides `WarriorSpells`), but unrelated legacy
+filename/resource pairs are not allowed. If a file's introductory comment
+labels the source file, that label must match its current basename. Vendor
+filenames and initializer names remain unchanged.
+
 Configuration is separated by stability and ownership. `config/rawcodes.lua`
 owns shared unit and ability identifiers; `config/item_schema.lua` owns the
 serialized item-stat order and immutable item metadata; and
 `config/stat_schema.lua` owns stat labels and tooltip parsing syntax. Runtime
 stat getters and breakdowns live in `ui/hud/stat_values.lua`, where their
 dependencies on profiles, progression, unit state, and world queries are
-explicit. `config/gameplay_constants.lua` remains the compatibility resource
+explicit. `config/variables.lua` remains the compatibility resource
 for world state and hero definitions that have not yet moved to an owner.
 
 ## Runtime diagnostics

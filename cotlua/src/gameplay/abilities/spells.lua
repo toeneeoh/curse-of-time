@@ -1,5 +1,5 @@
 --[[
-    spell.lua
+    spells.lua
 
     A library that handles spell related events:
         (EVENT_PLAYER_UNIT_SPELL_EFFECT,

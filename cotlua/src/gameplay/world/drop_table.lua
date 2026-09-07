@@ -1,5 +1,5 @@
 --[[
-    droptable.lua
+    drop_table.lua
 
     Defines item drop tables for units, adjusts rates to equalize drop chances
 ]]

@@ -1,5 +1,5 @@
 --[[
-    gluebutton.lua
+    glue_button.lua
 
     A module that provides button and tooltip functionality for shops and other UI.
 ]]

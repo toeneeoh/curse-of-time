@@ -99,14 +99,3 @@ OnInit.global("DevRuntimeLog", function(Require)
         DevLog.write("EARLY_ERROR", Debug.data.firstError)
     end
 end, Debug and Debug.getLine())
-
-OnInit.final("DevMetricSnapshots", function()
-    if not DevLog.enabled then return end
-
-    local function snapshot()
-        DevLog.snapshot("periodic")
-        TimerQueue:callDelayed(30., snapshot)
-    end
-
-    TimerQueue:callDelayed(30., snapshot)
-end, Debug and Debug.getLine())

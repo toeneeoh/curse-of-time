@@ -1,4 +1,4 @@
-OnInit.final("RogueSpells", function(Require)
+OnInit.final("MasterRogueSpells", function(Require)
     Require('Spells')
     Require('SpellTools')
     Require('Events')

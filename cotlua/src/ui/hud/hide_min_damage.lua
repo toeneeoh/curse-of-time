@@ -1,5 +1,5 @@
 --[[
-    hidemindamage.lua
+    hide_min_damage.lua
 
     Credits: Tasyen
     A tool that hides the minimum damage from game UI

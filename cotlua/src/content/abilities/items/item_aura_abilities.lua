@@ -99,4 +99,3 @@ OnInit.final("ItemAuraAbilities", function(Require)
     local SEA_WARDS = Spell.define('A0E2')
     local JEWEL_OF_THE_HORDE = Spell.define('A0D3')
 end, Debug and Debug.getLine())
-

@@ -1,5 +1,5 @@
 --[[
-    items.lua
+    item.lua
 
     A library that defines a custom item interface
 ]]

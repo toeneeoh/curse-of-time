@@ -1,5 +1,5 @@
 --[[
-    bonus.lua
+    bonuses.lua
 
     A module that provides direct modification of a unit's stats using object natives.
 ]]

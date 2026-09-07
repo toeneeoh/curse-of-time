@@ -1,5 +1,5 @@
 --[[
-    orders.lua
+    unit_orders.lua
 
     This library handles order events
         (EVENT_PLAYER_UNIT_ISSUED_POINT_ORDER,

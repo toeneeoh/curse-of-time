@@ -1,5 +1,5 @@
 --[[
-    unittable.lua
+    unit_table.lua
 
     A library that defines a Unit interface that indexes newly
     created units.
