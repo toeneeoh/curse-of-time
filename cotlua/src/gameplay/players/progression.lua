@@ -73,3 +73,23 @@ OnInit.global("Progression", function(Require)
         end
     end
 end)
+
+OnInit.final("ProgressionRuntime", function(Require)
+    Require('Progression')
+    Require('Profile')
+    Require('TimerQueue')
+
+    TimerQueue:callPeriodically(60., nil, function()
+        local user = User.first
+
+        while user do
+            local profile = Profile[user.id]
+            if profile and profile.playing then
+                profile.hero.time = profile.hero.time + 1
+                profile.total_time = profile.total_time + 1
+                ExperienceControl(user.id)
+            end
+            user = user.next
+        end
+    end)
+end, Debug and Debug.getLine())

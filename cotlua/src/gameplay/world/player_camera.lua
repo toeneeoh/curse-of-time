@@ -1,8 +1,24 @@
+local update_locked_camera
+
 OnInit.global("PlayerCamera", function(Require)
     Require('Variables')
     Require('TimerQueue')
 
     local custom_lighting = __jarray(0)
+    local is_camera_locked = {}
+
+    ---@param pid integer
+    ---@param locked boolean
+    function SetCameraLocked(pid, locked)
+        is_camera_locked[pid] = locked
+    end
+
+    update_locked_camera = function()
+        local pid = GetPlayerId(GetLocalPlayer()) + 1
+        if is_camera_locked[pid] then
+            SetCameraField(CAMERA_FIELD_TARGET_DISTANCE, ZOOM[pid], 0.)
+        end
+    end
 
     local function update_lighting(pid, x, y)
         local daynight_model = DEFAULT_LIGHTING
@@ -102,3 +118,14 @@ OnInit.global("PlayerCamera", function(Require)
         TimerQueue:callDelayed(fadein, apply_black_mask, tbl, fadeout, false)
     end
 end)
+
+OnInit.final("PlayerCameraRuntime", function(Require)
+    Require('PlayerCamera')
+    Require('MapSetup')
+    Require('TimerQueue')
+
+    TimerQueue:callPeriodically(0.35, nil, update_locked_camera)
+    TimerQueue:callPeriodically(1., nil, function()
+        SetCameraQuickPosition(TOWN_CENTER_X, TOWN_CENTER_Y)
+    end)
+end, Debug and Debug.getLine())

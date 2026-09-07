@@ -60,6 +60,13 @@ operations are owned by focused modules under `gameplay/abilities`,
 available to preserve map-script compatibility, but initializers now require the
 resource that owns the relevant family instead of a broad `Helper` resource.
 
+The former world timer catch-all has also been removed. Camera locking and the
+town camera target are scheduled by `gameplay/world/player_camera.lua`; hero
+spellboost and backpack mirroring by `gameplay/players/hero_refresh.lua`;
+playtime accounting by `gameplay/players/progression.lua`; fountain restoration
+by `gameplay/world/fountain.lua`; rotating hints by `ui/hud/hints.lua`; and the
+world-boss hunt timer by `gameplay/world/boss.lua`.
+
 ## Persistence format
 
 The rawcode/index mapping lives in `src/config/save_schema.lua`. Entries in

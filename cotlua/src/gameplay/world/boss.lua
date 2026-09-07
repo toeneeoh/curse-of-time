@@ -7,6 +7,8 @@
 OnInit.final("Boss", function(Require)
     Require('Variables')
     Require('ItemEventRegistry')
+    Require('TimerQueue')
+    Require('Users')
 
     local TQ = TimerQueue
     local dead_gods = 0
@@ -773,5 +775,6 @@ OnInit.final("Boss", function(Require)
     TriggerAddCondition(t, Filter(PositionLegionIllusions))
 
     TQ:callPeriodically(15., nil, BossWander)
+    HUNT_TIMER = TQ:callDelayed(2040. - (User.AmountPlaying * 240), ShadowStepExpire)
 
 end, Debug and Debug.getLine())
