@@ -4,7 +4,6 @@ OnInit.final("Colosseum", function(Require)
     Require('ItemEventRegistry')
     Require('ALICE')
     Require('SpellTools')
-    Require('Progression')
     Require('Currency')
 
     local GetRectCenterXY = function(whichRect)
@@ -83,7 +82,8 @@ OnInit.final("Colosseum", function(Require)
     local BOSS_HP = 500
     local BOSS_DAMAGE = 50
     local BOSS_ARMOR = 2
-    local COIN_GOLD_MULTIPLIER = 5
+    local COIN_BASE_GOLD = 25000
+    local COIN_LEVEL_SCALING = 8
 
     -- unit stats
     local stat_hp = 0
@@ -467,7 +467,8 @@ OnInit.final("Colosseum", function(Require)
         rewarded[pid] = true
         local coins = base_coins + bonus_coins[pid]
         local level = math.max(1, math.min(MAX_LEVEL, math.floor(average_level)))
-        local gold = math.floor(coins * GOLD_TABLE[level] * COIN_GOLD_MULTIPLIER)
+        local gold_per_coin = COIN_BASE_GOLD + level * level * COIN_LEVEL_SCALING
+        local gold = math.floor(coins * gold_per_coin)
 
         if gold > 0 then
             AwardGold(pid, gold, true)
