@@ -11,6 +11,7 @@ OnInit.final("Faction", function(Require)
     Require('Items')
     Require('Prompt')
     local fl_type = FourCC('n000')
+    local faction_shop_type = FourCC('n004')
     local Faction, Quest
 
     ---@class Faction
@@ -206,7 +207,7 @@ OnInit.final("Faction", function(Require)
             local self = setmetatable({}, mt)
 
             self.leader = CreateUnit(Player(PLAYER_NEUTRAL_PASSIVE), fl_type, x, y, 270.)
-            self.shop = CreateUnit(Player(PLAYER_NEUTRAL_PASSIVE), shop_id, x + 500., y, 270.)
+            self.shop = CreateUnit(Player(PLAYER_NEUTRAL_PASSIVE), faction_shop_type, x + 500., y, 270.)
             self.name = name
             self.quests = {}
             self.buff = buff
