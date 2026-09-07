@@ -6,10 +6,14 @@ OnInit.final("ShopTransaction", function(Require)
     Require('Items')
     Require('ShopQuote')
     Require('ShopActions')
+    Require('ShopRegistry')
 
     ShopTransaction = {}
 
     ---Re-evaluates immediately before committing synchronized state changes.
+    ---@param shop ShopDefinition
+    ---@param item ShopItem
+    ---@param pid integer
     ---@return PurchaseQuote
     function ShopTransaction.commit(shop, item, pid)
         local quote = ShopQuote.evaluate(shop, item, pid)
@@ -49,9 +53,7 @@ OnInit.final("ShopTransaction", function(Require)
         end
 
         PlayerAddItemById(pid, item.id)
-        if shop.stock[item.id] ~= -1 then
-            shop.stock[item.id] = shop.stock[item.id] - 1
-        end
+        ShopRegistry.consumeStock(shop, item.id)
         return quote
     end
 end, Debug and Debug.getLine())

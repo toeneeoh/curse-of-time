@@ -318,6 +318,18 @@ OnInit.final("ArchitectureTests", function(Require)
             if not definition.view then
                 return false, values[1] .. " has no bound shop view"
             end
+            if definition.view.definition ~= definition then
+                return false, values[1] .. " view is bound to the wrong definition"
+            end
+            if #definition.items > 0 then
+                local first_item = definition.items[1]
+                if not definition:has(first_item.id) then
+                    return false, values[1] .. " item membership index is incomplete"
+                end
+                if definition:getStock(first_item.id) == nil then
+                    return false, values[1] .. " stock state is missing"
+                end
+            end
         end
         return true
     end)

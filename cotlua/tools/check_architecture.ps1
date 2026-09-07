@@ -98,6 +98,17 @@ if ($currencySource -match '\b(BlzCreateFrame|BlzFrame|GetLocalPlayer|RESOURCE_B
     $failures.Add('Currency gameplay module contains HUD presentation logic')
 }
 
+$shopDomainFiles = @(
+    'gameplay\shops\quote.lua',
+    'gameplay\shops\transaction.lua'
+)
+foreach ($shopDomainFile in $shopDomainFiles) {
+    $shopDomainSource = Get-Content -LiteralPath (Join-Path $sourcePath $shopDomainFile) -Raw
+    if ($shopDomainSource -match '\bshop\.(current|stock|view)\b') {
+        $failures.Add("Shop domain module reads frame-backed state: $shopDomainFile")
+    }
+}
+
 foreach ($file in $sourceFiles) {
     $source = Get-Content -LiteralPath $file.FullName -Raw
     if ($source -match 'Require\(["'']Helper["'']\)') {

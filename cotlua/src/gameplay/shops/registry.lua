@@ -1,7 +1,9 @@
 -- Synchronized shop definitions. Catalog content can register shops without
 -- constructing or depending on local frame state.
 
-OnInit.global("ShopRegistry", function()
+OnInit.global("ShopRegistry", function(Require)
+    Require('ItemHelpers')
+
     ---@class ShopDefinition
     ---@field id integer
     ---@field aoe number
@@ -9,6 +11,9 @@ OnInit.global("ShopRegistry", function()
     ---@field items table[]
     ---@field stock table[]
     ---@field stock_by_key table<string, table>
+    ---@field stock_count table<string, integer>
+    ---@field item_by_id table<string, table>
+    ---@field current unit[]
     ---@field view Shop?
     local ShopDefinition = {}
     ShopDefinition.__index = ShopDefinition
@@ -26,6 +31,32 @@ OnInit.global("ShopRegistry", function()
             return self.view:visible(visible)
         end
         return false
+    end
+
+    ---@param item_id string|integer
+    ---@return boolean
+    function ShopDefinition:has(item_id)
+        local key = GetItem(item_id)
+        return self.item_by_id[key] ~= nil
+    end
+
+    ---@param item_id string|integer
+    ---@return integer?
+    function ShopDefinition:getStock(item_id)
+        return self.stock_count[GetItem(item_id)]
+    end
+
+    ---@param pid integer
+    ---@param shop_unit unit?
+    function ShopDefinition:setCurrent(pid, shop_unit)
+        self.current[pid] = shop_unit
+    end
+
+    ---@param pid integer
+    ---@return boolean
+    function ShopDefinition:isInRange(pid)
+        local shop_unit = self.current[pid]
+        return shop_unit ~= nil and IsUnitInRange(Hero[pid], shop_unit, self.aoe)
     end
 
     ---@param id integer
@@ -46,14 +77,17 @@ OnInit.global("ShopRegistry", function()
             aoe = aoe,
             categories = {},
             items = {},
+            item_by_id = {},
             stock = {},
             stock_by_key = {},
+            stock_count = {},
+            current = {},
         }, ShopDefinition)
         ShopRegistry.definitions[id] = definition
         ShopRegistry.order[#ShopRegistry.order + 1] = definition
 
         if ShopRegistry.adapter then
-            definition.view = ShopRegistry.adapter.create(id, aoe)
+            definition.view = ShopRegistry.adapter.create(id, aoe, definition)
         end
         return definition
     end
@@ -85,10 +119,17 @@ OnInit.global("ShopRegistry", function()
         local definition = ShopRegistry.definitions[id]
         if not definition then return end
 
-        definition.items[#definition.items + 1] = {
+        local key = GetItem(item_id)
+        if definition.item_by_id[key] then return end
+
+        local item = {
             id = item_id,
+            key = key,
             categories = categories,
         }
+        definition.items[#definition.items + 1] = item
+        definition.item_by_id[key] = item
+        definition.stock_count[key] = -1
         if ShopRegistry.adapter then
             ShopRegistry.adapter.addItem(id, item_id, categories)
         end
@@ -101,7 +142,8 @@ OnInit.global("ShopRegistry", function()
         local definition = ShopRegistry.definitions[id]
         if not definition then return end
 
-        local key = type(item_id) .. ":" .. tostring(item_id)
+        local key = GetItem(item_id)
+        definition.stock_count[key] = count
         local stock = definition.stock_by_key[key]
         if stock then
             stock.count = count
@@ -115,12 +157,21 @@ OnInit.global("ShopRegistry", function()
         end
     end
 
+    ---@param definition ShopDefinition
+    ---@param item_id string|integer
+    function ShopRegistry.consumeStock(definition, item_id)
+        local count = definition:getStock(item_id)
+        if count and count ~= -1 then
+            ShopRegistry.setStock(definition.id, item_id, count - 1)
+        end
+    end
+
     ---@param adapter table
     function ShopRegistry.bind(adapter)
         ShopRegistry.adapter = adapter
         for index = 1, #ShopRegistry.order do
             local definition = ShopRegistry.order[index]
-            definition.view = adapter.create(definition.id, definition.aoe)
+            definition.view = adapter.create(definition.id, definition.aoe, definition)
             for category_index = 1, #definition.categories do
                 local category = definition.categories[category_index]
                 adapter.addCategory(definition.id, category.icon, category.description)

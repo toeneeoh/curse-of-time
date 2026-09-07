@@ -8,6 +8,7 @@ OnInit.final("ShopQuote", function(Require)
     Require('Items')
     Require('ShopCatalog')
     Require('ShopActions')
+    Require('ShopRegistry')
 
     ShopQuote = {}
 
@@ -35,6 +36,7 @@ OnInit.final("ShopQuote", function(Require)
         return inventory
     end
 
+    ---@param shop ShopDefinition
     local function evaluate_components(shop, item, pid, inventory, quote)
         local remaining = __jarray(0)
         for id, count in pairs(inventory) do
@@ -59,6 +61,9 @@ OnInit.final("ShopQuote", function(Require)
         return true
     end
 
+    ---@param shop ShopDefinition
+    ---@param item ShopItem
+    ---@param pid integer
     function ShopQuote.isCraftable(shop, item, pid)
         return evaluate_components(shop, item, pid, inventory_components(pid))
     end
@@ -73,6 +78,9 @@ OnInit.final("ShopQuote", function(Require)
     ---@field action ShopActionDefinition?
 
     ---@return PurchaseQuote
+    ---@param shop ShopDefinition
+    ---@param item ShopItem
+    ---@param pid integer
     function ShopQuote.evaluate(shop, item, pid)
         local quote = {
             can_buy = false,
@@ -82,11 +90,11 @@ OnInit.final("ShopQuote", function(Require)
             consume = __jarray(0),
         }
         if item == 0 or not item then return quote end
-        if not shop.current[pid] or not IsUnitInRange(Hero[pid], shop.current[pid], shop.aoe) then
+        if not shop:isInRange(pid) then
             quote.reason = "range"
             return quote
         end
-        local stock = shop.stock[item.id]
+        local stock = shop:getStock(item.id)
         if stock == nil or stock == 0 then
             quote.reason = "stock"
             return quote

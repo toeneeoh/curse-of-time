@@ -117,7 +117,7 @@ OnInit.final("Shop", function(Require)
     ---@param si ShopItem
     ---@return boolean
     local function IsCraftable(shop, pid, si)
-        return ShopQuote.isCraftable(shop, si, pid)
+        return ShopQuote.isCraftable(shop.definition, si, pid)
     end
 
     --[[ ----------------------------------------------------------------------------------------- ]]
@@ -686,7 +686,7 @@ OnInit.final("Shop", function(Require)
 
                 if GetLocalPlayer() == p then
                     BlzFrameSetText(self.tooltip, i.tooltip)
-                    self.purchase:enabled(ShopQuote.evaluate(self.shop, i, pid).can_buy)
+                    self.purchase:enabled(ShopQuote.evaluate(self.shop.definition, i, pid).can_buy)
                     self:visible(true)
                 end
             end
@@ -1024,6 +1024,7 @@ OnInit.final("Shop", function(Require)
     local shoppool = array2d()
 
     ---@class Shop
+    ---@field definition ShopDefinition
     ---@field setStock function
     ---@field addCategory function
     ---@field addItem function
@@ -1116,8 +1117,8 @@ OnInit.final("Shop", function(Require)
         ---@return boolean
         function thistype:buy(i, p, test)
             local pid = GetPlayerId(p) + 1
-            local quote = test and ShopQuote.evaluate(self, i, pid)
-                or ShopTransaction.commit(self, i, pid)
+            local quote = test and ShopQuote.evaluate(self.definition, i, pid)
+                or ShopTransaction.commit(self.definition, i, pid)
 
             if not quote.can_buy then
                 if not test then
@@ -1634,6 +1635,7 @@ OnInit.final("Shop", function(Require)
                 end
 
                 self.current[pid] = nil
+                self.definition:setCurrent(pid, nil)
             end
         end
 
@@ -1674,6 +1676,7 @@ OnInit.final("Shop", function(Require)
                 -- Otherwise the affordability check sees a nil current shop and
                 -- leaves the purchase icon in its disabled state.
                 self.current[pid] = selected and GetTriggerUnit() or nil
+                self.definition:setCurrent(pid, self.current[pid])
 
                 if GetLocalPlayer() == p then
                     self:visible(selected)
@@ -1691,6 +1694,7 @@ OnInit.final("Shop", function(Require)
                     end
 
                     self.current[pid] = nil
+                    self.definition:setCurrent(pid, nil)
                 end
             end
         end
@@ -1733,8 +1737,14 @@ OnInit.final("Shop", function(Require)
     RegisterShopActionChangedAction(Shop.refresh)
     RegisterCurrencyChangedAction(Shop.refresh)
 
+    local function create_shop_view(id, aoe, definition)
+        local view = Shop.create(id, aoe)
+        view.definition = definition
+        return view
+    end
+
     ShopRegistry.bind({
-        create = Shop.create,
+        create = create_shop_view,
         setStock = Shop.setStock,
         addCategory = Shop.addCategory,
         addItem = Shop.addItem,
