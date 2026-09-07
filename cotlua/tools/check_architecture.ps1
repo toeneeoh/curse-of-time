@@ -139,6 +139,19 @@ foreach ($file in $sourceFiles) {
     }
 }
 
+foreach ($file in $sourceFiles) {
+    $relativePath = [IO.Path]::GetRelativePath($sourcePath, $file.FullName)
+    $gameplayPrefix = "gameplay$([IO.Path]::DirectorySeparatorChar)"
+    if (-not $relativePath.StartsWith($gameplayPrefix)) {
+        continue
+    }
+
+    $source = Get-Content -LiteralPath $file.FullName -Raw
+    if ($source -match '\bShop\.refresh\s*\(') {
+        $failures.Add("Gameplay module refreshes shop UI directly: $relativePath")
+    }
+}
+
 # Shop inventory is declarative content. Keeping registration calls in one
 # subtree prevents world and player runtime modules from acquiring UI/catalog
 # responsibilities again.

@@ -31,6 +31,29 @@ OnInit.final("Currency", function(Require)
 
     local IS_CONVERTING_PLAT     = {} ---@type boolean[]
     local IS_CONVERTER_PURCHASED = {} ---@type boolean[]
+    local changed_actions = {}
+
+    ---@param callback fun(pid: integer, currency: integer, amount: integer)
+    ---@return boolean
+    function RegisterCurrencyChangedAction(callback)
+        for index = 1, #changed_actions do
+            if changed_actions[index] == callback then
+                return false
+            end
+        end
+
+        changed_actions[#changed_actions + 1] = callback
+        return true
+    end
+
+    ---@param pid integer
+    ---@param currency integer
+    ---@param amount integer
+    local function notify_currency_changed(pid, currency, amount)
+        for index = 1, #changed_actions do
+            changed_actions[index](pid, currency, amount)
+        end
+    end
 
     local function player_from_pid(pid)
         return Player(pid - 1)
@@ -161,7 +184,7 @@ OnInit.final("Currency", function(Require)
         amount = math.max(0, amount)
         CURRENCY[currency_key(pid, index)] = amount
         setter[index](pid, amount)
-        Shop.refresh(pid)
+        notify_currency_changed(pid, index, amount)
     end
 
     ---@type fun(pid: integer, index: integer):integer
@@ -274,9 +297,12 @@ OnInit.final("Currency", function(Require)
         local p   = GetTriggerPlayer()
         local pid = GetPlayerId(p) + 1 ---@type integer 
         local gold_key = currency_key(pid, GOLD)
+        local gold = GetPlayerState(p, PLAYER_STATE_RESOURCE_GOLD)
 
-        Shop.refresh(pid)
-        CURRENCY[gold_key] = GetPlayerState(p, PLAYER_STATE_RESOURCE_GOLD)
+        if CURRENCY[gold_key] ~= gold then
+            CURRENCY[gold_key] = gold
+            notify_currency_changed(pid, GOLD, gold)
+        end
 
         if IS_CONVERTING_PLAT[pid] then
             -- SetCurrency changes player state and fires this trigger again.

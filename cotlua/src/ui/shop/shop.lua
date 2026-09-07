@@ -17,6 +17,7 @@ OnInit.final("Shop", function(Require)
     Require('ShopCatalog')
     Require('ShopActions')
     Require('ShopRegistry')
+    Require('Currency')
 
     -- Credits:
     --      Taysen: FDF file
@@ -1730,6 +1731,7 @@ OnInit.final("Shop", function(Require)
 
     RegisterItemChangedAction(Shop.refresh)
     RegisterShopActionChangedAction(Shop.refresh)
+    RegisterCurrencyChangedAction(Shop.refresh)
 
     ShopRegistry.bind({
         create = Shop.create,
