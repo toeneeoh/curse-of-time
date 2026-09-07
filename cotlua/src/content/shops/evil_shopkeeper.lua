@@ -4,7 +4,7 @@ OnInit.final("EvilShopkeeperShop", function(Require)
     Require('ShopRegistry')
 
     local shop_id = FourCC('n01F')
-    evilshop = CreateShop(shop_id, 1000.)
+    CreateShop(shop_id, 1000.)
 
     local sword = ShopAddCategory(shop_id, "ReplaceableTextures\\CommandButtons\\BTNThoriumMelee.blp", "Sword")
     local heavy = ShopAddCategory(shop_id, "ReplaceableTextures\\CommandButtons\\BTNImprovedStrengthOfTheMoon.tga", "Heavy")

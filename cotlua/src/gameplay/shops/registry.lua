@@ -14,6 +14,7 @@ OnInit.global("ShopRegistry", function(Require)
     ---@field stock_count table<string, integer>
     ---@field item_by_id table<string, table>
     ---@field current unit[]
+    ---@field visibility boolean
     ---@field view Shop?
     local ShopDefinition = {}
     ShopDefinition.__index = ShopDefinition
@@ -23,15 +24,6 @@ OnInit.global("ShopRegistry", function(Require)
         order = {},
         adapter = nil,
     }
-
-    ---@param visible boolean
-    ---@return boolean
-    function ShopDefinition:visible(visible)
-        if self.view then
-            return self.view:visible(visible)
-        end
-        return false
-    end
 
     ---@param item_id string|integer
     ---@return boolean
@@ -82,12 +74,14 @@ OnInit.global("ShopRegistry", function(Require)
             stock_by_key = {},
             stock_count = {},
             current = {},
+            visibility = false,
         }, ShopDefinition)
         ShopRegistry.definitions[id] = definition
         ShopRegistry.order[#ShopRegistry.order + 1] = definition
 
         if ShopRegistry.adapter then
             definition.view = ShopRegistry.adapter.create(id, aoe, definition)
+            ShopRegistry.adapter.setVisible(definition, definition.visibility)
         end
         return definition
     end
@@ -166,12 +160,27 @@ OnInit.global("ShopRegistry", function(Require)
         end
     end
 
+    ---@param id integer
+    ---@param visible boolean
+    ---@return boolean
+    function ShopRegistry.setVisible(id, visible)
+        local definition = ShopRegistry.definitions[id]
+        if not definition then return false end
+
+        definition.visibility = visible
+        if ShopRegistry.adapter then
+            ShopRegistry.adapter.setVisible(definition, visible)
+        end
+        return visible
+    end
+
     ---@param adapter table
     function ShopRegistry.bind(adapter)
         ShopRegistry.adapter = adapter
         for index = 1, #ShopRegistry.order do
             local definition = ShopRegistry.order[index]
             definition.view = adapter.create(definition.id, definition.aoe, definition)
+            adapter.setVisible(definition, definition.visibility)
             for category_index = 1, #definition.categories do
                 local category = definition.categories[category_index]
                 adapter.addCategory(definition.id, category.icon, category.description)

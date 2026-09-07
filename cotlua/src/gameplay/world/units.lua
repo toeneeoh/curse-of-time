@@ -7,7 +7,6 @@
 
 OnInit.final("Units", function(Require)
     Require('BossSchema')
-    Require('Shop')
     Require('EvilShopkeeperShop')
     Require('Boss')
     Require('Items')

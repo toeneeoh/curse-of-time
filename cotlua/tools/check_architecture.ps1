@@ -163,6 +163,9 @@ foreach ($file in $sourceFiles) {
     }
 
     $source = Get-Content -LiteralPath $file.FullName -Raw
+    if ($source -match 'Require\(["'']Shop["'']\)') {
+        $failures.Add("Gameplay module requires shop UI: $relativePath")
+    }
     if ($source -match '\bShop\.refresh\s*\(') {
         $failures.Add("Gameplay module refreshes shop UI directly: $relativePath")
     }

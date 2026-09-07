@@ -2,6 +2,7 @@ OnInit.global("Shopkeeper", function(Require)
     Require('MainMap')
     Require('Variables')
     Require('TimerQueue')
+    Require('ShopRegistry')
 
     local shop_id = FourCC('n01F')
     local random = math.random
@@ -26,7 +27,7 @@ OnInit.global("Shopkeeper", function(Require)
             end
         until IsTerrainWalkable(x, y)
 
-        evilshop:visible(false)
+        ShopRegistry.setVisible(shop_id, false)
         ShowUnit(shop, false)
         ShowUnit(shop, true)
         SetUnitPosition(shop, x, y)

@@ -1743,8 +1743,13 @@ OnInit.final("Shop", function(Require)
         return view
     end
 
+    local function set_shop_view_visible(definition, visible)
+        return definition.view:visible(visible)
+    end
+
     ShopRegistry.bind({
         create = create_shop_view,
+        setVisible = set_shop_view_visible,
         setStock = Shop.setStock,
         addCategory = Shop.addCategory,
         addItem = Shop.addItem,
