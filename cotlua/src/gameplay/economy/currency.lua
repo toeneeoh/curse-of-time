@@ -5,7 +5,6 @@
 ]]
 OnInit.final("Currency", function(Require)
     Require('Users')
-    Require('Frames')
     Require('ItemEventRegistry')
     Require('EconomyEffects')
 
@@ -32,6 +31,7 @@ OnInit.final("Currency", function(Require)
     local IS_CONVERTING_PLAT     = {} ---@type boolean[]
     local IS_CONVERTER_PURCHASED = {} ---@type boolean[]
     local changed_actions = {}
+    local converter_changed_actions = {}
 
     ---@param callback fun(pid: integer, currency: integer, amount: integer)
     ---@return boolean
@@ -55,6 +55,28 @@ OnInit.final("Currency", function(Require)
         end
     end
 
+    ---@param callback fun(pid: integer, purchased: boolean, enabled: boolean)
+    ---@return boolean
+    function RegisterCurrencyConverterChangedAction(callback)
+        for index = 1, #converter_changed_actions do
+            if converter_changed_actions[index] == callback then
+                return false
+            end
+        end
+
+        converter_changed_actions[#converter_changed_actions + 1] = callback
+        return true
+    end
+
+    ---@param pid integer
+    local function notify_converter_changed(pid)
+        local purchased = IS_CONVERTER_PURCHASED[pid] == true
+        local enabled = purchased and IS_CONVERTING_PLAT[pid] == true
+        for index = 1, #converter_changed_actions do
+            converter_changed_actions[index](pid, purchased, enabled)
+        end
+    end
+
     local function player_from_pid(pid)
         return Player(pid - 1)
     end
@@ -63,54 +85,10 @@ OnInit.final("Currency", function(Require)
         return pid * CURRENCY_COUNT + index
     end
 
-    local function is_local_player(pid)
-        return GetLocalPlayer() == player_from_pid(pid)
-    end
-
-    -- frame setup
-    local converter_frame = BlzCreateFrame("QuestButtonDisabledBackdropTemplate", RESOURCE_BAR, 0, 0)
-    local convert_button
-
-    local function refresh_converter_button(pid)
-        if not is_local_player(pid) then
-            return
-        end
-
-        local purchased = IS_CONVERTER_PURCHASED[pid]
-        local tooltip = purchased
-            and "Convert gold to platinum automatically"
-            or "Must purchase a converter to use!"
-
-        BlzFrameSetText(convert_button.tooltip.tooltip, tooltip)
-        convert_button:enable(purchased and IS_CONVERTING_PLAT[pid])
-    end
-    BlzFrameSetTexture(converter_frame, "trans32.blp", 0, true)
-    BlzFrameSetSize(converter_frame, 0.006, 0.006)
-    BlzFrameSetPoint(converter_frame, FRAMEPOINT_TOP, RESOURCE_BAR, FRAMEPOINT_TOP, 0, -0.025)
-
-    -- converter button
-    local function on_convert()
-        local frame = BlzGetTriggerFrame()
-        local pid = GetPlayerId(GetTriggerPlayer()) + 1
-
-        if IS_CONVERTER_PURCHASED[pid] then
-            IS_CONVERTING_PLAT[pid] = not IS_CONVERTING_PLAT[pid]
-        end
-
-        if is_local_player(pid) then
-            BlzFrameSetEnable(frame, false)
-            BlzFrameSetEnable(frame, true)
-            convert_button:enable(IS_CONVERTING_PLAT[pid] or false)
-        end
-    end
-
-    convert_button = SimpleButton.create(converter_frame, "ReplaceableTextures\\CommandButtons\\BTNConvert.blp", 0.017, 0.017, FRAMEPOINT_CENTER, FRAMEPOINT_CENTER, -0.0975, -0.0025, on_convert, "Must purchase a converter to use!", FRAMEPOINT_TOP, FRAMEPOINT_BOTTOM)
-    convert_button:enable(false)
-
     local function on_cleanup(pid)
         IS_CONVERTER_PURCHASED[pid] = false
         IS_CONVERTING_PLAT[pid] = false
-        refresh_converter_button(pid)
+        notify_converter_changed(pid)
     end
     local U = User.first
     while U do
@@ -125,12 +103,31 @@ OnInit.final("Currency", function(Require)
         return IS_CONVERTER_PURCHASED[pid] == true
     end
 
+    ---@param pid integer
+    ---@return boolean
+    function IsCurrencyConverterEnabled(pid)
+        return IS_CONVERTER_PURCHASED[pid] == true
+            and IS_CONVERTING_PLAT[pid] == true
+    end
+
+    ---@param pid integer
+    ---@return boolean
+    function ToggleCurrencyConverter(pid)
+        if not IS_CONVERTER_PURCHASED[pid] then
+            return false
+        end
+
+        IS_CONVERTING_PLAT[pid] = not IS_CONVERTING_PLAT[pid]
+        notify_converter_changed(pid)
+        return IS_CONVERTING_PLAT[pid]
+    end
+
     ---Marks the synchronized converter service as purchased. Charging remains
     ---the responsibility of its transaction immediately before this call.
     ---@param pid integer
     function GrantCurrencyConverter(pid)
         IS_CONVERTER_PURCHASED[pid] = true
-        refresh_converter_button(pid)
+        notify_converter_changed(pid)
     end
 
     -- crystal to gold
@@ -167,23 +164,16 @@ OnInit.final("Currency", function(Require)
         [GOLD] = function(pid, amount) SetPlayerState(player_from_pid(pid), PLAYER_STATE_RESOURCE_GOLD, amount) end,
         [PLATINUM] = function(pid, amount) SetPlayerState(player_from_pid(pid), PLAYER_STATE_RESOURCE_LUMBER, amount) end,
         [CRYSTAL] = function(pid, amount) SetPlayerState(player_from_pid(pid), PLAYER_STATE_RESOURCE_FOOD_USED, amount) end,
-        [HONOR] = function (pid, amount)
-            if is_local_player(pid) then
-                BlzFrameSetText(HONOR_TEXT, amount)
-            end
-        end,
-        [FACTION] = function(pid, amount)
-            if is_local_player(pid) then
-                BlzFrameSetText(FACTION_TEXT, amount)
-            end
-        end,
     }
 
     ---@type fun(pid: integer, index: integer, amount: integer)
     function SetCurrency(pid, index, amount)
         amount = math.max(0, amount)
         CURRENCY[currency_key(pid, index)] = amount
-        setter[index](pid, amount)
+        local set_player_state = setter[index]
+        if set_player_state then
+            set_player_state(pid, amount)
+        end
         notify_currency_changed(pid, index, amount)
     end
 

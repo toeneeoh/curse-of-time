@@ -39,6 +39,7 @@ OnInit.final("ArchitectureTests", function(Require)
     Require('MainMap')
     Require('HelpText')
     Require('HintConfig')
+    Require('CurrencyDisplay')
 
     ArchitectureTests = {
         tests = {},

@@ -93,6 +93,11 @@ if ($manifest -match 'legacy_helpers\.lua') {
     $failures.Add('Legacy helper module is present in the bootstrap manifest')
 }
 
+$currencySource = Get-Content -LiteralPath (Join-Path $sourcePath 'gameplay\economy\currency.lua') -Raw
+if ($currencySource -match '\b(BlzCreateFrame|BlzFrame|GetLocalPlayer|RESOURCE_BAR|HONOR_TEXT|FACTION_TEXT)') {
+    $failures.Add('Currency gameplay module contains HUD presentation logic')
+}
+
 foreach ($file in $sourceFiles) {
     $source = Get-Content -LiteralPath $file.FullName -Raw
     if ($source -match 'Require\(["'']Helper["'']\)') {
