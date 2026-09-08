@@ -216,6 +216,8 @@ OnInit.final("Colosseum", function(Require)
         local RAGE = FourCC('A02E')
         local SPINNING_GLAIVES = FourCC('A02L')
         local ARCANE_ORB = FourCC('A02S')
+        local GRAVITY_WELL = FourCC('A02Z')
+        local VOID_SWEEP = FourCC('A033')
         local list = {}
         local active = {}
         local callbacks = {}
@@ -356,7 +358,7 @@ OnInit.final("Colosseum", function(Require)
             BossAffix.stop()
             boss = which_boss
 
-            local count = wave >= 10 and 2 or 1
+            local count = math.min(4, wave // 5)
             active = pickN(count, list)
             local names = {}
 
@@ -719,6 +721,227 @@ OnInit.final("Colosseum", function(Require)
             end
 
             BossAffix.create(ARCANE_ORB, "Arcane Orb", start_arcane_orb)
+        end
+
+        do
+            local WELL_PERIOD = 16.
+            local WARNING_DURATION = 1.75
+            local PULL_DURATION = 4.
+            local PULL_INTERVAL = 0.125
+            local PULL_RADIUS = 700.
+            local PULL_SPEED = 85.
+            local DANGER_RADIUS = 190.
+            local well_effect ---@type effect?
+
+            local function stop_gravity_well()
+                if well_effect then
+                    DestroyEffect(well_effect)
+                    well_effect = nil
+                end
+            end
+
+            local function start_gravity_well(queue)
+                local function cast(expected_generation)
+                    if expected_generation ~= generation or not boss or not UnitAlive(boss) then
+                        return
+                    end
+                    if not begin_boss_cast(GRAVITY_WELL, "Gravity Well", 1.) then
+                        queue(0.5, cast)
+                        return
+                    end
+
+                    local target = Hero[players[random(1, #players)]]
+                    local x = target and GetUnitX(target) or colo_x
+                    local y = target and GetUnitY(target) or colo_y
+                    local warning = {
+                        active = true,
+                        effect = AddSpecialEffect("Indicators\\circle.mdl", x, y),
+                        x = x,
+                        y = y,
+                    }
+                    BlzSetSpecialEffectScale(warning.effect, PULL_RADIUS / 500.)
+                    indicators[#indicators + 1] = warning
+
+                    local function pull(expected, remaining)
+                        if expected ~= generation or not boss or not UnitAlive(boss) then
+                            stop_gravity_well()
+                            return
+                        end
+
+                        for _, pid in ipairs(players) do
+                            local hero = Hero[pid]
+                            if hero and UnitAlive(hero) then
+                                local dx = x - GetUnitX(hero)
+                                local dy = y - GetUnitY(hero)
+                                local distance = math.sqrt(dx * dx + dy * dy)
+                                if distance > DANGER_RADIUS and distance <= PULL_RADIUS then
+                                    CAT_Knockback(hero, PULL_SPEED * dx / distance, PULL_SPEED * dy / distance, 0.)
+                                end
+                            end
+                        end
+
+                        if remaining > PULL_INTERVAL then
+                            queue(PULL_INTERVAL, pull, remaining - PULL_INTERVAL)
+                        else
+                            stop_gravity_well()
+                            DestroyEffect(AddSpecialEffect(
+                                "Abilities\\Spells\\Undead\\Darksummoning\\DarkSummonTarget.mdl",
+                                x,
+                                y
+                            ))
+                            damage_area(x, y, DANGER_RADIUS, 0.4, "Gravity Well")
+                        end
+                    end
+
+                    local function activate(expected)
+                        if expected ~= generation or not boss or not UnitAlive(boss) then
+                            remove_indicator(warning)
+                            return
+                        end
+
+                        remove_indicator(warning)
+                        stop_gravity_well()
+                        well_effect = AddSpecialEffect(
+                            "Abilities\\Spells\\Undead\\DeathAndDecay\\DeathandDecayTarget.mdl",
+                            x,
+                            y
+                        )
+                        BlzSetSpecialEffectScale(well_effect, 1.6)
+                        pull(expected, PULL_DURATION)
+                    end
+
+                    queue(WARNING_DURATION, activate)
+                    queue(WELL_PERIOD, cast)
+                end
+
+                queue(6., cast)
+            end
+
+            BossAffix.create(GRAVITY_WELL, "Gravity Well", start_gravity_well, stop_gravity_well)
+        end
+
+        do
+            local SWEEP_PERIOD = 14.
+            local WARNING_DURATION = 1.5
+            local SWEEP_DURATION = 2.5
+            local SWEEP_INTERVAL = 0.05
+            local SWEEP_RANGE = 1350.
+            local SWEEP_WIDTH = 95.
+            local SWEEP_ARC = 120. * bj_DEGTORAD
+            local LIGHTNING_OFFSETS = { -45., 0., 45. }
+            local sweep_lightnings = {} ---@type lightning[]
+
+            local function stop_void_sweep()
+                for _, lightning in ipairs(sweep_lightnings) do
+                    DestroyLightning(lightning)
+                end
+                sweep_lightnings = {}
+            end
+
+            local function start_void_sweep(queue)
+                local function cast(expected_generation)
+                    if expected_generation ~= generation or not boss or not UnitAlive(boss) then
+                        return
+                    end
+                    if not begin_boss_cast(VOID_SWEEP, "Void Sweep", 1.) then
+                        queue(0.5, cast)
+                        return
+                    end
+
+                    local x, y = GetUnitX(boss), GetUnitY(boss)
+                    local target = Hero[players[random(1, #players)]]
+                    local target_angle = target and math.atan(GetUnitY(target) - y, GetUnitX(target) - x)
+                        or random() * 2. * bj_PI
+                    local start_angle = target_angle - SWEEP_ARC * 0.5
+                    local warnings = {}
+
+                    for distance = 300., 1200., 300. do
+                        local warning = {
+                            active = true,
+                            effect = AddSpecialEffect(
+                                "Indicators\\moving arrows.mdl",
+                                x + distance * math.cos(start_angle),
+                                y + distance * math.sin(start_angle)
+                            ),
+                        }
+                        BlzSetSpecialEffectScale(warning.effect, 0.4)
+                        BlzSetSpecialEffectYaw(warning.effect, start_angle + bj_PI * 0.5)
+                        indicators[#indicators + 1] = warning
+                        warnings[#warnings + 1] = warning
+                    end
+
+                    local function sweep(expected, elapsed, hits)
+                        if expected ~= generation or not boss or not UnitAlive(boss) then
+                            stop_void_sweep()
+                            return
+                        end
+
+                        local angle = start_angle + SWEEP_ARC * math.min(1., elapsed / SWEEP_DURATION)
+                        local cos_angle = math.cos(angle)
+                        local sin_angle = math.sin(angle)
+                        local end_x = x + SWEEP_RANGE * cos_angle
+                        local end_y = y + SWEEP_RANGE * sin_angle
+                        local start_z = BlzGetUnitZ(boss) + 100.
+                        local end_z = GetTerrainZ(end_x, end_y) + 100.
+
+                        for index, offset in ipairs(LIGHTNING_OFFSETS) do
+                            local offset_x = -sin_angle * offset
+                            local offset_y = cos_angle * offset
+                            if not sweep_lightnings[index] then
+                                sweep_lightnings[index] = AddLightningEx(
+                                    "DRAL", true, x + offset_x, y + offset_y, start_z,
+                                    end_x + offset_x, end_y + offset_y, end_z
+                                )
+                            else
+                                MoveLightningEx(
+                                    sweep_lightnings[index], true,
+                                    x + offset_x, y + offset_y, start_z,
+                                    end_x + offset_x, end_y + offset_y, end_z
+                                )
+                            end
+                        end
+
+                        for _, pid in ipairs(players) do
+                            local hero = Hero[pid]
+                            if hero and UnitAlive(hero) and not hits[hero] then
+                                local dx = GetUnitX(hero) - x
+                                local dy = GetUnitY(hero) - y
+                                local forward = dx * cos_angle + dy * sin_angle
+                                local sideways = math.abs(-dx * sin_angle + dy * cos_angle)
+                                if forward >= 0. and forward <= SWEEP_RANGE and sideways <= SWEEP_WIDTH then
+                                    hits[hero] = true
+                                    DamageTarget(boss, hero, BlzGetUnitMaxHP(hero) * 0.3, ATTACK_TYPE_NORMAL, MAGIC, "Void Sweep")
+                                end
+                            end
+                        end
+
+                        if elapsed < SWEEP_DURATION then
+                            queue(SWEEP_INTERVAL, sweep, elapsed + SWEEP_INTERVAL, hits)
+                        else
+                            stop_void_sweep()
+                        end
+                    end
+
+                    local function activate(expected)
+                        for _, warning in ipairs(warnings) do
+                            remove_indicator(warning)
+                        end
+                        if expected ~= generation or not boss or not UnitAlive(boss) then
+                            return
+                        end
+
+                        stop_void_sweep()
+                        sweep(expected, 0., {})
+                    end
+
+                    queue(WARNING_DURATION, activate)
+                    queue(SWEEP_PERIOD, cast)
+                end
+
+                queue(5., cast)
+            end
+
+            BossAffix.create(VOID_SWEEP, "Void Sweep", start_void_sweep, stop_void_sweep)
         end
     end
 
@@ -1316,6 +1539,247 @@ OnInit.final("Colosseum", function(Require)
         end
     end
 
+    local pursuit = Encounter.create("Pursuit", "Every |cffffcc0010|r seconds, each player leaves a trail of |cffffcc003|r delayed explosions. Each explosion deals |cffffcc0018%|r max health magic damage."
+    , "ReplaceableTextures\\CommandButtons\\BTNClusterRockets.blp")
+    do
+        local generation = 0
+        local callbacks = {}
+        local warnings = {}
+
+        local function schedule(delay, callback, ...)
+            local id = TimerQueue:callDelayed(delay, callback, generation, ...)
+            callbacks[#callbacks + 1] = id
+        end
+
+        local function remove_warning(warning)
+            if warning.active then
+                warning.active = false
+                DestroyEffect(warning.effect)
+            end
+        end
+
+        local function detonate(expected_generation, warning)
+            if expected_generation ~= generation or not warning.active then
+                return
+            end
+
+            remove_warning(warning)
+            DestroyEffect(AddSpecialEffect(
+                "Abilities\\Spells\\Orc\\WarStomp\\WarStompCaster.mdl",
+                warning.x,
+                warning.y
+            ))
+            for _, pid in ipairs(players) do
+                local hero = Hero[pid]
+                if hero and UnitAlive(hero) and IsUnitInRangeXY(hero, warning.x, warning.y, 225.) then
+                    DamageTarget(DUMMY_UNIT, hero, BlzGetUnitMaxHP(hero) * 0.18, ATTACK_TYPE_NORMAL, MAGIC, "Pursuit")
+                end
+            end
+        end
+
+        local function mark(expected_generation, hero, remaining)
+            if expected_generation ~= generation or not hero or not UnitAlive(hero) then
+                return
+            end
+
+            local x, y = GetUnitX(hero), GetUnitY(hero)
+            local warning = {
+                active = true,
+                effect = AddSpecialEffect("Indicators\\circle.mdl", x, y),
+                x = x,
+                y = y,
+            }
+            BlzSetSpecialEffectScale(warning.effect, 0.45)
+            warnings[#warnings + 1] = warning
+            schedule(1.5, detonate, warning)
+
+            if remaining > 1 then
+                schedule(0.6, mark, hero, remaining - 1)
+            end
+        end
+
+        local function start_pursuit(expected_generation)
+            if expected_generation ~= generation then
+                return
+            end
+
+            for _, pid in ipairs(players) do
+                mark(expected_generation, Hero[pid], 3)
+            end
+            schedule(10., start_pursuit)
+        end
+
+        pursuit.end_wave = function()
+            generation = generation + 1
+            for _, callback in ipairs(callbacks) do
+                TimerQueue:disableCallback(callback)
+            end
+            callbacks = {}
+            for _, warning in ipairs(warnings) do
+                remove_warning(warning)
+            end
+            warnings = {}
+        end
+        pursuit.start_wave = function()
+            pursuit.end_wave()
+            schedule(7., start_pursuit)
+        end
+    end
+
+    local crossfire = Encounter.create("Crossfire", "Every |cffffcc009|r seconds, opposing projectile walls cross the arena with two safe lanes. Each projectile deals |cffffcc0020%|r max health magic damage."
+    , "ReplaceableTextures\\CommandButtons\\BTNScatterRockets.blp")
+    do
+        local generation = 0
+        local callbacks = {}
+        local warnings = {}
+        local missiles = {}
+
+        local function destroy_crossfire_missile(missile)
+            missile.active = false
+            if missile.visual then
+                DestroyEffect(missile.visual)
+                missile.visual = nil
+            end
+        end
+
+        local missile_template = {
+            selfInteractions = {
+                CAT_MoveAutoHeight,
+                CAT_Orient2D,
+                CAT_Decay,
+            },
+            interactions = {
+                unit = CAT_UnitCollisionCheck2D,
+            },
+            identifier = "missile",
+            collisionRadius = 90.,
+            friendlyFire = false,
+            visualZ = 35.,
+            speed = 1000.,
+            maxSpeed = 1000.,
+            lifetime = 3.4,
+            owner = PLAYER_CREEP,
+            onUnitCollision = CAT_UnitPassThrough2D,
+            onUnitCallback = function(self, target)
+                if not self.hits[target] then
+                    self.hits[target] = true
+                    for _, pid in ipairs(players) do
+                        if Hero[pid] == target and UnitAlive(target) then
+                            DamageTarget(DUMMY_UNIT, target, BlzGetUnitMaxHP(target) * 0.2, ATTACK_TYPE_NORMAL, MAGIC, "Crossfire")
+                            return
+                        end
+                    end
+                end
+            end,
+            destroy = destroy_crossfire_missile,
+        }
+        missile_template.__index = missile_template
+
+        local function schedule(delay, callback, ...)
+            local id = TimerQueue:callDelayed(delay, callback, generation, ...)
+            callbacks[#callbacks + 1] = id
+        end
+
+        local function clear_warning(warning)
+            if warning.active then
+                warning.active = false
+                DestroyEffect(warning.effect)
+            end
+        end
+
+        local function launch(expected_generation, volley)
+            for _, warning in ipairs(warnings) do
+                clear_warning(warning)
+            end
+            warnings = {}
+
+            if expected_generation ~= generation then
+                return
+            end
+
+            for _, data in ipairs(volley) do
+                local missile = setmetatable({
+                    active = true,
+                    x = data.x,
+                    y = data.y,
+                    vx = data.vx,
+                    vy = data.vy,
+                    hits = {},
+                }, missile_template)
+                missile.visual = AddSpecialEffect(
+                    "war3mapImported\\HighSpeedProjectile_ByEpsilon.mdx",
+                    missile.x,
+                    missile.y
+                )
+                missiles[#missiles + 1] = missile
+                ALICE_Create(missile)
+            end
+        end
+
+        local function start_crossfire(expected_generation)
+            if expected_generation ~= generation then
+                return
+            end
+
+            local angle = random() * bj_PI
+            local cos_angle = math.cos(angle)
+            local sin_angle = math.sin(angle)
+            local perpendicular_x = -sin_angle
+            local perpendicular_y = cos_angle
+            local safe_lane = random(1, 6)
+            local volley = {}
+
+            for lane = 1, 7 do
+                if lane ~= safe_lane and lane ~= safe_lane + 1 then
+                    local offset = (lane - 4) * 300.
+                    for direction = -1, 1, 2 do
+                        local x = colo_x + perpendicular_x * offset - cos_angle * ARENA_RADIUS * direction
+                        local y = colo_y + perpendicular_y * offset - sin_angle * ARENA_RADIUS * direction
+                        volley[#volley + 1] = {
+                            x = x,
+                            y = y,
+                            vx = cos_angle * 1000. * direction,
+                            vy = sin_angle * 1000. * direction,
+                        }
+
+                        local warning = {
+                            active = true,
+                            effect = AddSpecialEffect("Indicators\\moving arrows.mdl", x, y),
+                        }
+                        BlzSetSpecialEffectScale(warning.effect, 0.4)
+                        BlzSetSpecialEffectYaw(warning.effect, direction > 0 and angle or angle + bj_PI)
+                        warnings[#warnings + 1] = warning
+                    end
+                end
+            end
+
+            schedule(1.75, launch, volley)
+            schedule(9., start_crossfire)
+        end
+
+        crossfire.end_wave = function()
+            generation = generation + 1
+            for _, callback in ipairs(callbacks) do
+                TimerQueue:disableCallback(callback)
+            end
+            callbacks = {}
+            for _, warning in ipairs(warnings) do
+                clear_warning(warning)
+            end
+            warnings = {}
+            for _, missile in ipairs(missiles) do
+                if missile.active then
+                    ALICE_Kill(missile)
+                end
+            end
+            missiles = {}
+        end
+        crossfire.start_wave = function()
+            crossfire.end_wave()
+            schedule(6., start_crossfire)
+        end
+    end
+
     ---@class Augment
     ---@field display function
     ---@field create function
@@ -1706,6 +2170,42 @@ OnInit.final("Colosseum", function(Require)
         end
         battle_trance.start_wave = function(pid)
             BattleTranceBuff:add(Hero[pid], Hero[pid])
+        end
+    end
+    local bloodsport = Augment.create("Bloodsport", "Killing an enemy during a wave restores |cffffcc003%|r Max Health and Max Mana.", "ReplaceableTextures\\CommandButtons\\BTNVampiricAura.blp", "defense")
+    do
+        bloodsport.cleanup = function(pid)
+            BloodsportBuff:dispel(nil, Hero[pid])
+        end
+        bloodsport.end_wave = function(pid)
+            bloodsport.cleanup(pid)
+        end
+        bloodsport.start_wave = function(pid)
+            BloodsportBuff:add(Hero[pid], Hero[pid])
+        end
+    end
+    local colossus_slayer = Augment.create("Colossus Slayer", "Deal |cffffcc0035%|r increased damage to Colosseum bosses.", "ReplaceableTextures\\CommandButtons\\BTNCriticalStrike.blp", "offense")
+    do
+        colossus_slayer.cleanup = function(pid)
+            ColossusSlayerBuff:dispel(nil, Hero[pid])
+        end
+        colossus_slayer.end_wave = function(pid)
+            colossus_slayer.cleanup(pid)
+        end
+        colossus_slayer.start_wave = function(pid)
+            ColossusSlayerBuff:add(Hero[pid], Hero[pid])
+        end
+    end
+    local fleet_footed = Augment.create("Fleet-Footed", "Gain |cffffcc0020%|r movespeed and |cffffcc0015%|r evasion during waves.", "ReplaceableTextures\\CommandButtons\\BTNBootsOfSpeed.blp", "utility")
+    do
+        fleet_footed.cleanup = function(pid)
+            FleetFootedBuff:dispel(nil, Hero[pid])
+        end
+        fleet_footed.end_wave = function(pid)
+            fleet_footed.cleanup(pid)
+        end
+        fleet_footed.start_wave = function(pid)
+            FleetFootedBuff:add(Hero[pid], Hero[pid])
         end
     end
     local healing_expert = Augment.create("Healing Expert", "At the end of each wave, fully restore health, mana, and potion charges.", "trans32.blp", "defense")

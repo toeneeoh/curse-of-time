@@ -150,7 +150,6 @@ OnInit.final("BuffsWorldColosseum", function(Require)
         function thistype:onApply()
             self.active = true
             self.sfx = Unit[self.target]:addEffect("spinning fire.mdl", "origin")
-            self.sfx.scale = 0.6
             periodic(self)
         end
     end
@@ -178,6 +177,90 @@ OnInit.final("BuffsWorldColosseum", function(Require)
             self.spellboost = 0.25
             unit.damage_percent = unit.damage_percent + self.attack
             unit.spellboost = unit.spellboost + self.spellboost
+        end
+    end
+
+    ---@class BloodsportBuff : Buff
+    BloodsportBuff = Buff.new()
+    do
+        local thistype = BloodsportBuff
+        thistype.NAME            = "Bloodsport"
+        thistype.DESC            = "Killing an enemy restores ^$restore% Max Health and Max Mana"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNVampiricAura.blp"
+        thistype.AURA            = true
+        thistype.DISPEL_TYPE     = BUFF_POSITIVE
+        thistype.STACK_TYPE      = BUFF_STACK_NONE
+
+        local function on_kill(source)
+            local self = thistype:get(nil, source)
+            if self then
+                HP(source, source, BlzGetUnitMaxHP(source) * self.restore, thistype.NAME)
+                MP(source, BlzGetUnitMaxMana(source) * self.restore)
+            end
+        end
+
+        function thistype:onRemove()
+            EVENT_ON_KILL:unregister_unit_action(self.target, on_kill)
+        end
+
+        function thistype:onApply()
+            self.restore = 0.03
+            EVENT_ON_KILL:register_unit_action(self.target, on_kill)
+        end
+    end
+
+    ---@class ColossusSlayerBuff : Buff
+    ColossusSlayerBuff = Buff.new()
+    do
+        local thistype = ColossusSlayerBuff
+        local COLOSSEUM_BOSS_ID = FourCC('N003')
+        thistype.NAME            = "Colossus Slayer"
+        thistype.DESC            = "This unit deals +^$damage% damage to Colosseum bosses"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNCriticalStrike.blp"
+        thistype.AURA            = true
+        thistype.DISPEL_TYPE     = BUFF_POSITIVE
+        thistype.STACK_TYPE      = BUFF_STACK_NONE
+
+        local function on_hit(source, target, amount)
+            local self = thistype:get(nil, source)
+            if self and GetUnitTypeId(target) == COLOSSEUM_BOSS_ID then
+                amount.value = amount.value * (1. + self.damage)
+            end
+        end
+
+        function thistype:onRemove()
+            EVENT_ON_HIT_MULTIPLIER:unregister_unit_action(self.target, on_hit)
+        end
+
+        function thistype:onApply()
+            self.damage = 0.35
+            EVENT_ON_HIT_MULTIPLIER:register_unit_action(self.target, on_hit)
+        end
+    end
+
+    ---@class FleetFootedBuff : Buff
+    FleetFootedBuff = Buff.new()
+    do
+        local thistype = FleetFootedBuff
+        thistype.NAME            = "Fleet-Footed"
+        thistype.DESC            = "This unit has +^$ms% movespeed and +$evasion% evasion"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNBootsOfSpeed.blp"
+        thistype.AURA            = true
+        thistype.DISPEL_TYPE     = BUFF_POSITIVE
+        thistype.STACK_TYPE      = BUFF_STACK_NONE
+
+        function thistype:onRemove()
+            local unit = Unit[self.target]
+            unit.ms_percent = unit.ms_percent - self.ms
+            unit.evasion = unit.evasion - self.evasion
+        end
+
+        function thistype:onApply()
+            local unit = Unit[self.target]
+            self.ms = 0.2
+            self.evasion = 15
+            unit.ms_percent = unit.ms_percent + self.ms
+            unit.evasion = unit.evasion + self.evasion
         end
     end
 
