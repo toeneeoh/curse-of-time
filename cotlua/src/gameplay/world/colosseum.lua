@@ -531,10 +531,16 @@ OnInit.final("Colosseum", function(Require)
         players[#players + 1] = pid
 
         -- adjust difficulty
-        total_level = total_level + GetUnitLevel(Hero[pid])
-        stat_hp = stat_hp + Unit[Hero[pid]].str + Unit[Hero[pid]].agi + Unit[Hero[pid]].int
-        stat_armor = stat_armor + (Unit[Hero[pid]].agi + Unit[Hero[pid]].int) * 0.1
-        stat_dmg = stat_dmg + Unit[Hero[pid]].str + Unit[Hero[pid]].agi
+        local hero = Hero[pid]
+        local unit = Unit[hero]
+        local strength = unit.str + unit.bonus_str
+        local agility = unit.agi + unit.bonus_agi
+        local intelligence = unit.int + unit.bonus_int
+
+        total_level = total_level + GetUnitLevel(hero)
+        stat_hp = stat_hp + strength + agility + intelligence
+        stat_armor = stat_armor + (agility + intelligence) * 0.1
+        stat_dmg = stat_dmg + strength + agility
 
         -- disable inventory
         DisableItems(pid, true)
