@@ -40,7 +40,10 @@ OnInit.final("Colosseum", function(Require)
     -- At level 200, enemies adopt the overworld's chaos defense so magic and
     -- non-chaos physical damage cannot bypass late-game durability. At level 250,
     -- they adopt chaos attacks; their displayed damage is divided by the matching
-    -- damage-system multiplier so this type transition does not alter actual DPS.
+    -- damage-system multiplier so this type transition does not itself alter DPS.
+    -- Enemy damage then ramps by 4% of the baseline per level beyond 200. This
+    -- reaches 9x at level 400 and 13x at level 500, matching the threat growth of
+    -- late overworld enemies without exposing players to the raw 350x type jump.
     -- Each entrant contributes their highest total attribute to every stat-derived
     -- term, so Strength, Agility, and Intelligence heroes scale the encounter alike.
     -- At 0.0003 armor per point, 500,000 primary attribute adds 150 armor, keeping a level-400
@@ -114,6 +117,7 @@ OnInit.final("Colosseum", function(Require)
     local CHAOS_ARMOR_LEVEL = 200
     local CHAOS_ATTACK_LEVEL = 250
     local STAT_ARMOR_PER_ATTRIBUTE = 0.0003
+    local LATE_GAME_DAMAGE_PER_LEVEL = 0.04
 
     -- unit stats
     local stat_hp = 0
@@ -121,6 +125,11 @@ OnInit.final("Colosseum", function(Require)
     local stat_armor = 0
 
     local coin_effect
+
+    local function get_enemy_damage_multiplier()
+        local scaled_level = math.min(MAX_LEVEL, average_level)
+        return 1. + math.max(0., scaled_level - CHAOS_ARMOR_LEVEL) * LATE_GAME_DAMAGE_PER_LEVEL
+    end
 
     local wave_formations = {
         {
@@ -700,7 +709,7 @@ OnInit.final("Colosseum", function(Require)
                         x,
                         y
                     )
-                    BlzSetSpecialEffectScale(orb.visual, 0.85)
+                    BlzSetSpecialEffectScale(orb.visual, 1.05)
                     launch_projectile(orb)
 
                     queue(ORB_PERIOD, cast)
@@ -794,7 +803,7 @@ OnInit.final("Colosseum", function(Require)
         local spawn = 2
         local wave_mult = (0.95 + wave * 0.05)
         local player_count = #players
-        local dmg = R2I(stat_dmg / player_count + average_level * BOSS_DAMAGE * wave_mult * party_damage_mult)
+        local dmg = R2I((stat_dmg / player_count + average_level * BOSS_DAMAGE * wave_mult * party_damage_mult) * get_enemy_damage_multiplier())
         local hp = R2I(stat_hp / player_count + average_level * BOSS_HP * wave_mult * party_health_mult)
         local armor = stat_armor / player_count + average_level * BOSS_ARMOR * wave_mult
 
@@ -828,7 +837,7 @@ OnInit.final("Colosseum", function(Require)
             for _ = 1, entry.count do
                 local spawn = random(1, 3)
                 local u = BlzCreateUnitWithSkin(PLAYER_BOSS, unit_id, colo_x, colo_y, 270., FourCC(skin))
-                local dmg = R2I((stat_dmg / #players + average_level * BASE_DAMAGE * wave_mult * party_damage_mult * num_mult) * role.damage)
+                local dmg = R2I((stat_dmg / #players + average_level * BASE_DAMAGE * wave_mult * party_damage_mult * num_mult) * role.damage * get_enemy_damage_multiplier())
                 local hp = R2I((stat_hp / #players + average_level * BASE_HP * wave_mult * party_health_mult * num_mult) * role.hp)
                 local armor = (stat_armor / #players + average_level * BASE_ARMOR * wave_mult) * role.armor
 
@@ -1231,9 +1240,9 @@ OnInit.final("Colosseum", function(Require)
         }
         bullet_template.__index = bullet_template
 
-        -- returns start (sx, sy) on the rim and an inward-facing heading theta with 35 degree variance
-        local function random_rim_and_inward_theta(cx, cy)
-            local startAngle = math.random() * (2 * math.pi)
+        -- Returns a rim position and an inward-facing heading. The caller spaces
+        -- start angles around the rim so warning lanes do not pile up at center.
+        local function rim_and_inward_theta(cx, cy, startAngle)
             local sx = cx + ARENA_RADIUS * math.cos(startAngle)
             local sy = cy + ARENA_RADIUS * math.sin(startAngle)
 
@@ -1256,11 +1265,15 @@ OnInit.final("Colosseum", function(Require)
         local function bullet_wave()
             local cx = colo_x
             local cy = colo_y
-
             local missiles = {}
+            local count = math.random(5, 6)
+            local angle_step = 2. * math.pi / count
+            local start_rotation = math.random() * 2. * math.pi
 
-            for _ = 1, math.random(5, 6) do
-                local sx, sy, theta = random_rim_and_inward_theta(cx, cy)
+            for index = 1, count do
+                local jitter = (math.random() - 0.5) * angle_step * 0.3
+                local start_angle = start_rotation + (index - 1) * angle_step + jitter
+                local sx, sy, theta = rim_and_inward_theta(cx, cy, start_angle)
 
                 -- place bullet indicators
                 local sfx, x, y
@@ -1319,6 +1332,9 @@ OnInit.final("Colosseum", function(Require)
             utility = {},
         }
         local player_choices = {}
+        local list = {}
+        local dev_reroll_index = __jarray(1) ---@type integer[]
+        local augment_chosen = {}
         local wave_offset -- lazy augment indexing
 
         --#region frame setup
@@ -1364,9 +1380,63 @@ OnInit.final("Colosseum", function(Require)
         end
         show_hide_button:onClick(on_show_hide)
 
+        local function refresh_choice_text(pid)
+            if GetLocalPlayer() ~= Player(pid - 1) then
+                return
+            end
+
+            for i = 1, 3 do
+                local choice = player_choices[pid][i + wave_offset]
+                BlzFrameSetText(augment_desc[i], choice.desc)
+                BlzFrameSetText(augment_name[i], choice.name)
+            end
+        end
+
+        local dev_reroll_button = SimpleButton.create(
+            frame,
+            "ReplaceableTextures\\CommandButtons\\BTNEngineeringUpgrade.blp",
+            0.025,
+            0.025,
+            FRAMEPOINT_TOPLEFT,
+            FRAMEPOINT_TOPLEFT,
+            0.02,
+            -0.065,
+            nil,
+            "|cffffcc00DEV: Cycle Augments|r|nCycles through every augment in groups of three."
+        )
+        dev_reroll_button:visible(false)
+        dev_reroll_button:onClick(function()
+            local pid = GetPlayerId(GetTriggerPlayer()) + 1
+            local frame_handle = BlzGetTriggerFrame()
+
+            BlzFrameSetEnable(frame_handle, false)
+            BlzFrameSetEnable(frame_handle, true)
+
+            if not DEV_ENABLED or augment_chosen[pid] or #list == 0 then
+                return
+            end
+
+            local cursor = dev_reroll_index[pid]
+            local choices = {}
+            for i = 1, 3 do
+                local attempts = 0
+                local choice
+                repeat
+                    choice = list[cursor]
+                    cursor = cursor % #list + 1
+                    attempts = attempts + 1
+                until attempts >= #list
+                    or (not TableHas(active[pid], choice) and not TableHas(choices, choice))
+
+                choices[i] = choice
+                player_choices[pid][i + wave_offset] = choice
+            end
+            dev_reroll_index[pid] = cursor
+            refresh_choice_text(pid)
+        end)
+
         --  reverse map
         local button_map = {}
-        local augment_chosen = {}
 
         local on_pick_augment = function()
             local pid = GetPlayerId(GetTriggerPlayer()) + 1
@@ -1518,11 +1588,8 @@ OnInit.final("Colosseum", function(Require)
             end
 
             BlzFrameSetVisible(frame, true)
-
-            for i = 1, 3 do
-                BlzFrameSetText(augment_desc[i], player_choices[pid][i + wave_offset].desc)
-                BlzFrameSetText(augment_name[i], player_choices[pid][i + wave_offset].name)
-            end
+            dev_reroll_button:visible(DEV_ENABLED)
+            refresh_choice_text(pid)
         end
 
         ---@type fun(name: string, desc: string, icon: string, category?: string): Augment
@@ -1535,6 +1602,7 @@ OnInit.final("Colosseum", function(Require)
             self.category = category or "utility"
 
             by_category[self.category][#by_category[self.category] + 1] = self
+            list[#list + 1] = self
 
             return self
         end
@@ -1579,6 +1647,9 @@ OnInit.final("Colosseum", function(Require)
 
             local hp = R2I(stat_hp / #players + average_level * BASE_HP * party_health_mult * 50)
             BlzSetUnitMaxHP(bag, hp)
+            if average_level >= CHAOS_ARMOR_LEVEL then
+                BlzSetUnitIntegerField(bag, UNIT_IF_DEFENSE_TYPE, ARMOR_CHAOS)
+            end
             SetWidgetLife(bag, hp)
 
             if not callback then
@@ -1627,11 +1698,14 @@ OnInit.final("Colosseum", function(Require)
     end
     local battle_trance = Augment.create("Battle Trance", "Your hero gains |cffffcc0025%|r attack damage and |cffffcc0025%|r Spellboost.", "ReplaceableTextures\\CommandButtons\\BTNBloodLust.blp", "offense")
     do
-        battle_trance.on_pick = function(pid)
-            BattleTranceBuff:add(Hero[pid], Hero[pid])
-        end
         battle_trance.cleanup = function(pid)
             BattleTranceBuff:dispel(nil, Hero[pid])
+        end
+        battle_trance.end_wave = function(pid)
+            battle_trance.cleanup(pid)
+        end
+        battle_trance.start_wave = function(pid)
+            BattleTranceBuff:add(Hero[pid], Hero[pid])
         end
     end
     local healing_expert = Augment.create("Healing Expert", "At the end of each wave, fully restore health, mana, and potion charges.", "trans32.blp", "defense")
