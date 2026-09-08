@@ -122,18 +122,33 @@ OnInit.final("BuffsWorldColosseum", function(Require)
         end
 
         local function periodic(self)
+            if not self.active then
+                return
+            end
+
+            self.callback = nil
             local x, y = GetUnitX(self.target), GetUnitY(self.target)
             self.dmg = GetHeroStat(HighestStat(self.target, true), self.target, true)
             ALICE_ForAllObjectsInRangeDo(damage_target, x, y, 900., "unit", valid_damage_target, self.target, self.dmg)
-            self.callback = TQ:callDelayed(1., periodic, self)
+
+            -- Damage callbacks can synchronously end the Colosseum and remove this
+            -- buff. Do not let the currently executing tick revive its timer chain.
+            if self.active then
+                self.callback = TQ:callDelayed(1., periodic, self)
+            end
         end
 
         function thistype:onRemove()
+            self.active = false
             Unit[self.target]:removeEffect(self.sfx)
-            TQ:disableCallback(self.callback)
+            if self.callback then
+                TQ:disableCallback(self.callback)
+                self.callback = nil
+            end
         end
 
         function thistype:onApply()
+            self.active = true
             self.sfx = Unit[self.target]:addEffect("spinning fire.mdl", "origin")
             self.sfx.scale = 0.6
             periodic(self)
