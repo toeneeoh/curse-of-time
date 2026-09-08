@@ -7,6 +7,8 @@ OnInit.final("Colosseum", function(Require)
     Require('Currency')
     Require('AbilityCasting')
     Require('FloatingText')
+    Require('Damage')
+    Require('BuffsWorldColosseum')
 
     local GetRectCenterXY = function(whichRect)
         return { x = GetRectCenterX(whichRect), y = GetRectCenterY(whichRect) }
@@ -35,6 +37,14 @@ OnInit.final("Colosseum", function(Require)
     -- Extra players add 65% health and 10% damage each, enough to require group
     -- effort without repeating the old superlinear party scaling. Every fifth
     -- wave is a boss, where affixes and avoidable mechanics supply the difficulty.
+    -- At level 200, enemies adopt the overworld's chaos defense so magic and
+    -- non-chaos physical damage cannot bypass late-game durability. At level 250,
+    -- they adopt chaos attacks; their displayed damage is divided by the matching
+    -- damage-system multiplier so this type transition does not alter actual DPS.
+    -- Each entrant contributes their highest total attribute to every stat-derived
+    -- term, so Strength, Agility, and Intelligence heroes scale the encounter alike.
+    -- At 0.0003 armor per point, 500,000 primary attribute adds 150 armor, keeping a level-400
+    -- normal wave near the 300-450 armor range used by contemporary overworld mobs.
     -- Coins are paid even on failure, so each is worth 25,000 + 8 * level^2 gold:
     -- about 1.305 platinum at level 400 and 2.025 platinum at level 500. A typical
     -- full level-500 run therefore remains below the guaranteed Naga dungeon gold
@@ -101,6 +111,9 @@ OnInit.final("Colosseum", function(Require)
     local BOSS_ARMOR = 2
     local COIN_BASE_GOLD = 25000
     local COIN_LEVEL_SCALING = 8
+    local CHAOS_ARMOR_LEVEL = 200
+    local CHAOS_ATTACK_LEVEL = 250
+    local STAT_ARMOR_PER_ATTRIBUTE = 0.0003
 
     -- unit stats
     local stat_hp = 0
@@ -746,7 +759,7 @@ OnInit.final("Colosseum", function(Require)
         end
     end
 
-    local setup_unit = function(u, spawn, skin, dmg, hp, armor)
+    local setup_unit = function(u, spawn, skin, dmg, hp, armor, boss)
         SetUnitXBounded(u, colo_spawn[spawn].x)
         SetUnitYBounded(u, colo_spawn[spawn].y)
 
@@ -754,6 +767,13 @@ OnInit.final("Colosseum", function(Require)
         BlzSetHeroProperName(u, GetObjectName(FourCC(skin)))
 
         -- setup stats
+        if average_level >= CHAOS_ARMOR_LEVEL then
+            BlzSetUnitIntegerField(u, UNIT_IF_DEFENSE_TYPE, boss and ARMOR_CHAOS_BOSS or ARMOR_CHAOS)
+        end
+        if average_level >= CHAOS_ATTACK_LEVEL then
+            BlzSetUnitWeaponIntegerField(u, UNIT_WEAPON_IF_ATTACK_ATTACK_TYPE, 0, ATTACK_CHAOS)
+            dmg = math.max(1, R2I(dmg / CHAOS_ATTACK_DAMAGE_MULTIPLIER))
+        end
         BlzSetUnitBaseDamage(u, dmg, 0)
         BlzSetUnitMaxHP(u, hp)
         BlzSetUnitArmor(u, armor)
@@ -778,7 +798,7 @@ OnInit.final("Colosseum", function(Require)
         local hp = R2I(stat_hp / player_count + average_level * BOSS_HP * wave_mult * party_health_mult)
         local armor = stat_armor / player_count + average_level * BOSS_ARMOR * wave_mult
 
-        setup_unit(u, spawn, skin, dmg, hp, armor)
+        setup_unit(u, spawn, skin, dmg, hp, armor, true)
         BossAffix.start(u)
 
         EVENT_ON_UNIT_DEATH:register_unit_action(u, on_boss_kill)
@@ -915,11 +935,12 @@ OnInit.final("Colosseum", function(Require)
         local strength = unit.str + unit.bonus_str
         local agility = unit.agi + unit.bonus_agi
         local intelligence = unit.int + unit.bonus_int
+        local power = math.max(strength, agility, intelligence)
 
         total_level = total_level + GetUnitLevel(hero)
-        stat_hp = stat_hp + strength + agility + intelligence
-        stat_armor = stat_armor + (agility + intelligence) * 0.1
-        stat_dmg = stat_dmg + strength + agility
+        stat_hp = stat_hp + power
+        stat_armor = stat_armor + power * STAT_ARMOR_PER_ATTRIBUTE
+        stat_dmg = stat_dmg + power
 
         -- disable inventory
         DisableItems(pid, true)
@@ -1607,14 +1628,10 @@ OnInit.final("Colosseum", function(Require)
     local battle_trance = Augment.create("Battle Trance", "Your hero gains |cffffcc0025%|r attack damage and |cffffcc0025%|r Spellboost.", "ReplaceableTextures\\CommandButtons\\BTNBloodLust.blp", "offense")
     do
         battle_trance.on_pick = function(pid)
-            local unit = Unit[Hero[pid]]
-            unit.damage_percent = unit.damage_percent + 0.25
-            unit.spellboost = unit.spellboost + 0.25
+            BattleTranceBuff:add(Hero[pid], Hero[pid])
         end
         battle_trance.cleanup = function(pid)
-            local unit = Unit[Hero[pid]]
-            unit.damage_percent = unit.damage_percent - 0.25
-            unit.spellboost = unit.spellboost - 0.25
+            BattleTranceBuff:dispel(nil, Hero[pid])
         end
     end
     local healing_expert = Augment.create("Healing Expert", "At the end of each wave, fully restore health, mana, and potion charges.", "trans32.blp", "defense")

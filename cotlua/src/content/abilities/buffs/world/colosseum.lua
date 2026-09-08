@@ -135,7 +135,34 @@ OnInit.final("BuffsWorldColosseum", function(Require)
 
         function thistype:onApply()
             self.sfx = Unit[self.target]:addEffect("spinning fire.mdl", "origin")
+            self.sfx.scale = 0.6
             periodic(self)
+        end
+    end
+
+    ---@class BattleTranceBuff : Buff
+    BattleTranceBuff = Buff.new()
+    do
+        local thistype = BattleTranceBuff
+        thistype.NAME            = "Battle Trance"
+        thistype.DESC            = "This unit has +^$attack% attack damage and +^$spellboost% Spellboost"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNBloodLust.blp"
+        thistype.AURA            = true
+        thistype.DISPEL_TYPE     = BUFF_POSITIVE
+        thistype.STACK_TYPE      = BUFF_STACK_NONE
+
+        function thistype:onRemove()
+            local unit = Unit[self.target]
+            unit.damage_percent = unit.damage_percent - self.attack
+            unit.spellboost = unit.spellboost - self.spellboost
+        end
+
+        function thistype:onApply()
+            local unit = Unit[self.target]
+            self.attack = 0.25
+            self.spellboost = 0.25
+            unit.damage_percent = unit.damage_percent + self.attack
+            unit.spellboost = unit.spellboost + self.spellboost
         end
     end
 

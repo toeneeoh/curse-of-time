@@ -14,6 +14,8 @@ OnInit.final("Damage", function(Require)
     ATTACK_CHAOS     = 5 ---@type integer 
     ARMOR_CHAOS      = 6 ---@type integer 
     ARMOR_CHAOS_BOSS = 7 ---@type integer 
+    CHAOS_ARMOR_DAMAGE_MULTIPLIER = 0.03 ---@type number
+    CHAOS_ATTACK_DAMAGE_MULTIPLIER = 350. ---@type number
 
     PHYSICAL = DAMAGE_TYPE_NORMAL ---@type damagetype 
     MAGIC    = DAMAGE_TYPE_MAGIC ---@type damagetype 
@@ -89,12 +91,12 @@ OnInit.final("Damage", function(Require)
 
         if TYPE ~= PURE then
             if (dtype == ARMOR_CHAOS or dtype == ARMOR_CHAOS_BOSS) then -- chaos armor
-                amount = amount * 0.03
+                amount = amount * CHAOS_ARMOR_DAMAGE_MULTIPLIER
             end
 
             if TYPE == PHYSICAL then
                 if atype == ATTACK_CHAOS then
-                    amount = amount * 350.
+                    amount = amount * CHAOS_ATTACK_DAMAGE_MULTIPLIER
                 end
 
                 if armor >= 0 then
