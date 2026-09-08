@@ -412,7 +412,7 @@ OnInit.final("ArchitectureTests", function(Require)
     ArchitectureTests.register("unit and item abilities are registered", function()
         local spell_ids = {
             'A071', 'A06C', 'A06O', 'A0B0', 'A02J', 'A0FV',
-            'ACfn', 'A0AJ', 'A02L', 'A01H', 'A015',
+            'ACfn', 'A0AJ', 'A01H', 'A015',
             'Aarm', 'Abas', 'Zs00', 'Zs01', 'Zs02', 'Zs03', 'Zs04', 'Zs05', 'Zs06',
             'A07G', 'A0B5', 'A0C0', 'A09O', 'Areg', 'Abon', 'Ahrt',
             'A01F', 'A03D', 'A061', 'AIbk', 'A018', 'A01S',

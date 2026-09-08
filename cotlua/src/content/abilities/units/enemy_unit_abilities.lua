@@ -2,7 +2,6 @@ OnInit.final("EnemyUnitAbilities", function(Require)
     Require("Spells")
 
     local random = math.random
-    local distance = MISSILE_DISTANCE
 
     local URSA_FROST_NOVA = Spell.define('ACfn')
     do
@@ -24,55 +23,6 @@ OnInit.final("EnemyUnitAbilities", function(Require)
         local function onStruck(target, source)
             if random(1, 5) == 1 then
                 IssueImmediateOrder(target, "waterelemental")
-            end
-        end
-
-        function thistype.onSetup(u)
-            EVENT_ENEMY_AI:register_unit_action(u, onStruck)
-        end
-    end
-
-    local SHOCKWAVE = Spell.define("A02L")
-    do
-        local thistype = SHOCKWAVE
-
-        local missile_template = {
-            selfInteractions = {
-                CAT_MoveAutoHeight,
-                CAT_Orient2D,
-                distance,
-            },
-            interactions = {
-                unit = CAT_UnitCollisionCheck2D,
-            },
-            identifier = "missile",
-            collisionRadius = 100.,
-            friendlyFire = false,
-            visualZ = 75.,
-            speed = 1000.,
-            onUnitCollision = CAT_UnitPassThrough2D,
-            onUnitCallback = function(self, enemy)
-                DamageTarget(self.source, enemy, 6000., ATTACK_TYPE_NORMAL, MAGIC, "Shockwave")
-            end,
-        }
-
-        local function onStruck(target, source)
-            if UnitDistance(source, target) < 600. then
-                if CastSpell(target, thistype.id, 1., 15, 1) then
-                    local x, y = GetUnitX(target), GetUnitY(target)
-                    local angle = math.atan(GetUnitX(source) - y, GetUnitY(source) - x)
-                    local missile = setmetatable({}, missile_template)
-                    missile.x = x
-                    missile.y = y
-                    missile.vx = missile.speed * math.cos(angle)
-                    missile.vy = missile.speed * math.sin(angle)
-                    missile.visual = AddSpecialEffect("Abilities\\Spells\\Orc\\Shockwave\\ShockwaveMissile.mdl", x, y)
-                    BlzSetSpecialEffectScale(missile.visual, 1.1)
-                    missile.source = target
-                    missile.owner = GetOwningPlayer(target)
-
-                    ALICE_Create(missile)
-                end
             end
         end
 

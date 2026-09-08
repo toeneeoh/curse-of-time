@@ -190,10 +190,13 @@ OnInit.final("Colosseum", function(Require)
         local NOVA = FourCC('A01X')
         local UNSTABLE_GROUND = FourCC('A020')
         local RAGE = FourCC('A02E')
+        local SPINNING_GLAIVES = FourCC('A02L')
+        local ARCANE_ORB = FourCC('A02S')
         local list = {}
         local active = {}
         local callbacks = {}
         local indicators = {}
+        local projectiles = {}
         local boss
         local generation = 0
 
@@ -207,6 +210,33 @@ OnInit.final("Colosseum", function(Require)
             if indicator.active then
                 indicator.active = false
                 DestroyEffect(indicator.effect)
+            end
+        end
+
+        local function destroy_projectile(projectile)
+            projectile.active = false
+            if projectile.visual then
+                DestroyEffect(projectile.visual)
+                projectile.visual = nil
+            end
+        end
+
+        local function launch_projectile(projectile)
+            projectile.active = true
+            projectiles[#projectiles + 1] = projectile
+            ALICE_Create(projectile)
+        end
+
+        local function damage_contestant(projectile, target, health_fraction, tag)
+            if not projectile.active then
+                return
+            end
+
+            for _, pid in ipairs(players) do
+                if Hero[pid] == target and UnitAlive(target) then
+                    DamageTarget(projectile.source, target, BlzGetUnitMaxHP(target) * health_fraction, ATTACK_TYPE_NORMAL, MAGIC, tag)
+                    return
+                end
             end
         end
 
@@ -268,6 +298,13 @@ OnInit.final("Colosseum", function(Require)
                 remove_indicator(indicator)
             end
             indicators = {}
+
+            for _, projectile in ipairs(projectiles) do
+                if projectile.active then
+                    ALICE_Kill(projectile)
+                end
+            end
+            projectiles = {}
 
             for _, affix in ipairs(active) do
                 if affix.stop then
@@ -410,6 +447,177 @@ OnInit.final("Colosseum", function(Require)
             end
 
             BossAffix.create(RAGE, "Rage", start_rage, end_rage)
+        end
+
+        do
+            local GLAIVE_COUNT = 10
+            local GLAIVE_GAP = 2
+            local GLAIVE_PERIOD = 9.
+            local GLAIVE_DAMAGE = 0.22
+            local rotation = 0.
+
+            local glaive_template = {
+                selfInteractions = {
+                    CAT_MoveAutoHeight,
+                    CAT_Orient2D,
+                    CAT_Decay,
+                },
+                interactions = {
+                    unit = CAT_UnitCollisionCheck2D,
+                },
+                identifier = "missile",
+                collisionRadius = 70.,
+                friendlyFire = false,
+                visualZ = 65.,
+                speed = 750.,
+                maxSpeed = 750.,
+                lifetime = 2.4,
+                onUnitCollision = CAT_UnitPassThrough2D,
+                onUnitCallback = function(self, target)
+                    if not self.volley_hits[target] then
+                        self.volley_hits[target] = true
+                        damage_contestant(self, target, GLAIVE_DAMAGE, "Spinning Glaives")
+                    end
+                end,
+                destroy = destroy_projectile,
+            }
+            glaive_template.__index = glaive_template
+
+            local function start_glaives(queue)
+                local function cast(expected_generation)
+                    if expected_generation ~= generation or not boss or not UnitAlive(boss) then
+                        return
+                    end
+
+                    local x, y = GetUnitX(boss), GetUnitY(boss)
+                    local gap_start = random(0, GLAIVE_COUNT - 1)
+                    local volley_hits = {}
+                    rotation = rotation + bj_PI / GLAIVE_COUNT
+
+                    DestroyEffect(AddSpecialEffectTarget(
+                        "Abilities\\Spells\\NightElf\\FanOfKnives\\FanOfKnivesCaster.mdl",
+                        boss,
+                        "origin"
+                    ))
+
+                    for index = 0, GLAIVE_COUNT - 1 do
+                        local gap_offset = math.fmod(index - gap_start + GLAIVE_COUNT, GLAIVE_COUNT)
+                        if gap_offset >= GLAIVE_GAP then
+                            local angle = rotation + index * 2. * bj_PI / GLAIVE_COUNT
+                            local missile = setmetatable({}, glaive_template)
+                            missile.x = x + 140. * math.cos(angle)
+                            missile.y = y + 140. * math.sin(angle)
+                            missile.vx = missile.speed * math.cos(angle)
+                            missile.vy = missile.speed * math.sin(angle)
+                            missile.source = boss
+                            missile.owner = PLAYER_BOSS
+                            missile.volley_hits = volley_hits
+                            missile.visual = AddSpecialEffect(
+                                "Abilities\\Weapons\\GlaiveMissile\\GlaiveMissile.mdl",
+                                missile.x,
+                                missile.y
+                            )
+                            BlzSetSpecialEffectScale(missile.visual, 1.35)
+                            launch_projectile(missile)
+                        end
+                    end
+
+                    queue(GLAIVE_PERIOD, cast)
+                end
+
+                queue(5., cast)
+            end
+
+            BossAffix.create(SPINNING_GLAIVES, "Spinning Glaives", start_glaives)
+        end
+
+        do
+            local ORB_PERIOD = 14.
+            local ORB_DAMAGE = 0.18
+            local ORB_BOUNDARY = ARENA_RADIUS - 110.
+
+            local function bounce_orb(orb)
+                local dx = orb.x - colo_x
+                local dy = orb.y - colo_y
+                local distance = math.sqrt(dx * dx + dy * dy)
+
+                if distance < ORB_BOUNDARY then
+                    return
+                end
+
+                local nx = dx / distance
+                local ny = dy / distance
+                local outward_speed = orb.vx * nx + orb.vy * ny
+                if outward_speed <= 0. then
+                    return
+                end
+
+                orb.x = colo_x + nx * ORB_BOUNDARY
+                orb.y = colo_y + ny * ORB_BOUNDARY
+                orb.vx = orb.vx - 2. * outward_speed * nx
+                orb.vy = orb.vy - 2. * outward_speed * ny
+                BlzSetSpecialEffectX(orb.visual, orb.x)
+                BlzSetSpecialEffectY(orb.visual, orb.y)
+                DestroyEffect(AddSpecialEffect(
+                    "Abilities\\Spells\\NightElf\\Blink\\BlinkCaster.mdl",
+                    orb.x,
+                    orb.y
+                ))
+            end
+
+            local orb_template = {
+                selfInteractions = {
+                    CAT_MoveAutoHeight,
+                    bounce_orb,
+                    CAT_Orient2D,
+                    CAT_Decay,
+                },
+                interactions = {
+                    unit = CAT_UnitCollisionCheck2D,
+                },
+                identifier = "missile",
+                collisionRadius = 100.,
+                friendlyFire = false,
+                visualZ = 85.,
+                speed = 475.,
+                maxSpeed = 475.,
+                lifetime = 11.,
+                onUnitCollision = CAT_UnitMultiPassThrough2D,
+                onUnitCallback = function(self, target)
+                    damage_contestant(self, target, ORB_DAMAGE, "Arcane Orb")
+                end,
+                destroy = destroy_projectile,
+            }
+            orb_template.__index = orb_template
+
+            local function start_arcane_orb(queue)
+                local function cast(expected_generation)
+                    if expected_generation ~= generation or not boss or not UnitAlive(boss) then
+                        return
+                    end
+
+                    local x, y = GetUnitX(boss), GetUnitY(boss)
+                    local target = Hero[players[random(1, #players)]]
+                    local angle = target and math.atan(GetUnitY(target) - y, GetUnitX(target) - x)
+                        or random() * 2. * bj_PI
+                    local orb = setmetatable({}, orb_template)
+                    orb.x = x
+                    orb.y = y
+                    orb.vx = orb.speed * math.cos(angle)
+                    orb.vy = orb.speed * math.sin(angle)
+                    orb.source = boss
+                    orb.owner = PLAYER_BOSS
+                    orb.visual = AddSpecialEffect("war3mapImported\\SuperLightningBall.mdl", x, y)
+                    BlzSetSpecialEffectScale(orb.visual, 1.35)
+                    launch_projectile(orb)
+
+                    queue(ORB_PERIOD, cast)
+                end
+
+                queue(7., cast)
+            end
+
+            BossAffix.create(ARCANE_ORB, "Arcane Orb", start_arcane_orb)
         end
     end
 
