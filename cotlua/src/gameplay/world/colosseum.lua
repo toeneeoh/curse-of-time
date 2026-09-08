@@ -186,6 +186,10 @@ OnInit.final("Colosseum", function(Require)
 
     BossAffix = {}
     do
+        local MARKED_FOR_DESTRUCTION = FourCC('A01V')
+        local NOVA = FourCC('A01X')
+        local UNSTABLE_GROUND = FourCC('A020')
+        local RAGE = FourCC('A02E')
         local list = {}
         local active = {}
         local callbacks = {}
@@ -219,19 +223,19 @@ OnInit.final("Colosseum", function(Require)
             end
         end
 
-        local function detonate(expected_generation, indicator, radius, health_fraction, tag)
+        local function detonate(expected_generation, indicator, radius, health_fraction, tag, impact_model, impact_scale)
             if expected_generation ~= generation or not indicator.active then
                 return
             end
 
             remove_indicator(indicator)
-            local effect = AddSpecialEffect("Abilities\\Spells\\Human\\FlameStrike\\FlameStrike1.mdl", indicator.x, indicator.y)
-            BlzSetSpecialEffectScale(effect, math.max(0.75, radius / 250.))
+            local effect = AddSpecialEffect(impact_model, indicator.x, indicator.y)
+            BlzSetSpecialEffectScale(effect, impact_scale or math.max(0.75, radius / 250.))
             DestroyEffect(effect)
             damage_area(indicator.x, indicator.y, radius, health_fraction, tag)
         end
 
-        local function warn_area(x, y, radius, delay, health_fraction, tag)
+        local function warn_area(x, y, radius, delay, health_fraction, tag, impact_model, impact_scale)
             local indicator = {
                 active = true,
                 effect = AddSpecialEffect("Indicators\\circle.mdl", x, y),
@@ -240,11 +244,16 @@ OnInit.final("Colosseum", function(Require)
             }
             BlzSetSpecialEffectScale(indicator.effect, radius / 500.)
             indicators[#indicators + 1] = indicator
-            schedule(delay, detonate, indicator, radius, health_fraction, tag)
+            schedule(delay, detonate, indicator, radius, health_fraction, tag, impact_model, impact_scale)
         end
 
-        function BossAffix.create(name, start)
-            list[#list + 1] = { name = name, start = start }
+        function BossAffix.create(ability_id, name, start, stop)
+            list[#list + 1] = {
+                ability_id = ability_id,
+                name = name,
+                start = start,
+                stop = stop,
+            }
         end
 
         function BossAffix.stop()
@@ -259,6 +268,15 @@ OnInit.final("Colosseum", function(Require)
                 remove_indicator(indicator)
             end
             indicators = {}
+
+            for _, affix in ipairs(active) do
+                if affix.stop then
+                    affix.stop()
+                end
+                if boss then
+                    UnitRemoveAbility(boss, affix.ability_id)
+                end
+            end
             active = {}
             boss = nil
         end
@@ -272,6 +290,7 @@ OnInit.final("Colosseum", function(Require)
             local names = {}
 
             for _, affix in ipairs(active) do
+                UnitAddAbility(boss, affix.ability_id)
                 names[#names + 1] = affix.name
                 affix.start(schedule, warn_area)
             end
@@ -279,7 +298,7 @@ OnInit.final("Colosseum", function(Require)
             DisplayTextToTable(players, "|cffffcc00Boss abilities:|r " .. table.concat(names, ", "))
         end
 
-        BossAffix.create("Marked for Destruction", function(queue, warn)
+        BossAffix.create(MARKED_FOR_DESTRUCTION, "Marked for Destruction", function(queue, warn)
             local function cast(expected_generation)
                 if expected_generation ~= generation or not boss or not UnitAlive(boss) then
                     return
@@ -287,7 +306,12 @@ OnInit.final("Colosseum", function(Require)
                 for _, pid in ipairs(players) do
                     local hero = Hero[pid]
                     if hero and UnitAlive(hero) then
-                        warn(GetUnitX(hero), GetUnitY(hero), 225., 2., 0.3, "Marked for Destruction")
+                        warn(
+                            GetUnitX(hero), GetUnitY(hero), 225., 2., 0.3,
+                            "Marked for Destruction",
+                            "Abilities\\Spells\\Undead\\Impale\\ImpaleHitTarget.mdl",
+                            1.5
+                        )
                     end
                 end
                 queue(8., cast)
@@ -295,30 +319,98 @@ OnInit.final("Colosseum", function(Require)
             queue(4., cast)
         end)
 
-        BossAffix.create("Nova", function(queue, warn)
+        BossAffix.create(NOVA, "Nova", function(queue, warn)
             local function cast(expected_generation)
                 if expected_generation ~= generation or not boss or not UnitAlive(boss) then
                     return
                 end
-                warn(GetUnitX(boss), GetUnitY(boss), 500., 2.5, 0.35, "Colosseum Nova")
+                warn(
+                    GetUnitX(boss), GetUnitY(boss), 500., 2.5, 0.35,
+                    "Colosseum Nova", "war3mapImported\\Death Nova.mdx", 1.5
+                )
                 queue(10., cast)
             end
             queue(5., cast)
         end)
 
-        BossAffix.create("Unstable Ground", function(queue, warn)
+        BossAffix.create(UNSTABLE_GROUND, "Unstable Ground", function(queue, warn)
             local function cast(expected_generation)
                 if expected_generation ~= generation or not boss or not UnitAlive(boss) then
                     return
                 end
                 for _ = 1, 3 do
                     local x, y = colo_get_random_location(250.)
-                    warn(x, y, 275., 3., 0.25, "Unstable Ground")
+                    warn(
+                        x, y, 275., 3., 0.25, "Unstable Ground",
+                        "Abilities\\Spells\\Human\\Thunderclap\\ThunderClapCaster.mdx",
+                        1.25
+                    )
                 end
                 queue(12., cast)
             end
             queue(4., cast)
         end)
+
+        do
+            local RAGE_DURATION = 6.
+            local RAGE_PERIOD = 18.
+            local RAGE_DAMAGE_BONUS = 1.5
+            local RAGE_ARMOR_BONUS = 2.
+            local RAGE_DAMAGE_TAKEN = 0.25
+            local RAGE_ATTACK_SPEED = 2.
+            local RAGE_MOVE_SPEED_BONUS = 0.35
+            local rage_unit ---@type Unit?
+            local rage_move_speed = 0.
+            local rage_effect ---@type effect?
+
+            local function end_rage()
+                if not rage_unit then
+                    return
+                end
+
+                rage_unit.damage_percent = rage_unit.damage_percent - RAGE_DAMAGE_BONUS
+                rage_unit.armor_percent = rage_unit.armor_percent - RAGE_ARMOR_BONUS
+                rage_unit.dr = rage_unit.dr / RAGE_DAMAGE_TAKEN
+                rage_unit.bonus_bat = rage_unit.bonus_bat * RAGE_ATTACK_SPEED
+                rage_unit.ms_percent = rage_unit.ms_percent - rage_move_speed
+                rage_unit = nil
+                rage_move_speed = 0.
+
+                if rage_effect then
+                    DestroyEffect(rage_effect)
+                    rage_effect = nil
+                end
+            end
+
+            local function start_rage(queue)
+                local function cast(expected_generation)
+                    if expected_generation ~= generation or not boss or not UnitAlive(boss) then
+                        return
+                    end
+
+                    end_rage()
+                    rage_unit = Unit[boss]
+                    rage_move_speed = RAGE_MOVE_SPEED_BONUS * math.min(1., rage_unit.ms_percent)
+                    rage_unit.damage_percent = rage_unit.damage_percent + RAGE_DAMAGE_BONUS
+                    rage_unit.armor_percent = rage_unit.armor_percent + RAGE_ARMOR_BONUS
+                    rage_unit.dr = rage_unit.dr * RAGE_DAMAGE_TAKEN
+                    rage_unit.bonus_bat = rage_unit.bonus_bat / RAGE_ATTACK_SPEED
+                    rage_unit.ms_percent = rage_unit.ms_percent + rage_move_speed
+                    rage_effect = AddSpecialEffectTarget(
+                        "Abilities\\Spells\\Orc\\Bloodlust\\BloodlustTarget.mdl",
+                        boss,
+                        "origin"
+                    )
+
+                    queue(RAGE_DURATION, end_rage)
+                    queue(RAGE_PERIOD, cast)
+                end
+
+                queue(6., cast)
+            end
+
+            BossAffix.create(RAGE, "Rage", start_rage, end_rage)
+        end
     end
 
     local on_kill = function(killed)

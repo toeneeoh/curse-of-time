@@ -7,6 +7,7 @@ OnInit.global("Preloader", function()
     gg_trg_map_preplaced = nil
 
     preload("Abilities\\Spells\\Human\\Thunderclap\\ThunderClapCaster.mdx")
+    preload("Abilities\\Spells\\Undead\\Impale\\ImpaleHitTarget.mdl")
     preload("Abilities\\Spells\\Other\\Monsoon\\MonsoonBoltTarget.mdx")
     preload("Abilities\\Weapons\\Bolt\\BoltImpact.mdx")
     preload("war3mapImported\\FrozenOrb.MDX")
