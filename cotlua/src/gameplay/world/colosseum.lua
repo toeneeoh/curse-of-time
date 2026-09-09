@@ -245,6 +245,11 @@ OnInit.final("Colosseum", function(Require)
         end
     end
 
+    ---@class BossAffix
+    ---@field create function
+    ---@field start function
+    ---@field stop function
+    ---@field reroll function
     BossAffix = {}
     do
         local MARKED_FOR_DESTRUCTION = FourCC('A01V')
@@ -262,6 +267,7 @@ OnInit.final("Colosseum", function(Require)
         local projectiles = {}
         local boss
         local generation = 0
+        local dev_reroll_index = 1
 
         local function schedule(delay, callback, ...)
             local id = TimerQueue:callDelayed(delay, callback, generation, ...)
@@ -391,12 +397,9 @@ OnInit.final("Colosseum", function(Require)
             boss = nil
         end
 
-        function BossAffix.start(which_boss)
-            BossAffix.stop()
+        local function activate_affixes(which_boss, affixes)
             boss = which_boss
-
-            local count = math.min(4, wave // 5)
-            active = pickN(count, list)
+            active = affixes
             local names = {}
 
             for _, affix in ipairs(active) do
@@ -406,6 +409,29 @@ OnInit.final("Colosseum", function(Require)
             end
 
             DisplayTextToTable(players, "|cffffcc00Boss abilities:|r " .. table.concat(names, ", "))
+        end
+
+        function BossAffix.start(which_boss)
+            BossAffix.stop()
+            local count = math.min(4, wave // 5)
+            activate_affixes(which_boss, pickN(count, list))
+        end
+
+        function BossAffix.reroll()
+            if not DEV_ENABLED or not boss or not UnitAlive(boss) or #list == 0 then
+                return
+            end
+
+            local which_boss = boss
+            local count = math.min(4, wave // 5)
+            local affixes = {}
+
+            BossAffix.stop()
+            for index = 1, count do
+                affixes[index] = list[dev_reroll_index]
+                dev_reroll_index = dev_reroll_index % #list + 1
+            end
+            activate_affixes(which_boss, affixes)
         end
 
         BossAffix.create(MARKED_FOR_DESTRUCTION, "Marked for Destruction", function(queue, warn)
@@ -894,7 +920,7 @@ OnInit.final("Colosseum", function(Require)
                         "Indicators\\line closed.mdx",
                         SWEEP_RANGE * 0.6,
                         1.2,
-                        start_angle - bj_PI * 0.5
+                        start_angle
                     )
                     add_warning(
                         "Indicators\\moving arrows.mdl",
@@ -1289,6 +1315,7 @@ OnInit.final("Colosseum", function(Require)
     ---@field create function
     ---@field call function
     ---@field pickEncounters function
+    ---@field reroll function
     Encounter = {}
     do
         --#region frame setup
@@ -1348,6 +1375,56 @@ OnInit.final("Colosseum", function(Require)
         local thistype = Encounter
         local list = {}
         local active
+        local dev_reroll_index = 1
+
+        local dev_encounter_reroll = SimpleButton.create(
+            encounter_backdrop,
+            "ReplaceableTextures\\CommandButtons\\BTNCycleRight.blp",
+            0.022,
+            0.022,
+            FRAMEPOINT_LEFT,
+            FRAMEPOINT_RIGHT,
+            0.006,
+            0.,
+            nil,
+            "|cffffcc00DEV: Cycle Encounters|r|nReplaces this run's encounter set."
+        )
+        dev_encounter_reroll:visible(false)
+        dev_encounter_reroll:onClick(function()
+            local clicked = BlzGetTriggerFrame()
+            BlzFrameSetEnable(clicked, false)
+            BlzFrameSetEnable(clicked, true)
+            Encounter.reroll()
+        end)
+
+        local dev_boss_reroll = SimpleButton.create(
+            encounter_backdrop,
+            "ReplaceableTextures\\CommandButtons\\BTNEngineeringUpgrade.blp",
+            0.022,
+            0.022,
+            FRAMEPOINT_LEFT,
+            FRAMEPOINT_RIGHT,
+            0.032,
+            0.,
+            nil,
+            "|cffffcc00DEV: Cycle Boss Skills|r|nReplaces the current boss's active skill set."
+        )
+        dev_boss_reroll:visible(false)
+        dev_boss_reroll:onClick(function()
+            local clicked = BlzGetTriggerFrame()
+            BlzFrameSetEnable(clicked, false)
+            BlzFrameSetEnable(clicked, true)
+            BossAffix.reroll()
+        end)
+
+        local function refresh_encounter_icons()
+            for index = 1, 3 do
+                encounter_icons[index]:icon(active[index].icon)
+                encounter_icons[index]:setTooltipIcon(active[index].icon)
+                encounter_icons[index]:setTooltipName(active[index].name)
+                encounter_icons[index]:setTooltipText(active[index].desc)
+            end
+        end
 
         function Encounter.destroy(pid)
             if pid then
@@ -1392,19 +1469,43 @@ OnInit.final("Colosseum", function(Require)
             -- force bullet_hell
             --active[1] = list[4]
 
-            -- set icon / tooltip
-            for i = 1, 3 do
-                encounter_icons[i]:icon(active[i].icon)
-                encounter_icons[i]:setTooltipIcon(active[i].icon)
-                encounter_icons[i]:setTooltipName(active[i].name)
-                encounter_icons[i]:setTooltipText(active[i].desc)
-            end
+            refresh_encounter_icons()
+            dev_encounter_reroll:visible(DEV_ENABLED)
+            dev_boss_reroll:visible(DEV_ENABLED)
 
             -- display frame
             local pid = GetPlayerId(GetLocalPlayer()) + 1
             if TableHas(players, pid) then
                 BlzFrameSetVisible(encounter_frame, true)
                 BlzFrameSetAlpha(progress_bar, 255)
+            end
+        end
+
+        function thistype.reroll()
+            if not DEV_ENABLED or not active or #list == 0 then
+                return
+            end
+
+            local wave_active = colo_active and timer_frame == nil
+            if wave_active then
+                thistype.call(wave, "end_wave")
+            end
+
+            active = {}
+            for index = 1, 3 do
+                active[index] = list[dev_reroll_index]
+                dev_reroll_index = dev_reroll_index % #list + 1
+            end
+            refresh_encounter_icons()
+
+            local names = {}
+            for index = 1, 3 do
+                names[index] = active[index].name
+            end
+            DisplayTextToTable(players, "|cffffcc00Encounters:|r " .. table.concat(names, ", "))
+
+            if wave_active then
+                thistype.call(wave, "start_wave")
             end
         end
 
