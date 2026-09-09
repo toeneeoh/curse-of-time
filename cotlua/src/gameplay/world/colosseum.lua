@@ -887,13 +887,14 @@ OnInit.final("Colosseum", function(Require)
                         warnings[#warnings + 1] = warning
                     end
 
-                    -- The line model already spans the beam. Two arrows show its
-                    -- counter-clockwise sweep direction without obscuring it.
+                    -- The model's origin is centered and its long axis is local Y,
+                    -- so move it outward and rotate that axis onto the beam.
+                    -- Two arrows show the counter-clockwise sweep direction.
                     add_warning(
                         "Indicators\\line closed.mdx",
-                        0.,
-                        1.,
-                        start_angle
+                        SWEEP_RANGE * 0.6,
+                        1.2,
+                        start_angle - bj_PI * 0.5
                     )
                     add_warning(
                         "Indicators\\moving arrows.mdl",
