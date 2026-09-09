@@ -7,6 +7,50 @@ OnInit.final("BuffsWorldColosseum", function(Require)
     local TQ = TimerQueue
     local valid_damage_target = VALID_DAMAGE_TARGET
 
+    ---@class ColosseumRageBuff : Buff
+    ColosseumRageBuff = Buff.new()
+    do
+        local thistype = ColosseumRageBuff
+        thistype.NAME            = "Rage"
+        thistype.DESC            = "This unit has +^$damage% attack damage, +^$armor% armor, +^$attack_speed% attack speed, and +^$move_speed% movespeed, and takes ^$damage_reduction% reduced damage"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNBloodLust.blp"
+        thistype.DISPEL_TYPE     = BUFF_POSITIVE
+        thistype.STACK_TYPE      = BUFF_STACK_NONE
+
+        function thistype:onRemove()
+            local unit = Unit[self.target]
+            unit.damage_percent = unit.damage_percent - self.damage
+            unit.armor_percent = unit.armor_percent - self.armor
+            unit.dr = unit.dr / (1. - self.damage_reduction)
+            unit.bonus_bat = unit.bonus_bat * self.bat_multiplier
+            unit.ms_percent = unit.ms_percent - self.move_speed
+            unit:removeEffect(self.sfx)
+        end
+
+        function thistype:onApply()
+            local unit = Unit[self.target]
+            self.damage = 1.5
+            self.armor = 2.
+            self.attack_speed = 1.
+            self.damage_reduction = 0.75
+            self.bat_multiplier = 2.
+            self.move_speed = 0.35 * math.min(1., unit.ms_percent)
+
+            unit.damage_percent = unit.damage_percent + self.damage
+            unit.armor_percent = unit.armor_percent + self.armor
+            unit.dr = unit.dr * (1. - self.damage_reduction)
+            unit.bonus_bat = unit.bonus_bat / self.bat_multiplier
+            unit.ms_percent = unit.ms_percent + self.move_speed
+
+            self.sfx = unit:addEffect(
+                "Abilities\\Spells\\Orc\\Bloodlust\\BloodlustTarget.mdl",
+                "overhead"
+            )
+            self.sfx.scale = 1.35
+            self.sfx.color = { 255, 64, 96 }
+        end
+    end
+
     ---@class EarthquakeDebuff : Buff
     EarthquakeDebuff = Buff.new()
     do

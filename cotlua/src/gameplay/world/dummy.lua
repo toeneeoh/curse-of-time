@@ -40,6 +40,7 @@ OnInit.final("Dummy", function(Require)
     ---@class Dummy
     ---@field unit unit
     ---@field abil integer
+    ---@field dynamic_abilities table<integer, boolean>
     ---@field recycle function
     ---@field create function
     ---@field cast function
@@ -52,6 +53,20 @@ OnInit.final("Dummy", function(Require)
     do
         local thistype = Dummy
         local mt = { __index = thistype }
+
+        ---Remove every transient ability before a pooled dummy is reused.
+        ---Warcraft can reject removal while an attack order is active, so any
+        ---ability that remains is retained and retried on the next cleanup.
+        ---@param dummy Dummy
+        local function purge_dynamic_abilities(dummy)
+            UnitRemoveAbility(dummy.unit, IATK)
+            for id in pairs(dummy.dynamic_abilities) do
+                UnitRemoveAbility(dummy.unit, id)
+                if GetUnitAbilityLevel(dummy.unit, id) == 0 then
+                    dummy.dynamic_abilities[id] = nil
+                end
+            end
+        end
 
         ---@param source unit
         ---@param target unit
@@ -107,7 +122,9 @@ OnInit.final("Dummy", function(Require)
 
         ---@type fun(self: Dummy)
         function thistype:recycle()
-            UnitRemoveAbility(self.unit, self.abil)
+            BlzUnitClearOrders(self.unit, false)
+            BlzSetUnitWeaponBooleanField(self.unit, UNIT_WEAPON_BF_ATTACKS_ENABLED, 0, false)
+            purge_dynamic_abilities(self)
             self.abil = 0
             self.source = nil
             self.spell_source = nil
@@ -116,7 +133,6 @@ OnInit.final("Dummy", function(Require)
             SetUnitAnimation(self.unit, "stand")
             SetUnitPropWindow(self.unit, bj_DEGTORAD * 180.)
             BlzSetUnitName(self.unit, " ")
-            BlzSetUnitWeaponBooleanField(self.unit, UNIT_WEAPON_BF_ATTACKS_ENABLED, 0, false)
             SetUnitOwner(self.unit, Player(PLAYER_NEUTRAL_PASSIVE), true)
             BlzSetUnitSkin(self.unit, DUMMY_CASTER)
             SetUnitXBounded(self.unit, 30000.)
@@ -127,7 +143,6 @@ OnInit.final("Dummy", function(Require)
             SetUnitScale(self.unit, 1, 1, 1)
             SetUnitVertexColor(self.unit, 255, 255, 255, 255)
             SetUnitTimeScale(self.unit, 1.)
-            BlzUnitClearOrders(self.unit, false)
             BlzUnitDisableAbility(self.unit, FourCC('Amov'), false, false)
             PauseUnit(self.unit, true)
             BlzSetUnitAttackCooldown(self.unit, 0.01, 0)
@@ -150,6 +165,7 @@ OnInit.final("Dummy", function(Require)
                 self = {
                     unit = CreateUnit(Player(PLAYER_NEUTRAL_PASSIVE), DUMMY_CASTER, x, y, 0),
                     abil = 0,
+                    dynamic_abilities = {},
                 }
                 UnitAddAbility(self.unit, FourCC('Amrf'))
                 UnitRemoveAbility(self.unit, FourCC('Amrf'))
@@ -167,9 +183,11 @@ OnInit.final("Dummy", function(Require)
                 PauseUnit(self.unit, false)
             end
 
-            if UnitAddAbility(self.unit, abil) then
+            purge_dynamic_abilities(self)
+            if abil ~= 0 and UnitAddAbility(self.unit, abil) then
                 SetUnitAbilityLevel(self.unit, abil, ablev)
                 self.abil = abil
+                self.dynamic_abilities[abil] = true
             end
 
             if type(dur) == "number" then

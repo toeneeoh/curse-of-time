@@ -476,31 +476,13 @@ OnInit.final("Colosseum", function(Require)
         do
             local RAGE_DURATION = 6.
             local RAGE_PERIOD = 18.
-            local RAGE_DAMAGE_BONUS = 1.5
-            local RAGE_ARMOR_BONUS = 2.
-            local RAGE_DAMAGE_TAKEN = 0.25
-            local RAGE_ATTACK_SPEED = 2.
-            local RAGE_MOVE_SPEED_BONUS = 0.35
-            local rage_unit ---@type Unit?
-            local rage_move_speed = 0.
-            local rage_effect ---@type effect?
 
             local function end_rage()
-                if not rage_unit then
-                    return
-                end
-
-                rage_unit.damage_percent = rage_unit.damage_percent - RAGE_DAMAGE_BONUS
-                rage_unit.armor_percent = rage_unit.armor_percent - RAGE_ARMOR_BONUS
-                rage_unit.dr = rage_unit.dr / RAGE_DAMAGE_TAKEN
-                rage_unit.bonus_bat = rage_unit.bonus_bat * RAGE_ATTACK_SPEED
-                rage_unit.ms_percent = rage_unit.ms_percent - rage_move_speed
-                rage_unit = nil
-                rage_move_speed = 0.
-
-                if rage_effect then
-                    DestroyEffect(rage_effect)
-                    rage_effect = nil
+                if boss then
+                    local buff = ColosseumRageBuff:get(nil, boss)
+                    if buff then
+                        buff:remove()
+                    end
                 end
             end
 
@@ -515,20 +497,8 @@ OnInit.final("Colosseum", function(Require)
                     end
 
                     end_rage()
-                    rage_unit = Unit[boss]
-                    rage_move_speed = RAGE_MOVE_SPEED_BONUS * math.min(1., rage_unit.ms_percent)
-                    rage_unit.damage_percent = rage_unit.damage_percent + RAGE_DAMAGE_BONUS
-                    rage_unit.armor_percent = rage_unit.armor_percent + RAGE_ARMOR_BONUS
-                    rage_unit.dr = rage_unit.dr * RAGE_DAMAGE_TAKEN
-                    rage_unit.bonus_bat = rage_unit.bonus_bat / RAGE_ATTACK_SPEED
-                    rage_unit.ms_percent = rage_unit.ms_percent + rage_move_speed
-                    rage_effect = AddSpecialEffectTarget(
-                        "Abilities\\Spells\\Orc\\Bloodlust\\BloodlustTarget.mdl",
-                        boss,
-                        "origin"
-                    )
+                    ColosseumRageBuff:add(boss, boss):duration(RAGE_DURATION)
 
-                    queue(RAGE_DURATION, end_rage)
                     queue(RAGE_PERIOD, cast)
                 end
 
@@ -767,14 +737,19 @@ OnInit.final("Colosseum", function(Require)
             local PULL_INTERVAL = 0.125
             local PULL_RADIUS = 700.
             local PULL_SPEED = 85.
-            local DANGER_RADIUS = 190.
-            local well_effect ---@type effect?
+            local DANGER_RADIUS = 250.
+            local channel_effect ---@type effect?
+            local well_effects = {} ---@type effect[]
 
             local function stop_gravity_well()
-                if well_effect then
-                    DestroyEffect(well_effect)
-                    well_effect = nil
+                if channel_effect then
+                    DestroyEffect(channel_effect)
+                    channel_effect = nil
                 end
+                for _, effect in ipairs(well_effects) do
+                    DestroyEffect(effect)
+                end
+                well_effects = {}
             end
 
             local function start_gravity_well(queue)
@@ -786,6 +761,14 @@ OnInit.final("Colosseum", function(Require)
                         queue(0.5, cast)
                         return
                     end
+
+                    channel_effect = AddSpecialEffectTarget(
+                        "war3mapImported\\WindShell.mdx",
+                        boss,
+                        "origin"
+                    )
+                    BlzSetSpecialEffectScale(channel_effect, 1.25)
+                    BlzSetSpecialEffectColor(channel_effect, 128, 64, 255)
 
                     local target = Hero[players[random(1, #players)]]
                     local x = target and GetUnitX(target) or colo_x
@@ -821,11 +804,12 @@ OnInit.final("Colosseum", function(Require)
                             queue(PULL_INTERVAL, pull, remaining - PULL_INTERVAL)
                         else
                             stop_gravity_well()
-                            DestroyEffect(AddSpecialEffect(
-                                "Abilities\\Spells\\Undead\\Darksummoning\\DarkSummonTarget.mdl",
-                                x,
-                                y
-                            ))
+                            -- WindShell by OVOgenez and Rebirth by BaiyuGalan.
+                            local impact = AddSpecialEffect("war3mapImported\\Rebirth.mdx", x, y)
+                            BlzSetSpecialEffectScale(impact, 1.5)
+                            BlzSetSpecialEffectColor(impact, 144, 64, 255)
+                            BlzPlaySpecialEffect(impact, ANIM_TYPE_BIRTH)
+                            TimerQueue:callDelayed(2., DestroyEffect, impact)
                             damage_area(x, y, DANGER_RADIUS, 0.4, "Gravity Well")
                         end
                     end
@@ -838,12 +822,13 @@ OnInit.final("Colosseum", function(Require)
 
                         remove_indicator(warning)
                         stop_gravity_well()
-                        well_effect = AddSpecialEffect(
-                            "Abilities\\Spells\\Undead\\DeathAndDecay\\DeathandDecayTarget.mdl",
+                        local corrupted_well = AddSpecialEffect(
+                            "Abilities\\Spells\\NightElf\\MoonWell\\CorruptedMoonWellTarget.mdl",
                             x,
                             y
                         )
-                        BlzSetSpecialEffectScale(well_effect, 1.6)
+                        BlzSetSpecialEffectScale(corrupted_well, 1.8)
+                        well_effects[#well_effects + 1] = corrupted_well
                         pull(expected, PULL_DURATION)
                     end
 
@@ -1381,6 +1366,11 @@ OnInit.final("Colosseum", function(Require)
 
         function thistype.pickEncounters()
             active = pickN(3, list)
+
+            -- The frame is reused between runs, so reset the previous run's
+            -- progress before making it visible for the new selection.
+            BlzFrameSetText(wave_text, wave)
+            BlzFrameSetValue(progress_bar, 0.)
 
             -- force bullet_hell
             --active[1] = list[4]
