@@ -845,11 +845,12 @@ OnInit.final("Colosseum", function(Require)
         do
             local SWEEP_PERIOD = 14.
             local WARNING_DURATION = 1.5
-            local SWEEP_DURATION = 6.5
+            local SWEEP_DURATION = 8.
             local SWEEP_INTERVAL = 0.05
             local SWEEP_RANGE = 1550.
             local SWEEP_WIDTH = 95.
-            local SWEEP_ARC = 120. * bj_DEGTORAD
+            local SWEEP_ARC = 240. * bj_DEGTORAD
+            local WARNING_SEGMENTS = 5
             local LIGHTNING_OFFSETS = { -45., 0., 45. }
             local sweep_lightnings = {} ---@type lightning[]
 
@@ -876,21 +877,47 @@ OnInit.final("Colosseum", function(Require)
                         or random() * 2. * bj_PI
                     local start_angle = target_angle - SWEEP_ARC * 0.5
                     local warnings = {}
+                    local cos_start = math.cos(start_angle)
+                    local sin_start = math.sin(start_angle)
 
-                    for distance = 300., 1200., 300. do
+                    local function add_warning(model, distance, scale, yaw)
                         local warning = {
                             active = true,
                             effect = AddSpecialEffect(
-                                "Indicators\\moving arrows.mdl",
-                                x + distance * math.cos(start_angle),
-                                y + distance * math.sin(start_angle)
+                                model,
+                                x + distance * cos_start,
+                                y + distance * sin_start
                             ),
                         }
-                        BlzSetSpecialEffectScale(warning.effect, 0.4)
-                        BlzSetSpecialEffectYaw(warning.effect, start_angle + bj_PI * 0.5)
+                        BlzSetSpecialEffectScale(warning.effect, scale)
+                        BlzSetSpecialEffectYaw(warning.effect, yaw)
                         indicators[#indicators + 1] = warning
                         warnings[#warnings + 1] = warning
                     end
+
+                    -- Tile the closed-line indicator across the complete beam
+                    -- footprint, then show its counter-clockwise sweep direction
+                    -- at both ends without cluttering the middle of the warning.
+                    for index = 1, WARNING_SEGMENTS do
+                        add_warning(
+                            "Indicators\\line closed.mdx",
+                            SWEEP_RANGE * (index - 0.5) / WARNING_SEGMENTS,
+                            1.4,
+                            start_angle
+                        )
+                    end
+                    add_warning(
+                        "Indicators\\moving arrows.mdl",
+                        100.,
+                        0.45,
+                        start_angle + bj_PI * 0.5
+                    )
+                    add_warning(
+                        "Indicators\\moving arrows.mdl",
+                        SWEEP_RANGE - 100.,
+                        0.45,
+                        start_angle + bj_PI * 0.5
+                    )
 
                     local function sweep(expected, elapsed, hits)
                         if expected ~= generation or not boss or not UnitAlive(boss) then
