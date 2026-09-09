@@ -738,14 +738,9 @@ OnInit.final("Colosseum", function(Require)
             local PULL_RADIUS = 700.
             local PULL_SPEED = 85.
             local DANGER_RADIUS = 250.
-            local channel_effect ---@type effect?
             local well_effects = {} ---@type effect[]
 
             local function stop_gravity_well()
-                if channel_effect then
-                    DestroyEffect(channel_effect)
-                    channel_effect = nil
-                end
                 for _, effect in ipairs(well_effects) do
                     DestroyEffect(effect)
                 end
@@ -761,14 +756,6 @@ OnInit.final("Colosseum", function(Require)
                         queue(0.5, cast)
                         return
                     end
-
-                    channel_effect = AddSpecialEffectTarget(
-                        "war3mapImported\\WindShell.mdx",
-                        boss,
-                        "origin"
-                    )
-                    BlzSetSpecialEffectScale(channel_effect, 1.25)
-                    BlzSetSpecialEffectColor(channel_effect, 128, 64, 255)
 
                     local target = Hero[players[random(1, #players)]]
                     local x = target and GetUnitX(target) or colo_x
@@ -823,12 +810,18 @@ OnInit.final("Colosseum", function(Require)
                         remove_indicator(warning)
                         stop_gravity_well()
                         local corrupted_well = AddSpecialEffect(
-                            "Abilities\\Spells\\NightElf\\MoonWell\\CorruptedMoonWellTarget.mdl",
+                            "buildings\\demon\\CorruptedMoonWell\\CorruptedMoonWell.mdl",
                             x,
                             y
                         )
-                        BlzSetSpecialEffectScale(corrupted_well, 1.8)
                         well_effects[#well_effects + 1] = corrupted_well
+
+                        -- WindShell by OVOgenez. Its footprint matches the
+                        -- gravity warning and remains centered on the well.
+                        local wind_shell = AddSpecialEffect("war3mapImported\\WindShell.mdx", x, y)
+                        BlzSetSpecialEffectScale(wind_shell, PULL_RADIUS / 500.)
+                        BlzSetSpecialEffectColor(wind_shell, 128, 64, 255)
+                        well_effects[#well_effects + 1] = wind_shell
                         pull(expected, PULL_DURATION)
                     end
 
@@ -850,7 +843,6 @@ OnInit.final("Colosseum", function(Require)
             local SWEEP_RANGE = 1550.
             local SWEEP_WIDTH = 95.
             local SWEEP_ARC = 240. * bj_DEGTORAD
-            local WARNING_SEGMENTS = 5
             local LIGHTNING_OFFSETS = { -45., 0., 45. }
             local sweep_lightnings = {} ---@type lightning[]
 
@@ -895,17 +887,14 @@ OnInit.final("Colosseum", function(Require)
                         warnings[#warnings + 1] = warning
                     end
 
-                    -- Tile the closed-line indicator across the complete beam
-                    -- footprint, then show its counter-clockwise sweep direction
-                    -- at both ends without cluttering the middle of the warning.
-                    for index = 1, WARNING_SEGMENTS do
-                        add_warning(
-                            "Indicators\\line closed.mdx",
-                            SWEEP_RANGE * (index - 0.5) / WARNING_SEGMENTS,
-                            1.4,
-                            start_angle
-                        )
-                    end
+                    -- The line model already spans the beam. Two arrows show its
+                    -- counter-clockwise sweep direction without obscuring it.
+                    add_warning(
+                        "Indicators\\line closed.mdx",
+                        0.,
+                        1.,
+                        start_angle
+                    )
                     add_warning(
                         "Indicators\\moving arrows.mdl",
                         100.,
