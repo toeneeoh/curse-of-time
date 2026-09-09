@@ -14,12 +14,16 @@ OnInit.final("Colosseum", function(Require)
         return { x = GetRectCenterX(whichRect), y = GetRectCenterY(whichRect) }
     end
     local valid_damage_target = VALID_DAMAGE_TARGET
+    local ARENA_MIN_X = 20300.
+    local ARENA_MAX_X = 23193.
+    local ARENA_MIN_Y = -5488.
+    local ARENA_MAX_Y = -3000.
     local ARENA_RADIUS = 1500.
     local ticket_id = 'I008'
     local unit_id = FourCC('n002')
     local boss_id = FourCC('N003')
-    local colo_x = 21746
-    local colo_y = -4347
+    local colo_x = (ARENA_MIN_X + ARENA_MAX_X) * 0.5
+    local colo_y = (ARENA_MIN_Y + ARENA_MAX_Y) * 0.5
     local random = math.random
     local colo_spawn = {
         GetRectCenterXY(gg_rct_Colosseum_Monster_Spawn),
@@ -56,9 +60,42 @@ OnInit.final("Colosseum", function(Require)
 
     local function colo_get_random_location(inward_offset)
         inward_offset = inward_offset or 0
-        local x, y = colo_x + math.random(- ARENA_RADIUS + inward_offset, ARENA_RADIUS - inward_offset), colo_y + math.random(- ARENA_RADIUS + inward_offset, ARENA_RADIUS - inward_offset)
+        local x = math.random(
+            math.ceil(ARENA_MIN_X + inward_offset),
+            math.floor(ARENA_MAX_X - inward_offset)
+        )
+        local y = math.random(
+            math.ceil(ARENA_MIN_Y + inward_offset),
+            math.floor(ARENA_MAX_Y - inward_offset)
+        )
 
         return x, y
+    end
+
+    ---Returns the distance from a point to the inset arena edge along a direction.
+    ---@param x number
+    ---@param y number
+    ---@param dx number
+    ---@param dy number
+    ---@param inset number
+    ---@return number
+    local function distance_to_arena_edge(x, y, dx, dy, inset)
+        local x_distance = math.huge
+        local y_distance = math.huge
+
+        if dx > 0. then
+            x_distance = (ARENA_MAX_X - inset - x) / dx
+        elseif dx < 0. then
+            x_distance = (ARENA_MIN_X + inset - x) / dx
+        end
+
+        if dy > 0. then
+            y_distance = (ARENA_MAX_Y - inset - y) / dy
+        elseif dy < 0. then
+            y_distance = (ARENA_MIN_Y + inset - y) / dy
+        end
+
+        return math.max(0., math.min(x_distance, y_distance))
     end
 
     local melee_skins = {
@@ -823,9 +860,9 @@ OnInit.final("Colosseum", function(Require)
         do
             local SWEEP_PERIOD = 14.
             local WARNING_DURATION = 1.5
-            local SWEEP_DURATION = 2.5
+            local SWEEP_DURATION = 6.5
             local SWEEP_INTERVAL = 0.05
-            local SWEEP_RANGE = 1350.
+            local SWEEP_RANGE = 1550.
             local SWEEP_WIDTH = 95.
             local SWEEP_ARC = 120. * bj_DEGTORAD
             local LIGHTNING_OFFSETS = { -45., 0., 45. }
@@ -876,6 +913,10 @@ OnInit.final("Colosseum", function(Require)
                             return
                         end
 
+                        -- Keep the sweep pivot attached to the boss instead of
+                        -- leaving the beam behind when the boss moves.
+                        x = GetUnitX(boss)
+                        y = GetUnitY(boss)
                         local angle = start_angle + SWEEP_ARC * math.min(1., elapsed / SWEEP_DURATION)
                         local cos_angle = math.cos(angle)
                         local sin_angle = math.sin(angle)
@@ -954,6 +995,12 @@ OnInit.final("Colosseum", function(Require)
         end
 
         for _, pid in ipairs(players) do
+            local hero = Hero[pid]
+            local bloodsport_buff = hero and BloodsportBuff:get(nil, hero)
+            if bloodsport_buff and UnitAlive(hero) then
+                bloodsport_buff:proc()
+            end
+
             if bonus_drop_chance[pid] > 0 and random() * 100 < bonus_drop_chance[pid] then
                 bonus_coins[pid] = bonus_coins[pid] + 1
                 coin_effect(killed, 1)
@@ -1402,7 +1449,7 @@ OnInit.final("Colosseum", function(Require)
         end
     end
     local martyrdom = Encounter.create("Martyrdom", "Enemies explode on death, dealing |cffffcc00" .. "15" .. "%|r max health magic damage to nearby players."
-    , "ReplaceableTextures\\CommandButtons\\BTNTemp.blp")
+    , "ReplaceableTextures\\CommandButtons\\BTNBomb.blp")
     do
         -- on death function
         local function explode(killed)
@@ -1435,7 +1482,7 @@ OnInit.final("Colosseum", function(Require)
         end
     end
     local bullet_hell = Encounter.create("Bullet Hell", "Every |cffffcc00" .. "6|r" .. " seconds, a flurry of projectiles are launched across the arena, dealing |cffffcc00" .. "25%|r" .. " max health magic damage on impact."
-    , "ReplaceableTextures\\CommandButtons\\BTNTemp.blp")
+    , "ReplaceableTextures\\CommandButtons\\BTNHumanArtilleryUpOne.blp")
     do
         local callback
         local model = "Indicators\\moving arrows.mdl"
@@ -1626,7 +1673,7 @@ OnInit.final("Colosseum", function(Require)
         end
     end
 
-    local crossfire = Encounter.create("Crossfire", "Every |cffffcc009|r seconds, opposing projectile walls cross the arena with two safe lanes. Each projectile deals |cffffcc0020%|r max health magic damage."
+    local crossfire = Encounter.create("Crossfire", "Every |cffffcc009|r seconds, opposing projectile walls cross the arena. Each projectile deals |cffffcc0020%|r max health magic damage."
     , "ReplaceableTextures\\CommandButtons\\BTNScatterRockets.blp")
     do
         local generation = 0
@@ -1657,7 +1704,7 @@ OnInit.final("Colosseum", function(Require)
             visualZ = 35.,
             speed = 1000.,
             maxSpeed = 1000.,
-            lifetime = 3.4,
+            lifetime = 4.2,
             owner = PLAYER_CREEP,
             onUnitCollision = CAT_UnitPassThrough2D,
             onUnitCallback = function(self, target)
@@ -1726,20 +1773,27 @@ OnInit.final("Colosseum", function(Require)
             local sin_angle = math.sin(angle)
             local perpendicular_x = -sin_angle
             local perpendicular_y = cos_angle
-            local safe_lane = random(1, 6)
+            local safe_lane = random(1, 7)
             local volley = {}
 
             for lane = 1, 7 do
-                if lane ~= safe_lane and lane ~= safe_lane + 1 then
+                if lane ~= safe_lane then
                     local offset = (lane - 4) * 300.
                     for direction = -1, 1, 2 do
-                        local x = colo_x + perpendicular_x * offset - cos_angle * ARENA_RADIUS * direction
-                        local y = colo_y + perpendicular_y * offset - sin_angle * ARENA_RADIUS * direction
+                        local travel_x = cos_angle * direction
+                        local travel_y = sin_angle * direction
+                        local lane_x = colo_x + perpendicular_x * offset
+                        local lane_y = colo_y + perpendicular_y * offset
+                        local edge_distance = distance_to_arena_edge(
+                            lane_x, lane_y, -travel_x, -travel_y, 80.
+                        )
+                        local x = lane_x - travel_x * edge_distance
+                        local y = lane_y - travel_y * edge_distance
                         volley[#volley + 1] = {
                             x = x,
                             y = y,
-                            vx = cos_angle * 1000. * direction,
-                            vy = sin_angle * 1000. * direction,
+                            vx = travel_x * 1000.,
+                            vy = travel_y * 1000.,
                         }
 
                         local warning = {
@@ -2172,7 +2226,7 @@ OnInit.final("Colosseum", function(Require)
             BattleTranceBuff:add(Hero[pid], Hero[pid])
         end
     end
-    local bloodsport = Augment.create("Bloodsport", "Killing an enemy during a wave restores |cffffcc003%|r Max Health and Max Mana.", "ReplaceableTextures\\CommandButtons\\BTNVampiricAura.blp", "defense")
+    local bloodsport = Augment.create("Bloodsport", "Whenever an enemy dies during a wave, restore |cffffcc003%|r Max Health and Max Mana.", "ReplaceableTextures\\CommandButtons\\BTNVampiricAura.blp", "defense")
     do
         bloodsport.cleanup = function(pid)
             BloodsportBuff:dispel(nil, Hero[pid])

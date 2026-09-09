@@ -117,6 +117,10 @@ OnInit.final("VampireSpells", function(Require)
 
         ---@type fun(pt: PlayerTimer): boolean
         local function periodic(pt)
+            if BloodLordBuff:get(nil, pt.source) then
+                return false
+            end
+
             local ablev = GetUnitAbilityLevel(pt.source, BLOODDOMAIN.id) ---@type integer 
 
             pt.dur = pt.dur - 1
@@ -151,7 +155,7 @@ OnInit.final("VampireSpells", function(Require)
         end
 
         function thistype:onCast()
-            local pt = TimerList[self.pid]:add()
+            local pt = TimerList[self.pid]:add(thistype.id)
 
             if GetHeroStr(self.caster, true) > GetHeroAgi(self.caster, true) and GetUnitAbilityLevel(self.caster, BLOODLORD.id) > 0 then
                 pt.aoe = thistype.aoe * 2. * LBOOST[self.pid]

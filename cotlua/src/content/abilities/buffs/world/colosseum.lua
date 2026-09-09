@@ -181,31 +181,24 @@ OnInit.final("BuffsWorldColosseum", function(Require)
     end
 
     ---@class BloodsportBuff : Buff
+    ---@field proc fun(self: BloodsportBuff)
     BloodsportBuff = Buff.new()
     do
         local thistype = BloodsportBuff
         thistype.NAME            = "Bloodsport"
-        thistype.DESC            = "Killing an enemy restores ^$restore% Max Health and Max Mana"
+        thistype.DESC            = "Whenever an enemy dies during a wave, this unit restores ^$restore% Max Health and Max Mana"
         thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNVampiricAura.blp"
         thistype.AURA            = true
         thistype.DISPEL_TYPE     = BUFF_POSITIVE
         thistype.STACK_TYPE      = BUFF_STACK_NONE
 
-        local function on_kill(source)
-            local self = thistype:get(nil, source)
-            if self then
-                HP(source, source, BlzGetUnitMaxHP(source) * self.restore, thistype.NAME)
-                MP(source, BlzGetUnitMaxMana(source) * self.restore)
-            end
-        end
-
-        function thistype:onRemove()
-            EVENT_ON_KILL:unregister_unit_action(self.target, on_kill)
+        function thistype:proc()
+            HP(self.target, self.target, BlzGetUnitMaxHP(self.target) * self.restore, thistype.NAME)
+            MP(self.target, BlzGetUnitMaxMana(self.target) * self.restore)
         end
 
         function thistype:onApply()
             self.restore = 0.03
-            EVENT_ON_KILL:register_unit_action(self.target, on_kill)
         end
     end
 

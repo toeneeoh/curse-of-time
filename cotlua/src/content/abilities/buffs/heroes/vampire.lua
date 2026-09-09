@@ -112,6 +112,10 @@ OnInit.final("BuffsHeroesVampire", function(Require)
                 UnitDisableAbility(self.source, BLOODLEECH.id, false)
                 UnitDisableAbility(self.source, BLOODDOMAIN.id, false)
                 TQ:disableCallback(self.timer)
+
+                -- UnitDisableAbility restores the object-editor tooltip. Refresh
+                -- immediately so the dynamic Blood Lord values do not flash raw.
+                UpdateSpellTooltips(self.source)
             end
         end
 
@@ -124,6 +128,7 @@ OnInit.final("BuffsHeroesVampire", function(Require)
 
             if GetHeroAgi(self.source, true) > GetHeroStr(self.source, true) then
                 self.stat = "Agility"
+                TimerList[self.pid]:stopAllTimers(BLOODDOMAIN.id)
                 UnitDisableAbility(self.source, BLOODLEECH.id, true)
                 BlzUnitHideAbility(self.source, BLOODLEECH.id, false)
                 UnitDisableAbility(self.source, BLOODDOMAIN.id, true)
