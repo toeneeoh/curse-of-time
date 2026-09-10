@@ -7,6 +7,7 @@ OnInit.final("ShopQuote", function(Require)
     Require('ItemHelpers')
     Require('Items')
     Require('ShopCatalog')
+    Require('ShopOffers')
     Require('ShopActions')
     Require('ShopRegistry')
 
@@ -65,6 +66,7 @@ OnInit.final("ShopQuote", function(Require)
     ---@param item ShopItem
     ---@param pid integer
     function ShopQuote.isCraftable(shop, item, pid)
+        if item.virtual then return true end
         return evaluate_components(shop, item, pid, inventory_components(pid))
     end
 
@@ -76,10 +78,11 @@ OnInit.final("ShopQuote", function(Require)
     ---@field inventory table
     ---@field consume table
     ---@field action ShopActionDefinition?
+    ---@field offer ShopOffer?
 
     ---@return PurchaseQuote
     ---@param shop ShopDefinition
-    ---@param item ShopItem
+    ---@param item ShopItem|ShopOffer
     ---@param pid integer
     function ShopQuote.evaluate(shop, item, pid)
         local quote = {
@@ -92,6 +95,34 @@ OnInit.final("ShopQuote", function(Require)
         if item == 0 or not item then return quote end
         if not shop:isInRange(pid) then
             quote.reason = "range"
+            return quote
+        end
+
+        if item.virtual then
+            local stock = shop:getStock(item.id)
+            if stock == nil or stock == 0 then
+                quote.reason = "stock"
+                return quote
+            end
+
+            local available, reason = item:isAvailable(pid)
+            if not available then
+                quote.reason = "unavailable"
+                quote.label = reason
+                return quote
+            end
+
+            quote.cost = item:getPrice(pid)
+            for currency = 0, CURRENCY_COUNT - 1 do
+                if GetCurrency(pid, currency) < quote.cost[currency] then
+                    quote.reason = "currency"
+                    return quote
+                end
+            end
+
+            quote.can_buy = true
+            quote.reason = nil
+            quote.offer = item
             return quote
         end
         local stock = shop:getStock(item.id)

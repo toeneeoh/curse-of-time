@@ -61,8 +61,4 @@ OnInit.final("TownShops", function(Require)
     ShopAddItem(magic_shop, 'I102:0', 0)
     ShopAddItem(magic_shop, 'I101:0', 0)
 
-    local vendor = FourCC('n032')
-    CreateShop(vendor, 1000.)
-    ShopAddCategory(vendor, "ReplaceableTextures\\CommandButtons\\BTNCrystalBall.blp", "Miscellaneous")
-    ShopAddCategory(vendor, "ReplaceableTextures\\CommandButtons\\BTNChisel.dds", "Socketable")
 end, Debug and Debug.getLine())

@@ -15,6 +15,7 @@ OnInit.final("Shop", function(Require)
     Require('ShopTransaction')
     Require('ItemEventRegistry')
     Require('ShopCatalog')
+    Require('ShopOffers')
     Require('ShopActions')
     Require('ShopRegistry')
     Require('Currency')
@@ -208,9 +209,12 @@ OnInit.final("Shop", function(Require)
             BlzFrameSetSize(self.slot, width, height)
 
             if i ~= 0 then
+                local pid = GetPlayerId(GetLocalPlayer()) + 1
+                local name = i.virtual and i:getName(pid) or i.name
+                local tooltip = i.virtual and i:getTooltip(pid) or i.tooltip
                 self.button:icon(i.icon)
-                self.button.tooltip:text(i.tooltip)
-                self.button.tooltip:name(i.name)
+                self.button.tooltip:text(tooltip)
+                self.button.tooltip:name(name)
                 self.button.tooltip:icon(i.icon)
             end
 
@@ -238,23 +242,35 @@ OnInit.final("Shop", function(Require)
 
         ---@param pid integer
         function thistype:refresh(pid)
-            local available, label = GetItemAvailability(self.item.id, pid)
-            local price = GetItemPrice(self.item.id, pid)
-            local action = ShopAction.get(self.item.id)
+            if GetLocalPlayer() ~= Player(pid - 1) then return end
+
+            local available, label, price, action
             local status
+
+            if self.item.virtual then
+                available, label = self.item:isAvailable(pid)
+                price = self.item:getPrice(pid)
+                action = self.item
+                self.button.tooltip:name(self.item:getName(pid))
+                self.button.tooltip:text(self.item:getTooltip(pid))
+            else
+                available, label = GetItemAvailability(self.item.id, pid)
+                price = GetItemPrice(self.item.id, pid)
+                action = ShopAction.get(self.item.id)
+            end
 
             if self.shop.stock[self.item.id] == 0 then
                 status = "SOLD OUT"
             elseif not available then
                 status = label or "UNAVAILABLE"
-            elseif action then
+            elseif action and not self.item.virtual then
                 local action_available, action_reason = ShopAction.evaluate(self.item.id, pid)
                 if not action_available then
                     status = action_reason or "UNAVAILABLE"
                 elseif not price then
                     status = ShopAction.label(self.item.id, pid)
                 end
-            elseif not price then
+            elseif not price and not self.item.virtual then
                 status = "NOT FOR SALE"
             end
 
@@ -278,7 +294,7 @@ OnInit.final("Shop", function(Require)
 
             local row = 0
             for currency = 0, CURRENCY_COUNT - 1 do
-                local visible = not status and price[currency] > 0
+                local visible = not status and price and price[currency] > 0
 
                 BlzFrameSetVisible(self.costicon[currency], visible)
                 BlzFrameSetVisible(self.cost[currency], visible)
@@ -616,13 +632,15 @@ OnInit.final("Shop", function(Require)
             local counter = __jarray(0) ---@type table 
 
             if i ~= 0 then
+                local name = i.virtual and i:getName(pid) or i.name
+                local tooltip = i.virtual and i:getTooltip(pid) or i.tooltip
                 self.item[pid] = i
                 self.count[pid] = 0
 
                 self.main[pid].item = i
                 self.main[pid].button:icon(i.icon)
-                self.main[pid].button.tooltip:text(i.tooltip)
-                self.main[pid].button.tooltip:name(i.name)
+                self.main[pid].button.tooltip:text(tooltip)
+                self.main[pid].button.tooltip:name(name)
                 self.main[pid].button.tooltip:icon(i.icon)
                 self.main[pid].button:available(self.shop:has(i.id))
 
@@ -685,7 +703,7 @@ OnInit.final("Shop", function(Require)
                 end
 
                 if GetLocalPlayer() == p then
-                    BlzFrameSetText(self.tooltip, i.tooltip)
+                    BlzFrameSetText(self.tooltip, tooltip)
                     self.purchase:enabled(ShopQuote.evaluate(self.shop.definition, i, pid).can_buy)
                     self:visible(true)
                 end
@@ -1087,7 +1105,9 @@ OnInit.final("Shop", function(Require)
         ---@type fun(id: integer, itemid: integer, num: integer)
         function thistype.setStock(id, itemid, num)
             local self = registry[id][0] ---@type Shop
-            itemid = GetItem(itemid)
+            if type(itemid) ~= "string" or itemid:sub(1, 6) ~= "offer:" then
+                itemid = GetItem(itemid)
+            end
             local slot = registry[self][itemid] ---@type ShopSlot
 
             self.stock[itemid] = num
@@ -1199,12 +1219,12 @@ OnInit.final("Shop", function(Require)
                     end
 
                     if text ~= "" and text ~= nil then
-                        process = process and thistype.find(StringCase(slot.item.name, false), StringCase(text, false))
+                        local name = slot.item.virtual and slot.item:getName(pid) or slot.item.name
+                        process = process and thistype.find(StringCase(name, false), StringCase(text, false))
                     end
 
-                    local _, origid = GetItem(slot.item.id)
-
-                    if self.levelsort then
+                    if self.levelsort and not slot.item.virtual then
+                        local _, origid = GetItem(slot.item.id)
                         process = process and (GetHeroLevel(Hero[pid]) >= ItemData[origid][ITEM_LEVEL_REQUIREMENT])
                     end
 
@@ -1376,6 +1396,43 @@ OnInit.final("Shop", function(Require)
                 else
                     print("The item " .. itemId .. " is already registered for the shop " .. GetObjectName(id))
                 end
+            end
+        end
+
+        ---@param id integer
+        ---@param offer ShopOffer
+        function thistype.addOffer(id, offer)
+            local self = registry[id][0] ---@type Shop
+            if not self or registry[self][offer.id] then return end
+
+            local slot = ShopSlot.create(self, offer, R2I((self.index + 1)//COLUMNS), ModuloInteger(self.index + 1, COLUMNS))
+            self.size = self.size + 1
+            self.index = self.index + 1
+            slot:visible(slot.row >= 0 and slot.row <= ROWS - 1 and slot.column >= 0 and slot.column <= COLUMNS - 1)
+            self.stock[offer.id] = -1
+
+            if self.index > 0 and self.last then
+                slot.prev = self.last
+                slot.left = self.last
+                self.last.next = slot
+                self.last.right = slot
+            else
+                self.first = slot
+                self.head = slot
+            end
+
+            if slot.isVisible then self.tail = slot end
+            self.last = slot
+            registry[self][offer.id] = slot
+            shoppool[self][self.index] = slot
+
+            local total = COLUMNS * ROWS
+            if self.size > total then
+                BlzFrameSetVisible(self.sliderFrame, true)
+                local max = 1 + math.ceil((self.size - total) / COLUMNS)
+                BlzFrameSetMinMaxValue(self.sliderFrame, 1, max)
+                self.sliderValue = max
+                BlzFrameSetValue(self.sliderFrame, max)
             end
         end
 
@@ -1753,6 +1810,7 @@ OnInit.final("Shop", function(Require)
         setStock = Shop.setStock,
         addCategory = Shop.addCategory,
         addItem = Shop.addItem,
+        addOffer = Shop.addOffer,
     })
 
 end, Debug and Debug.getLine())

@@ -3,12 +3,14 @@
 
 OnInit.global("ShopRegistry", function(Require)
     Require('ItemHelpers')
+    Require('ShopOffers')
 
     ---@class ShopDefinition
     ---@field id integer
     ---@field aoe number
     ---@field categories table[]
     ---@field items table[]
+    ---@field offers ShopOffer[]
     ---@field stock table[]
     ---@field stock_by_key table<string, table>
     ---@field stock_count table<string, integer>
@@ -19,6 +21,13 @@ OnInit.global("ShopRegistry", function(Require)
     local ShopDefinition = {}
     ShopDefinition.__index = ShopDefinition
 
+    local function entry_key(id)
+        if type(id) == "string" and id:sub(1, 6) == "offer:" then
+            return id
+        end
+        return GetItem(id)
+    end
+
     ShopRegistry = {
         definitions = {},
         order = {},
@@ -28,14 +37,14 @@ OnInit.global("ShopRegistry", function(Require)
     ---@param item_id string|integer
     ---@return boolean
     function ShopDefinition:has(item_id)
-        local key = GetItem(item_id)
+        local key = entry_key(item_id)
         return self.item_by_id[key] ~= nil
     end
 
     ---@param item_id string|integer
     ---@return integer?
     function ShopDefinition:getStock(item_id)
-        return self.stock_count[GetItem(item_id)]
+        return self.stock_count[entry_key(item_id)]
     end
 
     ---@param pid integer
@@ -69,6 +78,7 @@ OnInit.global("ShopRegistry", function(Require)
             aoe = aoe,
             categories = {},
             items = {},
+            offers = {},
             item_by_id = {},
             stock = {},
             stock_by_key = {},
@@ -113,7 +123,7 @@ OnInit.global("ShopRegistry", function(Require)
         local definition = ShopRegistry.definitions[id]
         if not definition then return end
 
-        local key = GetItem(item_id)
+        local key = entry_key(item_id)
         if definition.item_by_id[key] then return end
 
         local item = {
@@ -130,13 +140,32 @@ OnInit.global("ShopRegistry", function(Require)
     end
 
     ---@param id integer
+    ---@param offer_definition ShopOfferDefinition
+    ---@return ShopOffer?
+    function ShopRegistry.addOffer(id, offer_definition)
+        local definition = ShopRegistry.definitions[id]
+        if not definition then return nil end
+
+        local offer = ShopOffer.create(offer_definition)
+        if not offer or definition.item_by_id[offer.id] then return nil end
+
+        definition.offers[#definition.offers + 1] = offer
+        definition.item_by_id[offer.id] = offer
+        definition.stock_count[offer.id] = -1
+        if ShopRegistry.adapter then
+            ShopRegistry.adapter.addOffer(id, offer)
+        end
+        return offer
+    end
+
+    ---@param id integer
     ---@param item_id string|integer
     ---@param count integer
     function ShopRegistry.setStock(id, item_id, count)
         local definition = ShopRegistry.definitions[id]
         if not definition then return end
 
-        local key = GetItem(item_id)
+        local key = entry_key(item_id)
         definition.stock_count[key] = count
         local stock = definition.stock_by_key[key]
         if stock then
@@ -189,6 +218,9 @@ OnInit.global("ShopRegistry", function(Require)
                 local item = definition.items[item_index]
                 adapter.addItem(definition.id, item.id, item.categories)
             end
+            for offer_index = 1, #definition.offers do
+                adapter.addOffer(definition.id, definition.offers[offer_index])
+            end
             for stock_index = 1, #definition.stock do
                 local stock = definition.stock[stock_index]
                 adapter.setStock(definition.id, stock.id, stock.count)
@@ -200,5 +232,6 @@ OnInit.global("ShopRegistry", function(Require)
     CreateShop = ShopRegistry.create
     ShopAddCategory = ShopRegistry.addCategory
     ShopAddItem = ShopRegistry.addItem
+    ShopAddOffer = ShopRegistry.addOffer
     ShopSetStock = ShopRegistry.setStock
 end, Debug and Debug.getLine())

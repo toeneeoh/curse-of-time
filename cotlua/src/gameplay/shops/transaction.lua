@@ -12,12 +12,27 @@ OnInit.final("ShopTransaction", function(Require)
 
     ---Re-evaluates immediately before committing synchronized state changes.
     ---@param shop ShopDefinition
-    ---@param item ShopItem
+    ---@param item ShopItem|ShopOffer
     ---@param pid integer
     ---@return PurchaseQuote
     function ShopTransaction.commit(shop, item, pid)
         local quote = ShopQuote.evaluate(shop, item, pid)
         if not quote.can_buy then return quote end
+
+        if quote.offer then
+            if not quote.offer.purchase(pid) then
+                quote.can_buy = false
+                quote.reason = "action"
+                return quote
+            end
+            for currency = 0, CURRENCY_COUNT - 1 do
+                if quote.cost[currency] > 0 then
+                    AddCurrency(pid, currency, -quote.cost[currency])
+                end
+            end
+            ShopRegistry.consumeStock(shop, item.id)
+            return quote
+        end
 
         if quote.action then
             if not quote.action.open(pid) then

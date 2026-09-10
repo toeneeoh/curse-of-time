@@ -60,6 +60,7 @@ OnInit.global("PlayerLifecycle", function(Require)
         SetCurrency(pid, GOLD, 0)
         SetCurrency(pid, PLATINUM, 0)
         SetCurrency(pid, CRYSTAL, 0)
+        SetCurrency(pid, HONOR, 0)
         ResetPlayerLighting(pid)
 
         if GetLocalPlayer() == player then

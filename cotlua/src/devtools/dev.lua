@@ -209,7 +209,7 @@ modifiers:
             SetCurrency(pid, CRYSTAL, S2I(args[2]))
         end,
         ["sh"] = function(p, pid, args)
-            SetCurrency(pid, HONOR, S2I(args[2]))
+            Honor.setTotal(pid, S2I(args[2]))
         end,
         ["sf"] = function(p, pid, args)
             SetCurrency(pid, FACTION, S2I(args[2]))
@@ -392,7 +392,7 @@ modifiers:
             SetCurrency(pid, GOLD, 9999999)
             SetCurrency(pid, PLATINUM, 9999)
             SetCurrency(pid, CRYSTAL, 9999)
-            SetCurrency(pid, HONOR, 9999)
+            Honor.setTotal(pid, 9999)
             SetCurrency(pid, FACTION, 9999)
             SetHeroLevel(Hero[pid], 400, false)
             FogMaskEnable(false)

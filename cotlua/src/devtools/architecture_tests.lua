@@ -6,6 +6,8 @@ OnInit.final("ArchitectureTests", function(Require)
     Require('ShopTransaction')
     Require('ShopRegistry')
     Require('TownShops')
+    Require('ColosseumShop')
+    Require('Honor')
     Require('FactionShop')
     Require('EvilShopkeeperShop')
     Require('Recipe')
@@ -330,6 +332,19 @@ OnInit.final("ArchitectureTests", function(Require)
                 end
                 if definition:getStock(first_item.id) == nil then
                     return false, values[1] .. " stock state is missing"
+                end
+            end
+            if values[1] == 'n032' then
+                if #definition.offers ~= 4 then
+                    return false, "Prize Vendor virtual offer count changed"
+                end
+                local offer = definition.offers[1]
+                if not offer.virtual or not definition:has(offer.id) then
+                    return false, "Prize Vendor offer index is incomplete"
+                end
+                local price = offer:getPrice(1)
+                if price[HONOR] ~= 1 then
+                    return false, "Prize Vendor reward does not use Honor pricing"
                 end
             end
         end

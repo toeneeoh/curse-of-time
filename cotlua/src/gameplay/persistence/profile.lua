@@ -607,7 +607,9 @@ OnInit.final("Profile", function(Require)
             hero.gold = math.min(GetCurrency(self.pid, GOLD), MAX_GOLD)
             hero.platinum = math.min(GetCurrency(self.pid, PLATINUM), MAX_PLAT_CRYS)
             hero.crystal = math.min(GetCurrency(self.pid, CRYSTAL), MAX_PLAT_CRYS)
-            hero.honor = math.min(GetCurrency(self.pid, HONOR), MAX_HONOR)
+            -- Honor is an earned lifetime budget. Spending it on reallocatable
+            -- rewards changes only the available balance for this session.
+            hero.honor = math.min(hero.honor or GetCurrency(self.pid, HONOR), MAX_HONOR)
             hero.faction_points = math.min(GetCurrency(self.pid, FACTION), MAX_FACTION)
             hero.teleport = GetUnitAbilityLevel(Backpack[self.pid], TELEPORT_HOME.id)
             hero.reveal = GetUnitAbilityLevel(Backpack[self.pid], FourCC('A0FK'))

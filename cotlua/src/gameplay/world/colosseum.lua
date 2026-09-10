@@ -5,6 +5,7 @@ OnInit.final("Colosseum", function(Require)
     Require('ALICE')
     Require('SpellTools')
     Require('Currency')
+    Require('Honor')
     Require('AbilityCasting')
     Require('FloatingText')
     Require('Damage')
@@ -1196,7 +1197,7 @@ OnInit.final("Colosseum", function(Require)
         end
 
         if cleared then
-            AddCurrency(pid, HONOR, 1)
+            Honor.award(pid, 1)
         end
 
         DisplayTextToPlayer(Player(pid - 1), 0., 0., "Colosseum reward: " .. coins .. " coins" .. (cleared and " and 1 Honor." or "."))
