@@ -335,7 +335,7 @@ OnInit.final("ArchitectureTests", function(Require)
                 end
             end
             if values[1] == 'n032' then
-                if #definition.offers ~= 4 then
+                if #definition.offers ~= 5 then
                     return false, "Prize Vendor virtual offer count changed"
                 end
                 local offer = definition.offers[1]
@@ -343,7 +343,7 @@ OnInit.final("ArchitectureTests", function(Require)
                     return false, "Prize Vendor offer index is incomplete"
                 end
                 local price = offer:getPrice(1)
-                if price[HONOR] ~= 1 then
+                if price[HONOR] ~= 5 then
                     return false, "Prize Vendor reward does not use Honor pricing"
                 end
             end

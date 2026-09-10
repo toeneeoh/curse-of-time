@@ -10,6 +10,7 @@ OnInit.final("Honor", function(Require)
     local totals = __jarray(0)
     local MAX_HONOR = 100000
     local allocations = {}
+    local active = {}
     local rewards = {}
     local reward_order = {}
 
@@ -28,7 +29,7 @@ OnInit.final("Honor", function(Require)
         if type(reward.cost) == "function" then
             return reward.cost(rank)
         end
-        return reward.cost or 1
+        return reward.cost or 5
     end
 
     ---@param definition HonorRewardDefinition
@@ -98,9 +99,37 @@ OnInit.final("Honor", function(Require)
         end
 
         local new_rank = old_rank + 1
-        reward.apply(pid, old_rank, new_rank)
+        if active[pid] then
+            reward.apply(pid, old_rank, new_rank)
+        end
         ranks[key] = new_rank
         return true
+    end
+
+    ---Applies the selected loadout when a player enters the Colosseum.
+    ---@param pid integer
+    function Honor.activate(pid)
+        if active[pid] then return end
+        active[pid] = true
+        local ranks = allocation(pid)
+        for index = 1, #reward_order do
+            local reward = reward_order[index]
+            local rank = ranks[reward.key]
+            if rank > 0 then reward.apply(pid, 0, rank) end
+        end
+    end
+
+    ---Removes all loadout effects without changing their allocated ranks.
+    ---@param pid integer
+    function Honor.deactivate(pid)
+        if not active[pid] then return end
+        local ranks = allocation(pid)
+        for index = 1, #reward_order do
+            local reward = reward_order[index]
+            local rank = ranks[reward.key]
+            if rank > 0 then reward.apply(pid, rank, 0) end
+        end
+        active[pid] = nil
     end
 
     ---@param pid integer
@@ -112,7 +141,7 @@ OnInit.final("Honor", function(Require)
             local reward = reward_order[index]
             local rank = ranks[reward.key]
             if rank > 0 then
-                reward.apply(pid, rank, 0)
+                if active[pid] then reward.apply(pid, rank, 0) end
                 ranks[reward.key] = 0
                 changed = true
             end
@@ -147,11 +176,13 @@ OnInit.final("Honor", function(Require)
 
     local function on_setup(pid)
         allocations[pid] = __jarray(0)
+        active[pid] = nil
         Honor.setTotal(pid, Profile[pid].hero.honor or 0)
     end
 
     local function on_cleanup(pid)
         allocations[pid] = nil
+        active[pid] = nil
         totals[pid] = 0
     end
 

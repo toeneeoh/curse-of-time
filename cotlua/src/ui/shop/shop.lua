@@ -253,6 +253,7 @@ OnInit.final("Shop", function(Require)
                 action = self.item
                 self.button.tooltip:name(self.item:getName(pid))
                 self.button.tooltip:text(self.item:getTooltip(pid))
+                self.button:available(ShopQuote.evaluate(self.shop.definition, self.item, pid).can_buy)
             else
                 available, label = GetItemAvailability(self.item.id, pid)
                 price = GetItemPrice(self.item.id, pid)
@@ -262,7 +263,7 @@ OnInit.final("Shop", function(Require)
             if self.shop.stock[self.item.id] == 0 then
                 status = "SOLD OUT"
             elseif not available then
-                status = label or "UNAVAILABLE"
+                status = self.item.virtual and nil or label or "UNAVAILABLE"
             elseif action and not self.item.virtual then
                 local action_available, action_reason = ShopAction.evaluate(self.item.id, pid)
                 if not action_available then
@@ -295,6 +296,7 @@ OnInit.final("Shop", function(Require)
             local row = 0
             for currency = 0, CURRENCY_COUNT - 1 do
                 local visible = not status and price and price[currency] > 0
+                    and (not self.item.virtual or available)
 
                 BlzFrameSetVisible(self.costicon[currency], visible)
                 BlzFrameSetVisible(self.cost[currency], visible)
@@ -642,7 +644,9 @@ OnInit.final("Shop", function(Require)
                 self.main[pid].button.tooltip:text(tooltip)
                 self.main[pid].button.tooltip:name(name)
                 self.main[pid].button.tooltip:icon(i.icon)
-                self.main[pid].button:available(self.shop:has(i.id))
+                self.main[pid].button:available(not i.virtual
+                    and self.shop:has(i.id)
+                    or ShopQuote.evaluate(self.shop.definition, i, pid).can_buy)
 
                 self:showUsed(p)
 

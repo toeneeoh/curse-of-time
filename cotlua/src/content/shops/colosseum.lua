@@ -13,13 +13,14 @@ OnInit.final("ColosseumShop", function(Require)
     local reward_data = {
         {
             key = "gladiators_might",
-            name = "Gladiator's Might",
+            name = "Colosseum Might",
             icon = "ReplaceableTextures\\CommandButtons\\BTNBattleRoar.blp",
             max_rank = 5,
-            detail = "Gain |cffffcc003%|r attack damage and Spellboost per rank.",
+            detail = "Gain |cffffcc003%|r attack damage and Spellboost per rank while inside the Colosseum.",
             apply = function(pid, old_rank, new_rank)
                 local delta = (new_rank - old_rank) * 0.03
-                local unit = Unit[Hero[pid]]
+                local hero = Hero[pid]
+                local unit = hero and Unit[hero]
                 if unit then
                     unit.damage_percent = unit.damage_percent + delta
                     unit.spellboost = unit.spellboost + delta
@@ -28,12 +29,13 @@ OnInit.final("ColosseumShop", function(Require)
         },
         {
             key = "gladiators_resolve",
-            name = "Gladiator's Resolve",
+            name = "Colosseum Resolve",
             icon = "ReplaceableTextures\\CommandButtons\\BTNDefend.blp",
             max_rank = 5,
-            detail = "Take |cffffcc003%|r less damage per rank.",
+            detail = "Take |cffffcc003%|r less damage per rank while inside the Colosseum.",
             apply = function(pid, old_rank, new_rank)
-                local unit = Unit[Hero[pid]]
+                local hero = Hero[pid]
+                local unit = hero and Unit[hero]
                 if unit then
                     unit.dr = unit.dr * (0.97 ^ (new_rank - old_rank))
                 end
@@ -41,16 +43,25 @@ OnInit.final("ColosseumShop", function(Require)
         },
         {
             key = "gladiators_stride",
-            name = "Gladiator's Stride",
+            name = "Colosseum Stride",
             icon = "ReplaceableTextures\\CommandButtons\\BTNBootsOfSpeed.blp",
             max_rank = 5,
-            detail = "Gain |cffffcc0010|r movespeed per rank.",
+            detail = "Gain |cffffcc0010|r movespeed per rank while inside the Colosseum.",
             apply = function(pid, old_rank, new_rank)
-                local unit = Unit[Hero[pid]]
+                local hero = Hero[pid]
+                local unit = hero and Unit[hero]
                 if unit then
                     unit.ms_flat = unit.ms_flat + (new_rank - old_rank) * 10
                 end
             end,
+        },
+        {
+            key = "colosseum_spoils",
+            name = "Colosseum Spoils",
+            icon = "ReplaceableTextures\\CommandButtons\\BTNChestOfGold.blp",
+            max_rank = 5,
+            detail = "Gain |cffffcc0010%|r more gold from Colosseum rewards per rank.",
+            apply = function() end,
         },
     }
 
@@ -91,7 +102,7 @@ OnInit.final("ColosseumShop", function(Require)
         categories = services,
         availability = function(pid)
             if Honor.getAllocated(pid) == 0 then
-                return false, "NO ALLOCATIONS"
+                return false, "NO HONOR"
             end
             return true
         end,

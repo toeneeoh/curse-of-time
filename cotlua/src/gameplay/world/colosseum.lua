@@ -1190,7 +1190,8 @@ OnInit.final("Colosseum", function(Require)
         local coins = base_coins + bonus_coins[pid]
         local level = math.max(1, math.min(MAX_LEVEL, math.floor(average_level)))
         local gold_per_coin = COIN_BASE_GOLD + level * level * COIN_LEVEL_SCALING
-        local gold = math.floor(coins * gold_per_coin)
+        local gold_multiplier = 1. + 0.1 * Honor.getRank(pid, "colosseum_spoils")
+        local gold = math.floor(coins * gold_per_coin * gold_multiplier)
 
         if gold > 0 then
             AwardGold(pid, gold, true)
@@ -1204,6 +1205,7 @@ OnInit.final("Colosseum", function(Require)
     end
 
     local function colo_on_cleanup(pid)
+        Honor.deactivate(pid)
         Augment.destroy(pid)
         Encounter.destroy(pid)
 
@@ -1250,6 +1252,9 @@ OnInit.final("Colosseum", function(Require)
         stat_armor = stat_armor + power * STAT_ARMOR_PER_ATTRIBUTE
         stat_dmg = stat_dmg + power
 
+        -- Honor loadout bonuses intentionally apply after encounter scaling.
+        Honor.activate(pid)
+
         -- disable inventory
         DisableItems(pid, true)
         MoveHero(pid, colo_x, colo_y)
@@ -1288,6 +1293,7 @@ OnInit.final("Colosseum", function(Require)
 
         -- reenable items and reward remaining players
         for _, pid in ipairs(players) do
+            Honor.deactivate(pid)
             MoveHero(pid, TOWN_CENTER_X, TOWN_CENTER_Y)
             DisableItems(pid, false)
             colo_reward(pid, cleared == true)
