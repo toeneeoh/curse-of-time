@@ -90,6 +90,7 @@ OnInit.final("UnitTable", function(Require)
     ---@field proxy table
     ---@field hidehp boolean
     ---@field busy boolean
+    ---@field death_exception boolean
     ---@field _casting boolean
     ---@field aggro_timer integer
     ---@field boss Boss

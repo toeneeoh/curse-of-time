@@ -180,6 +180,9 @@ OnInit.final("Items", function(Require)
     ---@field x number
     ---@field y number
     ---@field quality integer[]
+    ---@field extra integer[]
+    ---@field rarity integer
+    ---@field limit integer
     ---@field eval conditionfunc
     ---@field consumeCharge function
     ---@field calculateValue function
@@ -195,6 +198,7 @@ OnInit.final("Items", function(Require)
     ---@field restricted boolean
     ---@field create function
     ---@field destroy function
+    ---@field onDestroy function
     ---@field owner player
     ---@field sfx effect
     ---@field tooltip string
@@ -1141,6 +1145,15 @@ OnInit.final("Items", function(Require)
             if self.limit > 0 then
                 text[#text + 1] = "|cff808080|nLimit: 1"
                 alt_text[#alt_text + 1] = "|cff808080|nLimit: 1"
+            end
+
+            local extra_info = ITEM_EXTRA_INFO[self.id]
+            if extra_info then
+                local extra_text = extra_info(self)
+                if extra_text then
+                    text[#text + 1] = extra_text
+                    alt_text[#alt_text + 1] = extra_text
+                end
             end
 
             self.tooltip = concat(text)

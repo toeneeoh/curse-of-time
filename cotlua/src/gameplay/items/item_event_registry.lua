@@ -3,6 +3,7 @@
 OnInit.global("ItemEventRegistry", function()
     ON_BUY_LOOKUP = {}
     ITEM_LOOKUP = {}
+    ITEM_EXTRA_INFO = {} ---@type table<integer, fun(item: Item): string?>
 
     local changed = {}
     local debug_try = Debug.try
