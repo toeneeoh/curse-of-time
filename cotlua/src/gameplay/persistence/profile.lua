@@ -159,10 +159,8 @@ OnInit.final("Profile", function(Require)
         end
 
         ---@return boolean
-        local function profile_click()
-            local pid   = GetPlayerId(GetTriggerPlayer()) + 1 ---@type integer 
-            local dw    = DialogWindow[pid] ---@type DialogWindow 
-            local index = dw:getClickedIndex(GetClickedButton()) ---@type integer 
+        local function profile_click(dw, index)
+            local pid = dw.pid
 
             if index ~= -1 then
                 thistype[pid] = thistype.create(pid)
@@ -358,10 +356,8 @@ OnInit.final("Profile", function(Require)
         end
 
         ---@return boolean
-        local function confirm_delete_character()
-            local pid   = GetPlayerId(GetTriggerPlayer()) + 1
-            local dw    = DialogWindow[pid]
-            local index = dw:getClickedIndex(GetClickedButton())
+        local function confirm_delete_character(dw, index)
+            local pid = dw.pid
 
             if index ~= -1 then
                 Profile[pid]:delete_character()
@@ -374,19 +370,17 @@ OnInit.final("Profile", function(Require)
 
         local toggle_delete = {} ---@type boolean[] 
 
-        local function load_menu()
-            local pid   = GetPlayerId(GetTriggerPlayer()) + 1 ---@type integer 
-            local dw    = DialogWindow[pid]
-            local index = dw:getClickedIndex(GetClickedButton()) ---@type integer 
+        local function load_menu(dw, index, data, is_menu)
+            local pid = dw.pid
 
             -- new character button
-            if GetClickedButton() == dw.MenuButton[2] then
+            if is_menu and index == 0 then
                 thistype[pid]:get_empty_slot()
 
                 if thistype[pid]:getSlotsUsed() >= MAX_SLOTS then
                     DisplayTimedTextToPlayer(GetTriggerPlayer(), 0, 0, 30.0, "You cannot save more than " .. MAX_SLOTS .. " heroes!")
-                    dw.Page = -1
-                    dw:display()
+                    dw.Page = 0
+                    dw:refresh()
                 else
                     if not SELECTING_HERO[pid] then
                         thistype[pid].new_char = true
@@ -396,26 +390,20 @@ OnInit.final("Profile", function(Require)
                     dw:destroy()
                 end
             -- load / delete button
-            elseif GetClickedButton() == dw.MenuButton[3] then
-                -- stay at the same page
-                if dw.Page > -1 then
-                    dw.Page = dw.Page - 1
-                end
-
+            elseif is_menu and index == 1 then
                 if toggle_delete[pid] then
                     toggle_delete[pid] = false
-                    dw.MenuButtonName[3] = "|cffff0000Delete Character"
+                    dw:setMenuButtonName(1, "|cffff0000Delete Character")
                     dw.title = "|cffffffffLOAD"
-                    dw:display()
                 else
                     toggle_delete[pid] = true
-                    dw.MenuButtonName[3] = "|cffffffffLoad Character"
+                    dw:setMenuButtonName(1, "|cffffffffLoad Character")
                     dw.title = "|cffff0000DELETE"
-                    dw:display()
                 end
+                dw:refresh()
             -- character slot
-            elseif index ~= -1 then
-                local slot = dw.data[index]
+            elseif not is_menu and index ~= -1 then
+                local slot = data
                 thistype[pid].current_slot = slot
                 dw:destroy()
 
@@ -685,7 +673,7 @@ OnInit.final("Profile", function(Require)
 
     ---@class HeroData
     ---@field id integer
-    ---@field hardcore boolean
+    ---@field hardcore integer
     ---@field prestige integer
     ---@field level integer
     ---@field str integer

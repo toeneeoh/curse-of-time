@@ -9,6 +9,7 @@ OnInit.final("Struggle", function(Require)
     Require('ItemHelpers')
     Require('ItemEventRegistry')
     Require('PlayerLifecycle')
+    Require('Profile')
 
     ---@class StruggleService
     Struggle = {}
@@ -17,7 +18,12 @@ OnInit.final("Struggle", function(Require)
     local WAIVER_ITEM = FourCC('I00T')
     local ENTRY_DURATION = 45.
     local FIRST_WAVE_DELAY = 5.
-    local BETWEEN_WAVE_DELAY = 3.
+    local BETWEEN_WAVE_DELAY = 5.
+    local TRICKLE_INTERVAL = 1.25
+    local TRICKLE_SIZE = 3
+    local MIN_WAVE_UNITS = 25
+    local MAX_WAVE_UNITS = 40
+    local ENEMY_TEMPLATE = FourCC('n002')
     local CHAOS_ARMOR_LEVEL = 200
     local CHAOS_ATTACK_LEVEL = 250
     local STAT_ARMOR_PER_ATTRIBUTE = 0.0003
@@ -34,13 +40,13 @@ OnInit.final("Struggle", function(Require)
         gg_rct_InfiniteStruggleSpawn4,
     }
 
-    local prechaos = {
+    local prechaos_skins = {
         fodder = { FourCC('n0tb'), FourCC('n0ss'), FourCC('n0hh') },
         blocker = { FourCC('n0dm'), FourCC('n01G'), FourCC('n01M') },
         ranged = { FourCC('n024'), FourCC('n028'), FourCC('n0us') },
         disruptor = { FourCC('n0ut'), FourCC('n028'), FourCC('n0tc') },
     }
-    local chaos = {
+    local chaos_skins = {
         fodder = { FourCC('n03C'), FourCC('n033'), FourCC('n03E') },
         blocker = { FourCC('n03A'), FourCC('n08N'), FourCC('n031') },
         ranged = { FourCC('n01W'), FourCC('n00W'), FourCC('n02J') },
@@ -48,10 +54,12 @@ OnInit.final("Struggle", function(Require)
     }
 
     -- Struggle is an endless pressure mode, not a second Colosseum. Its waves
-    -- have only a three-second reset, use mixed battlefield roles, and grow
+    -- arrive in 25-40 unit trickles with only a five-second reset, use mixed
+    -- battlefield roles, and grow
     -- quadratically in durability while damage grows more slowly. Encounter
-    -- strength snapshots the entrants' level and highest total attribute so all
-    -- hero archetypes are represented, including item-granted bonus attributes.
+    -- strength snapshots the entrants' level, permanent base attributes, and
+    -- equipped-item attributes. Temporary pre-entry buffs are deliberately
+    -- ignored so buffing before entry cannot raise or lower the run's baseline.
     -- Party size increases durability much more than damage. At the same level
     -- breakpoints as the late overworld and Colosseum, enemies receive chaos
     -- defense and attacks; chaos attack damage is divided by the map's native
@@ -60,31 +68,31 @@ OnInit.final("Struggle", function(Require)
         {
             name = "The Crush",
             roles = {
-                { type = "fodder", count = 9, hp = 0.7, damage = 0.75, armor = 0.7, speed = 0.12 },
-                { type = "ranged", count = 3, hp = 0.65, damage = 1.35, armor = 0.65, speed = 0.05 },
+                { type = "fodder", weight = 0.75, hp = 0.7, damage = 0.75, armor = 0.7, speed = 0.12 },
+                { type = "ranged", weight = 0.25, hp = 0.65, damage = 1.35, armor = 0.65, speed = 0.05 },
             },
         },
         {
             name = "Shield Wall",
             roles = {
-                { type = "blocker", count = 5, hp = 1.65, damage = 0.7, armor = 1.5, speed = -0.08 },
-                { type = "ranged", count = 5, hp = 0.6, damage = 1.5, armor = 0.6, speed = 0.08 },
+                { type = "blocker", weight = 0.5, hp = 1.65, damage = 0.7, armor = 1.5, speed = -0.08 },
+                { type = "ranged", weight = 0.5, hp = 0.6, damage = 1.5, armor = 0.6, speed = 0.08 },
             },
         },
         {
             name = "Hunting Pack",
             roles = {
-                { type = "fodder", count = 7, hp = 0.8, damage = 0.9, armor = 0.75, speed = 0.18 },
-                { type = "disruptor", count = 3, hp = 0.9, damage = 1.15, armor = 0.9, speed = 0.12 },
-                { type = "ranged", count = 2, hp = 0.55, damage = 1.65, armor = 0.55, speed = 0.05 },
+                { type = "fodder", weight = 0.58, hp = 0.8, damage = 0.9, armor = 0.75, speed = 0.18 },
+                { type = "disruptor", weight = 0.25, hp = 0.9, damage = 1.15, armor = 0.9, speed = 0.12 },
+                { type = "ranged", weight = 0.17, hp = 0.55, damage = 1.65, armor = 0.55, speed = 0.05 },
             },
         },
         {
             name = "Pressure Line",
             roles = {
-                { type = "blocker", count = 3, hp = 1.8, damage = 0.75, armor = 1.6, speed = -0.1 },
-                { type = "disruptor", count = 4, hp = 0.85, damage = 1.2, armor = 0.85, speed = 0.1 },
-                { type = "ranged", count = 4, hp = 0.6, damage = 1.55, armor = 0.6, speed = 0.05 },
+                { type = "blocker", weight = 0.27, hp = 1.8, damage = 0.75, armor = 1.6, speed = -0.1 },
+                { type = "disruptor", weight = 0.36, hp = 0.85, damage = 1.2, armor = 0.85, speed = 0.1 },
+                { type = "ranged", weight = 0.37, hp = 0.6, damage = 1.55, armor = 0.6, speed = 0.05 },
             },
         },
     }
@@ -102,6 +110,9 @@ OnInit.final("Struggle", function(Require)
     local active = false
     local entry_callback ---@type integer?
     local wave_callback ---@type integer?
+    local trickle_callback ---@type integer?
+    local spawn_queue = {}
+    local spawn_total = 0
     local exit_button ---@type SimpleButton?
 
     local begin_run, end_run, remove_player, schedule_wave, on_grave_death, on_cleanup
@@ -138,12 +149,33 @@ OnInit.final("Struggle", function(Require)
         return math.sqrt(get_wave_multiplier()) * level_multiplier
     end
 
+    local function get_persistent_power(pid)
+        local unit = Unit[Hero[pid]]
+        local strength = unit.str
+        local agility = unit.agi
+        local intelligence = unit.int
+        local items = Profile[pid].hero.items
+
+        for slot = 1, 6 do
+            local item = items[slot]
+            if item and item.equipped then
+                local modifier = ItemProfMod(item.id, pid)
+                local stats = item.cached_stats
+                strength = strength + math.floor(modifier * stats[ITEM_STRENGTH])
+                agility = agility + math.floor(modifier * stats[ITEM_AGILITY])
+                intelligence = intelligence + math.floor(modifier * stats[ITEM_INTELLIGENCE])
+            end
+        end
+
+        return math.max(strength, agility, intelligence)
+    end
+
     local function spawn_xy(rect)
         return GetRandomReal(GetRectMinX(rect), GetRectMaxX(rect)), GetRandomReal(GetRectMinY(rect), GetRectMaxY(rect))
     end
 
     local function configure_enemy(u, role, total_spawned)
-        local count_multiplier = math.max(0.7, math.min(1.2, 10. / total_spawned))
+        local count_multiplier = math.max(0.55, math.min(0.8, math.sqrt(12. / total_spawned)))
         local base_hp = average_power + average_level * 80.
         local base_damage = average_power + average_level * 5.
         local hp = base_hp * get_wave_multiplier() * party_health_multiplier * role.hp * count_multiplier
@@ -177,7 +209,42 @@ OnInit.final("Struggle", function(Require)
         active_count = math.max(0, active_count - 1)
         TimerQueue:callDelayed(3., RemoveUnit, killed)
 
-        if active and active_count == 0 then
+        if active and active_count == 0 and #spawn_queue == 0 and not trickle_callback then
+            completed_wave = wave
+            schedule_wave(BETWEEN_WAVE_DELAY)
+        end
+    end
+
+    local function spawn_enemy(role)
+        local skins = average_level >= CHAOS_ARMOR_LEVEL and chaos_skins or prechaos_skins
+        local pool = skins[role.type]
+        local rect = spawn_rects[math.random(1, #spawn_rects)]
+        local x, y = spawn_xy(rect)
+        local skin = pool[math.random(1, #pool)]
+        local u = BlzCreateUnitWithSkin(PLAYER_BOSS, ENEMY_TEMPLATE, x, y, GetRandomReal(0., 360.), skin)
+
+        BlzSetUnitSkin(u, skin)
+        BlzSetUnitName(u, GetObjectName(skin))
+        BlzSetHeroProperName(u, GetObjectName(skin))
+        enemies[#enemies + 1] = u
+        active_count = active_count + 1
+        configure_enemy(u, role, spawn_total)
+        EVENT_ON_UNIT_DEATH:register_unit_action(u, remove_enemy)
+    end
+
+    local function spawn_batch()
+        trickle_callback = nil
+        if not active then
+            return
+        end
+
+        for _ = 1, math.min(TRICKLE_SIZE, #spawn_queue) do
+            spawn_enemy(table.remove(spawn_queue))
+        end
+
+        if #spawn_queue > 0 then
+            trickle_callback = TimerQueue:callDelayed(TRICKLE_INTERVAL, spawn_batch)
+        elseif active_count == 0 then
             completed_wave = wave
             schedule_wave(BETWEEN_WAVE_DELAY)
         end
@@ -191,38 +258,27 @@ OnInit.final("Struggle", function(Require)
 
         wave = wave + 1
         local formation = formations[math.random(1, #formations)]
-        local pools = average_level >= CHAOS_ARMOR_LEVEL and chaos or prechaos
-        local extra_units = math.min(10, (wave - 1) // 5)
-        local spawn_counts = {}
-        local total_spawned = 0
+        spawn_total = math.random(MIN_WAVE_UNITS, MAX_WAVE_UNITS)
+        spawn_queue = {}
+        local assigned = 0
 
         for index, role in ipairs(formation.roles) do
-            spawn_counts[index] = role.count
-            total_spawned = total_spawned + role.count
-        end
-        for index = 1, extra_units do
-            local role_index = (index - 1) % #formation.roles + 1
-            spawn_counts[role_index] = spawn_counts[role_index] + 1
-            total_spawned = total_spawned + 1
-        end
-
-        DisplayTextToTable(players, "|cffffcc00Struggle Wave " .. wave .. ":|r " .. formation.name)
-
-        for index, role in ipairs(formation.roles) do
-            local count = spawn_counts[index]
-            local pool = pools[role.type]
+            local count = index == #formation.roles
+                and (spawn_total - assigned)
+                or math.floor(spawn_total * role.weight)
+            assigned = assigned + count
             for _ = 1, count do
-                local rect = spawn_rects[math.random(1, #spawn_rects)]
-                local x, y = spawn_xy(rect)
-                local id = pool[math.random(1, #pool)]
-                local u = CreateUnit(PLAYER_BOSS, id, x, y, GetRandomReal(0., 360.))
-
-                enemies[#enemies + 1] = u
-                active_count = active_count + 1
-                configure_enemy(u, role, total_spawned)
-                EVENT_ON_UNIT_DEATH:register_unit_action(u, remove_enemy)
+                spawn_queue[#spawn_queue + 1] = role
             end
         end
+
+        for index = #spawn_queue, 2, -1 do
+            local swap = math.random(1, index)
+            spawn_queue[index], spawn_queue[swap] = spawn_queue[swap], spawn_queue[index]
+        end
+
+        DisplayTextToTable(players, "|cffffcc00Struggle Wave " .. wave .. ":|r " .. formation.name .. " (" .. spawn_total .. " enemies)")
+        spawn_batch()
     end
 
     schedule_wave = function(delay)
@@ -316,13 +372,8 @@ OnInit.final("Struggle", function(Require)
         local total_power = 0.
         for _, pid in ipairs(players) do
             local hero = Hero[pid]
-            local unit = Unit[hero]
             total_level = total_level + GetUnitLevel(hero)
-            total_power = total_power + math.max(
-                unit.str + unit.bonus_str,
-                unit.agi + unit.bonus_agi,
-                unit.int + unit.bonus_int
-            )
+            total_power = total_power + get_persistent_power(pid)
         end
 
         average_level = total_level / #players
@@ -345,6 +396,10 @@ OnInit.final("Struggle", function(Require)
             TimerQueue:disableCallback(wave_callback)
             wave_callback = nil
         end
+        if trickle_callback then
+            TimerQueue:disableCallback(trickle_callback)
+            trickle_callback = nil
+        end
 
         entry_open = false
         active = false
@@ -353,6 +408,8 @@ OnInit.final("Struggle", function(Require)
         end
         enemies = {}
         active_count = 0
+        spawn_queue = {}
+        spawn_total = 0
         players = {}
         wave = 0
         completed_wave = 0
@@ -375,17 +432,18 @@ OnInit.final("Struggle", function(Require)
     end
 
     exit_button = SimpleButton.create(
-        BlzGetOriginFrame(ORIGIN_FRAME_WORLD_FRAME, 0),
+        BlzGetOriginFrame(ORIGIN_FRAME_GAME_UI, 0),
         "war3mapImported\\ExitButton.blp",
         0.03,
-        0.015,
+        0.025,
         FRAMEPOINT_TOP,
         FRAMEPOINT_TOP,
         0.,
-        0.015,
+        -0.04,
         on_exit_click,
         "Leave the Infinite Struggle and claim a waiver for the highest completed wave."
     )
+    BlzFrameSetLevel(exit_button.frame, 20)
     exit_button:visible(false)
 
     ITEM_EXTRA_INFO[WAIVER_ITEM] = function(item)

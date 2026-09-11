@@ -7,13 +7,17 @@ OnInit.final("DialogWindow", function(Require)
     ---@field name string
     ---@field data any
     ---@field icon string?
+    ---@field callback function?
 
     ---@class DialogWindow
     ---@field pid integer
     ---@field title string
     ---@field kind any
     ---@field callback function
+    ---@field create function
     ---@field data any[]
+    ---@field choices DialogWindowChoice[]
+    ---@field menu DialogWindowChoice[]
     ---@field Button framehandle[]
     ---@field ButtonName string[]
     ---@field MenuButton framehandle[]
@@ -23,6 +27,10 @@ OnInit.final("DialogWindow", function(Require)
     ---@field Page integer
     ---@field options_per_page integer
     ---@field cancellable boolean
+    ---@field clicked_index integer
+    ---@field clicked_data any
+    ---@field clicked_menu boolean
+    ---@field on_cancel function?
     ---@field display function
     ---@field addButton function
     ---@field addMenuButton function
@@ -30,6 +38,8 @@ OnInit.final("DialogWindow", function(Require)
     ---@field getClickedData function
     ---@field getCurrent function
     ---@field destroy function
+    ---@field setMenuButtonName function
+    ---@field refresh function
     DialogWindow = {}
     do
         local thistype = DialogWindow
@@ -370,6 +380,29 @@ OnInit.final("DialogWindow", function(Require)
                 refresh(self.pid)
             end
             return self
+        end
+
+        ---@param index integer Zero-based menu index.
+        ---@param name string
+        ---@return boolean
+        function thistype:setMenuButtonName(index, name)
+            local choice = self.menu[index]
+            if not choice then
+                return false
+            end
+
+            choice.name = name
+            self.MenuButtonName[index] = name
+            if self.active then
+                refresh(self.pid)
+            end
+            return true
+        end
+
+        function thistype:refresh()
+            if self.active then
+                refresh(self.pid)
+            end
         end
 
         ---@param callback function?
