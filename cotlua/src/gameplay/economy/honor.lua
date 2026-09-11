@@ -28,6 +28,7 @@ OnInit.final("Honor", function(Require)
     ---@field key string
     ---@field name string
     ---@field description string
+    ---@field icon? string
     ---@field apply? fun(pid: integer)
 
     local function notify_changed(pid)

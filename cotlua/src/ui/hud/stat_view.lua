@@ -84,6 +84,7 @@ OnInit.final("StatView", function(Require)
     local function make_slot(parent, breakdown_parent, y)
         local tag_f = BlzCreateFrameByType("TEXT", "", parent, "", 0)
         local val_f = BlzCreateFrameByType("TEXT", "", parent, "", 0)
+        local separator = BlzCreateFrameByType("BACKDROP", "", parent, "", 0)
 
         BlzFrameSetPoint(tag_f, FRAMEPOINT_TOPLEFT, parent, FRAMEPOINT_TOPLEFT, 0.015, y)
         BlzFrameSetTextAlignment(tag_f, TEXT_JUSTIFY_CENTER, TEXT_JUSTIFY_LEFT)
@@ -92,6 +93,10 @@ OnInit.final("StatView", function(Require)
         BlzFrameSetPoint(val_f, FRAMEPOINT_TOPLEFT, parent, FRAMEPOINT_TOPLEFT, 0.113, y)
         BlzFrameSetTextAlignment(val_f, TEXT_JUSTIFY_CENTER, TEXT_JUSTIFY_LEFT)
         BlzFrameSetEnable(val_f, false)
+        BlzFrameSetSize(separator, 0.27, 0.001)
+        BlzFrameSetTexture(separator, "replaceabletextures\\teamcolor\\teamcolor08", 0, true)
+        BlzFrameSetEnable(separator, false)
+        BlzFrameSetVisible(separator, false)
 
         -- breakdown icon (slot-based)
         local icon = BlzCreateFrameByType("BACKDROP", "", breakdown_parent, "", 0)
@@ -108,6 +113,7 @@ OnInit.final("StatView", function(Require)
         return {
             tag = tag_f,
             val = val_f,
+            separator = separator,
             icon = icon,
             tip = tip,
             has_breakdown = false,
@@ -137,9 +143,25 @@ OnInit.final("StatView", function(Require)
 
         for line = 1, MAX_ROWS do
             local y = -0.04 + (-line + 1) * 0.01
-            tab_ui[page].rows[line] = make_slot(frame, breakdown_frames[page], y)
-            BlzFrameSetVisible(tab_ui[page].rows[line].tag, false)
-            BlzFrameSetVisible(tab_ui[page].rows[line].val, false)
+            if page == HONOR_TAB and line >= 4 then
+                y = -0.085 - (line - 4) * 0.032
+            end
+            local slot = make_slot(frame, breakdown_frames[page], y)
+            tab_ui[page].rows[line] = slot
+            BlzFrameSetVisible(slot.tag, false)
+            BlzFrameSetVisible(slot.val, false)
+
+            if page == HONOR_TAB and line >= 4 then
+                BlzFrameClearAllPoints(slot.icon)
+                BlzFrameSetPoint(slot.icon, FRAMEPOINT_TOPLEFT, frame, FRAMEPOINT_TOPLEFT, 0.016, y + 0.006)
+                BlzFrameSetScale(slot.icon, 1.)
+                BlzFrameSetSize(slot.icon, 0.024, 0.024)
+                BlzFrameClearAllPoints(slot.tag)
+                BlzFrameSetPoint(slot.tag, FRAMEPOINT_TOPLEFT, frame, FRAMEPOINT_TOPLEFT, 0.048, y)
+                BlzFrameClearAllPoints(slot.val)
+                BlzFrameSetPoint(slot.val, FRAMEPOINT_TOPLEFT, frame, FRAMEPOINT_TOPLEFT, 0.15, y)
+                BlzFrameSetPoint(slot.separator, FRAMEPOINT_TOPLEFT, frame, FRAMEPOINT_TOPLEFT, 0.015, y - 0.024)
+            end
         end
     end
 
@@ -343,17 +365,17 @@ OnInit.final("StatView", function(Require)
         end
     end
 
-    local function render_honor_row(slot, tag, value, tooltip)
+    local function render_honor_row(slot, tag, value, tooltip, icon)
         set_if_changed(slot, "last_tag", slot.tag, tag)
         set_if_changed(slot, "last_val", slot.val, value)
         BlzFrameSetVisible(slot.tag, true)
         BlzFrameSetVisible(slot.val, true)
 
-        if tooltip then
+        if tooltip and icon then
             set_tip_if_changed(slot, tooltip)
-            BlzFrameClearAllPoints(slot.icon)
-            BlzFrameSetPoint(slot.icon, FRAMEPOINT_TOPRIGHT, slot.val, FRAMEPOINT_TOPLEFT, -0.002, 0.)
+            BlzFrameSetTexture(slot.icon, icon, 0, true)
             BlzFrameSetVisible(slot.icon, true)
+            BlzFrameSetVisible(slot.separator, true)
             slot.has_breakdown = true
         end
     end
@@ -375,8 +397,7 @@ OnInit.final("StatView", function(Require)
         local next_milestone = Honor.getNextMilestone(target_pid)
         if next_milestone then
             render_honor_row(rows[2], "|cffffcc00Next Milestone|r",
-                total .. "/" .. next_milestone.honor,
-                next_milestone.name .. "\n" .. next_milestone.description)
+                total .. "/" .. next_milestone.honor)
         else
             render_honor_row(rows[2], "|cffffcc00Next Milestone|r", "Complete")
         end
@@ -391,7 +412,8 @@ OnInit.final("StatView", function(Require)
             local status = unlocked and "Unlocked" or "Locked"
             render_honor_row(rows[row], "|cffffcc00" .. milestone.honor .. " Honor|r",
                 color .. milestone.name .. "|r",
-                color .. status .. "|r\n" .. milestone.description)
+                color .. status .. "|r\n" .. milestone.description,
+                milestone.icon or "ReplaceableTextures\\CommandButtons\\BTNChestOfGold.blp")
             row = row + 1
         end
     end
@@ -452,6 +474,7 @@ OnInit.final("StatView", function(Require)
                         BlzFrameSetVisible(slot.tag, false)
                         BlzFrameSetVisible(slot.val, false)
                         BlzFrameSetVisible(slot.icon, false)
+                        BlzFrameSetVisible(slot.separator, false)
                         slot.has_breakdown = false
                         slot.last_tip      = nil
                         slot.last_icon_x   = nil

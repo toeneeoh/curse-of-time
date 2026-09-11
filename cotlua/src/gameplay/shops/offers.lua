@@ -9,6 +9,7 @@ OnInit.global("ShopOffers", function()
     ---@field key string Stable identifier, unique across all virtual offers.
     ---@field name string|fun(pid: integer): string
     ---@field icon string
+    ---@field disabled_icon? string
     ---@field tooltip string|fun(pid: integer): string
     ---@field categories? integer
     ---@field price? number|table|fun(pid: integer): number|table

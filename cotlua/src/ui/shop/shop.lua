@@ -212,7 +212,12 @@ OnInit.final("Shop", function(Require)
                 local pid = GetPlayerId(GetLocalPlayer()) + 1
                 local name = i.virtual and i:getName(pid) or i.name
                 local tooltip = i.virtual and i:getTooltip(pid) or i.tooltip
-                self.button:icon(i.icon)
+                local icon = i.icon
+                if i.virtual and i.disabled_icon then
+                    local available = i:isAvailable(pid)
+                    icon = available and icon or i.disabled_icon
+                end
+                self.button:icon(icon)
                 self.button.tooltip:text(tooltip)
                 self.button.tooltip:name(name)
                 self.button.tooltip:icon(i.icon)
@@ -251,9 +256,11 @@ OnInit.final("Shop", function(Require)
                 available, label = self.item:isAvailable(pid)
                 price = self.item:getPrice(pid)
                 action = self.item
+                local icon = available and self.item.icon
+                    or self.item.disabled_icon or self.item.icon
+                self.button:icon(icon)
                 self.button.tooltip:name(self.item:getName(pid))
                 self.button.tooltip:text(self.item:getTooltip(pid))
-                self.button:available(ShopQuote.evaluate(self.shop.definition, self.item, pid).can_buy)
             else
                 available, label = GetItemAvailability(self.item.id, pid)
                 price = GetItemPrice(self.item.id, pid)
@@ -263,7 +270,9 @@ OnInit.final("Shop", function(Require)
             if self.shop.stock[self.item.id] == 0 then
                 status = "SOLD OUT"
             elseif not available then
-                status = self.item.virtual and nil or label or "UNAVAILABLE"
+                if not (self.item.virtual and self.item.disabled_icon) then
+                    status = label or "UNAVAILABLE"
+                end
             elseif action and not self.item.virtual then
                 local action_available, action_reason = ShopAction.evaluate(self.item.id, pid)
                 if not action_available then
@@ -636,17 +645,20 @@ OnInit.final("Shop", function(Require)
             if i ~= 0 then
                 local name = i.virtual and i:getName(pid) or i.name
                 local tooltip = i.virtual and i:getTooltip(pid) or i.tooltip
+                local icon = i.icon
+                if i.virtual and i.disabled_icon then
+                    local available = i:isAvailable(pid)
+                    icon = available and icon or i.disabled_icon
+                end
                 self.item[pid] = i
                 self.count[pid] = 0
 
                 self.main[pid].item = i
-                self.main[pid].button:icon(i.icon)
+                self.main[pid].button:icon(icon)
                 self.main[pid].button.tooltip:text(tooltip)
                 self.main[pid].button.tooltip:name(name)
                 self.main[pid].button.tooltip:icon(i.icon)
-                self.main[pid].button:available(not i.virtual
-                    and self.shop:has(i.id)
-                    or ShopQuote.evaluate(self.shop.definition, i, pid).can_buy)
+                self.main[pid].button:available(self.shop:has(i.id))
 
                 self:showUsed(p)
 

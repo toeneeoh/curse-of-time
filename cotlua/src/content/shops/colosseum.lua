@@ -98,6 +98,7 @@ OnInit.final("ColosseumShop", function(Require)
         key = "reset_honor",
         name = "Reset Honor Allocations",
         icon = "ReplaceableTextures\\CommandButtons\\BTNCancel.blp",
+        disabled_icon = "ReplaceableTextures\\CommandButtonsDisabled\\DISBTNCancel.blp",
         tooltip = "Refund all Honor allocated to Colosseum bonuses. Honor earned is never lost.",
         categories = services,
         availability = function(pid)

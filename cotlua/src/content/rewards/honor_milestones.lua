@@ -16,6 +16,9 @@ OnInit.final("HonorMilestones", function(Require)
             key = "lifetime_honor_" .. required,
             honor = required,
             name = capstone and "Prestige Reward" or "Milestone Reward",
+            icon = capstone
+                and "ReplaceableTextures\\CommandButtons\\BTNMedalionOfCourage.blp"
+                or "ReplaceableTextures\\CommandButtons\\BTNChestOfGold.blp",
             description = capstone
                 and "A prestigious cosmetic or title will be assigned to this milestone."
                 or "The reward for this milestone has not been assigned yet.",
