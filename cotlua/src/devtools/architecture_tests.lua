@@ -8,6 +8,7 @@ OnInit.final("ArchitectureTests", function(Require)
     Require('TownShops')
     Require('ColosseumShop')
     Require('Honor')
+    Require('HonorMilestones')
     Require('FactionShop')
     Require('EvilShopkeeperShop')
     Require('Recipe')
@@ -361,6 +362,22 @@ OnInit.final("ArchitectureTests", function(Require)
     ArchitectureTests.register("colosseum ticket rewards use the drop table service", function()
         if type(DropTable.rollColosseumTicket) ~= "function" then
             return false, "colosseum ticket roll API is missing"
+        end
+        return true
+    end)
+
+    ArchitectureTests.register("lifetime Honor milestones are ordered and complete", function()
+        local milestones = Honor.getMilestones()
+        if #milestones ~= 14 then
+            return false, "lifetime Honor milestone count changed"
+        end
+        if milestones[1].honor ~= 5 or milestones[#milestones].honor ~= 10000 then
+            return false, "lifetime Honor milestone bounds changed"
+        end
+        for index = 2, #milestones do
+            if milestones[index - 1].honor >= milestones[index].honor then
+                return false, "lifetime Honor milestones are not strictly ordered"
+            end
         end
         return true
     end)

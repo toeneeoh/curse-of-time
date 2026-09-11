@@ -13,12 +13,93 @@ OnInit.final("Honor", function(Require)
     local active = {}
     local rewards = {}
     local reward_order = {}
+    local milestones = {}
+    local applied_milestones = {}
+    local changed_actions = {}
 
     ---@class HonorRewardDefinition
     ---@field key string
     ---@field max_rank integer
     ---@field cost? integer|fun(rank: integer): integer
     ---@field apply fun(pid: integer, old_rank: integer, new_rank: integer)
+
+    ---@class HonorMilestoneDefinition
+    ---@field honor integer
+    ---@field key string
+    ---@field name string
+    ---@field description string
+    ---@field apply? fun(pid: integer)
+
+    local function notify_changed(pid)
+        for index = 1, #changed_actions do
+            changed_actions[index](pid)
+        end
+    end
+
+    ---@param callback fun(pid: integer)
+    function Honor.registerChangedAction(callback)
+        changed_actions[#changed_actions + 1] = callback
+    end
+
+    ---@param definition HonorMilestoneDefinition
+    ---@return boolean
+    function Honor.registerMilestone(definition)
+        if type(definition) ~= "table"
+            or type(definition.key) ~= "string"
+            or type(definition.name) ~= "string"
+            or type(definition.description) ~= "string"
+            or (definition.apply ~= nil and type(definition.apply) ~= "function")
+            or (definition.honor or 0) < 1 then
+            return false
+        end
+        for index = 1, #milestones do
+            if milestones[index].key == definition.key
+                or milestones[index].honor == definition.honor then
+                return false
+            end
+        end
+        milestones[#milestones + 1] = definition
+        table.sort(milestones, function(a, b) return a.honor < b.honor end)
+        return true
+    end
+
+    ---@return HonorMilestoneDefinition[]
+    function Honor.getMilestones()
+        return milestones
+    end
+
+    ---@param pid integer
+    ---@param milestone HonorMilestoneDefinition
+    ---@return boolean
+    function Honor.isMilestoneUnlocked(pid, milestone)
+        return totals[pid] >= milestone.honor
+    end
+
+    ---@param pid integer
+    ---@return HonorMilestoneDefinition?
+    function Honor.getNextMilestone(pid)
+        for index = 1, #milestones do
+            if totals[pid] < milestones[index].honor then
+                return milestones[index]
+            end
+        end
+        return nil
+    end
+
+    local function update_milestones(pid)
+        local applied = applied_milestones[pid]
+        if not applied then
+            applied = {}
+            applied_milestones[pid] = applied
+        end
+        for index = 1, #milestones do
+            local milestone = milestones[index]
+            if totals[pid] >= milestone.honor and not applied[milestone.key] then
+                applied[milestone.key] = true
+                if milestone.apply then milestone.apply(pid) end
+            end
+        end
+    end
 
     local function allocation(pid)
         if not allocations[pid] then allocations[pid] = __jarray(0) end
@@ -159,6 +240,8 @@ OnInit.final("Honor", function(Require)
             Profile[pid].hero.honor = amount
         end
         SetCurrency(pid, HONOR, math.max(0, amount - Honor.getAllocated(pid)))
+        update_milestones(pid)
+        notify_changed(pid)
     end
 
     ---@param pid integer
@@ -172,17 +255,21 @@ OnInit.final("Honor", function(Require)
             Profile[pid].hero.honor = totals[pid]
         end
         AddCurrency(pid, HONOR, totals[pid] - previous)
+        update_milestones(pid)
+        notify_changed(pid)
     end
 
     local function on_setup(pid)
         allocations[pid] = __jarray(0)
         active[pid] = nil
+        applied_milestones[pid] = {}
         Honor.setTotal(pid, Profile[pid].hero.honor or 0)
     end
 
     local function on_cleanup(pid)
         allocations[pid] = nil
         active[pid] = nil
+        applied_milestones[pid] = nil
         totals[pid] = 0
     end
 

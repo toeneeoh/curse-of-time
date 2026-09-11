@@ -6,6 +6,8 @@
 
 OnInit.final("StatView", function(Require)
     Require('StatValues')
+    Require('Honor')
+    Require('HonorMilestones')
 
     ---@class STAT_WINDOW
     ---@field display function
@@ -58,6 +60,7 @@ OnInit.final("StatView", function(Require)
         {
             { tag = "|cffffcc00Perk Points|r", priority = 1, getter = function(u) local pid = GetPlayerId(GetOwningPlayer(u)) + 1 return "1" end},
         },
+        {}, -- lifetime Honor milestones use their own paginated renderer
     }
 
     local function build_tab_order(tab)
@@ -74,6 +77,8 @@ OnInit.final("StatView", function(Require)
     local frame = BlzCreateFrame("ListBoxWar3", BlzGetFrameByName("ConsoleUIBackdrop", 0), 0, 0)
 
     local MAX_ROWS = 32
+    local HONOR_TAB = 4
+    local MILESTONES_PER_PAGE = 7
     local tab_ui = {} -- tab_ui[page] = { rows = { [1]=slot,... }, order = ..., entries = ... }
 
     local function make_slot(parent, breakdown_parent, y)
@@ -118,6 +123,7 @@ OnInit.final("StatView", function(Require)
         BlzCreateFrameByType("FRAME", "", frame, "", 0),
         BlzCreateFrameByType("FRAME", "", frame, "", 0),
         BlzCreateFrameByType("FRAME", "", frame, "", 0),
+        BlzCreateFrameByType("FRAME", "", frame, "", 0),
     }
     for i = 1, #breakdown_frames do
         BlzFrameSetTexture(breakdown_frames[i], "trans32.blp", 0, true)
@@ -147,7 +153,7 @@ OnInit.final("StatView", function(Require)
 
     -- initialize viewing tables
     for i = 1, PLAYER_CAP do
-        viewing[i] = {unit = nil, page = 1}
+        viewing[i] = {unit = nil, page = 1, milestone_page = 1}
     end
 
     BlzFrameSetAbsPoint(frame, FRAMEPOINT_TOPLEFT, -0.05, 0.55)
@@ -259,9 +265,9 @@ OnInit.final("StatView", function(Require)
         SimpleButton.create(tab_frame, "ReplaceableTextures\\CommandButtons\\BTNHeroPanelStatsButton.dds", 0.026, 0.026, FRAMEPOINT_TOPLEFT, FRAMEPOINT_TOPLEFT, 0.0125, -0.0125, nil, "View Stats", FRAMEPOINT_BOTTOM, FRAMEPOINT_TOP, 0., 0.01),
         SimpleButton.create(tab_frame, "ReplaceableTextures\\CommandButtons\\BTNHeroPanelCurrencyButton.dds", 0.026, 0.026, FRAMEPOINT_TOPLEFT, FRAMEPOINT_TOPLEFT, 0.042, -0.0125, nil, "View Currency", FRAMEPOINT_BOTTOM, FRAMEPOINT_TOP, 0., 0.01),
         SimpleButton.create(tab_frame, "ReplaceableTextures\\CommandButtons\\BTNHeroPanelPerkButton.dds", 0.026, 0.026, FRAMEPOINT_TOPLEFT, FRAMEPOINT_TOPLEFT, 0.0715, -0.0125, nil, "View Perks", FRAMEPOINT_BOTTOM, FRAMEPOINT_TOP, 0., 0.01),
+        SimpleButton.create(tab_frame, "ReplaceableTextures\\CommandButtons\\BTNMedalionOfCourage.blp", 0.026, 0.026, FRAMEPOINT_TOPLEFT, FRAMEPOINT_TOPLEFT, 0.101, -0.0125, nil, "View Honor Milestones", FRAMEPOINT_BOTTOM, FRAMEPOINT_TOP, 0., 0.01),
     }
-    tabs[2]:enable(false)
-    tabs[3]:enable(false)
+    for index = 2, #tabs do tabs[index]:enable(false) end
 
     local function switch_tab()
         local trigger_frame = BlzGetTriggerFrame()
@@ -295,6 +301,33 @@ OnInit.final("StatView", function(Require)
     tabs[1]:onClick(switch_tab)
     tabs[2]:onClick(switch_tab)
     tabs[3]:onClick(switch_tab)
+    tabs[4]:onClick(switch_tab)
+
+    local milestone_controls = BlzCreateFrameByType("FRAME", "", frame, "", 0)
+    local milestone_page_text = BlzCreateFrameByType("TEXT", "", milestone_controls, "", 0)
+    BlzFrameSetPoint(milestone_controls, FRAMEPOINT_BOTTOM, frame, FRAMEPOINT_BOTTOM, 0., 0.012)
+    BlzFrameSetSize(milestone_controls, 0.11, 0.02)
+    BlzFrameSetPoint(milestone_page_text, FRAMEPOINT_CENTER, milestone_controls, FRAMEPOINT_CENTER, 0., 0.)
+    BlzFrameSetTextAlignment(milestone_page_text, TEXT_JUSTIFY_CENTER, TEXT_JUSTIFY_CENTER)
+    BlzFrameSetEnable(milestone_page_text, false)
+
+    local function change_milestone_page(direction)
+        local pid = GetPlayerId(GetTriggerPlayer()) + 1
+        local max_pages = math.max(1, math.ceil(#Honor.getMilestones() / MILESTONES_PER_PAGE))
+        viewing[pid].milestone_page = math.max(1, math.min(max_pages,
+            viewing[pid].milestone_page + direction))
+        STAT_WINDOW.refresh(pid)
+    end
+
+    local previous_milestones = SimpleButton.create(milestone_controls,
+        "ReplaceableTextures\\CommandButtons\\BTNCycleLeft.blp", 0.016, 0.016,
+        FRAMEPOINT_LEFT, FRAMEPOINT_LEFT, 0., 0., function() change_milestone_page(-1) end,
+        "Previous Milestones", FRAMEPOINT_BOTTOM, FRAMEPOINT_TOP, 0., 0.01)
+    local next_milestones = SimpleButton.create(milestone_controls,
+        "ReplaceableTextures\\CommandButtons\\BTNCycleRight.blp", 0.016, 0.016,
+        FRAMEPOINT_RIGHT, FRAMEPOINT_RIGHT, 0., 0., function() change_milestone_page(1) end,
+        "Next Milestones", FRAMEPOINT_BOTTOM, FRAMEPOINT_TOP, 0., 0.01)
+    BlzFrameSetVisible(milestone_controls, false)
 
     local function set_if_changed(slot, field, f, s)
         if slot[field] ~= s then
@@ -307,6 +340,59 @@ OnInit.final("StatView", function(Require)
         if slot.last_tip ~= s then
             slot.last_tip = s
             BlzFrameSetText(slot.tip.tooltip, s)
+        end
+    end
+
+    local function render_honor_row(slot, tag, value, tooltip)
+        set_if_changed(slot, "last_tag", slot.tag, tag)
+        set_if_changed(slot, "last_val", slot.val, value)
+        BlzFrameSetVisible(slot.tag, true)
+        BlzFrameSetVisible(slot.val, true)
+
+        if tooltip then
+            set_tip_if_changed(slot, tooltip)
+            BlzFrameClearAllPoints(slot.icon)
+            BlzFrameSetPoint(slot.icon, FRAMEPOINT_TOPRIGHT, slot.val, FRAMEPOINT_TOPLEFT, -0.002, 0.)
+            BlzFrameSetVisible(slot.icon, true)
+            slot.has_breakdown = true
+        end
+    end
+
+    local function render_honor_page(pid, target_pid)
+        local rows = tab_ui[HONOR_TAB].rows
+        local total = Honor.getTotal(target_pid)
+        local milestone_list = Honor.getMilestones()
+        local max_pages = math.max(1, math.ceil(#milestone_list / MILESTONES_PER_PAGE))
+        local page = math.max(1, math.min(max_pages, viewing[pid].milestone_page))
+        viewing[pid].milestone_page = page
+
+        BlzFrameSetVisible(milestone_controls, true)
+        BlzFrameSetText(milestone_page_text, "Milestones " .. page .. "/" .. max_pages)
+        previous_milestones:enable(page > 1)
+        next_milestones:enable(page < max_pages)
+
+        render_honor_row(rows[1], "|cffffcc00Lifetime Honor|r", tostring(total))
+        local next_milestone = Honor.getNextMilestone(target_pid)
+        if next_milestone then
+            render_honor_row(rows[2], "|cffffcc00Next Milestone|r",
+                total .. "/" .. next_milestone.honor,
+                next_milestone.name .. "\n" .. next_milestone.description)
+        else
+            render_honor_row(rows[2], "|cffffcc00Next Milestone|r", "Complete")
+        end
+
+        local first = (page - 1) * MILESTONES_PER_PAGE + 1
+        local last = math.min(#milestone_list, first + MILESTONES_PER_PAGE - 1)
+        local row = 4
+        for index = first, last do
+            local milestone = milestone_list[index]
+            local unlocked = Honor.isMilestoneUnlocked(target_pid, milestone)
+            local color = unlocked and "|cff00ff00" or "|cff777777"
+            local status = unlocked and "Unlocked" or "Locked"
+            render_honor_row(rows[row], "|cffffcc00" .. milestone.honor .. " Honor|r",
+                color .. milestone.name .. "|r",
+                color .. status .. "|r\n" .. milestone.description)
+            row = row + 1
         end
     end
 
@@ -407,6 +493,12 @@ OnInit.final("StatView", function(Require)
         -- show correct breakdown frame for this page
         for i = 1, #breakdown_frames do
             BlzFrameSetVisible(breakdown_frames[i], i == page)
+        end
+
+        BlzFrameSetVisible(milestone_controls, page == HONOR_TAB)
+        if page == HONOR_TAB then
+            render_honor_page(pid, tpid)
+            return
         end
 
         -- row index map: stat index -> row number (per page)
@@ -528,5 +620,15 @@ OnInit.final("StatView", function(Require)
         EVENT_ON_CLEANUP:register_action(U.id, on_cleanup)
         U = U.next
     end
+
+
+    Honor.registerChangedAction(function(changed_pid)
+        local pid = GetPlayerId(GetLocalPlayer()) + 1
+        local selected = viewing[pid].unit
+        if selected and viewing[pid].page == HONOR_TAB
+            and GetPlayerId(GetOwningPlayer(selected)) + 1 == changed_pid then
+            STAT_WINDOW.refresh(pid)
+        end
+    end)
 
 end, Debug and Debug.getLine())
