@@ -32,7 +32,7 @@ OnInit.final("StruggleRewards", function(Require)
     end
 
     local function percentage_bonus(rank)
-        return rank * 0.1
+        return math.floor(rank / 10)
     end
 
     ---@param base_name string
@@ -42,6 +42,9 @@ OnInit.final("StruggleRewards", function(Require)
     local function reward_definition(base_name, level_requirement, item_type)
         return {
             custom_level = true,
+            flavor = base_name == "Struggle Gem"
+                and "|cff808080A crystallized record of the deepest Struggle overcome by this hero.|r"
+                or "|cff808080A pre-Chaos record of the deepest Struggle overcome by this hero.|r",
             prepare = function(_, data)
                 data[ITEM_TIER] = 3
                 data[ITEM_TYPE] = item_type

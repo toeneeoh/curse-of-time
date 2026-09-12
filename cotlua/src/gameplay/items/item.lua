@@ -265,6 +265,7 @@ OnInit.final("Items", function(Require)
         ---@field prepare? fun(item: Item, data: table)
         ---@field calculateValue? fun(item: Item, stat: integer, flag: integer?): number?
         ---@field name? fun(item: Item): string
+        ---@field flavor? string
         ---@field appendHeader? fun(item: Item, text: string[], alt_text: string[])
 
         ItemRuntime = { definitions = {} }
@@ -1067,9 +1068,9 @@ OnInit.final("Items", function(Require)
         parse_item_stat[ITEM_ABILITY2] = parse_item_stat[ITEM_ABILITY]
 
         function thistype:update()
-            local orig = ItemData[self.id].tooltip ---@type string
-            local text = {}
             local definition = ItemRuntime.definitions[self.id]
+            local orig = (definition and definition.flavor) or ItemData[self.id].tooltip ---@type string
+            local text = {}
 
             -- first "header" lines: rarity, upg level, tier, type, req level
             if self.level > 0 and not (definition and definition.custom_level) then
