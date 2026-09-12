@@ -26,8 +26,18 @@ OnInit.final("Inventory", function(Require)
     local FPS_64 = FPS_32 * 0.5
     local concat = table.concat
     local frame_set_visible, frame_clear_all_points = BlzFrameSetVisible, BlzFrameClearAllPoints
-    local get_x_stable, get_y_stable = GetMouseFrameXStable, GetMouseFrameYStable
     local setabspoint = BlzFrameSetAbsPoint
+
+    -- Screen coordinates are intentionally asynchronous. They are used only
+    -- for local presentation and tentative slot selection; the chosen slot is
+    -- synchronized before InventoryService mutates gameplay state.
+    local function get_mouse_frame_x()
+        return BlzPixelToFrameX(BlzGetMouseScreenPosX())
+    end
+
+    local function get_mouse_frame_y()
+        return BlzPixelToFrameY(BlzGetMouseScreenPosY())
+    end
 
     local CONTEXT_BUTTON_WIDTH = 0.055
     local CONTEXT_BUTTON_HEIGHT = 0.016
@@ -67,20 +77,6 @@ OnInit.final("Inventory", function(Require)
         {0.1665, 0.0,    "unequip3", FRAMEPOINT_TOPRIGHT},
     }
 
-    -- tracker is offset for some reason
-    local MAGIC_X_OFFSET = 0.21
-    local MAGIC_Y_OFFSET = -0.085
-
-    ---@param slot integer
-    ---@return number x, number y
-    local slot_to_xy = function(slot)
-        if inventory_slots[slot] then
-            return inventory_slots[slot][1] + MAGIC_X_OFFSET, inventory_slots[slot][2] + MAGIC_Y_OFFSET
-        end
-
-        return 0, 0
-    end
-
     local disabled_for_player = {}
     local alt_down = {} ---@type boolean[]
 
@@ -109,7 +105,7 @@ OnInit.final("Inventory", function(Require)
         -- determines what item slot a user has their cursor over
         ---@return integer
         local get_hovered_slot = function()
-            local x, y = get_x_stable(), get_y_stable()
+            local x, y = get_mouse_frame_x(), get_mouse_frame_y()
 
             -- bail if mouse is outside inventory UI
             if x < INVENTORY_MIN_X - 0.03 or x > INVENTORY_MIN_X + INVENTORY_WIDTH + 0.03 or
@@ -343,7 +339,7 @@ OnInit.final("Inventory", function(Require)
         -- BlzFrameSetLevel(tracker, 5)
 
         local function update_tracker()
-            setabspoint(tracker, FRAMEPOINT_CENTER, get_x_stable(), get_y_stable())
+            setabspoint(tracker, FRAMEPOINT_CENTER, get_mouse_frame_x(), get_mouse_frame_y())
             if count > 0 then
                 TimerQueue:callDelayed(FPS_64, update_tracker)
             end
@@ -401,7 +397,6 @@ OnInit.final("Inventory", function(Require)
 
                 clear_context(pid)
                 hide_tracker(pid)
-                PauseMouseTracker(pid)
             end
         end
         AddToEsc(INVENTORY.close) -- close window hotkey reference
@@ -544,8 +539,6 @@ OnInit.final("Inventory", function(Require)
                     new_slot:visible(false)
                 end
 
-                local x, y = slot_to_xy(highlighted)
-                StartMouseTracker(pid, x, y)
             end
         end
 
@@ -718,10 +711,12 @@ OnInit.final("Inventory", function(Require)
         local confirm_item = function(pid)
             target_thread[pid] = coroutine.create(function()
                 local hero = Profile[pid].hero
-                local slot = get_hovered_slot() -- not sync safe
+                local slot = -1
+                if GetLocalPlayer() == Player(pid - 1) then
+                    slot = get_hovered_slot() -- intentionally asynchronous
+                end
 
                 hide_tracker(pid)
-                PauseMouseTracker(pid)
 
                 -- start target sync
                 send_target(pid, slot)

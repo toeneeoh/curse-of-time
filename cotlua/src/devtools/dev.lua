@@ -562,8 +562,8 @@ modifiers:
             items[1]:equip()
         end,
         ["mousecoords"] = function(p, pid, args)
-            local mouse_x = GetMouseFrameXStable()
-            local mouse_y = GetMouseFrameYStable()
+            local mouse_x = BlzPixelToFrameX(BlzGetMouseScreenPosX())
+            local mouse_y = BlzPixelToFrameY(BlzGetMouseScreenPosY())
 
             print(mouse_x .. " " .. mouse_y)
         end,

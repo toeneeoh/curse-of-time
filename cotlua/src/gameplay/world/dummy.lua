@@ -70,16 +70,11 @@ OnInit.final("Dummy", function(Require)
 
         ---@param source unit
         ---@param target unit
-        local function attack_delay(source, target)
-            BlzSetUnitWeaponBooleanField(source, UNIT_WEAPON_BF_ATTACKS_ENABLED, 0, true)
-            IssueTargetOrderById(source, 852173, target)
-        end
-
-        ---@param source unit
-        ---@param target unit
         local function instant_attack(source, target)
             UnitAddAbility(source, IATK)
-            TQ:callDelayed(FPS_32, attack_delay, source, target)
+            BlzSetUnitWeaponBooleanField(source, UNIT_WEAPON_BF_ATTACKS_ENABLED, 0, true)
+            BlzResetUnitAttack(source)
+            IssueTargetOrderById(source, 852173, target)
         end
 
         ---Issues an immediate, unit-targeted, or point-targeted spell order.

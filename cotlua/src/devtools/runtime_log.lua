@@ -62,18 +62,15 @@ OnInit.global("DevRuntimeLog", function(Require)
         local events = RuntimeMetrics.events
         local enemy_ai = RuntimeMetrics.enemy_ai
         local timers = RuntimeMetrics.timer_queue
-        local mouse = RuntimeMetrics.mouse_tracker
         local movespeed = RuntimeMetrics.movespeed
         DevLog.write("METRICS", string.format(
-            "%s init=%d/%d items=%d/%d/%d peak=%d events=%d callbacks=%d damage=%d ai=%d/%d timers=%d peak=%d mouse=%s ticks=%d sessions=%d active_s=%.3f avg_us=%.2f max_us=%.2f period=%.5f movespeed=%d peak=%d ticks=%d updates=%d sessions=%d active_s=%.3f avg_us=%.2f max_us=%.2f period=%.5f",
+            "%s init=%d/%d items=%d/%d/%d peak=%d events=%d callbacks=%d damage=%d ai=%d/%d timers=%d peak=%d movespeed=%d peak=%d ticks=%d updates=%d sessions=%d active_s=%.3f avg_us=%.2f max_us=%.2f period=%.5f",
             label or "snapshot",
             initializers.completed, initializers.started,
             items.live, items.created, items.destroyed, items.peak,
             events.triggers, events.callbacks, RuntimeMetrics.damage.events,
             enemy_ai.dispatches, enemy_ai.evaluations,
             timers.active, timers.peak,
-            tostring(mouse.active), mouse.ticks, mouse.sessions, active_time(mouse),
-            average_sample_microseconds(mouse), mouse.max_sample_time * 1000000., mouse.period,
             movespeed.active, movespeed.peak, movespeed.ticks, movespeed.unit_updates,
             movespeed.sessions, active_time(movespeed), average_sample_microseconds(movespeed),
             movespeed.max_sample_time * 1000000., movespeed.period))

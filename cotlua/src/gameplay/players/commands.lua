@@ -94,16 +94,16 @@ OnInit.final("Commands", function(Require)
                 local _, _, zoom, lock = args[2]:find("(%d+)%s.([lL])")
 
                 if zoom then
+                    SetCameraZoom(pid, MathClamp(tonumber(zoom), 100, 3000))
                     if string.lower(lock) == "l" then
                         SetCameraLocked(pid, true)
                     end
-                    ZOOM[pid] = MathClamp(tonumber(zoom), 100, 3000)
                 end
             end
         end,
         ["-zml"] = function(p, pid, args, cmd)
+            SetCameraZoom(pid, 2500)
             SetCameraLocked(pid, true)
-            ZOOM[pid] = 2500
         end,
         ["-lock"] = function(p, pid, args)
             SetCameraLocked(pid, true)

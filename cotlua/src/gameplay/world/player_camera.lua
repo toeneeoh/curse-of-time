@@ -1,5 +1,3 @@
-local update_locked_camera
-
 OnInit.global("PlayerCamera", function(Require)
     Require('Variables')
     Require('TimerQueue')
@@ -8,15 +6,26 @@ OnInit.global("PlayerCamera", function(Require)
     local is_camera_locked = {}
 
     ---@param pid integer
+    local function apply_camera_lock(pid)
+        if GetLocalPlayer() == Player(pid - 1) then
+            SetCameraFieldControlledByInput(CAMERA_FIELD_TARGET_DISTANCE, not is_camera_locked[pid])
+            if is_camera_locked[pid] then
+                SetCameraField(CAMERA_FIELD_TARGET_DISTANCE, ZOOM[pid], 0.)
+            end
+        end
+    end
+
+    ---@param pid integer
     ---@param locked boolean
     function SetCameraLocked(pid, locked)
         is_camera_locked[pid] = locked
+        apply_camera_lock(pid)
     end
 
-    update_locked_camera = function()
-        local pid = GetPlayerId(GetLocalPlayer()) + 1
+    function SetCameraZoom(pid, zoom)
+        ZOOM[pid] = zoom
         if is_camera_locked[pid] then
-            SetCameraField(CAMERA_FIELD_TARGET_DISTANCE, ZOOM[pid], 0.)
+            apply_camera_lock(pid)
         end
     end
 
@@ -124,7 +133,6 @@ OnInit.final("PlayerCameraRuntime", function(Require)
     Require('MapSetup')
     Require('TimerQueue')
 
-    TimerQueue:callPeriodically(0.35, nil, update_locked_camera)
     TimerQueue:callPeriodically(1., nil, function()
         SetCameraQuickPosition(TOWN_CENTER_X, TOWN_CENTER_Y)
     end)

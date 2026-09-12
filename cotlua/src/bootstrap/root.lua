@@ -12,17 +12,6 @@ do
         events = { triggers = 0, callbacks = 0 },
         damage = { events = 0 },
         enemy_ai = { evaluations = 0, dispatches = 0 },
-        mouse_tracker = {
-            active = false,
-            ticks = 0,
-            sessions = 0,
-            active_time = 0.,
-            started_at = nil,
-            samples = 0,
-            sample_time = 0.,
-            max_sample_time = 0.,
-            period = 0.0078125,
-        },
         movespeed = {
             active = 0,
             peak = 0,
@@ -305,7 +294,6 @@ dofile('gameplay/abilities/spells.lua')
 dofile('framework/ui/prompt.lua')
 dofile('framework/ui/simple_button.lua')
 dofile('ui/inventory/item_details.lua')
-dofile('framework/ui/mouse_tracker.lua')
 dofile('framework/ui/glue_button.lua')
 dofile('ui/hud/spell_view.lua')
 dofile('ui/hud/frames.lua')
