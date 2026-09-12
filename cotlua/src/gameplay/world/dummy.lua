@@ -140,7 +140,6 @@ OnInit.final("Dummy", function(Require)
             SetUnitTimeScale(self.unit, 1.)
             BlzUnitDisableAbility(self.unit, FourCC('Amov'), false, false)
             PauseUnit(self.unit, true)
-            BlzSetUnitAttackCooldown(self.unit, 0.01, 0)
             UnitAddBonus(self.unit, BONUS_ATTACK_SPEED, 4.)
             DUMMY_STACK[#DUMMY_STACK + 1] = self
             EVENT_DUMMY_ON_HIT:unregister_unit_action(self.unit)
@@ -193,8 +192,6 @@ OnInit.final("Dummy", function(Require)
                 TQ:callDelayed(DUMMY_RECYCLE_TIME, thistype.recycle, self)
             end
 
-            -- reset attack cooldown
-            BlzSetUnitAttackCooldown(self.unit, 0.01, 0)
             UnitSetBonus(self.unit, BONUS_ATTACK_SPEED, 4.)
 
             SetUnitXBounded(self.unit, x)

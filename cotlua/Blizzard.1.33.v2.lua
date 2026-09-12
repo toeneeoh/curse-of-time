@@ -1,6 +1,8 @@
 --[[
 	Attached to https://www.hiveworkshop.com/threads/a-comprehensive-guide-to-mapping-in-lua.341880/
 	Compiled from Blizzard.j of Warcraft version 1.33.0.19308 using cjass2lua v1.12 https://github.com/goshante/cjass2lua
+	Forsaken Kingdom 3.0 project natives are declared in common.1.33.v2.lua;
+	the installed Blizzard.j contains no additional BJ wrappers to convert.
 ]]
 
 ---@meta

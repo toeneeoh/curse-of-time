@@ -23,7 +23,6 @@ OnInit.final("Inventory", function(Require)
     local INVENTORY_SLOT_SIZE = 0.0266
     local DROP_ITEM_COMMAND = "robogoblin"
 
-    local FPS_64 = FPS_32 * 0.5
     local concat = table.concat
     local frame_set_visible, frame_clear_all_points = BlzFrameSetVisible, BlzFrameClearAllPoints
     local setabspoint = BlzFrameSetAbsPoint
@@ -31,12 +30,23 @@ OnInit.final("Inventory", function(Require)
     -- Screen coordinates are intentionally asynchronous. They are used only
     -- for local presentation and tentative slot selection; the chosen slot is
     -- synchronized before InventoryService mutates gameplay state.
-    local function get_mouse_frame_x()
-        return BlzPixelToFrameX(BlzGetMouseScreenPosX())
-    end
+    ---@return number?, number?
+    local function get_mouse_frame_position()
+        local pixel_x = BlzGetMouseScreenPosX()
+        local pixel_y = BlzGetMouseScreenPosY()
+        local client_width = BlzGetLocalClientWidth()
+        local client_height = BlzGetLocalClientHeight()
 
-    local function get_mouse_frame_y()
-        return BlzPixelToFrameY(BlzGetMouseScreenPosY())
+        -- The screen-position natives can report coordinates outside the
+        -- client while focus changes or the cursor leaves the window. Keep the
+        -- last valid tracker position instead of snapping the dragged icon.
+        if client_width <= 0 or client_height <= 0 or
+        pixel_x < 0 or pixel_x > client_width or pixel_y < 0 or pixel_y > client_height
+        then
+            return nil, nil
+        end
+
+        return BlzPixelToFrameX(pixel_x), BlzPixelToFrameY(pixel_y)
     end
 
     local CONTEXT_BUTTON_WIDTH = 0.055
@@ -105,7 +115,11 @@ OnInit.final("Inventory", function(Require)
         -- determines what item slot a user has their cursor over
         ---@return integer
         local get_hovered_slot = function()
-            local x, y = get_mouse_frame_x(), get_mouse_frame_y()
+            local x, y = get_mouse_frame_position()
+
+            if not x or not y then
+                return -1
+            end
 
             -- bail if mouse is outside inventory UI
             if x < INVENTORY_MIN_X - 0.03 or x > INVENTORY_MIN_X + INVENTORY_WIDTH + 0.03 or
@@ -328,26 +342,32 @@ OnInit.final("Inventory", function(Require)
             context_buttons[i]:onClick(on_context_push)
         end
 
-        local count = 0
-
         -- frame that follows the mouse (for item dragging)
         local tracker = BlzCreateFrameByType("BACKDROP", "", BlzGetFrameByName("ConsoleUIBackdrop", 0), "", 0)
+        local tracker_timer = CreateTimer()
         BlzFrameSetEnable(tracker, false)
         BlzFrameSetSize(tracker, INVENTORY_SLOT_SIZE, INVENTORY_SLOT_SIZE)
         BlzFrameSetTexture(tracker, "trans32.blp", 0, true)
-        -- frame_set_visible(tracker, true)
-        -- BlzFrameSetLevel(tracker, 5)
 
-        local function update_tracker()
-            setabspoint(tracker, FRAMEPOINT_CENTER, get_mouse_frame_x(), get_mouse_frame_y())
-            if count > 0 then
-                TimerQueue:callDelayed(FPS_64, update_tracker)
+        local function update_tracker_position()
+            local x, y = get_mouse_frame_position()
+            if x and y then
+                setabspoint(tracker, FRAMEPOINT_CENTER, x, y)
             end
         end
 
         local hide_tracker = function(pid)
             if GetLocalPlayer() == Player(pid - 1) then
+                PauseTimer(tracker_timer)
                 BlzFrameSetTexture(tracker, "trans32.blp", 0, true)
+            end
+        end
+
+        local show_tracker = function(pid, texture)
+            if GetLocalPlayer() == Player(pid - 1) then
+                update_tracker_position()
+                BlzFrameSetTexture(tracker, texture, 0, true)
+                TimerStart(tracker_timer, 1. / 128., true, update_tracker_position)
             end
         end
 
@@ -376,10 +396,6 @@ OnInit.final("Inventory", function(Require)
 
             thistype.refresh(tpid)
 
-            count = count + 1
-            if count == 1 then -- only run if atleast one player is looking at the inventory
-                TimerQueue:callDelayed(FPS_64, update_tracker)
-            end
         end
 
         INVENTORY.close = function(pid)
@@ -392,8 +408,6 @@ OnInit.final("Inventory", function(Require)
                 EVENT_ON_M1_UP:unregister_action(pid, on_m1_up)
                 EVENT_ON_M2_DOWN:unregister_action(pid, on_m2_down)
                 EVENT_ON_M2_UP:unregister_action(pid, on_m2_up)
-
-                count = math.max(0, count - 1)
 
                 clear_context(pid)
                 hide_tracker(pid)
@@ -535,9 +549,9 @@ OnInit.final("Inventory", function(Require)
                 send_context(pid, highlighted)
 
                 if GetLocalPlayer() == Player(pid - 1) then
-                    BlzFrameSetTexture(tracker, new_slot.texture, 0, true)
                     new_slot:visible(false)
                 end
+                show_tracker(pid, new_slot.texture)
 
             end
         end

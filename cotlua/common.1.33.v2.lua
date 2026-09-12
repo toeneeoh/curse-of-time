@@ -1,6 +1,7 @@
 --[[
 	Attached to https://www.hiveworkshop.com/threads/a-comprehensive-guide-to-mapping-in-lua.341880/
 	Compiled from common.j of Warcraft version 1.33.0.19308 using cjass2lua v1.12 https://github.com/goshante/cjass2lua
+	Extended with declarations for Forsaken Kingdom 3.0 natives used by this project.
 ]]
 
 ---@meta
@@ -9405,4 +9406,54 @@ function BlzUnitClearOrders(whichUnit, onlyQueued) end	-- (native)
 ---@param whichUnit unit
 ---@param clearQueue boolean
 function BlzUnitForceStopOrder(whichUnit, clearQueue) end	-- (native)
+
+-- ============================================================================
+--  Forsaken Kingdom 3.0
+--  These declarations are language-server metadata only. The functions are
+--  supplied by the current Warcraft runtime and are not compiled into the map.
+
+---@param whichKey oskeytype
+---@return boolean
+function BlzIsKeyPressed(whichKey) end	-- (native)
+
+---@param metaKey integer
+---@return boolean
+function BlzIsMetaKeyPressed(metaKey) end	-- (native)
+
+---@param whichButton mousebuttontype
+---@return boolean
+function BlzIsMouseButtonPressed(whichButton) end	-- (native)
+
+---@return integer
+function BlzGetMouseScreenPosX() end	-- (native)
+
+---@return integer
+function BlzGetMouseScreenPosY() end	-- (native)
+
+---@param pixelX integer
+---@return number
+function BlzPixelToFrameX(pixelX) end	-- (native)
+
+---@param pixelY integer
+---@return number
+function BlzPixelToFrameY(pixelY) end	-- (native)
+
+---@param frameX number
+---@return integer
+function BlzFrameToPixelX(frameX) end	-- (native)
+
+---@param frameY number
+---@return integer
+function BlzFrameToPixelY(frameY) end	-- (native)
+
+---@param whichUnit unit
+function BlzResetUnitAttack(whichUnit) end	-- (native)
+
+---@param whichField camerafield
+---@param controlled boolean
+function SetCameraFieldControlledByInput(whichField, controlled) end	-- (native)
+
+---@param whichField camerafield
+---@return boolean
+function GetCameraFieldControlledByInput(whichField) end	-- (native)
 
