@@ -26,6 +26,7 @@ OnInit.final("Struggle", function(Require)
     Require('ItemEventRegistry')
     Require('PlayerLifecycle')
     Require('Profile')
+    Require('StruggleSpecials')
 
     ---@class StruggleService
     Struggle = {}
@@ -109,6 +110,15 @@ OnInit.final("Struggle", function(Require)
                 { type = "ranged", weight = 0.37, hp = 0.6, damage = 1.55, armor = 0.6, speed = 0.05 },
             },
         },
+    }
+
+    local special_roles = {
+        { type = "harpooner", skin_type = "ranged", ranged = true, special = "hook",
+            hp = 0.75, damage = 1.1, armor = 0.7, speed = 0.08 },
+        { type = "burster", skin_type = "disruptor", special = "rupture",
+            hp = 0.6, damage = 1., armor = 0.55, speed = 0.35 },
+        { type = "blightcaster", skin_type = "disruptor", ranged = true, special = "miasma",
+            hp = 0.7, damage = 0.9, armor = 0.65, speed = 0.05 },
     }
 
     local players = {} ---@type integer[]
@@ -282,6 +292,7 @@ OnInit.final("Struggle", function(Require)
 
     local function remove_enemy(killed)
         clear_fury(killed)
+        StruggleSpecials.cleanup(killed)
         TableRemove(enemies, killed)
         active_count = math.max(0, active_count - 1)
         TimerQueue:callDelayed(3., RemoveUnit, killed)
@@ -291,11 +302,12 @@ OnInit.final("Struggle", function(Require)
 
     local function spawn_enemy(role)
         local skins = average_level >= CHAOS_ARMOR_LEVEL and chaos_skins or prechaos_skins
-        local pool = skins[role.type]
+        local pool = skins[role.skin_type or role.type]
         local rect = spawn_rects[math.random(1, #spawn_rects)]
         local x, y = spawn_xy(rect)
         local skin = pool[math.random(1, #pool)]
-        local template = role.type == "ranged" and RANGED_ENEMY_TEMPLATE or MELEE_ENEMY_TEMPLATE
+        local is_ranged = role.ranged or role.type == "ranged"
+        local template = is_ranged and RANGED_ENEMY_TEMPLATE or MELEE_ENEMY_TEMPLATE
         local u = BlzCreateUnitWithSkin(PLAYER_BOSS, template, x, y, GetRandomReal(0., 360.), skin)
 
         BlzSetUnitSkin(u, skin)
@@ -303,13 +315,20 @@ OnInit.final("Struggle", function(Require)
         BlzSetHeroProperName(u, GetObjectName(skin))
         if role.type == "ranged" then
             UnitAddAbility(u, FURY_SWIPES_ABILITY)
+        end
+        if is_ranged then
             BlzSetUnitWeaponRealField(u, UNIT_WEAPON_RF_ATTACK_RANGE, 0, RANGED_ATTACK_RANGE)
             BlzSetUnitRealField(u, UNIT_RF_ACQUISITION_RANGE, RANGED_ACQUISITION_RANGE)
+        end
+        if role.type == "ranged" then
             EVENT_ON_HIT_MULTIPLIER:register_unit_action(u, on_struggle_fury_hit)
         end
         enemies[#enemies + 1] = u
         active_count = active_count + 1
         configure_enemy(u, role, spawn_total)
+        if role.special then
+            StruggleSpecials.setup(u, role.special, random_player_hero)
+        end
         EVENT_ON_UNIT_DEATH:register_unit_action(u, remove_enemy)
     end
 
@@ -349,6 +368,14 @@ OnInit.final("Struggle", function(Require)
             assigned = assigned + count
             for _ = 1, count do
                 spawn_queue[#spawn_queue + 1] = role
+            end
+        end
+
+        if wave >= 2 then
+            local special_count = math.min(3, 1 + (wave - 1) // 10)
+            for _ = 1, special_count do
+                local queue_index = math.random(1, #spawn_queue)
+                spawn_queue[queue_index] = special_roles[math.random(1, #special_roles)]
             end
         end
 
@@ -592,6 +619,7 @@ OnInit.final("Struggle", function(Require)
         checkpoint_pending = {}
         for _, u in ipairs(enemies) do
             clear_fury(u)
+            StruggleSpecials.cleanup(u)
             RemoveUnit(u)
         end
         enemies = {}
