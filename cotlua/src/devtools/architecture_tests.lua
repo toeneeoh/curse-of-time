@@ -221,15 +221,30 @@ OnInit.final("ArchitectureTests", function(Require)
         return true
     end)
 
-    ArchitectureTests.register("summon essence save extension is backward compatible", function()
+    ArchitectureTests.register("character save extensions are backward compatible", function()
         local source = HeroData.create()
         source.id = 1
         source.summon_essence = 185
+        source.struggle_best_wave = 75
+        source.struggle_claim_wave = 70
 
         local current = source:values()
         local decoded = HeroData.create()
-        if not decoded:propagate(current) or decoded.summon_essence ~= 185 then
-            return false, "summon essence did not round-trip"
+        if not decoded:propagate(current)
+            or decoded.summon_essence ~= 185
+            or decoded.struggle_best_wave ~= 75
+            or decoded.struggle_claim_wave ~= 70 then
+            return false, "trailing character fields did not round-trip"
+        end
+
+        current[#current] = nil
+        current[#current] = nil
+        local before_struggle = HeroData.create()
+        if not before_struggle:propagate(current)
+            or before_struggle.summon_essence ~= 185
+            or before_struggle.struggle_best_wave ~= 0
+            or before_struggle.struggle_claim_wave ~= 0 then
+            return false, "pre-Struggle character did not default Struggle progress to zero"
         end
 
         current[#current] = nil

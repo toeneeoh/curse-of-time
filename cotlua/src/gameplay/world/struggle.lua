@@ -21,7 +21,7 @@ OnInit.final("Struggle", function(Require)
     Require('Events')
     Require('TimerQueue')
     Require('SimpleButton')
-    Require('Items')
+    Require('DialogWindow')
     Require('ItemHelpers')
     Require('ItemEventRegistry')
     Require('PlayerLifecycle')
@@ -31,10 +31,12 @@ OnInit.final("Struggle", function(Require)
     Struggle = {}
 
     local ENTRY_ITEM = FourCC('I0EW')
-    local WAIVER_ITEM = FourCC('I00T')
     local ENTRY_DURATION = 45.
     local FIRST_WAVE_DELAY = 5.
     local BETWEEN_WAVE_DELAY = 5.
+    local CHECKPOINT_INTERVAL = 5
+    local CHECKPOINT_DECISION_TIME = 20.
+    local MAX_SAVED_WAVE = 0xFFFF
     local TRICKLE_INTERVAL = 1.25
     local TRICKLE_SIZE = 3
     local MIN_WAVE_UNITS = 25
@@ -122,12 +124,18 @@ OnInit.final("Struggle", function(Require)
     local entry_callback ---@type integer?
     local wave_callback ---@type integer?
     local trickle_callback ---@type integer?
+    local checkpoint_callback ---@type integer?
     local spawn_queue = {}
     local spawn_total = 0
     local exit_button ---@type SimpleButton?
     local fury_state = setmetatable({}, { __mode = 'k' })
+    local checkpoint_active = false
+    local checkpoint_waiting = 0
+    local checkpoint_pending = {} ---@type boolean[]
+    local checkpoint_dialogs = {} ---@type DialogWindow[]
 
-    local begin_run, end_run, remove_player, schedule_wave, on_grave_death, on_cleanup, on_struggle_fury_hit
+    local begin_run, begin_checkpoint, end_run, remove_player, schedule_wave
+    local on_grave_death, on_cleanup, on_struggle_fury_hit
 
     local function set_exit_visible(pid, visible)
         if GetLocalPlayer() == Player(pid - 1) and exit_button then
@@ -258,16 +266,26 @@ OnInit.final("Struggle", function(Require)
         state.callback = TimerQueue:callDelayed(FURY_RESET_TIME, expire_fury, source, target)
     end
 
+    local function complete_wave()
+        if not active or active_count ~= 0 or #spawn_queue ~= 0 or trickle_callback then
+            return
+        end
+
+        completed_wave = wave
+        if wave % CHECKPOINT_INTERVAL == 0 then
+            begin_checkpoint()
+        else
+            schedule_wave(BETWEEN_WAVE_DELAY)
+        end
+    end
+
     local function remove_enemy(killed)
         clear_fury(killed)
         TableRemove(enemies, killed)
         active_count = math.max(0, active_count - 1)
         TimerQueue:callDelayed(3., RemoveUnit, killed)
 
-        if active and active_count == 0 and #spawn_queue == 0 and not trickle_callback then
-            completed_wave = wave
-            schedule_wave(BETWEEN_WAVE_DELAY)
-        end
+        complete_wave()
     end
 
     local function spawn_enemy(role)
@@ -306,8 +324,7 @@ OnInit.final("Struggle", function(Require)
         if #spawn_queue > 0 then
             trickle_callback = TimerQueue:callDelayed(TRICKLE_INTERVAL, spawn_batch)
         elseif active_count == 0 then
-            completed_wave = wave
-            schedule_wave(BETWEEN_WAVE_DELAY)
+            complete_wave()
         end
     end
 
@@ -349,25 +366,112 @@ OnInit.final("Struggle", function(Require)
         wave_callback = TimerQueue:callDelayed(delay, spawn_wave)
     end
 
-    local function award_waiver(pid)
-        if completed_wave <= 0 then
-            DisplayTextToPlayer(Player(pid - 1), 0., 0., "No Struggle waiver was earned.")
+    local function record_claim(pid, checkpoint_wave)
+        local profile = Profile[pid]
+        local hero_data = profile and profile.hero
+        if not hero_data then
+            return false
+        end
+
+        checkpoint_wave = math.min(MAX_SAVED_WAVE, checkpoint_wave)
+        hero_data.struggle_best_wave = math.max(hero_data.struggle_best_wave or 0, checkpoint_wave)
+        hero_data.struggle_claim_wave = math.max(hero_data.struggle_claim_wave or 0, checkpoint_wave)
+        DisplayTextToPlayer(Player(pid - 1), 0., 0.,
+            "Wave |cffffcc00" .. checkpoint_wave .. "|r Struggle reward secured. Visit the Prize Vendor to redeem it.")
+        return true
+    end
+
+    local function clear_checkpoint_player(pid)
+        if checkpoint_pending[pid] then
+            checkpoint_pending[pid] = nil
+            checkpoint_waiting = math.max(0, checkpoint_waiting - 1)
+        end
+
+        local dialog = checkpoint_dialogs[pid]
+        if dialog then
+            checkpoint_dialogs[pid] = nil
+            dialog:destroy()
+        end
+    end
+
+    local function resume_after_checkpoint()
+        if not checkpoint_active or checkpoint_waiting > 0 then
             return
         end
 
-        local hero = Hero[pid]
-        local item = ItemRuntime.create(WAIVER_ITEM, GetUnitX(hero), GetUnitY(hero))
-        item.extra[1] = math.min(0xFFFF, completed_wave)
-        item:update()
-        PlayerAddItem(pid, item)
-        DisplayTextToPlayer(Player(pid - 1), 0., 0., "Struggle waiver earned for wave " .. completed_wave .. ".")
+        checkpoint_active = false
+        if checkpoint_callback then
+            TimerQueue:disableCallback(checkpoint_callback)
+            checkpoint_callback = nil
+        end
+
+        if active and #players > 0 then
+            DisplayTextToTable(players, "|cffffcc00The Struggle continues.|r The next reward is at wave "
+                .. (wave + CHECKPOINT_INTERVAL) .. ".")
+            schedule_wave(BETWEEN_WAVE_DELAY)
+        end
     end
 
-    remove_player = function(pid, defeated)
+    local function resolve_checkpoint(pid, claim)
+        if not checkpoint_active or not checkpoint_pending[pid] then
+            return
+        end
+
+        clear_checkpoint_player(pid)
+        if claim then
+            record_claim(pid, completed_wave)
+            remove_player(pid, false, true)
+        end
+        resume_after_checkpoint()
+    end
+
+    local function on_checkpoint_choice(dialog, _, claim)
+        resolve_checkpoint(dialog.pid, claim == true)
+    end
+
+    local function checkpoint_timeout()
+        checkpoint_callback = nil
+        local pending = {}
+        for pid in pairs(checkpoint_pending) do
+            pending[#pending + 1] = pid
+        end
+        for index = 1, #pending do
+            resolve_checkpoint(pending[index], true)
+        end
+    end
+
+    begin_checkpoint = function()
+        checkpoint_active = true
+        checkpoint_waiting = #players
+        checkpoint_pending = {}
+        checkpoint_dialogs = {}
+
+        DisplayTextToTable(players, "|cffffcc00Wave " .. completed_wave
+            .. " checkpoint reached.|r Claim the reward or risk it by continuing.")
+
+        for index = 1, #players do
+            local pid = players[index]
+            checkpoint_pending[pid] = true
+            local dialog = DialogWindow.create(pid,
+                "Struggle Wave " .. completed_wave .. " Cleared", on_checkpoint_choice, "struggle-checkpoint")
+            dialog.cancellable = false
+            dialog:addButton("Claim Wave " .. completed_wave .. " Reward and Leave", true,
+                "ReplaceableTextures\\CommandButtons\\BTNChestOfGold.blp")
+            dialog:addButton("Continue and Risk Reward", false,
+                "ReplaceableTextures\\CommandButtons\\BTNReplay-Play.blp")
+            checkpoint_dialogs[pid] = dialog
+            dialog:display()
+        end
+
+        checkpoint_callback = TimerQueue:callDelayed(CHECKPOINT_DECISION_TIME, checkpoint_timeout)
+    end
+
+    remove_player = function(pid, defeated, claimed)
         if not TableHas(players, pid) then
             return
         end
 
+        clear_checkpoint_player(pid)
         TableRemove(players, pid)
         set_exit_visible(pid, false)
         EVENT_ON_CLEANUP:unregister_action(pid, on_cleanup)
@@ -383,10 +487,18 @@ OnInit.final("Struggle", function(Require)
             MoveHero(pid, TOWN_CENTER_X, TOWN_CENTER_Y)
         end
         SetCamera(pid, MAIN_MAP.rect)
-        award_waiver(pid)
+
+        if active and not claimed then
+            local message = defeated
+                and "You were defeated and lost this Struggle's unclaimed reward."
+                or "You fled the Struggle without claiming a reward."
+            DisplayTextToPlayer(Player(pid - 1), 0., 0., message)
+        end
 
         if #players == 0 then
             end_run()
+        else
+            resume_after_checkpoint()
         end
     end
 
@@ -443,7 +555,7 @@ OnInit.final("Struggle", function(Require)
         party_damage_multiplier = 1. + 0.08 * (#players - 1)
         entry_open = false
         active = true
-        DisplayTextToTable(players, "|cffffcc00The Infinite Struggle begins.|r Flee with the EXIT button at any time.")
+        DisplayTextToTable(players, "|cffffcc00The Infinite Struggle begins.|r Rewards may be claimed every five waves; emergency fleeing forfeits the run.")
         SoundHandler("Sound\\Interface\\BattleNetDoorsStereo2.flac", false)
         schedule_wave(FIRST_WAVE_DELAY)
     end
@@ -461,9 +573,21 @@ OnInit.final("Struggle", function(Require)
             TimerQueue:disableCallback(trickle_callback)
             trickle_callback = nil
         end
+        if checkpoint_callback then
+            TimerQueue:disableCallback(checkpoint_callback)
+            checkpoint_callback = nil
+        end
+
+        for pid, dialog in pairs(checkpoint_dialogs) do
+            checkpoint_dialogs[pid] = nil
+            dialog:destroy()
+        end
 
         entry_open = false
         active = false
+        checkpoint_active = false
+        checkpoint_waiting = 0
+        checkpoint_pending = {}
         for _, u in ipairs(enemies) do
             clear_fury(u)
             RemoveUnit(u)
@@ -479,6 +603,7 @@ OnInit.final("Struggle", function(Require)
         average_power = 1.
         party_health_multiplier = 1.
         party_damage_multiplier = 1.
+        checkpoint_dialogs = {}
     end
 
     local function on_exit_click()
@@ -503,7 +628,7 @@ OnInit.final("Struggle", function(Require)
         0.,
         0.015,
         on_exit_click,
-        "Leave the Infinite Struggle and claim a waiver for the highest completed wave."
+        "Flee the Infinite Struggle. Leaving outside a checkpoint forfeits the current reward."
     )
     BlzFrameClearAllPoints(exit_button.frame)
     BlzFrameSetPoint(
@@ -515,14 +640,6 @@ OnInit.final("Struggle", function(Require)
         -0.154
     )
     exit_button:visible(false)
-
-    ITEM_EXTRA_INFO[WAIVER_ITEM] = function(item)
-        local earned_wave = item.extra[1]
-        if earned_wave > 0 then
-            return "|n|cffffcc00Completed Struggle Wave:|r " .. earned_wave
-        end
-        return nil
-    end
 
     ITEM_LOOKUP[ENTRY_ITEM] = function(player, pid, _, item)
         if item and item.alive then
@@ -557,5 +674,27 @@ OnInit.final("Struggle", function(Require)
 
     function Struggle.getCompletedWave()
         return completed_wave
+    end
+
+    function Struggle.getBestWave(pid)
+        local profile = Profile[pid]
+        return profile and profile.hero and (profile.hero.struggle_best_wave or 0) or 0
+    end
+
+    function Struggle.getClaimWave(pid)
+        local profile = Profile[pid]
+        return profile and profile.hero and (profile.hero.struggle_claim_wave or 0) or 0
+    end
+
+    function Struggle.consumeClaim(pid, expected_wave)
+        local profile = Profile[pid]
+        local hero_data = profile and profile.hero
+        local claim_wave = hero_data and (hero_data.struggle_claim_wave or 0) or 0
+        if claim_wave <= 0 or (expected_wave and claim_wave ~= expected_wave) then
+            return false
+        end
+
+        hero_data.struggle_claim_wave = 0
+        return true
     end
 end, Debug and Debug.getLine())

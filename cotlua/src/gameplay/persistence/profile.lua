@@ -691,6 +691,8 @@ OnInit.final("Profile", function(Require)
     ---@field reveal integer
     ---@field skin integer
     ---@field summon_essence integer
+    ---@field struggle_best_wave integer
+    ---@field struggle_claim_wave integer
     ---@field create function
     ---@field values function
     ---@field propagate function
@@ -981,6 +983,8 @@ OnInit.final("Profile", function(Require)
             -- Optional trailing data leaves all existing version-1 inventory
             -- offsets intact; an older character payload simply reads zero.
             result[#result + 1] = self.summon_essence or 0
+            result[#result + 1] = self.struggle_best_wave or 0
+            result[#result + 1] = self.struggle_claim_wave or 0
 
             return result
         end
@@ -1057,6 +1061,8 @@ OnInit.final("Profile", function(Require)
             end
 
             self.summon_essence = read_value(data, index)
+            self.struggle_best_wave = read_value(data, index + 1)
+            self.struggle_claim_wave = read_value(data, index + 2)
 
             return true
         end
@@ -1066,6 +1072,9 @@ OnInit.final("Profile", function(Require)
             return setmetatable({
                 items = {},
                 saved_items = {},
+                summon_essence = 0,
+                struggle_best_wave = 0,
+                struggle_claim_wave = 0,
             }, mt)
         end
     end
