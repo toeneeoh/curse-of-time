@@ -1,3 +1,19 @@
+--[[
+    struggle.lua
+
+    Struggle is an endless pressure mode.
+    Its waves arrive in 25-40 unit trickles with only a five-second reset, use mixed
+    battlefield roles, and grow quadratically in durability while damage grows more slowly.
+    Encounter strength snapshots the entrants' level, permanent base attributes, and
+    equipped-item attributes.
+    Temporary pre-entry buffs are deliberately ignored so buffing before entry cannot raise
+    or lower the run's baseline.
+    Party size increases durability much more than damage. At the same level
+    breakpoints as the late overworld and Colosseum, enemies receive chaos
+    defense and attacks; chaos attack damage is divided by the map's native
+    multiplier before being written so the type transition is not a 350x jump.
+]]
+
 OnInit.final("Struggle", function(Require)
     Require('Variables')
     Require('UnitTable')
@@ -23,7 +39,13 @@ OnInit.final("Struggle", function(Require)
     local TRICKLE_SIZE = 3
     local MIN_WAVE_UNITS = 25
     local MAX_WAVE_UNITS = 40
-    local ENEMY_TEMPLATE = FourCC('n002')
+    local MELEE_ENEMY_TEMPLATE = FourCC('n002')
+    local RANGED_ENEMY_TEMPLATE = FourCC('h04H')
+    local RANGED_ATTACK_RANGE = 1000.
+    local RANGED_ACQUISITION_RANGE = 1100.
+    local FURY_DAMAGE_PER_STACK = 0.12
+    local FURY_MAX_STACKS = 8
+    local FURY_RESET_TIME = 6.
     local CHAOS_ARMOR_LEVEL = 200
     local CHAOS_ATTACK_LEVEL = 250
     local STAT_ARMOR_PER_ATTRIBUTE = 0.0003
@@ -53,17 +75,6 @@ OnInit.final("Struggle", function(Require)
         disruptor = { FourCC('n034'), FourCC('n02Z'), FourCC('n03T') },
     }
 
-    -- Struggle is an endless pressure mode, not a second Colosseum. Its waves
-    -- arrive in 25-40 unit trickles with only a five-second reset, use mixed
-    -- battlefield roles, and grow
-    -- quadratically in durability while damage grows more slowly. Encounter
-    -- strength snapshots the entrants' level, permanent base attributes, and
-    -- equipped-item attributes. Temporary pre-entry buffs are deliberately
-    -- ignored so buffing before entry cannot raise or lower the run's baseline.
-    -- Party size increases durability much more than damage. At the same level
-    -- breakpoints as the late overworld and Colosseum, enemies receive chaos
-    -- defense and attacks; chaos attack damage is divided by the map's native
-    -- multiplier before being written so the type transition is not a 350x jump.
     local formations = {
         {
             name = "The Crush",
@@ -114,8 +125,9 @@ OnInit.final("Struggle", function(Require)
     local spawn_queue = {}
     local spawn_total = 0
     local exit_button ---@type SimpleButton?
+    local fury_state = setmetatable({}, { __mode = 'k' })
 
-    local begin_run, end_run, remove_player, schedule_wave, on_grave_death, on_cleanup
+    local begin_run, end_run, remove_player, schedule_wave, on_grave_death, on_cleanup, on_struggle_fury_hit
 
     local function set_exit_visible(pid, visible)
         if GetLocalPlayer() == Player(pid - 1) and exit_button then
@@ -204,7 +216,50 @@ OnInit.final("Struggle", function(Require)
         end
     end
 
+    local function expire_fury(source, target)
+        local state = fury_state[source]
+        if state and state.target == target then
+            fury_state[source] = nil
+        end
+    end
+
+    local function clear_fury(source)
+        local state = fury_state[source]
+        if state then
+            if state.callback then
+                TimerQueue:disableCallback(state.callback)
+            end
+            fury_state[source] = nil
+        end
+        EVENT_ON_HIT_MULTIPLIER:unregister_unit_action(source, on_struggle_fury_hit)
+    end
+
+    on_struggle_fury_hit = function(source, target, amount)
+        local state = fury_state[source]
+        if not state then
+            state = { target = target, stacks = 0 }
+            fury_state[source] = state
+        elseif state.target ~= target then
+            if state.callback then
+                TimerQueue:disableCallback(state.callback)
+            end
+            state.target = target
+            state.stacks = 0
+        end
+
+        if state.stacks > 0 then
+            amount.value = amount.value * (1. + FURY_DAMAGE_PER_STACK * state.stacks)
+        end
+        state.stacks = math.min(FURY_MAX_STACKS, state.stacks + 1)
+
+        if state.callback then
+            TimerQueue:disableCallback(state.callback)
+        end
+        state.callback = TimerQueue:callDelayed(FURY_RESET_TIME, expire_fury, source, target)
+    end
+
     local function remove_enemy(killed)
+        clear_fury(killed)
         TableRemove(enemies, killed)
         active_count = math.max(0, active_count - 1)
         TimerQueue:callDelayed(3., RemoveUnit, killed)
@@ -221,11 +276,17 @@ OnInit.final("Struggle", function(Require)
         local rect = spawn_rects[math.random(1, #spawn_rects)]
         local x, y = spawn_xy(rect)
         local skin = pool[math.random(1, #pool)]
-        local u = BlzCreateUnitWithSkin(PLAYER_BOSS, ENEMY_TEMPLATE, x, y, GetRandomReal(0., 360.), skin)
+        local template = role.type == "ranged" and RANGED_ENEMY_TEMPLATE or MELEE_ENEMY_TEMPLATE
+        local u = BlzCreateUnitWithSkin(PLAYER_BOSS, template, x, y, GetRandomReal(0., 360.), skin)
 
         BlzSetUnitSkin(u, skin)
         BlzSetUnitName(u, GetObjectName(skin))
         BlzSetHeroProperName(u, GetObjectName(skin))
+        if role.type == "ranged" then
+            BlzSetUnitWeaponRealField(u, UNIT_WEAPON_RF_ATTACK_RANGE, 0, RANGED_ATTACK_RANGE)
+            BlzSetUnitRealField(u, UNIT_RF_ACQUISITION_RANGE, RANGED_ACQUISITION_RANGE)
+            EVENT_ON_HIT_MULTIPLIER:register_unit_action(u, on_struggle_fury_hit)
+        end
         enemies[#enemies + 1] = u
         active_count = active_count + 1
         configure_enemy(u, role, spawn_total)
@@ -404,6 +465,7 @@ OnInit.final("Struggle", function(Require)
         entry_open = false
         active = false
         for _, u in ipairs(enemies) do
+            clear_fury(u)
             RemoveUnit(u)
         end
         enemies = {}
@@ -432,18 +494,26 @@ OnInit.final("Struggle", function(Require)
     end
 
     exit_button = SimpleButton.create(
-        BlzGetOriginFrame(ORIGIN_FRAME_GAME_UI, 0),
+        BlzGetOriginFrame(ORIGIN_FRAME_WORLD_FRAME, 0),
         "war3mapImported\\ExitButton.blp",
         0.03,
-        0.025,
+        0.015,
         FRAMEPOINT_TOP,
         FRAMEPOINT_TOP,
         0.,
-        -0.04,
+        0.015,
         on_exit_click,
         "Leave the Infinite Struggle and claim a waiver for the highest completed wave."
     )
-    BlzFrameSetLevel(exit_button.frame, 20)
+    BlzFrameClearAllPoints(exit_button.frame)
+    BlzFrameSetPoint(
+        exit_button.frame,
+        FRAMEPOINT_CENTER,
+        BlzGetOriginFrame(ORIGIN_FRAME_WORLD_FRAME, 0),
+        FRAMEPOINT_CENTER,
+        0.,
+        -0.154
+    )
     exit_button:visible(false)
 
     ITEM_EXTRA_INFO[WAIVER_ITEM] = function(item)
