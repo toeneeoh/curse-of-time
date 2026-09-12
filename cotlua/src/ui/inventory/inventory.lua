@@ -111,6 +111,7 @@ OnInit.final("Inventory", function(Require)
         local target_thread = {} -- used to sync context and target acquisition
         local synced_context, synced_target = {}, {}
         local ui_mode = __jarray(0) -- 0 = normal, 1 = context menu open
+        local right_click_origin = __jarray(0)
 
         -- determines what item slot a user has their cursor over
         ---@return integer
@@ -128,46 +129,45 @@ OnInit.final("Inventory", function(Require)
                 return -1
             end
 
-            local closest_slot = 0
-            local closest_distance = 1000
             local mouse_x = x - INVENTORY_MIN_X
             local mouse_y = y - INVENTORY_MIN_Y
-            local threshold_distance = 0.025 * 0.025
+            local half_slot = INVENTORY_SLOT_SIZE * 0.5
 
-            -- loop through each slot's position and calculate the distance to the mouse
+            -- Test the actual square occupied by each slot. The previous nearest-
+            -- center radius also accepted gaps and points outside the icon bounds.
             for i = 1, #inventory_slots do
                 local pos = inventory_slots[i]
-                local dx = mouse_x - pos[1]
-                local dy = mouse_y - pos[2]
-                local distance = dx * dx + dy * dy
-
-                -- check if this slot is the closest
-                if distance < closest_distance then
-                    closest_distance = distance
-                    closest_slot = i
+                if math.abs(mouse_x - pos[1]) <= half_slot and
+                math.abs(mouse_y - pos[2]) <= half_slot
+                then
+                    return i
                 end
             end
 
-            if closest_distance > threshold_distance then
-                return 0
-            end
-
-            return closest_slot
+            return 0
         end
 
-        -- determines what item slot a user is highlighting
+        -- Screen coordinates are local-only. The resulting slot is synchronized
+        -- separately before it can cause an inventory mutation.
+        ---@param pid integer
         ---@return integer
-        local get_highlighted_slot = function(pid)
-            local index = 0
-
-            for i = 1, MAX_INVENTORY_SLOTS do
-                if BlzFrameIsVisible(slots[i].tooltip.frame) then
-                    index = slots[i].index
-                    break
-                end
+        local function get_local_hovered_slot(pid)
+            if GetLocalPlayer() == Player(pid - 1) then
+                return get_hovered_slot()
             end
+            return 0
+        end
 
-            return index
+        ---@param pid integer
+        ---@return integer
+        local function get_local_item_slot(pid)
+            local slot = get_local_hovered_slot(pid)
+            local profile = Profile[viewing[pid]]
+
+            if slot > 0 and profile and profile.hero and profile.hero.items[slot] then
+                return slot
+            end
+            return 0
         end
 
         --#region frame setup
@@ -312,6 +312,7 @@ OnInit.final("Inventory", function(Require)
         local function clear_context(pid)
             context[pid] = 0
             target[pid] = 0
+            right_click_origin[pid] = 0
             synced_context[pid] = false
             synced_target[pid] = false
         end
@@ -541,7 +542,7 @@ OnInit.final("Inventory", function(Require)
         end
 
         local pick_item = function(pid)
-            local highlighted = get_highlighted_slot(pid)
+            local highlighted = get_local_item_slot(pid)
 
             if highlighted > 0 then
                 local new_slot = slots[highlighted]
@@ -635,12 +636,11 @@ OnInit.final("Inventory", function(Require)
             end
         end
 
-        open_context_menu = function(pid, open)
+        open_context_menu = function(pid, open, highlighted)
             -- toggle context menu mode
             ui_mode[pid] = 1
 
-            -- get context asynchronously
-            local highlighted = get_highlighted_slot(pid)
+            highlighted = highlighted or get_local_item_slot(pid)
 
             -- open context menu
             if highlighted > 0 and open then
@@ -769,13 +769,21 @@ OnInit.final("Inventory", function(Require)
         -- mouse events
         on_m2_up = function()
             local pid = GetPlayerId(GetTriggerPlayer()) + 1
+            local pressed_slot = right_click_origin[pid]
+            local released_slot = get_local_item_slot(pid)
+            right_click_origin[pid] = 0
 
-            if not disabled_for_player[pid] then
-                open_context_menu(pid, true)
+            if not disabled_for_player[pid] and pressed_slot > 0 and released_slot == pressed_slot then
+                open_context_menu(pid, true, pressed_slot)
             end
         end
 
         on_m2_down = function()
+            local pid = GetPlayerId(GetTriggerPlayer()) + 1
+
+            if not disabled_for_player[pid] then
+                right_click_origin[pid] = get_local_item_slot(pid)
+            end
         end
 
         on_m1_down = function()
