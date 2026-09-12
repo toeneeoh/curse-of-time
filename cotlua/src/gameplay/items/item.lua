@@ -255,12 +255,28 @@ OnInit.final("Items", function(Require)
 
         ---@class ItemRuntime
         ---@field native_create function
+        ---@field definitions table<integer, RuntimeItemDefinition>
+        ---@field define fun(id: string|integer, definition: RuntimeItemDefinition)
         ---@field create fun(id: string|integer|item, x: number?, y: number?, expire: number?): Item
         ---@field wrap fun(handle: item): Item
         ---@field commit_slot fun(self: Item, slot: integer, suppress_refresh: boolean?): boolean
-        ItemRuntime = {} ---@type ItemRuntime
+        ---@class RuntimeItemDefinition
+        ---@field custom_level? boolean
+        ---@field prepare? fun(item: Item, data: table)
+        ---@field calculateValue? fun(item: Item, stat: integer, flag: integer?): number?
+        ---@field name? fun(item: Item): string
+        ---@field appendHeader? fun(item: Item, text: string[], alt_text: string[])
+
+        ItemRuntime = { definitions = {} }
         local NativeCreateItem = CreateItem
         ItemRuntime.native_create = NativeCreateItem
+
+        ---@param id string|integer
+        ---@param definition RuntimeItemDefinition
+        function ItemRuntime.define(id, definition)
+            local rawcode = type(id) == "string" and FourCC(id) or id
+            ItemRuntime.definitions[rawcode] = definition
+        end
 
         ---@type fun(id: string|integer|item, x: number?, y: number?, expire: number?): Item
         function ItemRuntime.create(id, x, y, expire)
@@ -309,6 +325,11 @@ OnInit.final("Items", function(Require)
             if tbl.tooltip == 0 then
                 -- if an item's description exists, use that for parsing (exception for default shops)
                 ParseItemTooltip(self.obj, ((BlzGetItemDescription(self.obj):len()) > 1 and BlzGetItemDescription(self.obj)) or "")
+            end
+
+            local definition = ItemRuntime.definitions[item_id]
+            if definition and definition.prepare then
+                definition.prepare(self, tbl)
             end
 
             if not rawget(tbl, "quality_index") then
@@ -448,6 +469,11 @@ OnInit.final("Items", function(Require)
         --Generates a proper name string
         ---@type fun(self: Item):string
         function thistype:name()
+            local definition = ItemRuntime.definitions[self.id]
+            if definition and definition.name then
+                return definition.name(self)
+            end
+
             local name = GetObjectName(self.id)
 
             if self.level > 0 then
@@ -617,7 +643,8 @@ OnInit.final("Items", function(Require)
         end
 
         function thistype:lvl(lvl)
-            if ItemData[self.id][ITEM_UPGRADE_MAX] > 0 then
+            local definition = ItemRuntime.definitions[self.id]
+            if ItemData[self.id][ITEM_UPGRADE_MAX] > 0 or (definition and definition.custom_level) then
                 if self.equipped then
                     apply_item_stats(self, -1)
                 end
@@ -670,6 +697,14 @@ OnInit.final("Items", function(Require)
         -- 1 = lower, 2 = upper
         ---@type fun(self: Item, STAT: integer, flag: integer): number
         function Item:calculateValue(STAT, flag)
+            local definition = ItemRuntime.definitions[self.id]
+            if definition and definition.calculateValue then
+                local value = definition.calculateValue(self, STAT, flag)
+                if value ~= nil then
+                    return value
+                end
+            end
+
             local tbl = ItemData[self.id]
             local unlockat = tbl[STAT .. "unlock"] ---@type number 
 
@@ -1034,9 +1069,10 @@ OnInit.final("Items", function(Require)
         function thistype:update()
             local orig = ItemData[self.id].tooltip ---@type string
             local text = {}
+            local definition = ItemRuntime.definitions[self.id]
 
             -- first "header" lines: rarity, upg level, tier, type, req level
-            if self.level > 0 then
+            if self.level > 0 and not (definition and definition.custom_level) then
                 local rarity_index = (self.level + 3) // self.rarity
                 BlzSetItemSkin(self.obj, ITEM_MODEL[rarity_index])
 
@@ -1060,6 +1096,10 @@ OnInit.final("Items", function(Require)
             local alt_text = {}
             for i, v in ipairs(text) do
                 alt_text[i] = v
+            end
+
+            if definition and definition.appendHeader then
+                definition.appendHeader(self, text, alt_text)
             end
 
             -- cache stats
@@ -1160,7 +1200,7 @@ OnInit.final("Items", function(Require)
             self.alt_tooltip = concat(alt_text)
 
             BlzSetItemIconPath(self.obj, ItemData[self.id].path)
-            BlzSetItemName(self.obj, ItemData[self.id].name)
+            BlzSetItemName(self.obj, definition and definition.name and definition.name(self) or ItemData[self.id].name)
             BlzSetItemDescription(self.obj, self.tooltip)
             BlzSetItemExtendedTooltip(self.obj, self.tooltip)
 

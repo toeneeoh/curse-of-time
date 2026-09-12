@@ -39,6 +39,7 @@ OnInit.final("Struggle", function(Require)
     local FIRST_WAVE_DELAY = 5.
     local BETWEEN_WAVE_DELAY = 5.
     local CHECKPOINT_INTERVAL = 5
+    local STARTING_WAVE_WINDOW = 25
     local CHECKPOINT_DECISION_TIME = 20.
     local MAX_SAVED_WAVE = 0xFFFF
     local TRICKLE_INTERVAL = 1.25
@@ -173,6 +174,15 @@ OnInit.final("Struggle", function(Require)
         end
 
         return nil
+    end
+
+    ---Returns the first wave of the level bracket immediately below the
+    ---lowest entrant. A party must clear a full 25-wave window to prove it can
+    ---reach a difficulty matching that entrant's level.
+    ---@param level integer
+    ---@return integer
+    local function recommended_start_wave(level)
+        return math.max(1, ((math.max(1, level) - 1) // STARTING_WAVE_WINDOW) * STARTING_WAVE_WINDOW + 1)
     end
 
     local function spawn_xy(rect)
@@ -603,11 +613,20 @@ OnInit.final("Struggle", function(Require)
             return
         end
 
+        local lowest_level = MAX_LEVEL
+        for _, pid in ipairs(players) do
+            lowest_level = math.min(lowest_level, GetUnitLevel(Hero[pid]))
+        end
+
+        local first_wave = recommended_start_wave(lowest_level)
+        wave = first_wave - 1
+        completed_wave = wave
         party_health_multiplier = 1. + 0.6 * (#players - 1)
         party_damage_multiplier = 1. + 0.08 * (#players - 1)
         entry_open = false
         active = true
-        DisplayTextToTable(players, "|cffffcc00The Infinite Struggle begins.|r Rewards may be claimed every five waves; emergency fleeing forfeits the run.")
+        DisplayTextToTable(players, "|cffffcc00The Infinite Struggle begins at wave " .. first_wave
+            .. ".|r Difficulty is based on the lowest entrant. Rewards may be claimed every five waves; emergency fleeing forfeits the run.")
         SoundHandler("Sound\\Interface\\BattleNetDoorsStereo2.flac", false)
         schedule_wave(FIRST_WAVE_DELAY)
     end
@@ -726,6 +745,12 @@ OnInit.final("Struggle", function(Require)
 
     function Struggle.getCompletedWave()
         return completed_wave
+    end
+
+    ---@param level integer
+    ---@return integer
+    function Struggle.getRecommendedStartWave(level)
+        return recommended_start_wave(level)
     end
 
     function Struggle.getBestWave(pid)

@@ -45,6 +45,7 @@ OnInit.final("ArchitectureTests", function(Require)
     Require('CurrencyDisplay')
     Require('FactionView')
     Require('DropTable')
+    Require('StruggleRewards')
 
     ArchitectureTests = {
         tests = {},
@@ -316,7 +317,7 @@ OnInit.final("ArchitectureTests", function(Require)
         local expected = {
             { 'n01A', 12, 40 },
             { 'n01B', 0, 11 },
-            { 'n032', 2, 0 },
+            { 'n032', 3, 0 },
             { 'n004', 1, 1 },
             { 'n01F', 10, 11 },
             { 'n02C', 12 },
@@ -351,7 +352,7 @@ OnInit.final("ArchitectureTests", function(Require)
                 end
             end
             if values[1] == 'n032' then
-                if #definition.offers ~= 5 then
+                if #definition.offers ~= 8 then
                     return false, "Prize Vendor virtual offer count changed"
                 end
                 local offer = definition.offers[1]
@@ -363,6 +364,23 @@ OnInit.final("ArchitectureTests", function(Require)
                     return false, "Prize Vendor reward does not use Honor pricing"
                 end
             end
+        end
+        return true
+    end)
+
+    ArchitectureTests.register("Struggle uses fixed level brackets and a 100-rank reward curve", function()
+        if Struggle.getRecommendedStartWave(1) ~= 1
+            or Struggle.getRecommendedStartWave(25) ~= 1
+            or Struggle.getRecommendedStartWave(26) ~= 26
+            or Struggle.getRecommendedStartWave(200) ~= 176
+            or Struggle.getRecommendedStartWave(500) ~= 476 then
+            return false, "Struggle recommended starting brackets changed"
+        end
+
+        if StruggleRewards.getAttributeBonus(1) ~= 10
+            or StruggleRewards.getAttributeBonus(100) ~= 19953
+            or StruggleRewards.getPercentageBonus(100) ~= 10 then
+            return false, "Struggle reward scaling changed"
         end
         return true
     end)

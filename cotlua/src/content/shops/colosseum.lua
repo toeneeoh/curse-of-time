@@ -3,12 +3,14 @@
 OnInit.final("ColosseumShop", function(Require)
     Require('ShopRegistry')
     Require('Honor')
+    Require('StruggleRewards')
     Require('UnitTable')
 
     local shop_id = FourCC('n032')
     CreateShop(shop_id, 1000.)
     local bonuses = ShopAddCategory(shop_id, "ReplaceableTextures\\CommandButtons\\BTNHeroPaladin.blp", "Bonuses")
     local services = ShopAddCategory(shop_id, "ReplaceableTextures\\CommandButtons\\BTNCancel.blp", "Services")
+    local struggle = ShopAddCategory(shop_id, "ReplaceableTextures\\CommandButtons\\BTNCrystalBall.blp", "Struggle")
 
     local reward_data = {
         {
@@ -109,6 +111,69 @@ OnInit.final("ColosseumShop", function(Require)
         end,
         purchase = function(pid)
             return Honor.reset(pid)
+        end,
+    })
+
+    local function struggle_tooltip(pid, form)
+        local rank = StruggleRewards.getClaimRank(pid)
+        local attribute = rank > 0 and StruggleRewards.getAttributeBonus(rank) or 0
+        local percentage = rank > 0 and StruggleRewards.getPercentageBonus(rank) or 0
+        return "Redeem the highest secured Struggle checkpoint as a " .. form .. "."
+            .. "\n\nReward Rank: |cffffcc00" .. rank .. "|r/|cffffcc00100|r"
+            .. "\nAll Attributes: |cffffcc00+" .. attribute .. "|r"
+            .. "\nSpellboost: |cffffcc00+" .. percentage .. "%|r"
+            .. "\nGold Find: |cffffcc00+" .. percentage .. "%|r"
+    end
+
+    ShopAddOffer(shop_id, {
+        key = "struggle_ring",
+        name = function(pid)
+            return "Ring of Struggle |cff999999(Rank " .. StruggleRewards.getClaimRank(pid) .. ")|r"
+        end,
+        icon = "ReplaceableTextures\\CommandButtons\\BTNRingGreen.blp",
+        tooltip = function(pid)
+            return struggle_tooltip(pid, "pre-Chaos ring")
+                .. "\n\nAt level |cffffcc00200|r, it can be crystallized into an equivalent socketable gem."
+        end,
+        categories = struggle,
+        availability = function(pid)
+            return StruggleRewards.canRedeem(pid, false)
+        end,
+        purchase = function(pid)
+            return StruggleRewards.redeem(pid, false)
+        end,
+    })
+
+    ShopAddOffer(shop_id, {
+        key = "struggle_gem",
+        name = function(pid)
+            return "Struggle Gem |cff999999(Rank " .. StruggleRewards.getClaimRank(pid) .. ")|r"
+        end,
+        icon = "ReplaceableTextures\\CommandButtons\\BTNCrystalBall.blp",
+        tooltip = function(pid)
+            return struggle_tooltip(pid, "socketable gem")
+                .. "\n\nRequires level |cffffcc00200|r. An embedded gem must be extracted before it can be upgraded."
+        end,
+        categories = struggle,
+        availability = function(pid)
+            return StruggleRewards.canRedeem(pid, true)
+        end,
+        purchase = function(pid)
+            return StruggleRewards.redeem(pid, true)
+        end,
+    })
+
+    ShopAddOffer(shop_id, {
+        key = "crystallize_struggle_ring",
+        name = "Crystallize Ring of Struggle",
+        icon = "ReplaceableTextures\\CommandButtons\\BTNOrbOfDarkness.blp",
+        tooltip = "Convert a Ring of Struggle into a socketable Struggle Gem of the same rank. This service is free and does not consume a checkpoint claim.",
+        categories = struggle,
+        availability = function(pid)
+            return StruggleRewards.canConvert(pid)
+        end,
+        purchase = function(pid)
+            return StruggleRewards.convert(pid)
         end,
     })
 end, Debug and Debug.getLine())
