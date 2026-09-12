@@ -21,6 +21,8 @@ OnInit.final("Inventory", function(Require)
     local INVENTORY_MIN_X   = 0.612
     local INVENTORY_MIN_Y   = 0.214
     local INVENTORY_SLOT_SIZE = 0.0266
+    local ITEM_HIT_PADDING  = 0.002
+    local TRACKER_FOLLOW    = 0.82
     local DROP_ITEM_COMMAND = "robogoblin"
 
     local concat = table.concat
@@ -114,8 +116,9 @@ OnInit.final("Inventory", function(Require)
         local right_click_origin = __jarray(0)
 
         -- determines what item slot a user has their cursor over
+        ---@param padding number?
         ---@return integer
-        local get_hovered_slot = function()
+        local get_hovered_slot = function(padding)
             local x, y = get_mouse_frame_position()
 
             if not x or not y then
@@ -131,7 +134,7 @@ OnInit.final("Inventory", function(Require)
 
             local mouse_x = x - INVENTORY_MIN_X
             local mouse_y = y - INVENTORY_MIN_Y
-            local half_slot = INVENTORY_SLOT_SIZE * 0.5
+            local half_slot = INVENTORY_SLOT_SIZE * 0.5 + (padding or 0.)
 
             -- Test the actual square occupied by each slot. The previous nearest-
             -- center radius also accepted gaps and points outside the icon bounds.
@@ -150,18 +153,20 @@ OnInit.final("Inventory", function(Require)
         -- Screen coordinates are local-only. The resulting slot is synchronized
         -- separately before it can cause an inventory mutation.
         ---@param pid integer
+        ---@param padding number?
         ---@return integer
-        local function get_local_hovered_slot(pid)
+        local function get_local_hovered_slot(pid, padding)
             if GetLocalPlayer() == Player(pid - 1) then
-                return get_hovered_slot()
+                return get_hovered_slot(padding)
             end
             return 0
         end
 
         ---@param pid integer
+        ---@param padding number?
         ---@return integer
-        local function get_local_item_slot(pid)
-            local slot = get_local_hovered_slot(pid)
+        local function get_local_item_slot(pid, padding)
+            local slot = get_local_hovered_slot(pid, padding)
             local profile = Profile[viewing[pid]]
 
             if slot > 0 and profile and profile.hero and profile.hero.items[slot] then
@@ -346,14 +351,22 @@ OnInit.final("Inventory", function(Require)
         -- frame that follows the mouse (for item dragging)
         local tracker = BlzCreateFrameByType("BACKDROP", "", BlzGetFrameByName("ConsoleUIBackdrop", 0), "", 0)
         local tracker_timer = CreateTimer()
+        local tracker_x, tracker_y
         BlzFrameSetEnable(tracker, false)
         BlzFrameSetSize(tracker, INVENTORY_SLOT_SIZE, INVENTORY_SLOT_SIZE)
         BlzFrameSetTexture(tracker, "trans32.blp", 0, true)
 
-        local function update_tracker_position()
+        ---@param snap boolean?
+        local function update_tracker_position(snap)
             local x, y = get_mouse_frame_position()
             if x and y then
-                setabspoint(tracker, FRAMEPOINT_CENTER, x, y)
+                if snap or not tracker_x or not tracker_y then
+                    tracker_x, tracker_y = x, y
+                else
+                    tracker_x = tracker_x + (x - tracker_x) * TRACKER_FOLLOW
+                    tracker_y = tracker_y + (y - tracker_y) * TRACKER_FOLLOW
+                end
+                setabspoint(tracker, FRAMEPOINT_CENTER, tracker_x, tracker_y)
             end
         end
 
@@ -361,12 +374,13 @@ OnInit.final("Inventory", function(Require)
             if GetLocalPlayer() == Player(pid - 1) then
                 PauseTimer(tracker_timer)
                 BlzFrameSetTexture(tracker, "trans32.blp", 0, true)
+                tracker_x, tracker_y = nil, nil
             end
         end
 
         local show_tracker = function(pid, texture)
             if GetLocalPlayer() == Player(pid - 1) then
-                update_tracker_position()
+                update_tracker_position(true)
                 BlzFrameSetTexture(tracker, texture, 0, true)
                 TimerStart(tracker_timer, 1. / 128., true, update_tracker_position)
             end
@@ -542,7 +556,7 @@ OnInit.final("Inventory", function(Require)
         end
 
         local pick_item = function(pid)
-            local highlighted = get_local_item_slot(pid)
+            local highlighted = get_local_item_slot(pid, ITEM_HIT_PADDING)
 
             if highlighted > 0 then
                 local new_slot = slots[highlighted]
@@ -685,6 +699,10 @@ OnInit.final("Inventory", function(Require)
             context[pid] = slot
             synced_context[pid] = true
 
+            if target_thread[pid] and synced_target[pid] then
+                coroutine.resume(target_thread[pid], target[pid])
+            end
+
             return false
         end
 
@@ -715,7 +733,7 @@ OnInit.final("Inventory", function(Require)
             synced_target[pid] = true
 
             -- resume any threads yielding for target
-            if target_thread[pid] then
+            if target_thread[pid] and synced_context[pid] then
                 coroutine.resume(target_thread[pid], slot)
             end
 
@@ -782,7 +800,7 @@ OnInit.final("Inventory", function(Require)
             local pid = GetPlayerId(GetTriggerPlayer()) + 1
 
             if not disabled_for_player[pid] then
-                right_click_origin[pid] = get_local_item_slot(pid)
+                right_click_origin[pid] = get_local_item_slot(pid, ITEM_HIT_PADDING)
             end
         end
 
