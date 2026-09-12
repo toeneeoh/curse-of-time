@@ -7,6 +7,7 @@
 OnInit.final("StruggleSpecials", function(Require)
     Require('AbilityCasting')
     Require('BuffsCommon')
+    Require('BuffsWorldStruggle')
     Require('Chain')
     Require('Events')
     Require('SpellTools')
@@ -124,7 +125,7 @@ OnInit.final("StruggleSpecials", function(Require)
             GetUnitX(source), GetUnitY(source)))
         for target in each(group) do
             if IsUnitType(target, UNIT_TYPE_HERO) then
-                DamageTarget(source, target, BlzGetUnitBaseDamage(source, 0) * 2.,
+                DamageTarget(source, target, BlzGetUnitBaseDamage(source, 0) * 10.,
                     ATTACK_TYPE_NORMAL, MAGIC, "Volatile Rupture")
                 Silence:add(source, target):duration(2.)
             end
@@ -163,8 +164,9 @@ OnInit.final("StruggleSpecials", function(Require)
         MakeGroupInRange(BOSS_ID, group, zone.x, zone.y, MIASMA_RADIUS, Condition(FilterEnemy))
         for target in each(group) do
             if IsUnitType(target, UNIT_TYPE_HERO) then
-                DamageTarget(state.source, target, BlzGetUnitBaseDamage(state.source, 0) * 0.35,
+                DamageTarget(state.source, target, BlzGetUnitBaseDamage(state.source, 0) * 0.5,
                     ATTACK_TYPE_NORMAL, MAGIC, "Corrosive Miasma")
+                CorrosiveMiasmaDebuff:add(state.source, target):duration(1.1)
             end
         end
         DestroyGroup(group)
@@ -202,7 +204,7 @@ OnInit.final("StruggleSpecials", function(Require)
             and CastSpell(state.source, CORROSIVE_MIASMA, 0.75, -1, 1.) then
             local x, y = GetUnitX(target), GetUnitY(target)
             local indicator = AddSpecialEffect("Indicators\\circle.mdl", x, y)
-            BlzSetSpecialEffectScale(indicator, MIASMA_RADIUS / 128.)
+            --BlzSetSpecialEffectScale(indicator, MIASMA_RADIUS / 325.)
             state.effects[indicator] = true
             FloatingTextUnit("Corrosive Miasma", state.source, 2., 70., 0., 11., 80, 255, 80, 0, true)
             schedule(state, 0.75, create_miasma, indicator, x, y)

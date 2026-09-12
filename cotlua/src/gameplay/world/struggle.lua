@@ -26,6 +26,7 @@ OnInit.final("Struggle", function(Require)
     Require('ItemEventRegistry')
     Require('PlayerLifecycle')
     Require('Profile')
+    Require('BuffsWorldStruggle')
     Require('StruggleSpecials')
 
     ---@class StruggleService
@@ -45,10 +46,8 @@ OnInit.final("Struggle", function(Require)
     local MELEE_ENEMY_TEMPLATE = FourCC('n002')
     local RANGED_ENEMY_TEMPLATE = FourCC('n008')
     local FURY_SWIPES_ABILITY = FourCC('A036')
-    local RANGED_ATTACK_RANGE = 1000.
-    local RANGED_ACQUISITION_RANGE = 1100.
-    local FURY_DAMAGE_PER_STACK = 0.12
-    local FURY_MAX_STACKS = 8
+    local FURY_DAMAGE_PER_STACK = 0.15
+    local FURY_MAX_STACKS = 20
     local FURY_RESET_TIME = 6.
     local CHAOS_ARMOR_LEVEL = 200
     local CHAOS_ATTACK_LEVEL = 250
@@ -114,11 +113,14 @@ OnInit.final("Struggle", function(Require)
 
     local special_roles = {
         { type = "harpooner", skin_type = "ranged", ranged = true, special = "hook",
-            hp = 0.75, damage = 1.1, armor = 0.7, speed = 0.08 },
+            hp = 0.75, damage = 1.1, armor = 0.7, speed = 0.08,
+            color = { 110, 175, 255 }, scale = 1.2 },
         { type = "burster", skin_type = "disruptor", special = "rupture",
-            hp = 0.6, damage = 1., armor = 0.55, speed = 0.35 },
+            hp = 0.6, damage = 1., armor = 0.55, speed = 0.35,
+            color = { 255, 210, 70 }, scale = 1.2 },
         { type = "blightcaster", skin_type = "disruptor", ranged = true, special = "miasma",
-            hp = 0.7, damage = 0.9, armor = 0.65, speed = 0.05 },
+            hp = 0.7, damage = 0.9, armor = 0.65, speed = 0.05,
+            color = { 110, 175, 255 }, scale = 1.2 },
     }
 
     local players = {} ---@type integer[]
@@ -140,6 +142,7 @@ OnInit.final("Struggle", function(Require)
     local spawn_total = 0
     local exit_button ---@type SimpleButton?
     local fury_state = setmetatable({}, { __mode = 'k' })
+    local fury_targets = setmetatable({}, { __mode = 'k' })
     local checkpoint_active = false
     local checkpoint_waiting = 0
     local checkpoint_pending = {} ---@type boolean[]
@@ -235,9 +238,52 @@ OnInit.final("Struggle", function(Require)
         end
     end
 
+    local function refresh_fury_debuff(target)
+        local sources = fury_targets[target]
+        local highest = 0
+        local remaining = 0.
+
+        if sources then
+            for _, state in pairs(sources) do
+                if state.stacks > highest then
+                    highest = state.stacks
+                    remaining = state.callback and TimerQueue:getRemaining(state.callback) or FURY_RESET_TIME
+                end
+            end
+        end
+
+        if highest > 0 then
+            StruggleFuryDebuff:add(target, target):update(
+                highest,
+                highest * FURY_DAMAGE_PER_STACK,
+                math.max(FPS_32, remaining or FURY_RESET_TIME)
+            )
+        else
+            local buff = StruggleFuryDebuff:get(nil, target)
+            if buff then
+                buff:remove()
+            end
+            fury_targets[target] = nil
+        end
+    end
+
+    local function detach_fury_source(source, state)
+        if not state or not state.target then
+            return
+        end
+
+        local target = state.target
+        local sources = fury_targets[target]
+        if sources then
+            sources[source] = nil
+        end
+        refresh_fury_debuff(target)
+    end
+
     local function expire_fury(source, target)
         local state = fury_state[source]
         if state and state.target == target then
+            detach_fury_source(source, state)
             fury_state[source] = nil
         end
     end
@@ -248,6 +294,7 @@ OnInit.final("Struggle", function(Require)
             if state.callback then
                 TimerQueue:disableCallback(state.callback)
             end
+            detach_fury_source(source, state)
             fury_state[source] = nil
         end
         EVENT_ON_HIT_MULTIPLIER:unregister_unit_action(source, on_struggle_fury_hit)
@@ -262,6 +309,7 @@ OnInit.final("Struggle", function(Require)
             if state.callback then
                 TimerQueue:disableCallback(state.callback)
             end
+            detach_fury_source(source, state)
             state.target = target
             state.stacks = 0
         end
@@ -275,6 +323,14 @@ OnInit.final("Struggle", function(Require)
             TimerQueue:disableCallback(state.callback)
         end
         state.callback = TimerQueue:callDelayed(FURY_RESET_TIME, expire_fury, source, target)
+
+        local sources = fury_targets[target]
+        if not sources then
+            sources = setmetatable({}, { __mode = 'k' })
+            fury_targets[target] = sources
+        end
+        sources[source] = state
+        refresh_fury_debuff(target)
     end
 
     local function complete_wave()
@@ -313,14 +369,15 @@ OnInit.final("Struggle", function(Require)
         BlzSetUnitSkin(u, skin)
         BlzSetUnitName(u, GetObjectName(skin))
         BlzSetHeroProperName(u, GetObjectName(skin))
+        if role.special then
+            SetUnitVertexColor(u, role.color[1], role.color[2], role.color[3], 255)
+            SetUnitScale(u, role.scale, role.scale, role.scale)
+        else
+            SetUnitVertexColor(u, 255, 255, 255, 255)
+            SetUnitScale(u, 1., 1., 1.)
+        end
         if role.type == "ranged" then
             UnitAddAbility(u, FURY_SWIPES_ABILITY)
-        end
-        if is_ranged then
-            BlzSetUnitWeaponRealField(u, UNIT_WEAPON_RF_ATTACK_RANGE, 0, RANGED_ATTACK_RANGE)
-            BlzSetUnitRealField(u, UNIT_RF_ACQUISITION_RANGE, RANGED_ACQUISITION_RANGE)
-        end
-        if role.type == "ranged" then
             EVENT_ON_HIT_MULTIPLIER:register_unit_action(u, on_struggle_fury_hit)
         end
         enemies[#enemies + 1] = u
@@ -633,6 +690,7 @@ OnInit.final("Struggle", function(Require)
         average_power = 1.
         party_health_multiplier = 1.
         party_damage_multiplier = 1.
+        fury_targets = setmetatable({}, { __mode = 'k' })
         checkpoint_dialogs = {}
     end
 
