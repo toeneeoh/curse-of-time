@@ -2,16 +2,19 @@
     struggle.lua
 
     Struggle is an endless pressure mode.
-    Its waves arrive in 25-40 unit trickles with only a five-second reset, use mixed
-    battlefield roles, and grow quadratically in durability while damage grows more slowly.
-    Encounter strength snapshots the entrants' level, permanent base attributes, and
-    equipped-item attributes.
-    Temporary pre-entry buffs are deliberately ignored so buffing before entry cannot raise
-    or lower the run's baseline.
-    Party size increases durability much more than damage. At the same level
-    breakpoints as the late overworld and Colosseum, enemies receive chaos
-    defense and attacks; chaos attack damage is divided by the map's native
-    multiplier before being written so the type transition is not a 350x jump.
+    Its waves arrive in 25-40 unit trickles with only a five-second reset and use
+    mixed battlefield roles. Wave number is the entire difficulty rating: entering
+    with stronger or weaker equipment cannot alter enemy stats, and a capable hero
+    is expected to approach a wave matching their level.
+
+    Health and damage grow linearly through the pre-Chaos game. Beginning at wave
+    200, the same linear baseline gains 2.25% health and 2% damage per additional
+    wave to follow late-game item growth. Enemies also adopt Chaos defense and
+    attacks at wave 200; written attack damage is divided by the matching damage-
+    system multiplier so the type change itself does not create a 350x spike.
+    Armor remains linear so physical and magical durability do not diverge without
+    bound. Party size increases health much more than damage, preserving the fixed
+    wave rating while accounting for additional targets and combined output.
 ]]
 
 OnInit.final("Struggle", function(Require)
@@ -22,7 +25,6 @@ OnInit.final("Struggle", function(Require)
     Require('TimerQueue')
     Require('SimpleButton')
     Require('DialogWindow')
-    Require('ItemHelpers')
     Require('ItemEventRegistry')
     Require('PlayerLifecycle')
     Require('Profile')
@@ -49,10 +51,12 @@ OnInit.final("Struggle", function(Require)
     local FURY_DAMAGE_PER_STACK = 0.15
     local FURY_MAX_STACKS = 20
     local FURY_RESET_TIME = 6.
-    local CHAOS_ARMOR_LEVEL = 200
-    local CHAOS_ATTACK_LEVEL = 250
-    local STAT_ARMOR_PER_ATTRIBUTE = 0.0003
-    local LATE_GAME_DAMAGE_PER_LEVEL = 0.04
+    local CHAOS_WAVE = 200
+    local BASE_HP_PER_WAVE = 80.
+    local BASE_DAMAGE_PER_WAVE = 5.
+    local BASE_ARMOR_PER_WAVE = 0.75
+    local CHAOS_HP_GROWTH = 1.0225
+    local CHAOS_DAMAGE_GROWTH = 1.02
     local MAX_ENEMY_HP = 2000000000
     local MAX_ENEMY_DAMAGE = 2000000000
 
@@ -128,8 +132,6 @@ OnInit.final("Struggle", function(Require)
     local active_count = 0
     local wave = 0
     local completed_wave = 0
-    local average_level = 1.
-    local average_power = 1.
     local party_health_multiplier = 1.
     local party_damage_multiplier = 1.
     local entry_open = false
@@ -173,53 +175,27 @@ OnInit.final("Struggle", function(Require)
         return nil
     end
 
-    local function get_wave_multiplier()
-        local progress = wave - 1
-        return 1. + 0.075 * progress + 0.0015 * progress * progress
-    end
-
-    local function get_damage_multiplier()
-        local level_multiplier = 1. + math.max(0., average_level - CHAOS_ARMOR_LEVEL) * LATE_GAME_DAMAGE_PER_LEVEL
-        return math.sqrt(get_wave_multiplier()) * level_multiplier
-    end
-
-    local function get_persistent_power(pid)
-        local unit = Unit[Hero[pid]]
-        local strength = unit.str
-        local agility = unit.agi
-        local intelligence = unit.int
-        local items = Profile[pid].hero.items
-
-        for slot = 1, 6 do
-            local item = items[slot]
-            if item and item.equipped then
-                local modifier = ItemProfMod(item.id, pid)
-                local stats = item.cached_stats
-                strength = strength + math.floor(modifier * stats[ITEM_STRENGTH])
-                agility = agility + math.floor(modifier * stats[ITEM_AGILITY])
-                intelligence = intelligence + math.floor(modifier * stats[ITEM_INTELLIGENCE])
-            end
-        end
-
-        return math.max(strength, agility, intelligence)
-    end
-
     local function spawn_xy(rect)
         return GetRandomReal(GetRectMinX(rect), GetRectMaxX(rect)), GetRandomReal(GetRectMinY(rect), GetRectMaxY(rect))
     end
 
     local function configure_enemy(u, role, total_spawned)
         local count_multiplier = math.max(0.55, math.min(0.8, math.sqrt(12. / total_spawned)))
-        local base_hp = average_power + average_level * 80.
-        local base_damage = average_power + average_level * 5.
-        local hp = base_hp * get_wave_multiplier() * party_health_multiplier * role.hp * count_multiplier
-        local damage = base_damage * get_damage_multiplier() * party_damage_multiplier * role.damage * count_multiplier
-        local armor = (average_power * STAT_ARMOR_PER_ATTRIBUTE + average_level * 0.75 + 1.5 * (wave - 1)) * role.armor
+        local base_hp = wave * BASE_HP_PER_WAVE
+        local base_damage = wave * BASE_DAMAGE_PER_WAVE
+        local chaos_progress = math.max(0, wave - CHAOS_WAVE)
 
-        if average_level >= CHAOS_ARMOR_LEVEL then
-            BlzSetUnitIntegerField(u, UNIT_IF_DEFENSE_TYPE, ARMOR_CHAOS)
+        if chaos_progress > 0 then
+            base_hp = base_hp * CHAOS_HP_GROWTH ^ chaos_progress
+            base_damage = base_damage * CHAOS_DAMAGE_GROWTH ^ chaos_progress
         end
-        if average_level >= CHAOS_ATTACK_LEVEL then
+
+        local hp = base_hp * party_health_multiplier * role.hp * count_multiplier
+        local damage = base_damage * party_damage_multiplier * role.damage * count_multiplier
+        local armor = wave * BASE_ARMOR_PER_WAVE * role.armor
+
+        if wave >= CHAOS_WAVE then
+            BlzSetUnitIntegerField(u, UNIT_IF_DEFENSE_TYPE, ARMOR_CHAOS)
             BlzSetUnitWeaponIntegerField(u, UNIT_WEAPON_IF_ATTACK_ATTACK_TYPE, 0, ATTACK_CHAOS)
             damage = damage / CHAOS_ATTACK_DAMAGE_MULTIPLIER
         end
@@ -357,7 +333,7 @@ OnInit.final("Struggle", function(Require)
     end
 
     local function spawn_enemy(role)
-        local skins = average_level >= CHAOS_ARMOR_LEVEL and chaos_skins or prechaos_skins
+        local skins = wave >= CHAOS_WAVE and chaos_skins or prechaos_skins
         local pool = skins[role.skin_type or role.type]
         local rect = spawn_rects[math.random(1, #spawn_rects)]
         local x, y = spawn_xy(rect)
@@ -627,16 +603,6 @@ OnInit.final("Struggle", function(Require)
             return
         end
 
-        local total_level = 0.
-        local total_power = 0.
-        for _, pid in ipairs(players) do
-            local hero = Hero[pid]
-            total_level = total_level + GetUnitLevel(hero)
-            total_power = total_power + get_persistent_power(pid)
-        end
-
-        average_level = total_level / #players
-        average_power = total_power / #players
         party_health_multiplier = 1. + 0.6 * (#players - 1)
         party_damage_multiplier = 1. + 0.08 * (#players - 1)
         entry_open = false
@@ -686,8 +652,6 @@ OnInit.final("Struggle", function(Require)
         players = {}
         wave = 0
         completed_wave = 0
-        average_level = 1.
-        average_power = 1.
         party_health_multiplier = 1.
         party_damage_multiplier = 1.
         fury_targets = setmetatable({}, { __mode = 'k' })
