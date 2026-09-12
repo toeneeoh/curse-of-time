@@ -42,7 +42,8 @@ OnInit.final("Struggle", function(Require)
     local MIN_WAVE_UNITS = 25
     local MAX_WAVE_UNITS = 40
     local MELEE_ENEMY_TEMPLATE = FourCC('n002')
-    local RANGED_ENEMY_TEMPLATE = FourCC('h04H')
+    local RANGED_ENEMY_TEMPLATE = FourCC('n008')
+    local FURY_SWIPES_ABILITY = FourCC('A036')
     local RANGED_ATTACK_RANGE = 1000.
     local RANGED_ACQUISITION_RANGE = 1100.
     local FURY_DAMAGE_PER_STACK = 0.12
@@ -301,6 +302,7 @@ OnInit.final("Struggle", function(Require)
         BlzSetUnitName(u, GetObjectName(skin))
         BlzSetHeroProperName(u, GetObjectName(skin))
         if role.type == "ranged" then
+            UnitAddAbility(u, FURY_SWIPES_ABILITY)
             BlzSetUnitWeaponRealField(u, UNIT_WEAPON_RF_ATTACK_RANGE, 0, RANGED_ATTACK_RANGE)
             BlzSetUnitRealField(u, UNIT_RF_ACQUISITION_RANGE, RANGED_ACQUISITION_RANGE)
             EVENT_ON_HIT_MULTIPLIER:register_unit_action(u, on_struggle_fury_hit)
