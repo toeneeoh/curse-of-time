@@ -144,7 +144,7 @@ OnInit.final("StatView", function(Require)
         for line = 1, MAX_ROWS do
             local y = -0.04 + (-line + 1) * 0.01
             if page == HONOR_TAB and line >= 4 then
-                y = -0.085 - (line - 4) * 0.032
+                y = -0.08 - (line - 4) * 0.032
             end
             local slot = make_slot(frame, breakdown_frames[page], y)
             tab_ui[page].rows[line] = slot

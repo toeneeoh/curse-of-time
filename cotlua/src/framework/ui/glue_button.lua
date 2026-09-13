@@ -344,7 +344,6 @@ OnInit.final("Gluebutton", function(Require)
     ---@field cooldown function
     ---@field use_cooldowns function
     ---@field use_click_placeholder function
-    ---@field stop function
     Button = {}
     do
         local thistype = Button
@@ -594,21 +593,13 @@ OnInit.final("Gluebutton", function(Require)
         ---@param animation integer
         function thistype:play(model, scale, animation)
             if model ~= "" and model ~= nil then
-                -- Rebinding a visible SPRITE after one of its parents was hidden
-                -- can restore the model on its terminal (often black) frame.
-                BlzFrameSetVisible(self.spriteFrame, false)
                 BlzFrameClearAllPoints(self.spriteFrame)
                 BlzFrameSetPoint(self.spriteFrame, FRAMEPOINT_CENTER, self.frame, FRAMEPOINT_CENTER, 0, 0)
                 BlzFrameSetSize(self.spriteFrame, self.widthSize, self.heightSize)
                 BlzFrameSetModel(self.spriteFrame, model, 0)
                 BlzFrameSetScale(self.spriteFrame, scale)
                 BlzFrameSetSpriteAnimate(self.spriteFrame, animation, 0)
-                BlzFrameSetVisible(self.spriteFrame, true)
             end
-        end
-
-        function thistype:stop()
-            BlzFrameSetVisible(self.spriteFrame, false)
         end
 
         function thistype:charge(n)
@@ -622,7 +613,6 @@ OnInit.final("Gluebutton", function(Require)
         ---@type fun(self: Button, model: string, width: number, height: number, scale: number, point: framepointtype, relativePoint: framepointtype, offsetX: number, offsetY: number)
         function thistype:display(model, width, height, scale, point, relativePoint, offsetX, offsetY)
             if model ~= "" and model ~= nil then
-                BlzFrameSetVisible(self.displayFrame, false)
                 BlzFrameClearAllPoints(self.displayFrame)
                 BlzFrameSetPoint(self.displayFrame, point, self.frame, relativePoint, offsetX, offsetY)
                 BlzFrameSetSize(self.displayFrame, width, height)
@@ -657,8 +647,6 @@ OnInit.final("Gluebutton", function(Require)
             self.frame = BlzCreateFrame("IconButtonTemplate", self.iconFrame, 0, 0)
             self.displayFrame = BlzCreateFrameByType("SPRITE", "", self.frame, "WarCraftIIILogo", 0)
             self.spriteFrame = BlzCreateFrameByType("SPRITE", "", self.frame, "", 0)
-            BlzFrameSetVisible(self.displayFrame, false)
-            BlzFrameSetVisible(self.spriteFrame, false)
 
             self.tooltip = Tooltip.create(self.iconFrame, TOOLTIP_SIZE, FRAMEPOINT_TOPLEFT, simpleTooltip)
             thistype.table[(self.frame)] = self

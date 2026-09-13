@@ -1138,39 +1138,10 @@ OnInit.final("Shop", function(Require)
                 self.isVisible = visibility
 
                 if visibility then
-                    local pid = GetPlayerId(GetLocalPlayer()) + 1
-                    BlzFrameSetVisible(self.base, true)
-                    thistype.refresh(pid)
-
-                    -- Rebind the persistent selection after the parent becomes
-                    -- visible so Warcraft does not restore a stale sprite frame.
-                    if self.lastClicked[pid] then
-                        self.lastClicked[pid]:display(nil, 0, 0, 0, nil, nil, 0, 0)
-                        self.lastClicked[pid]:display(ITEM_HIGHLIGHT, HIGHLIGHT_WIDTH,
-                            HIGHLIGHT_HEIGHT, HIGHLIGHT_SCALE, FRAMEPOINT_BOTTOMLEFT,
-                            FRAMEPOINT_BOTTOMLEFT, HIGHLIGHT_XOFFSET, HIGHLIGHT_YOFFSET)
-                    end
-                else
-                    -- Purchase animations are one-shot sprites. Leaving their
-                    -- terminal frame alive beneath a hidden shop can make them
-                    -- render black the next time the parent frame is shown.
-                    local slot = self.first ---@type ShopSlot
-                    while slot do
-                        slot.button:stop()
-                        slot = slot.next
-                    end
-
-                    local pid = GetPlayerId(GetLocalPlayer()) + 1
-                    self.details.main[pid].button:stop()
-                    for i = 0, INVENTORY_COUNT - 1 do
-                        self.details.components[pid][i].button:stop()
-                    end
-                    for i = 0, DETAIL_USED_COUNT - 1 do
-                        self.details.button[pid][i]:stop()
-                    end
-
-                    BlzFrameSetVisible(self.base, false)
+                    thistype.refresh(GetPlayerId(GetLocalPlayer()) + 1)
                 end
+
+                BlzFrameSetVisible(self.base, visibility)
             end
 
             return self.isVisible

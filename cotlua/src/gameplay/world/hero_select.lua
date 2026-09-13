@@ -38,6 +38,16 @@ OnInit.final("HeroSelect", function(Require)
         BlzFrameSetAbsPoint(sprite_frame, FRAMEPOINT_CENTER, 0.61, 0.285)
         BlzFrameSetSize(sprite_frame, 0.001, 0.001)
         BlzFrameSetScale(sprite_frame, 0.0008)
+        BlzFrameSetVisible(sprite_frame, false)
+
+        local function show_hero_sprite(model)
+            -- A SPRITE can retain a black render state when its hidden parent is
+            -- reopened. Rebind the model while hidden before showing it again.
+            BlzFrameSetVisible(sprite_frame, false)
+            BlzFrameSetModel(sprite_frame, model, 1)
+            BlzFrameSetSpriteAnimate(sprite_frame, 2, 0)
+            BlzFrameSetVisible(sprite_frame, true)
+        end
 
         local select_button = SimpleButton.create(frame, "trans32.blp", 0.1, 0.033, FRAMEPOINT_BOTTOMRIGHT, FRAMEPOINT_BOTTOMRIGHT, -0.09, 0.03)
         select_button:text("Select")
@@ -192,8 +202,7 @@ OnInit.final("HeroSelect", function(Require)
                         info:setTooltipName(GetAbilityName(hero.passive))
                         info:setTooltipText(BlzGetAbilityExtendedTooltip(hero.passive, 0))
                         BlzFrameSetText(name_label, hero.name)
-                        BlzFrameSetModel(sprite_frame, hero.model, 1)
-                        BlzFrameSetSpriteAnimate(sprite_frame, 2, 0)
+                        show_hero_sprite(hero.model)
 
                         -- populate stars
                         for j = 1, 5 do
@@ -253,6 +262,7 @@ OnInit.final("HeroSelect", function(Require)
             ClearSelection()
             SelectUnit(Hero[pid], true)
             ResetToGameCamera(0)
+            BlzFrameSetVisible(sprite_frame, false)
             BlzFrameSetVisible(frame, false)
         end
 
@@ -261,6 +271,9 @@ OnInit.final("HeroSelect", function(Require)
 
     function StartHeroSelect(pid)
         if GetLocalPlayer() == Player(pid - 1) then
+            -- Do not revive the previous model's terminal render state. The
+            -- sprite is shown after this visit's first hero selection.
+            BlzFrameSetVisible(sprite_frame, false)
             BlzFrameSetVisible(frame, true)
             ClearTextMessages()
         end
