@@ -44,6 +44,7 @@ OnInit.final("BuffsCommon", function(Require)
 
         function thistype:onApply()
             self.sfx = Unit[self.target]:addEffect("Abilities\\Spells\\Other\\Silence\\SilenceTarget.mdl", "overhead")
+            SoundHandler("Abilities\\Spells\\Other\\Silence1.flac", true, Player(self.tpid), self.target)
             ToggleCommandCard(self.target, false)
         end
     end

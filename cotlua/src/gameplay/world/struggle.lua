@@ -15,6 +15,11 @@
     Armor remains linear so physical and magical durability do not diverge without
     bound. Party size increases health much more than damage, preserving the fixed
     wave rating while accounting for additional targets and combined output.
+
+    A new character always starts at wave 1. Later runs begin at the first wave of
+    the 25-wave window containing the lowest entrant's secured best wave. This
+    preserves a meaningful retry window without deriving difficulty from current
+    level, equipment, or temporary buffs.
 ]]
 
 OnInit.final("Struggle", function(Require)
@@ -119,13 +124,13 @@ OnInit.final("Struggle", function(Require)
     local special_roles = {
         { type = "harpooner", skin_type = "ranged", ranged = true, special = "hook",
             hp = 0.75, damage = 1.1, armor = 0.7, speed = 0.08,
-            color = { 110, 175, 255 }, scale = 1.2 },
+            color = { 100, 100, 255 }, scale = 1.2 },
         { type = "burster", skin_type = "disruptor", special = "rupture",
             hp = 0.6, damage = 1., armor = 0.55, speed = 0.35,
-            color = { 255, 210, 70 }, scale = 1.2 },
+            color = { 255, 100, 50 }, scale = 1.2 },
         { type = "blightcaster", skin_type = "disruptor", ranged = true, special = "miasma",
             hp = 0.7, damage = 0.9, armor = 0.65, speed = 0.05,
-            color = { 110, 175, 255 }, scale = 1.2 },
+            color = { 100, 100, 255 }, scale = 1.2 },
     }
 
     local players = {} ---@type integer[]
@@ -176,13 +181,16 @@ OnInit.final("Struggle", function(Require)
         return nil
     end
 
-    ---Returns the first wave of the level bracket immediately below the
-    ---lowest entrant. A party must clear a full 25-wave window to prove it can
-    ---reach a difficulty matching that entrant's level.
-    ---@param level integer
+    ---Returns the first wave of the saved-best bracket. An entrant without a
+    ---previous secured checkpoint starts at wave 1.
+    ---@param best_wave integer
     ---@return integer
-    local function recommended_start_wave(level)
-        return math.max(1, ((math.max(1, level) - 1) // STARTING_WAVE_WINDOW) * STARTING_WAVE_WINDOW + 1)
+    local function recommended_start_wave(best_wave)
+        if best_wave <= 0 then
+            return 1
+        end
+        return math.max(1,
+            ((best_wave - 1) // STARTING_WAVE_WINDOW) * STARTING_WAVE_WINDOW + 1)
     end
 
     local function spawn_xy(rect)
@@ -350,7 +358,11 @@ OnInit.final("Struggle", function(Require)
         local skin = pool[math.random(1, #pool)]
         local is_ranged = role.ranged or role.type == "ranged"
         local template = is_ranged and RANGED_ENEMY_TEMPLATE or MELEE_ENEMY_TEMPLATE
-        local u = BlzCreateUnitWithSkin(PLAYER_BOSS, template, x, y, GetRandomReal(0., 360.), skin)
+        -- important to spawn the unit at center to establish return point
+        local u = BlzCreateUnitWithSkin(PLAYER_BOSS, template, center_x, center_y, GetRandomReal(0., 360.), skin)
+
+        SetUnitX(u, x)
+        SetUnitY(u, y)
 
         BlzSetUnitSkin(u, skin)
         BlzSetUnitName(u, GetObjectName(skin))
@@ -613,12 +625,12 @@ OnInit.final("Struggle", function(Require)
             return
         end
 
-        local lowest_level = MAX_LEVEL
+        local lowest_best_wave = MAX_SAVED_WAVE
         for _, pid in ipairs(players) do
-            lowest_level = math.min(lowest_level, GetUnitLevel(Hero[pid]))
+            lowest_best_wave = math.min(lowest_best_wave, Struggle.getBestWave(pid))
         end
 
-        local first_wave = recommended_start_wave(lowest_level)
+        local first_wave = recommended_start_wave(lowest_best_wave)
         wave = first_wave - 1
         completed_wave = wave
         party_health_multiplier = 1. + 0.6 * (#players - 1)
@@ -626,7 +638,7 @@ OnInit.final("Struggle", function(Require)
         entry_open = false
         active = true
         DisplayTextToTable(players, "|cffffcc00The Infinite Struggle begins at wave " .. first_wave
-            .. ".|r Difficulty is based on the lowest entrant. Rewards may be claimed every five waves; emergency fleeing forfeits the run.")
+            .. ".|r The starting point is based on the lowest entrant's previous best. Rewards may be claimed every five waves; emergency fleeing forfeits the run.")
         SoundHandler("Sound\\Interface\\BattleNetDoorsStereo2.flac", false)
         schedule_wave(FIRST_WAVE_DELAY)
     end
@@ -747,10 +759,10 @@ OnInit.final("Struggle", function(Require)
         return completed_wave
     end
 
-    ---@param level integer
+    ---@param best_wave integer
     ---@return integer
-    function Struggle.getRecommendedStartWave(level)
-        return recommended_start_wave(level)
+    function Struggle.getRecommendedStartWave(best_wave)
+        return recommended_start_wave(best_wave)
     end
 
     function Struggle.getBestWave(pid)

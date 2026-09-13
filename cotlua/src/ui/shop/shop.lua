@@ -102,7 +102,7 @@ OnInit.final("Shop", function(Require)
     local SCROLL_DELAY                   = 0.01 ---@type number 
 
     -- Buy / Sell sound, model and scale
-    local SPRITE_MODEL                   = "UI\\Feedback\\GoldCredit\\GoldCredit.mdl" ---@type string 
+    local SPRITE_MODEL                   = "goldcredit.mdx" ---@type string 
     local SPRITE_SCALE                   = 0.0005 ---@type number 
     local SUCCESS_SOUND                  = "Abilities\\Spells\\Other\\Transmute\\AlchemistTransmuteDeath1.wav" ---@type string 
     local ERROR_SOUND                    = "Sound\\Interface\\Error.wav" ---@type string 

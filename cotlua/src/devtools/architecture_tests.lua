@@ -368,8 +368,9 @@ OnInit.final("ArchitectureTests", function(Require)
         return true
     end)
 
-    ArchitectureTests.register("Struggle uses fixed level brackets and a 100-rank reward curve", function()
-        if Struggle.getRecommendedStartWave(1) ~= 1
+    ArchitectureTests.register("Struggle uses saved-best brackets and a 100-rank reward curve", function()
+        if Struggle.getRecommendedStartWave(0) ~= 1
+            or Struggle.getRecommendedStartWave(1) ~= 1
             or Struggle.getRecommendedStartWave(25) ~= 1
             or Struggle.getRecommendedStartWave(26) ~= 26
             or Struggle.getRecommendedStartWave(200) ~= 176

@@ -119,6 +119,8 @@ OnInit.final("ColosseumShop", function(Require)
         local attribute = rank > 0 and StruggleRewards.getAttributeBonus(rank) or 0
         local percentage = rank > 0 and StruggleRewards.getPercentageBonus(rank) or 0
         return "Redeem the highest secured Struggle checkpoint as a " .. form .. "."
+            .. " If you already own one, it is upgraded in place, including while socketed."
+            .. " Only one Ring of Struggle may be equipped or one Struggle Gem socketed at a time."
             .. "\n\nReward Rank: |cffffcc00" .. rank .. "|r/|cffffcc00100|r"
             .. "\nAll Attributes: |cffffcc00+" .. attribute .. "|r"
             .. "\nSpellboost: |cffffcc00+" .. percentage .. "%|r"
@@ -132,7 +134,7 @@ OnInit.final("ColosseumShop", function(Require)
         end,
         icon = "ReplaceableTextures\\CommandButtons\\BTNRingGreen.blp",
         tooltip = function(pid)
-            return struggle_tooltip(pid, "pre-Chaos ring")
+            return struggle_tooltip(pid, "ring")
                 .. "\n\nAt level |cffffcc00200|r, it can be crystallized into an equivalent socketable gem."
         end,
         categories = struggle,

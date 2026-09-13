@@ -44,7 +44,7 @@ OnInit.final("StruggleRewards", function(Require)
             custom_level = true,
             flavor = base_name == "Struggle Gem"
                 and "|cff808080A crystallized record of the deepest Struggle overcome by this hero.|r"
-                or "|cff808080A pre-Chaos record of the deepest Struggle overcome by this hero.|r",
+                or "|cff808080A record of the deepest Struggle overcome by this hero.|r",
             prepare = function(_, data)
                 data[ITEM_TIER] = 3
                 data[ITEM_TYPE] = item_type
@@ -59,7 +59,10 @@ OnInit.final("StruggleRewards", function(Require)
                     return attribute_bonus(rank)
                 elseif stat == ITEM_SPELLBOOST or stat == ITEM_GOLD_GAIN then
                     return percentage_bonus(rank)
-                elseif stat <= ITEM_ABILITY2 then
+                elseif stat <= TOTAL_STATS then
+                    -- Custom ranks extend far beyond the ordinary 20-level item
+                    -- multiplier table, so every other cached field must be
+                    -- resolved here instead of falling through to normal scaling.
                     return 0
                 end
                 return nil
@@ -130,10 +133,7 @@ OnInit.final("StruggleRewards", function(Require)
         end
 
         local rank = rank_from_wave(wave)
-        local existing, parent = find_reward(pid)
-        if parent then
-            return false, "EXTRACT GEM"
-        end
+        local existing = find_reward(pid)
         if existing and existing.level >= rank
             and existing.id == (gem and GEM_ID or RING_ID) then
             return false, "NO UPGRADE"

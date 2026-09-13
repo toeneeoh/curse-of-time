@@ -9408,21 +9408,21 @@ function BlzUnitClearOrders(whichUnit, onlyQueued) end	-- (native)
 function BlzUnitForceStopOrder(whichUnit, clearQueue) end	-- (native)
 
 -- ============================================================================
---  Forsaken Kingdom 3.0
---  These declarations are language-server metadata only. The functions are
---  supplied by the current Warcraft runtime and are not compiled into the map.
+--  Current Warcraft additions
+--  These declarations mirror the bundled common.j for language-server use.
+--  They are metadata only and are not compiled into the map.
 
----@param whichKey oskeytype
+---@param key oskeytype
 ---@return boolean
-function BlzIsKeyPressed(whichKey) end	-- (native)
+function BlzIsKeyPressed(key) end	-- (native)
 
----@param metaKey integer
+---@param metakey integer
 ---@return boolean
-function BlzIsMetaKeyPressed(metaKey) end	-- (native)
+function BlzIsMetaKeyPressed(metakey) end	-- (native)
 
----@param whichButton mousebuttontype
+---@param mouseButtonType mousebuttontype
 ---@return boolean
-function BlzIsMouseButtonPressed(whichButton) end	-- (native)
+function BlzIsMouseButtonPressed(mouseButtonType) end	-- (native)
 
 ---@return integer
 function BlzGetMouseScreenPosX() end	-- (native)
@@ -9447,7 +9447,8 @@ function BlzFrameToPixelX(frameX) end	-- (native)
 function BlzFrameToPixelY(frameY) end	-- (native)
 
 ---@param whichUnit unit
-function BlzResetUnitAttack(whichUnit) end	-- (native)
+---@param weaponIndex integer
+function BlzResetUnitAttack(whichUnit, weaponIndex) end	-- (native)
 
 ---@param whichField camerafield
 ---@param controlled boolean

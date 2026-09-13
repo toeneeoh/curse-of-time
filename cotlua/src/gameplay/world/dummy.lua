@@ -73,7 +73,7 @@ OnInit.final("Dummy", function(Require)
         local function instant_attack(source, target)
             UnitAddAbility(source, IATK)
             BlzSetUnitWeaponBooleanField(source, UNIT_WEAPON_BF_ATTACKS_ENABLED, 0, true)
-            BlzResetUnitAttack(source)
+            BlzResetUnitAttack(source, 0)
             IssueTargetOrderById(source, 852173, target)
         end
 

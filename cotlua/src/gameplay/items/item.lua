@@ -646,12 +646,24 @@ OnInit.final("Items", function(Require)
         function thistype:lvl(lvl)
             local definition = ItemRuntime.definitions[self.id]
             if ItemData[self.id][ITEM_UPGRADE_MAX] > 0 or (definition and definition.custom_level) then
-                if self.equipped then
+                local parent = self.socketed and self.parent or nil
+                local parent_equipped = parent and parent.equipped
+
+                if parent_equipped then
+                    apply_item_stats(parent, -1)
+                elseif self.equipped then
                     apply_item_stats(self, -1)
                 end
                 self.level = lvl
                 self:update()
-                if self.equipped then
+
+                if parent then
+                    parent:update()
+                end
+
+                if parent_equipped then
+                    apply_item_stats(parent, 1)
+                elseif self.equipped then
                     apply_item_stats(self, 1)
                 end
 
@@ -792,7 +804,14 @@ OnInit.final("Items", function(Require)
         ---@param ignore Item?
         ---@return boolean, string?
         local function is_item_limited(itm, ignore)
-            if itm.limit == 0 then
+            local candidates = { itm }
+            local has_limit = itm.limit > 0
+            for _, socket in ipairs(itm.sockets or {}) do
+                candidates[#candidates + 1] = socket
+                has_limit = has_limit or socket.limit > 0
+            end
+
+            if not has_limit then
                 return false
             end
 
@@ -802,14 +821,16 @@ OnInit.final("Items", function(Require)
                 local itm2 = items[i]
 
                 if itm2 and itm2 ~= ignore and itm ~= itm2 then
-                    if has_conflict(itm, itm2) then
-                        return true, LIMIT_STRING[itm.limit]
-                    end
+                    for _, candidate in ipairs(candidates) do
+                        if candidate.limit > 0 then
+                            if has_conflict(candidate, itm2) then
+                                return true, LIMIT_STRING[candidate.limit]
+                            end
 
-                    if itm2.sockets then
-                        for _, socket in ipairs(itm2.sockets) do
-                            if has_conflict(itm, socket) then
-                                return true, LIMIT_STRING[itm.limit]
+                            for _, socket in ipairs(itm2.sockets or {}) do
+                                if has_conflict(candidate, socket) then
+                                    return true, LIMIT_STRING[candidate.limit]
+                                end
                             end
                         end
                     end
@@ -832,7 +853,7 @@ OnInit.final("Items", function(Require)
                 or not itm.holder
                 or not itm.index
                 or #self.sockets >= MAX_SOCKETS
-                or is_item_limited(self)
+                or is_item_limited(itm)
             then
                 return false
             end

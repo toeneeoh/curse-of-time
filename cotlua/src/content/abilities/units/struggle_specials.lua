@@ -127,9 +127,10 @@ OnInit.final("StruggleSpecials", function(Require)
             if IsUnitType(target, UNIT_TYPE_HERO) then
                 DamageTarget(source, target, BlzGetUnitBaseDamage(source, 0) * 10.,
                     ATTACK_TYPE_NORMAL, MAGIC, "Volatile Rupture")
-                Silence:add(source, target):duration(2.)
+                Silence:add(source, target):duration(3.)
             end
         end
+        SetUnitExploded(source, true)
         DestroyGroup(group)
         KillUnit(source)
     end
@@ -143,7 +144,7 @@ OnInit.final("StruggleSpecials", function(Require)
             if distance_between(state.source, target) <= RUPTURE_RANGE
                 and CastSpell(state.source, VOLATILE_RUPTURE, 0.8, -1, 1.) then
                 FloatingTextUnit("Volatile Rupture", state.source, 2., 70., 0., 11., 255, 90, 30, 0, true)
-                schedule(state, 0.8, detonate)
+                schedule(state, 1.5, detonate)
                 retry = ability_cooldown(state.source, definitions.rupture)
             else
                 IssueTargetOrder(state.source, "attack", target)
@@ -204,10 +205,10 @@ OnInit.final("StruggleSpecials", function(Require)
             and CastSpell(state.source, CORROSIVE_MIASMA, 0.75, -1, 1.) then
             local x, y = GetUnitX(target), GetUnitY(target)
             local indicator = AddSpecialEffect("Indicators\\circle.mdl", x, y)
-            --BlzSetSpecialEffectScale(indicator, MIASMA_RADIUS / 325.)
+            BlzSetSpecialEffectScale(indicator, MIASMA_RADIUS / 500.)
             state.effects[indicator] = true
             FloatingTextUnit("Corrosive Miasma", state.source, 2., 70., 0., 11., 80, 255, 80, 0, true)
-            schedule(state, 0.75, create_miasma, indicator, x, y)
+            schedule(state, 1.5, create_miasma, indicator, x, y)
             retry = ability_cooldown(state.source, definitions.miasma)
         elseif target then
             IssueTargetOrder(state.source, "attack", target)
@@ -239,7 +240,7 @@ OnInit.final("StruggleSpecials", function(Require)
             active = true,
         }
         states[source] = state
-        schedule(state, GetRandomReal(2.5, 5.), start[kind])
+        schedule(state, GetRandomReal(3, 6.), start[kind])
         return true
     end
 
