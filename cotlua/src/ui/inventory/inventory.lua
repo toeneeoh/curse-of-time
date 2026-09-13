@@ -21,7 +21,6 @@ OnInit.final("Inventory", function(Require)
     local INVENTORY_MIN_X   = 0.612
     local INVENTORY_MIN_Y   = 0.214
     local INVENTORY_SLOT_SIZE = 0.0266
-    local ITEM_HIT_PADDING  = 0.002
     local TRACKER_FOLLOW    = 0.82
     local DROP_ITEM_COMMAND = "robogoblin"
 
@@ -116,9 +115,8 @@ OnInit.final("Inventory", function(Require)
         local right_click_origin = __jarray(0)
 
         -- determines what item slot a user has their cursor over
-        ---@param padding number?
         ---@return integer
-        local get_hovered_slot = function(padding)
+        local get_hovered_slot = function()
             local x, y = get_mouse_frame_position()
 
             if not x or not y then
@@ -134,7 +132,7 @@ OnInit.final("Inventory", function(Require)
 
             local mouse_x = x - INVENTORY_MIN_X
             local mouse_y = y - INVENTORY_MIN_Y
-            local half_slot = INVENTORY_SLOT_SIZE * 0.5 + (padding or 0.)
+            local half_slot = INVENTORY_SLOT_SIZE * 0.5
 
             -- Test the actual square occupied by each slot. The previous nearest-
             -- center radius also accepted gaps and points outside the icon bounds.
@@ -153,20 +151,18 @@ OnInit.final("Inventory", function(Require)
         -- Screen coordinates are local-only. The resulting slot is synchronized
         -- separately before it can cause an inventory mutation.
         ---@param pid integer
-        ---@param padding number?
         ---@return integer
-        local function get_local_hovered_slot(pid, padding)
+        local function get_local_hovered_slot(pid)
             if GetLocalPlayer() == Player(pid - 1) then
-                return get_hovered_slot(padding)
+                return get_hovered_slot()
             end
             return 0
         end
 
         ---@param pid integer
-        ---@param padding number?
         ---@return integer
-        local function get_local_item_slot(pid, padding)
-            local slot = get_local_hovered_slot(pid, padding)
+        local function get_local_item_slot(pid)
+            local slot = get_local_hovered_slot(pid)
             local profile = Profile[viewing[pid]]
 
             if slot > 0 and profile and profile.hero and profile.hero.items[slot] then
@@ -556,7 +552,7 @@ OnInit.final("Inventory", function(Require)
         end
 
         local pick_item = function(pid)
-            local highlighted = get_local_item_slot(pid, ITEM_HIT_PADDING)
+            local highlighted = get_local_item_slot(pid)
 
             if highlighted > 0 then
                 local new_slot = slots[highlighted]
@@ -699,10 +695,6 @@ OnInit.final("Inventory", function(Require)
             context[pid] = slot
             synced_context[pid] = true
 
-            if target_thread[pid] and synced_target[pid] then
-                coroutine.resume(target_thread[pid], target[pid])
-            end
-
             return false
         end
 
@@ -733,7 +725,7 @@ OnInit.final("Inventory", function(Require)
             synced_target[pid] = true
 
             -- resume any threads yielding for target
-            if target_thread[pid] and synced_context[pid] then
+            if target_thread[pid] then
                 coroutine.resume(target_thread[pid], slot)
             end
 
@@ -800,7 +792,7 @@ OnInit.final("Inventory", function(Require)
             local pid = GetPlayerId(GetTriggerPlayer()) + 1
 
             if not disabled_for_player[pid] then
-                right_click_origin[pid] = get_local_item_slot(pid, ITEM_HIT_PADDING)
+                right_click_origin[pid] = get_local_item_slot(pid)
             end
         end
 
