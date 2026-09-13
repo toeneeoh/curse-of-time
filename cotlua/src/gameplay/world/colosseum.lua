@@ -818,10 +818,9 @@ OnInit.final("Colosseum", function(Require)
                             queue(PULL_INTERVAL, pull, remaining - PULL_INTERVAL)
                         else
                             stop_gravity_well()
-                            -- WindShell by OVOgenez and Rebirth by BaiyuGalan.
                             local impact = AddSpecialEffect("war3mapImported\\Rebirth.mdx", x, y)
                             BlzSetSpecialEffectScale(impact, 1.5)
-                            BlzSetSpecialEffectColor(impact, 144, 64, 255)
+                            --BlzSetSpecialEffectColor(impact, 144, 64, 255)
                             BlzPlaySpecialEffect(impact, ANIM_TYPE_BIRTH)
                             TimerQueue:callDelayed(2., DestroyEffect, impact)
                             damage_area(x, y, DANGER_RADIUS, 0.4, "Gravity Well")
@@ -842,12 +841,13 @@ OnInit.final("Colosseum", function(Require)
                             y
                         )
                         well_effects[#well_effects + 1] = corrupted_well
+                        BlzPlaySpecialEffect(corrupted_well, ANIM_TYPE_STAND)
+                        BlzSetSpecialEffectYaw(corrupted_well, 225.)
+                        BlzSetSpecialEffectColorByPlayer(corrupted_well, PLAYER_CREEP)
 
-                        -- WindShell by OVOgenez. Its footprint matches the
-                        -- gravity warning and remains centered on the well.
                         local wind_shell = AddSpecialEffect("war3mapImported\\WindShell.mdx", x, y)
-                        BlzSetSpecialEffectScale(wind_shell, PULL_RADIUS / 500.)
-                        BlzSetSpecialEffectColor(wind_shell, 128, 64, 255)
+                        BlzSetSpecialEffectScale(wind_shell, PULL_RADIUS / 120.)
+                        --BlzSetSpecialEffectColor(wind_shell, 128, 64, 255)
                         well_effects[#well_effects + 1] = wind_shell
                         pull(expected, PULL_DURATION)
                     end
@@ -916,23 +916,29 @@ OnInit.final("Colosseum", function(Require)
 
                     -- The model's origin is centered and its long axis is local Y,
                     -- so move it outward and rotate that axis onto the beam.
-                    -- Two arrows show the counter-clockwise sweep direction.
+                    -- Three arrows show the counter-clockwise sweep direction.
                     add_warning(
                         "Indicators\\line closed.mdx",
-                        SWEEP_RANGE * 0.6,
+                        SWEEP_RANGE * 0.5,
                         1.2,
                         start_angle
                     )
                     add_warning(
                         "Indicators\\moving arrows.mdl",
-                        100.,
-                        0.45,
+                        200.,
+                        0.5,
                         start_angle + bj_PI * 0.5
                     )
                     add_warning(
                         "Indicators\\moving arrows.mdl",
-                        SWEEP_RANGE - 100.,
-                        0.45,
+                        SWEEP_RANGE - 200.,
+                        0.5,
+                        start_angle + bj_PI * 0.5
+                    )
+                    add_warning(
+                        "Indicators\\moving arrows.mdl",
+                        SWEEP_RANGE * 0.5,
+                        0.5,
                         start_angle + bj_PI * 0.5
                     )
 
@@ -1663,7 +1669,7 @@ OnInit.final("Colosseum", function(Require)
                 -- place bullet indicators
                 local sfx, x, y
 
-                for i = 1, 3 do
+                for i = 1, 2 do
                     x = sx + ((300. + i * 475.) * math.cos(theta))
                     y = sy + ((300. + i * 475.) * math.sin(theta))
                     sfx = AddSpecialEffect(model, x, y)

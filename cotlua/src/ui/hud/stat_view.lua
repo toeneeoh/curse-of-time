@@ -327,7 +327,7 @@ OnInit.final("StatView", function(Require)
 
     local milestone_controls = BlzCreateFrameByType("FRAME", "", frame, "", 0)
     local milestone_page_text = BlzCreateFrameByType("TEXT", "", milestone_controls, "", 0)
-    BlzFrameSetPoint(milestone_controls, FRAMEPOINT_BOTTOM, frame, FRAMEPOINT_BOTTOM, 0., 0.012)
+    BlzFrameSetPoint(milestone_controls, FRAMEPOINT_BOTTOM, frame, FRAMEPOINT_BOTTOM, 0., 0.013)
     BlzFrameSetSize(milestone_controls, 0.11, 0.02)
     BlzFrameSetPoint(milestone_page_text, FRAMEPOINT_CENTER, milestone_controls, FRAMEPOINT_CENTER, 0., 0.)
     BlzFrameSetTextAlignment(milestone_page_text, TEXT_JUSTIFY_CENTER, TEXT_JUSTIFY_CENTER)
