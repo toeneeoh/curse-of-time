@@ -46,18 +46,21 @@ OnInit.final("Colosseum", function(Require)
     -- non-chaos physical damage cannot bypass late-game durability. At level 250,
     -- they adopt chaos attacks; their displayed damage is divided by the matching
     -- damage-system multiplier so this type transition does not itself alter DPS.
-    -- Enemy damage then ramps by 4% of the baseline per level beyond 200. This
-    -- reaches 9x at level 400 and 13x at level 500, matching the threat growth of
+    -- Enemy damage then ramps by 6% of the baseline per level beyond 200. This
+    -- reaches 13x at level 400 and 19x at level 500, matching the threat growth of
     -- late overworld enemies without exposing players to the raw 350x type jump.
     -- Each entrant contributes their highest total attribute to every stat-derived
     -- term, so Strength, Agility, and Intelligence heroes scale the encounter alike.
     -- At 0.0003 armor per point, 500,000 primary attribute adds 150 armor, keeping a level-400
     -- normal wave near the 300-450 armor range used by contemporary overworld mobs.
-    -- Coins are paid even on failure, so each is worth 25,000 + 8 * level^2 gold:
-    -- about 1.305 platinum at level 400 and 2.025 platinum at level 500. A typical
-    -- full level-500 run therefore remains below the guaranteed Naga dungeon gold
-    -- reward, while an early failure cannot generate hundreds of platinum. Honor
-    -- is deliberately separate, character-owned progression awarded only on clear.
+    -- Coins are paid even on failure. Their value uses each recipient's own level,
+    -- not the encounter average: 25,000 + 8 * level^2 gold. A character below the
+    -- encounter level receives an additional (own level / encounter level)^2
+    -- multiplier. This leaves equal-level parties unchanged while making it
+    -- inefficient for a late-game character to carry a new character for gold.
+    -- Colosseum combat grants no experience, so entering low cannot bypass that
+    -- scaling during the run. Honor is separate, character-owned progression and
+    -- is awarded only on a clear.
 
     local function colo_get_random_location(inward_offset)
         inward_offset = inward_offset or 0
@@ -138,6 +141,7 @@ OnInit.final("Colosseum", function(Require)
     local bonus_coins = __jarray(0) ---@type integer[]
     local bonus_drop_chance = __jarray(0) ---@type number[]
     local rewarded = {} ---@type boolean[]
+    local xp_was_suspended = {} ---@type boolean[]
     local advance_wave, end_colosseum, colo_cleanup, colo_on_death ---@type function
 
     -- constants
@@ -147,7 +151,7 @@ OnInit.final("Colosseum", function(Require)
     local BASE_ARMOR = 0.75
     local GOLD_DROP_CHANCE = 10
 
-    local BOSS_HP = 500
+    local BOSS_HP = 1000
     local BOSS_DAMAGE = 50
     local BOSS_ARMOR = 2
     local COIN_BASE_GOLD = 25000
@@ -155,7 +159,7 @@ OnInit.final("Colosseum", function(Require)
     local CHAOS_ARMOR_LEVEL = 200
     local CHAOS_ATTACK_LEVEL = 250
     local STAT_ARMOR_PER_ATTRIBUTE = 0.0003
-    local LATE_GAME_DAMAGE_PER_LEVEL = 0.04
+    local LATE_GAME_DAMAGE_PER_LEVEL = 0.06
 
     -- unit stats
     local stat_hp = 0
@@ -1194,10 +1198,15 @@ OnInit.final("Colosseum", function(Require)
 
         rewarded[pid] = true
         local coins = base_coins + bonus_coins[pid]
-        local level = math.max(1, math.min(MAX_LEVEL, math.floor(average_level)))
+        local level = math.max(1, math.min(MAX_LEVEL, GetUnitLevel(Hero[pid])))
+        local encounter_level = math.max(1., math.min(MAX_LEVEL, average_level))
+        local level_multiplier = 1.
+        if level < encounter_level then
+            level_multiplier = (level / encounter_level) ^ 2
+        end
         local gold_per_coin = COIN_BASE_GOLD + level * level * COIN_LEVEL_SCALING
         local gold_multiplier = 1. + 0.1 * Honor.getRank(pid, "colosseum_spoils")
-        local gold = math.floor(coins * gold_per_coin * gold_multiplier)
+        local gold = math.floor(coins * gold_per_coin * level_multiplier * gold_multiplier)
 
         if gold > 0 then
             AwardGold(pid, gold, true)
@@ -1231,6 +1240,11 @@ OnInit.final("Colosseum", function(Require)
     end
 
     colo_cleanup = function(pid)
+        if xp_was_suspended[pid] ~= nil then
+            SuspendHeroXP(Hero[pid], xp_was_suspended[pid])
+            xp_was_suspended[pid] = nil
+        end
+
         TableRemove(players, pid)
 
         -- no more players, final cleanup
@@ -1260,6 +1274,10 @@ OnInit.final("Colosseum", function(Require)
 
         -- Honor loadout bonuses intentionally apply after encounter scaling.
         Honor.activate(pid)
+
+        -- Colosseum rewards gold and Honor, never character experience.
+        xp_was_suspended[pid] = IsSuspendedXP(hero)
+        SuspendHeroXP(hero, true)
 
         -- disable inventory
         DisableItems(pid, true)
@@ -1303,6 +1321,11 @@ OnInit.final("Colosseum", function(Require)
             MoveHero(pid, TOWN_CENTER_X, TOWN_CENTER_Y)
             DisableItems(pid, false)
             colo_reward(pid, cleared == true)
+
+            if xp_was_suspended[pid] ~= nil then
+                SuspendHeroXP(Hero[pid], xp_was_suspended[pid])
+                xp_was_suspended[pid] = nil
+            end
 
             EVENT_ON_CLEANUP:unregister_action(pid, colo_on_cleanup)
             EVENT_GRAVE_DEATH:unregister_unit_action(Hero[pid], colo_on_death)

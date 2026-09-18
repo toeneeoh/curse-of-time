@@ -173,9 +173,6 @@ OnInit.final("Commands", function(Require)
                 end
             end
         end,
-        ["-quests"] = function(p, pid, args)
-            DisplayQuestProgress(pid)
-        end,
         ["-hints"] = function(p, pid, args)
             if TableHas(HINT_PLAYERS, pid) then
                 TableRemove(HINT_PLAYERS, pid)
@@ -203,8 +200,6 @@ OnInit.final("Commands", function(Require)
     CMD_LIST["-savetime"] = CMD_LIST["-st"]
 
     CMD_LIST["-rt"] = CMD_LIST["-restime"]
-
-    CMD_LIST["-q"] = CMD_LIST["-quests"]
 
     CMD_LIST["-nohints"] = CMD_LIST["-hints"]
 

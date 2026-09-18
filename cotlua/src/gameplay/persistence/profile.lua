@@ -9,6 +9,7 @@
         slot checksums
         hotkeys
         total time
+        perk allocations
 
     character breakdown:
         character format magic/version
@@ -31,6 +32,11 @@ OnInit.final("Profile", function(Require)
     Require('TimerQueue')
     Require('Hotkeys')
     Require('SaveSchema')
+    Require('Progression')
+    Require('CharacterBrowser')
+    Require('TextHelpers')
+    Require('ItemSchema')
+    Require('DevRuntimeLog')
 
     local cos, sin = math.cos, math.sin
     local SETUP_X = -690.
@@ -52,6 +58,10 @@ OnInit.final("Profile", function(Require)
     ---@field current_slot integer
     ---@field checksums integer[]
     ---@field total_time integer
+    ---@field perk_ranks integer[]
+    ---@field perk_node_words integer[]
+    ---@field perk_budget_seen integer
+    ---@field perk_reset_available integer
     ---@field skin function
     ---@field hero HeroData
     ---@field new function
@@ -79,9 +89,14 @@ OnInit.final("Profile", function(Require)
     ---@field new_character function
     ---@field delete_character function
     ---@field playing boolean
+    ---@field registerStorageChangedAction function
+    ---@field notifyStorageChanged function
+    ---@field registerNewCharacterAction function
     Profile = {} ---@type Profile | Profile[]
     do
         local thistype = Profile
+        local storage_changed_actions = {}
+        local new_character_actions = {}
 
         local getter = {
             hero = function(tbl)
@@ -118,6 +133,10 @@ OnInit.final("Profile", function(Require)
                 checksums = __jarray(0),
                 timers = {},
                 total_time = 0,
+                perk_ranks = __jarray(0),
+                perk_node_words = __jarray(0),
+                perk_budget_seen = 0,
+                perk_reset_available = 0,
                 character_code = {},
                 storage = {}, ---@type HeroData[]
                 current_slot = 1,
@@ -126,6 +145,23 @@ OnInit.final("Profile", function(Require)
             EVENT_ON_CLEANUP:register_action(pid, on_cleanup)
 
             return self
+        end
+
+        ---@param action fun(pid: integer)
+        function thistype.registerStorageChangedAction(action)
+            storage_changed_actions[#storage_changed_actions + 1] = action
+        end
+
+        ---@param pid integer
+        function thistype.notifyStorageChanged(pid)
+            for index = 1, #storage_changed_actions do
+                storage_changed_actions[index](pid)
+            end
+        end
+
+        ---@param action fun(pid: integer, hero: HeroData)
+        function thistype.registerNewCharacterAction(action)
+            new_character_actions[#new_character_actions + 1] = action
         end
 
         function thistype:preload_character(code, slot)
@@ -227,7 +263,8 @@ OnInit.final("Profile", function(Require)
             MULTIBOARD.MAIN:display(self.pid)
 
             PlayerCleanup(self.pid)
-            self:hero_select()
+            self.cannot_load = false
+            self:hero_select(true)
 
             self:get_empty_slot()
             self.new_char = true
@@ -318,9 +355,7 @@ OnInit.final("Profile", function(Require)
                 ClearTextMessages()
             end
 
-            self:save_character()
-
-            return true
+            return self:save_character()
         end
 
         function thistype:new_character(id)
@@ -329,8 +364,9 @@ OnInit.final("Profile", function(Require)
             hero.id = SAVE_TABLE.KEY_UNITS[id]
             hero.unit_id = id
             hero.hardcore = 0
-            hero.prestige = 0
+            hero.deprecated_progression = 0
             hero.level = 1
+            hero.experience = 0
             hero.str = HERO_STATS[id].str
             hero.agi = HERO_STATS[id].agi
             hero.int = HERO_STATS[id].int
@@ -343,6 +379,10 @@ OnInit.final("Profile", function(Require)
             hero.teleport = 1
             hero.reveal = 1
             hero.skin = 25
+
+            for index = 1, #new_character_actions do
+                new_character_actions[index](self.pid, hero)
+            end
         end
 
         function thistype:delete_character()
@@ -352,6 +392,7 @@ OnInit.final("Profile", function(Require)
             end
             self.storage[self.current_slot] = nil
             self.character_code[self.current_slot] = nil
+            thistype.notifyStorageChanged(self.pid)
             self:save_profile()
         end
 
@@ -363,67 +404,14 @@ OnInit.final("Profile", function(Require)
                 Profile[pid]:delete_character()
 
                 dw:destroy()
+                Profile[pid]:open_dialog()
             end
 
             return false
         end
 
-        local toggle_delete = {} ---@type boolean[] 
-
-        local function load_menu(dw, index, data, is_menu)
-            local pid = dw.pid
-
-            -- new character button
-            if is_menu and index == 0 then
-                thistype[pid]:get_empty_slot()
-
-                if thistype[pid]:getSlotsUsed() >= MAX_SLOTS then
-                    DisplayTimedTextToPlayer(GetTriggerPlayer(), 0, 0, 30.0, "You cannot save more than " .. MAX_SLOTS .. " heroes!")
-                    dw.Page = 0
-                    dw:refresh()
-                else
-                    if not SELECTING_HERO[pid] then
-                        thistype[pid].new_char = true
-                        thistype[pid]:hero_select()
-                    end
-
-                    dw:destroy()
-                end
-            -- load / delete button
-            elseif is_menu and index == 1 then
-                if toggle_delete[pid] then
-                    toggle_delete[pid] = false
-                    dw:setMenuButtonName(1, "|cffff0000Delete Character")
-                    dw.title = "|cffffffffLOAD"
-                else
-                    toggle_delete[pid] = true
-                    dw:setMenuButtonName(1, "|cffffffffLoad Character")
-                    dw.title = "|cffff0000DELETE"
-                end
-                dw:refresh()
-            -- character slot
-            elseif not is_menu and index ~= -1 then
-                local slot = data
-                thistype[pid].current_slot = slot
-                dw:destroy()
-
-                if toggle_delete[pid] then
-                    -- confirm delete character
-                    dw = DialogWindow.create(pid, "Are you sure?|nAny perk bonuses from this character will be lost!", confirm_delete_character)
-                    dw:addButton("|cffff0000DELETE")
-                    dw:display()
-                else
-                    -- load character
-                    thistype[pid].new_char = false
-                    DisplayTextToPlayer(GetTriggerPlayer(), 0, 0, "Loading |c006969ffhero|r from selected slot...")
-                    CharacterSetup(pid, true)
-                end
-            end
-
-            return false
-        end
-
-        function thistype:hero_select()
+        ---@param show? boolean
+        function thistype:hero_select(show)
             if GetLocalPlayer() == Player(self.pid - 1) then
                 EnablePreSelect(false, false)
                 EnableSelect(false, false)
@@ -434,35 +422,114 @@ OnInit.final("Profile", function(Require)
             SetCurrency(self.pid, GOLD, 100)
             SetCamera(self.pid, gg_rct_Tavern)
 
-            StartHeroSelect(self.pid)
+            if show == false then
+                HideHeroSelect(self.pid)
+            else
+                StartHeroSelect(self.pid)
+            end
         end
 
-        function thistype:open_dialog()
-            local dw = DialogWindow.create(self.pid, "|cffffffffLOAD", load_menu)
+        local function browser_new(pid)
+            local profile = thistype[pid]
+            profile:get_empty_slot()
 
-            toggle_delete[self.pid] = false
+            if profile:getSlotsUsed() >= MAX_SLOTS then
+                DisplayTimedTextToPlayer(Player(pid - 1), 0, 0, 30.,
+                    "You cannot save more than " .. MAX_SLOTS .. " heroes!")
+                return
+            end
 
-            for i = 1, MAX_SLOTS do
-                if self.checksums[i] > 0 and self.character_code[i] then -- slot is not empty
-                    local name = "|cffffcc00"
-                    local storage = self.storage[i]
+            CharacterBrowser.hide(pid)
+            profile.new_char = true
+            profile:hero_select(true)
+        end
 
-                    if storage.prestige > 0 then
-                        name = name .. "[PRSTG] "
+        local function browser_select(pid, slot, deleting)
+            local profile = thistype[pid]
+            profile.current_slot = slot
+
+            if deleting then
+                local dialog = DialogWindow.create(pid,
+                    "Any perk bonuses from this character will be lost!",
+                    confirm_delete_character)
+                dialog:addButton("|cffff0000DELETE")
+                dialog:display()
+                return
+            end
+
+            CharacterBrowser.hide(pid)
+            profile.new_char = false
+            DisplayTextToPlayer(Player(pid - 1), 0, 0,
+                "Loading |c006969ffhero|r from selected slot...")
+            CharacterSetup(pid, true)
+        end
+
+        local function inventory_summary(hero)
+            local count = 0
+            local socket_count = 0
+            local source = hero.saved_items or hero.items or {}
+            local icons = {}
+
+            for slot = 1, MAX_INVENTORY_SLOTS do
+                local item = source[slot]
+                if item then
+                    count = count + 1
+                    socket_count = socket_count + #(item.sockets or {})
+                    local item_index = (item.id or 0) & 0x1FFF
+                    if item_index > 0 then
+                        icons[slot] = BlzGetAbilityIcon(CUSTOM_ITEM_OFFSET + item_index)
                     end
-                    name = name .. GetObjectName(SAVE_UNIT_TYPE[storage.id]) .. " [" .. (storage.level) .. "] "
-                    if storage.hardcore > 0 then
-                        name = name .. "[HC]"
-                    end
-
-                    dw:addButton(name, i)
                 end
             end
 
-            dw:addMenuButton("|cffffffffNew Character")
-            dw:addMenuButton("|cffff0000Delete Character")
+            return count, socket_count, icons
+        end
 
-            dw:display()
+        local function browser_slot(hero, slot)
+            local unit_id = hero.unit_id or SAVE_UNIT_TYPE[hero.id]
+            local name = GetObjectName(unit_id)
+            local item_count, socket_count, item_icons = inventory_summary(hero)
+            local played = (hero.time or 0) // 60 .. "h " .. ModuloInteger(hero.time or 0, 60) .. "m"
+            local tooltip = "|cffbb0000Strength:|r " .. RealToString(hero.str or 0)
+                .. "\n|cff008800Agility:|r " .. RealToString(hero.agi or 0)
+                .. "\n|cff2255ffIntelligence:|r " .. RealToString(hero.int or 0)
+                .. "\n\n|cffffcc00Gold:|r " .. RealToString(hero.gold or 0)
+                .. "\n|cffc0c0c0Platinum:|r " .. RealToString(hero.platinum or 0)
+                .. "\n|cff66ddffCrystal:|r " .. RealToString(hero.crystal or 0)
+                .. "\n|cffffcc00Honor:|r " .. RealToString(hero.honor or 0)
+                .. "\n\nPlaytime: " .. played
+                .. "\nStruggle Best: Wave " .. (hero.struggle_best_wave or 0)
+                .. "\nInventory: " .. item_count .. " / " .. MAX_INVENTORY_SLOTS
+                .. " items, " .. socket_count .. " sockets"
+                .. "\n|cff888888Saved in slot " .. slot .. "|r"
+
+            return {
+                icon = BlzGetAbilityIcon(unit_id),
+                name = name,
+                level = hero.level or 1,
+                mode = (hero.hardcore or 0) > 0 and "|cffff5555HC|r" or "|cff66ff66SC|r",
+                tooltip = tooltip,
+                item_icons = item_icons,
+                item_count = item_count,
+            }
+        end
+
+        function thistype:open_dialog()
+            HideHeroSelect(self.pid)
+            local slots = {}
+            for slot = 1, MAX_SLOTS do
+                local hero = self.storage[slot]
+                if self.checksums[slot] > 0 and self.character_code[slot] and hero then
+                    slots[slot] = browser_slot(hero, slot)
+                end
+            end
+
+            CharacterBrowser.show(self.pid, {
+                slots = slots,
+                max_slots = MAX_SLOTS,
+                on_select = browser_select,
+                on_new = browser_new,
+            })
         end
 
         ---@type fun(code: string, pid: integer): boolean
@@ -505,6 +572,18 @@ OnInit.final("Profile", function(Require)
             -- load total time
             index = index + 1
             self.total_time = data[index]
+            for perk_index = 1, PROFILE_PERK_SLOTS do
+                index = index + 1
+                self.perk_ranks[perk_index] = data[index] or 0
+            end
+            index = index + 1
+            self.perk_budget_seen = data[index] or 0
+            index = index + 1
+            self.perk_reset_available = data[index] or 0
+            for word = 1, PROFILE_PERK_NODE_WORDS do
+                index = index + 1
+                self.perk_node_words[word] = data[index] or 0
+            end
             self.profile_code = code
             thistype[pid] = self
 
@@ -562,6 +641,14 @@ OnInit.final("Profile", function(Require)
             end
 
             data[#data + 1] = self.total_time
+            for perk_index = 1, PROFILE_PERK_SLOTS do
+                data[#data + 1] = self.perk_ranks[perk_index] or 0
+            end
+            data[#data + 1] = self.perk_budget_seen or 0
+            data[#data + 1] = self.perk_reset_available or 0
+            for word = 1, PROFILE_PERK_NODE_WORDS do
+                data[#data + 1] = self.perk_node_words[word] or 0
+            end
             self.profile_code = Compile(self.pid, data)
 
             if GAME_STATE == 2 then
@@ -586,12 +673,27 @@ OnInit.final("Profile", function(Require)
         function thistype:save_character()
             local p = Player(self.pid - 1)
             local hero = self.hero
+            local live_hero = Hero[self.pid]
+            local live_id = live_hero and GetUnitTypeId(live_hero) or 0
+            local save_id = SAVE_TABLE.KEY_UNITS[live_id]
+
+            -- Developer hero swaps and repicks can replace the live unit
+            -- without rebuilding the selected HeroData. The unit on the map is
+            -- authoritative when writing the character identity.
+            if not save_id then
+                DisplayTimedTextToPlayer(p, 0, 0, 30.,
+                    "This hero type cannot be saved. Character data was not changed.")
+                return false
+            end
+            hero.id = save_id
+            hero.unit_id = live_id
 
             -- update hero data
-            hero.level = GetHeroLevel(Hero[self.pid])
-            hero.str = math.min(MAX_STATS, Unit[Hero[self.pid]].str)
-            hero.agi = math.min(MAX_STATS, Unit[Hero[self.pid]].agi)
-            hero.int = math.min(MAX_STATS, Unit[Hero[self.pid]].int)
+            hero.level = GetHeroLevel(live_hero)
+            hero.experience = Progression.getXPIntoLevel(live_hero)
+            hero.str = math.min(MAX_STATS, Unit[live_hero].str)
+            hero.agi = math.min(MAX_STATS, Unit[live_hero].agi)
+            hero.int = math.min(MAX_STATS, Unit[live_hero].int)
             hero.gold = math.min(GetCurrency(self.pid, GOLD), MAX_GOLD)
             hero.platinum = math.min(GetCurrency(self.pid, PLATINUM), MAX_PLAT_CRYS)
             hero.crystal = math.min(GetCurrency(self.pid, CRYSTAL), MAX_PLAT_CRYS)
@@ -607,8 +709,26 @@ OnInit.final("Profile", function(Require)
                 local itm = hero.items[i]
                 if itm then
                     itm.owner = p
+                    if (itm:encode_id() or 0) == 0 then
+                        DisplayTimedTextToPlayer(p, 0, 0, 30.,
+                            "Item in slot " .. i .. " (" .. GetObjectName(itm.id)
+                            .. ") cannot be represented by the current save format. Character was not saved.")
+                        return false
+                    end
+
+                    for socket_index = 1, math.min(#(itm.sockets or {}), MAX_SOCKETS) do
+                        local socket = itm.sockets[socket_index]
+                        if not socket or (socket:encode_id() or 0) == 0 then
+                            DisplayTimedTextToPlayer(p, 0, 0, 30.,
+                                "Socket " .. socket_index .. " in inventory slot " .. i
+                                .. " cannot be represented by the current save format. Character was not saved.")
+                            return false
+                        end
+                    end
                 end
             end
+
+            hero:update_saved_items()
 
             local s = Compile(self.pid, hero:values())
 
@@ -622,7 +742,15 @@ OnInit.final("Profile", function(Require)
             end
 
             self.character_code[self.current_slot] = s
+            if GetLocalPlayer() == p then
+                local item_count, socket_count = hero:get_saved_item_counts()
+                DevLog.write("PERSISTENCE", string.format(
+                    "saved slot=%d hero=%s level=%d xp=%d items=%d sockets=%d",
+                    self.current_slot, GetObjectName(hero.unit_id), hero.level,
+                    hero.experience or 0, item_count, socket_count))
+            end
             self:save_profile()
+            return true
         end
 
         function thistype:skin(index)
@@ -674,8 +802,9 @@ OnInit.final("Profile", function(Require)
     ---@class HeroData
     ---@field id integer
     ---@field hardcore integer
-    ---@field prestige integer
+    ---@field deprecated_progression integer Reserved character-save compatibility field.
     ---@field level integer
+    ---@field experience integer XP earned within the current 10,000-point level band.
     ---@field str integer
     ---@field agi integer
     ---@field int integer
@@ -693,10 +822,13 @@ OnInit.final("Profile", function(Require)
     ---@field summon_essence integer
     ---@field struggle_best_wave integer
     ---@field struggle_claim_wave integer
+    ---@field perk_milestones integer
     ---@field create function
     ---@field values function
     ---@field propagate function
     ---@field load_data function
+    ---@field update_saved_items function
+    ---@field get_saved_item_counts function
     ---@field item_to_drop Item
     HeroData = {}
     do
@@ -706,7 +838,7 @@ OnInit.final("Profile", function(Require)
         local scalar_keys = {
             "id",
             "hardcore",
-            "prestige",
+            "deprecated_progression",
             "level",
             "str",
             "agi",
@@ -870,6 +1002,63 @@ OnInit.final("Profile", function(Require)
             end
         end
 
+        local function snapshot_item(itm)
+            if not itm then
+                return nil
+            end
+
+            local id = itm:encode_id() or 0
+            if id == 0 then
+                return nil
+            end
+
+            local saved = {
+                id = id,
+                stats = itm:encode_stats() or 0,
+                extra = itm:encode_extra() or 0,
+                sockets = {},
+            }
+
+            local sockets = itm.sockets or {}
+            for index = 1, math.min(#sockets, MAX_SOCKETS) do
+                local socket = sockets[index]
+                local socket_id = socket and (socket:encode_id() or 0) or 0
+                if socket_id ~= 0 then
+                    saved.sockets[#saved.sockets + 1] = {
+                        id = socket_id,
+                        stats = socket:encode_stats() or 0,
+                        extra = socket:encode_extra() or 0,
+                    }
+                end
+            end
+
+            return saved
+        end
+
+        ---Refreshes the inspection DTO without allocating native item handles.
+        function thistype:update_saved_items()
+            for slot = 1, MAX_INVENTORY_SLOTS do
+                self.saved_items[slot] = snapshot_item(self.items[slot])
+            end
+        end
+
+        ---@return integer item_count
+        ---@return integer socket_count
+        function thistype:get_saved_item_counts()
+            local item_count = 0
+            local socket_count = 0
+
+            for slot = 1, MAX_INVENTORY_SLOTS do
+                local saved = self.saved_items[slot]
+                if saved then
+                    item_count = item_count + 1
+                    socket_count = socket_count + #(saved.sockets or {})
+                end
+            end
+
+            return item_count, socket_count
+        end
+
         local function deserialize_item(data, index)
             local id = read_value(data, index)
             index = index + 1
@@ -931,6 +1120,14 @@ OnInit.final("Profile", function(Require)
                 end
             end
 
+            -- Item.decode builds the parent's cache before its saved sockets
+            -- have been reconstructed. Refresh the completed item once so
+            -- equip applies the socket-inclusive values and its tooltip lists
+            -- the restored sockets immediately.
+            if #itm.sockets > 0 then
+                itm:update()
+            end
+
             return itm
         end
 
@@ -965,6 +1162,17 @@ OnInit.final("Profile", function(Require)
                 end
             end
 
+            SetHeroXP(Hero[pid], Progression.getCumulativeXP(self.level,
+                self.experience or 0), false)
+
+            if GetLocalPlayer() == owner then
+                local item_count, socket_count = self:get_saved_item_counts()
+                DevLog.write("PERSISTENCE", string.format(
+                    "loaded slot=%d hero=%s level=%d xp=%d items=%d sockets=%d",
+                    Profile[pid].current_slot, GetObjectName(self.unit_id), self.level,
+                    self.experience or 0, item_count, socket_count))
+            end
+
             return true
         end
 
@@ -985,12 +1193,14 @@ OnInit.final("Profile", function(Require)
             result[#result + 1] = self.summon_essence or 0
             result[#result + 1] = self.struggle_best_wave or 0
             result[#result + 1] = self.struggle_claim_wave or 0
+            result[#result + 1] = self.perk_milestones or 0
+            result[#result + 1] = self.experience or 0
 
             return result
         end
 
         local legacy_scalar_keys = {
-            "id", "hardcore", "prestige", "level", "str", "agi", "int",
+            "id", "hardcore", "deprecated_progression", "level", "str", "agi", "int",
             "gold", "platinum", "crystal", "time",
         }
 
@@ -1063,6 +1273,8 @@ OnInit.final("Profile", function(Require)
             self.summon_essence = read_value(data, index)
             self.struggle_best_wave = read_value(data, index + 1)
             self.struggle_claim_wave = read_value(data, index + 2)
+            self.perk_milestones = read_value(data, index + 3)
+            self.experience = read_value(data, index + 4)
 
             return true
         end
@@ -1075,6 +1287,8 @@ OnInit.final("Profile", function(Require)
                 summon_essence = 0,
                 struggle_best_wave = 0,
                 struggle_claim_wave = 0,
+                perk_milestones = 0,
+                experience = 0,
             }, mt)
         end
     end
@@ -1114,6 +1328,7 @@ OnInit.final("Profile", function(Require)
             DisplayTimedTextToPlayer(Player(pid - 1), 0, 0, 30., "Character data could not be recovered.")
             return
         end
+        CloseHeroSelect(pid)
 
         if load then
             x, y, angle, camera = GetRectCenterX(gg_rct_ChurchSpawn), GetRectCenterY(gg_rct_ChurchSpawn), 270., gg_rct_Church

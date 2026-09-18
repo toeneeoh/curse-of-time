@@ -12,7 +12,7 @@ OnInit.final("StatValues", function(Require)
     STAT_TAG[ITEM_LEVEL].breakdown = function(u)
         local level = GetUnitLevel(u)
         if IsUnitType(u, UNIT_TYPE_HERO) then
-            return "XP: " .. GetHeroXP(u) .. "/" .. RequiredXP(level)
+            return "XP: " .. Progression.getXPIntoLevel(u) .. "/" .. RequiredXP(level)
         end
         return ""
     end

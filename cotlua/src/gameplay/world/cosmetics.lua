@@ -8,7 +8,9 @@ OnInit.final("Cosmetics", function(Require)
     Require('Users')
     Require('Variables')
     Require('MapSetup')
+    Require('Honor')
 
+    Cosmetics = {}
     CosmeticTable = array2d(0) ---@type table
     DONATOR_AURA_OFFSET = 1000 ---@type integer 
 
@@ -59,31 +61,6 @@ OnInit.final("Cosmetics", function(Require)
         end
     end
 
-    --used to unlock backpack skins
-    PrestigeSkins = {
-        {HERO_MARKSMAN, HERO_PHOENIX_RANGER, HERO_BLOODZERKER},     --atk prestige 1
-        {HERO_MARKSMAN, HERO_PHOENIX_RANGER, HERO_BLOODZERKER},     --atk prestige 2
-        {HERO_SAVIOR, HERO_OBLIVION_GUARD, HERO_WARRIOR},           --str prestige 1
-        {HERO_SAVIOR, HERO_OBLIVION_GUARD, HERO_WARRIOR},           --str prestige 2
-        {HERO_ASSASSIN, HERO_MASTER_ROGUE, HERO_VAMPIRE},           --agi prestige 1
-        {HERO_ASSASSIN, HERO_MASTER_ROGUE, HERO_VAMPIRE},           --agi prestige 2
-        {HERO_HYDROMANCER, HERO_DARK_SAVIOR, HERO_DARK_SUMMONER},   --int prestige 1
-        {HERO_HYDROMANCER, HERO_DARK_SAVIOR, HERO_DARK_SUMMONER},   --int prestige 2
-        {HERO_CRUSADER, HERO_ROYAL_GUARDIAN},                       --dr prestige 1
-        {HERO_CRUSADER, HERO_ROYAL_GUARDIAN},                       --dr prestige 2
-        {HERO_ARCANIST, HERO_ELEMENTALIST, HERO_THUNDERBLADE},      --spellboost prestige 1
-        {HERO_ARCANIST, HERO_ELEMENTALIST, HERO_THUNDERBLADE},      --spellboost prestige 2
-        {HERO_ARCANIST, HERO_ELEMENTALIST, HERO_THUNDERBLADE},      --spellboost prestige 3
-        {HERO_HIGH_PRIEST, HERO_BARD},                              --regen prestige 1
-        {HERO_HIGH_PRIEST, HERO_BARD},                              --regen prestige 2
-        {HERO_ARCANIST, HERO_ASSASSIN, HERO_MARKSMAN, HERO_HYDROMANCER, HERO_PHOENIX_RANGER, HERO_ELEMENTALIST, HERO_HIGH_PRIEST, HERO_MASTER_ROGUE,
-        HERO_SAVIOR, HERO_BARD, HERO_CRUSADER, HERO_BLOODZERKER, HERO_DARK_SAVIOR, HERO_DARK_SUMMONER, HERO_OBLIVION_GUARD, HERO_ROYAL_GUARDIAN,
-        HERO_THUNDERBLADE, HERO_WARRIOR, HERO_VAMPIRE},            --prestige 10
-        {HERO_ARCANIST, HERO_ASSASSIN, HERO_MARKSMAN, HERO_HYDROMANCER, HERO_PHOENIX_RANGER, HERO_ELEMENTALIST, HERO_HIGH_PRIEST, HERO_MASTER_ROGUE,
-        HERO_SAVIOR, HERO_BARD, HERO_CRUSADER, HERO_BLOODZERKER, HERO_DARK_SAVIOR, HERO_DARK_SUMMONER, HERO_OBLIVION_GUARD, HERO_ROYAL_GUARDIAN,
-        HERO_THUNDERBLADE, HERO_WARRIOR, HERO_VAMPIRE},            --prestige all
-    }
-
     CosmeticTable.skins = {
         { name = "Malthael", id = FourCC('H013'), public = false },
         { name = "Faerie Dragon", id = FourCC('H014'), public = false },
@@ -111,40 +88,65 @@ OnInit.final("Cosmetics", function(Require)
         --obtainable skins
         { name = "None", id = DUMMY_VISION, public = true },
         { name = "Wisp", id = FourCC('H011'), public = true },
-        { name = "Black Dragon Whelp", id = FourCC('H031'), public = true, req = 1 }, --atk prestige 1
-        { name = "Shadow Mephit", id = FourCC('H03C'), public = true, req = 2 }, --atk prestige 2
-        { name = "Red Dragon Whelp", id = FourCC('H03E'), public = true, req = 1 }, --str prestige 1
-        { name = "Fire Mephit", id = FourCC('H03L'), public = true, req = 2 }, --str prestige 2
-        { name = "Green Dragon Whelp", id = FourCC('H03U'), public = true, req = 1 }, --agi prestige 1
-        { name = "Venom Mephit", id = FourCC('H03Z'), public = true, req = 2 }, --agi prestige 2
-        { name = "Blue Dragon Whelp", id = FourCC('H041'), public = true, req = 1 }, --int prestige 1
-        { name = "Ice Mephit", id = FourCC('H042'), public = true, req = 2 }, --int prestige 2
-        { name = "Wyvern", id = FourCC('H04E'), public = true, req = 1 }, --dmg prestige 1
-        { name = "Nether Dragon", id = FourCC('H04L'), public = true, req = 2 }, --dmg prestige 2
-        { name = "Owl", id = FourCC('H04O'), public = true, req = 1 }, --spellboost prestige 1
-        { name = "Spirit Owl", id = FourCC('H04P'), public = true, req = 2 }, --spellboost prestige 2
-        { name = "Phase Bat", id = FourCC('H058'), public = true, req = 3 }, --spellboost prestige 3
-        { name = "Yellow Dragon Whelp", id = FourCC('H05I'), public = true, req = 1 }, --regen prestige 1
-        { name = "Earth Mephit", id = FourCC('H05K'), public = true, req = 2 }, --regen prestige 2
-        { name = "Elder Shadow Dragon", id = FourCC('H066'), public = true, req = 10 }, --prestige 10 chars
-        { name = "Sin", id = FourCC('H06W'), public = true, req = HERO_TOTAL }, --all chars prestiged
+        { name = "Black Dragon Whelp", id = FourCC('H031'), honor = 5 },
+        { name = "Shadow Mephit", id = FourCC('H03C'), honor = 15 },
+        { name = "Red Dragon Whelp", id = FourCC('H03E'), honor = 5 },
+        { name = "Fire Mephit", id = FourCC('H03L'), honor = 15 },
+        { name = "Green Dragon Whelp", id = FourCC('H03U'), honor = 5 },
+        { name = "Venom Mephit", id = FourCC('H03Z'), honor = 15 },
+        { name = "Blue Dragon Whelp", id = FourCC('H041'), honor = 5 },
+        { name = "Ice Mephit", id = FourCC('H042'), honor = 15 },
+        { name = "Wyvern", id = FourCC('H04E'), honor = 30 },
+        { name = "Nether Dragon", id = FourCC('H04L'), honor = 50 },
+        { name = "Owl", id = FourCC('H04O'), honor = 100 },
+        { name = "Spirit Owl", id = FourCC('H04P'), honor = 200 },
+        { name = "Phase Bat", id = FourCC('H058'), honor = 350 },
+        { name = "Yellow Dragon Whelp", id = FourCC('H05I'), honor = 500 },
+        { name = "Earth Mephit", id = FourCC('H05K'), honor = 750 },
+        { name = "Elder Shadow Dragon", id = FourCC('H066'), honor = 1000 },
+        { name = "Sin", id = FourCC('H06W'), honor = 10000 },
     }
 
     PUBLIC_SKINS = 24
     TOTAL_SKINS = #CosmeticTable.skins
 
-    --generate error messages
-    local count = 1
-    for i = PUBLIC_SKINS + 2, TOTAL_SKINS do
-        local requirements = ""
+    ---@param pid integer
+    ---@param index integer
+    ---@return boolean
+    function Cosmetics.isSkinUnlocked(pid, index)
+        local skin = CosmeticTable.skins[index]
+        if not skin then return false end
 
-        for _, j in ipairs(PrestigeSkins[count]) do
-            requirements = requirements .. GetObjectName(j) .. ", "
+        local name = User[pid - 1].name
+        return skin.public == true
+            or CosmeticTable[name][index] > 0
+            or (skin.honor ~= nil and Honor.getTotal(pid) >= skin.honor)
+    end
+
+    ---@param index integer
+    ---@return string
+    function Cosmetics.getSkinRequirement(index)
+        local skin = CosmeticTable.skins[index]
+        if skin and skin.honor then
+            return "Requires |cffffcc00" .. skin.honor .. " Honor|r."
         end
-        requirements = requirements:gsub(", $", "")
-        CosmeticTable.skins[i].error = "|cffff0000You need atleast " .. CosmeticTable.skins[i].req .. " prestige" .. ((CosmeticTable.skins[i].req > 1 and "s") or "") .. " from (" .. requirements .. ")"
+        return "This backpack skin is not unlocked."
+    end
 
-        count = count + 1
+    ---@param pid integer
+    ---@return integer, integer
+    function Cosmetics.getBackpackProgress(pid)
+        local unlocked = 0
+        local total = 0
+        for index = 1, #CosmeticTable.skins do
+            if CosmeticTable.skins[index].honor then
+                total = total + 1
+                if Cosmetics.isSkinUnlocked(pid, index) then
+                    unlocked = unlocked + 1
+                end
+            end
+        end
+        return unlocked, total
     end
 
     --auras

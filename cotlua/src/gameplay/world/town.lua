@@ -23,7 +23,6 @@ OnInit.final("Town", function(Require)
         {x = 1778, y = -234, model = "war3mapImported\\HighElfKid_ByEpsilon.mdl"},
         {x = 1342, y = 302, model = "war3mapImported\\GoblinKid.mdl"},
         {x = 711, y = -294, model = "war3mapImported\\BloodElfKid_ByEpsilon.mdl"},
-        {x = 711, y = -294, model = "war3mapImported\\BloodElfKid_ByEpsilon.mdl"},
         {x = -920, y = 1034, model = "war3mapImported\\burnetteTC.mdl"},
         {x = -960, y = 1104, model = "war3mapImported\\Night Elf Villager.mdl"},
         {x = -2244, y = 480, model = "units\\critters\\VillagerWoman\\VillagerWoman"},

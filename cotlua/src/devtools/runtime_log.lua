@@ -63,8 +63,9 @@ OnInit.global("DevRuntimeLog", function(Require)
         local enemy_ai = RuntimeMetrics.enemy_ai
         local timers = RuntimeMetrics.timer_queue
         local movespeed = RuntimeMetrics.movespeed
+        local leveling = RuntimeMetrics.leveling
         DevLog.write("METRICS", string.format(
-            "%s init=%d/%d items=%d/%d/%d peak=%d events=%d callbacks=%d damage=%d ai=%d/%d timers=%d peak=%d movespeed=%d peak=%d ticks=%d updates=%d sessions=%d active_s=%.3f avg_us=%.2f max_us=%.2f period=%.5f",
+            "%s init=%d/%d items=%d/%d/%d peak=%d events=%d callbacks=%d damage=%d ai=%d/%d timers=%d peak=%d movespeed=%d peak=%d ticks=%d updates=%d sessions=%d active_s=%.3f avg_us=%.2f max_us=%.2f period=%.5f level_events=%d level_avg_ms=%.2f level_max_ms=%.2f level_award_avg_ms=%.2f level_award_max_ms=%.2f level_stages_ms=%.2f/%.2f/%.2f/%.2f/%.2f/%.2f",
             label or "snapshot",
             initializers.completed, initializers.started,
             items.live, items.created, items.destroyed, items.peak,
@@ -73,7 +74,18 @@ OnInit.global("DevRuntimeLog", function(Require)
             timers.active, timers.peak,
             movespeed.active, movespeed.peak, movespeed.ticks, movespeed.unit_updates,
             movespeed.sessions, active_time(movespeed), average_sample_microseconds(movespeed),
-            movespeed.max_sample_time * 1000000., movespeed.period))
+            movespeed.max_sample_time * 1000000., movespeed.period,
+            leveling.events,
+            leveling.total_time / math.max(1, leveling.events) * 1000.,
+            leveling.max_time * 1000.,
+            leveling.leveling_award_time / math.max(1, leveling.leveling_awards) * 1000.,
+            leveling.max_leveling_award_time * 1000.,
+            leveling.hero_event_time / math.max(1, leveling.events) * 1000.,
+            leveling.backpack_time / math.max(1, leveling.events) * 1000.,
+            leveling.item_time / math.max(1, leveling.events) * 1000.,
+            leveling.stat_sync_time / math.max(1, leveling.events) * 1000.,
+            leveling.stat_event_time / math.max(1, leveling.events) * 1000.,
+            leveling.finish_time / math.max(1, leveling.events) * 1000.))
     end
 
     if not DevLog.enabled then return end

@@ -128,6 +128,7 @@ OnInit.final("Chaos", function(Require)
         for i = 1, #GHOST_UNITS do
             RemoveUnit(GHOST_UNITS[i])
         end
+        GHOST_UNITS = {}
 
         for target in each(ug) do
             if target ~= udg_SPONSOR then

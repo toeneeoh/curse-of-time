@@ -27,6 +27,7 @@ OnInit.final("UnitTable", function(Require)
     ---@field destroy function
     ---@field destroyed boolean?
     ---@field onIndex fun(callback: fun(u: unit))
+    ---@field syncHeroAttributes fun(self: Unit)
     ---@field hit_based_health boolean
     ---@field damage integer
     ---@field bonus_damage integer
@@ -98,6 +99,11 @@ OnInit.final("UnitTable", function(Require)
     ---@field gold_rate number
     ---@field shield_count number
     ---@field xp_rate number
+    ---@field overworld_base_hp number
+    ---@field overworld_base_bonus_hp number
+    ---@field overworld_base_dm number
+    ---@field overworld_party_size integer
+    ---@field overworld_scaling_reset_pending boolean
     Unit = {}  ---@type Unit | Unit[]
     do
         local thistype = Unit
@@ -149,6 +155,38 @@ OnInit.final("UnitTable", function(Require)
             local damage = (BlzGetUnitBaseDamage(tbl.unit, 0) + tbl.proxy.bonus_damage) * tbl.proxy.damage_percent
             UnitSetBonus(tbl.unit, BONUS_DAMAGE, damage - BlzGetUnitBaseDamage(tbl.unit, 0))
             rawset(tbl.proxy, "damage", damage)
+        end
+
+        ---Synchronizes cached base hero attributes after Warcraft changes a
+        ---hero's level. The native values are already final, so writing them
+        ---back through SetHeroStr/Agi/Int only repeats engine work. Derived
+        ---resources and combat values are each recalculated once here.
+        function thistype:syncHeroAttributes()
+            local proxy = self.proxy
+            local str = GetHeroStr(self.unit, false)
+            local agi = GetHeroAgi(self.unit, false)
+            local int = GetHeroInt(self.unit, false)
+
+            rawset(proxy, "str", str)
+            rawset(proxy, "agi", agi)
+            rawset(proxy, "int", int)
+
+            local hp = R2I(self.base_hp + proxy.bonus_hp + 25 * (str + proxy.bonus_str))
+            BlzSetUnitMaxHP(self.unit, hp)
+            rawset(proxy, "hp", hp)
+
+            local mana = self.base_mana + proxy.bonus_mana + 20 * (int + proxy.bonus_int)
+            BlzSetUnitMaxMana(self.unit, mana)
+            rawset(proxy, "mana", mana)
+
+            local mregen = (proxy.nomanaregen and 0)
+                or (proxy.mana_regen_flat + (int + proxy.bonus_int) * INT_REGEN_FACTOR
+                    + proxy.mana_regen_max * mana * 0.01) * proxy.mana_regen_percent
+            UnitSetBonus(self.unit, BONUS_MANA_REGEN, mregen)
+            rawset(proxy, "mana_regen", mregen)
+
+            recalc_damage(self)
+            recalc_armor(self)
         end
 
         -- dot method set operators
@@ -576,7 +614,7 @@ OnInit.final("UnitTable", function(Require)
         function Unit:removeEffect(entry)
             local effects = self.effects
 
-            if not effects then
+            if not effects or not entry then
                 return
             end
 

@@ -13,8 +13,8 @@
     attacks at wave 200; written attack damage is divided by the matching damage-
     system multiplier so the type change itself does not create a 350x spike.
     Armor remains linear so physical and magical durability do not diverge without
-    bound. Party size increases health much more than damage, preserving the fixed
-    wave rating while accounting for additional targets and combined output.
+    bound. Each additional entrant adds 80% health, 30% damage, and one special
+    enemy conversion. Entrants must remain within 50 levels of the challenger.
 
     A new character always starts at wave 1. Later runs begin at the first wave of
     the 25-wave window containing the lowest entrant's secured best wave. This
@@ -39,13 +39,14 @@ OnInit.final("Struggle", function(Require)
     ---@class StruggleService
     Struggle = {}
 
-    local ENTRY_ITEM = FourCC('I0EW')
+    local ENTRY_ACTION_ITEM = FourCC('I0EW')
     local ENTRY_DURATION = 45.
+    local ENTRY_LEVEL_RANGE = 50
     local FIRST_WAVE_DELAY = 5.
     local BETWEEN_WAVE_DELAY = 5.
     local CHECKPOINT_INTERVAL = 5
     local STARTING_WAVE_WINDOW = 25
-    local CHECKPOINT_DECISION_TIME = 20.
+    local CHECKPOINT_DECISION_TIME = 30.
     local MAX_SAVED_WAVE = 0xFFFF
     local TRICKLE_INTERVAL = 1.25
     local TRICKLE_SIZE = 3
@@ -140,8 +141,11 @@ OnInit.final("Struggle", function(Require)
     local completed_wave = 0
     local party_health_multiplier = 1.
     local party_damage_multiplier = 1.
+    local party_size = 0
     local entry_open = false
     local active = false
+    local challenger_pid = 0
+    local challenger_level = 0
     local entry_callback ---@type integer?
     local wave_callback ---@type integer?
     local trickle_callback ---@type integer?
@@ -427,10 +431,12 @@ OnInit.final("Struggle", function(Require)
         end
 
         if wave >= 2 then
-            local special_count = math.min(3, 1 + (wave - 1) // 10)
-            for _ = 1, special_count do
-                local queue_index = math.random(1, #spawn_queue)
-                spawn_queue[queue_index] = special_roles[math.random(1, #special_roles)]
+            local special_count = math.min(8, #spawn_queue,
+                1 + (wave - 1) // 10 + math.max(0, party_size - 1))
+            for index = 1, special_count do
+                local queue_index = math.random(index, #spawn_queue)
+                spawn_queue[index], spawn_queue[queue_index] = spawn_queue[queue_index], spawn_queue[index]
+                spawn_queue[index] = special_roles[math.random(1, #special_roles)]
             end
         end
 
@@ -563,14 +569,12 @@ OnInit.final("Struggle", function(Require)
 
         DisableBackpackTeleports(pid, false)
         DisableItems(pid, false)
-        Unit[Hero[pid]].death_exception = defeated == true
-
-        if defeated or not UnitAlive(Hero[pid]) then
-            RevivePlayer(pid, TOWN_CENTER_X, TOWN_CENTER_Y, 1., 1.)
-        else
+        -- Defeat is a normal death. The shared death pipeline handles the
+        -- softcore penalty/revival or permanent hardcore character loss.
+        if not defeated and UnitAlive(Hero[pid]) then
             MoveHero(pid, TOWN_CENTER_X, TOWN_CENTER_Y)
+            SetCamera(pid, MAIN_MAP.rect)
         end
-        SetCamera(pid, MAIN_MAP.rect)
 
         if active and not claimed then
             local message = defeated
@@ -597,6 +601,14 @@ OnInit.final("Struggle", function(Require)
 
     local function enter(pid)
         if TableHas(players, pid) or not Hero[pid] or not UnitAlive(Hero[pid]) then
+            return false
+        end
+
+        local level = GetUnitLevel(Hero[pid])
+        if challenger_pid > 0 and math.abs(level - challenger_level) > ENTRY_LEVEL_RANGE then
+            DisplayTextToPlayer(Player(pid - 1), 0., 0.,
+                "You must be within |cffffcc00" .. ENTRY_LEVEL_RANGE
+                .. " levels|r of the Struggle challenger.")
             return false
         end
 
@@ -633,8 +645,9 @@ OnInit.final("Struggle", function(Require)
         local first_wave = recommended_start_wave(lowest_best_wave)
         wave = first_wave - 1
         completed_wave = wave
-        party_health_multiplier = 1. + 0.6 * (#players - 1)
-        party_damage_multiplier = 1. + 0.08 * (#players - 1)
+        party_size = #players
+        party_health_multiplier = 1. + 0.8 * (party_size - 1)
+        party_damage_multiplier = 1. + 0.3 * (party_size - 1)
         entry_open = false
         active = true
         DisplayTextToTable(players, "|cffffcc00The Infinite Struggle begins at wave " .. first_wave
@@ -685,6 +698,9 @@ OnInit.final("Struggle", function(Require)
         completed_wave = 0
         party_health_multiplier = 1.
         party_damage_multiplier = 1.
+        party_size = 0
+        challenger_pid = 0
+        challenger_level = 0
         fury_targets = setmetatable({}, { __mode = 'k' })
         checkpoint_dialogs = {}
     end
@@ -724,7 +740,7 @@ OnInit.final("Struggle", function(Require)
     )
     exit_button:visible(false)
 
-    ITEM_LOOKUP[ENTRY_ITEM] = function(player, pid, _, item)
+    ITEM_LOOKUP[ENTRY_ACTION_ITEM] = function(player, pid, _, item)
         if item and item.alive then
             item:destroy()
         end
@@ -741,6 +757,12 @@ OnInit.final("Struggle", function(Require)
         wave = 0
         completed_wave = 0
         players = {}
+        if not Hero[pid] or not UnitAlive(Hero[pid]) then
+            DisplayTextToPlayer(player, 0., 0., "A living hero is required to challenge the Infinite Struggle.")
+            return
+        end
+        challenger_pid = pid
+        challenger_level = GetUnitLevel(Hero[pid])
         entry_open = true
         DisplayTextToForce(FORCE_PLAYING, User[pid - 1].nameColored .. " has opened the Infinite Struggle for 45 seconds.")
         entry_callback = TimerQueue:callDelayed(ENTRY_DURATION, begin_run)

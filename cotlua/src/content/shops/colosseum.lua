@@ -8,9 +8,8 @@ OnInit.final("ColosseumShop", function(Require)
 
     local shop_id = FourCC('n032')
     CreateShop(shop_id, 1000.)
-    local bonuses = ShopAddCategory(shop_id, "ReplaceableTextures\\CommandButtons\\BTNHeroPaladin.blp", "Bonuses")
-    local services = ShopAddCategory(shop_id, "ReplaceableTextures\\CommandButtons\\BTNCancel.blp", "Services")
-    local struggle = ShopAddCategory(shop_id, "ReplaceableTextures\\CommandButtons\\BTNCrystalBall.blp", "Struggle")
+    local colosseum = ShopAddCategory(shop_id, "ReplaceableTextures\\CommandButtons\\BTNHeroPaladin.blp", "Colosseum")
+    local struggle = ShopAddCategory(shop_id, "ReplaceableTextures\\CommandButtons\\BTNBirial.blp", "Struggle")
 
     local reward_data = {
         {
@@ -80,7 +79,7 @@ OnInit.final("ColosseumShop", function(Require)
                 return reward.detail .. "\n\nCurrent Rank: |cffffcc00" .. Honor.getRank(pid, reward.key)
                     .. "|r/|cffffcc00" .. reward.max_rank .. "|r"
             end,
-            categories = bonuses,
+            categories = colosseum,
             price = function(pid)
                 return { [HONOR] = Honor.getNextCost(pid, reward.key) }
             end,
@@ -102,7 +101,7 @@ OnInit.final("ColosseumShop", function(Require)
         icon = "ReplaceableTextures\\CommandButtons\\BTNCancel.blp",
         disabled_icon = "ReplaceableTextures\\CommandButtonsDisabled\\DISBTNCancel.blp",
         tooltip = "Refund all Honor allocated to Colosseum bonuses. Honor earned is never lost.",
-        categories = services,
+        categories = colosseum,
         availability = function(pid)
             if Honor.getAllocated(pid) == 0 then
                 return false, "NO HONOR"
@@ -132,7 +131,7 @@ OnInit.final("ColosseumShop", function(Require)
         name = function(pid)
             return "Ring of Struggle |cff999999(Rank " .. StruggleRewards.getClaimRank(pid) .. ")|r"
         end,
-        icon = "ReplaceableTextures\\CommandButtons\\BTNRingGreen.blp",
+        icon = "ReplaceableTextures\\CommandButtons\\BTNSpikedRing.blp",
         tooltip = function(pid)
             return struggle_tooltip(pid, "ring")
                 .. "\n\nAt level |cffffcc00200|r, it can be crystallized into an equivalent socketable gem."
@@ -151,10 +150,10 @@ OnInit.final("ColosseumShop", function(Require)
         name = function(pid)
             return "Struggle Gem |cff999999(Rank " .. StruggleRewards.getClaimRank(pid) .. ")|r"
         end,
-        icon = "ReplaceableTextures\\CommandButtons\\BTNCrystalBall.blp",
+        icon = "ReplaceableTextures\\CommandButtons\\BTNShardOfPower.blp",
         tooltip = function(pid)
             return struggle_tooltip(pid, "socketable gem")
-                .. "\n\nRequires level |cffffcc00200|r. An embedded gem must be extracted before it can be upgraded."
+                .. "\n\nRequires level |cffffcc00200|r."
         end,
         categories = struggle,
         availability = function(pid)
@@ -168,8 +167,8 @@ OnInit.final("ColosseumShop", function(Require)
     ShopAddOffer(shop_id, {
         key = "crystallize_struggle_ring",
         name = "Crystallize Ring of Struggle",
-        icon = "ReplaceableTextures\\CommandButtons\\BTNOrbOfDarkness.blp",
-        tooltip = "Convert a Ring of Struggle into a socketable Struggle Gem of the same rank. This service is free and does not consume a checkpoint claim.",
+        icon = "ReplaceableTextures\\CommandButtons\\BTNCrystalStaff.blp",
+        tooltip = "Convert a Ring of Struggle into a socketable Struggle Gem of the same rank. This service is free and does not consume a reward claim.",
         categories = struggle,
         availability = function(pid)
             return StruggleRewards.canConvert(pid)

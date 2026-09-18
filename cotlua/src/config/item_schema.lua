@@ -153,26 +153,12 @@ OnInit.global("ItemSchema", function()
     SPRITE_RARITY = {
         [0] = "war3mapImported\\CommonBorder.dds",
         "war3mapImported\\RefinedBorder.dds",
-        "war3mapImported\\RefinedBorder.dds",
-        "war3mapImported\\RefinedBorder.dds",
-        "war3mapImported\\RefinedBorder.dds",
-        "war3mapImported\\RareBorder.dds",
-        "war3mapImported\\RareBorder.dds",
-        "war3mapImported\\RareBorder.dds",
         "war3mapImported\\RareBorder.dds",
         "war3mapImported\\EpicBorder.dds",
-        "war3mapImported\\EpicBorder.dds",
-        "war3mapImported\\EpicBorder.dds",
-        "war3mapImported\\EpicBorder.dds",
         "war3mapImported\\LegendaryBorder.dds",
-        "war3mapImported\\LegendaryBorder.dds",
-        "war3mapImported\\LegendaryBorder.dds",
-        "war3mapImported\\LegendaryBorder.dds",
-        "war3mapImported\\ChaosBorder.dds",
-        "war3mapImported\\ChaosBorder.dds",
-        "war3mapImported\\ChaosBorder.dds",
         "war3mapImported\\ChaosBorder.dds",
     }
+    MAX_ITEM_RARITY_INDEX = 5
 
     ITEM_STAT_MULTIPLIER = {
         [0] = 0,

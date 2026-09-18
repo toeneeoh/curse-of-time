@@ -8,6 +8,8 @@ OnInit.final("StatView", function(Require)
     Require('StatValues')
     Require('Honor')
     Require('HonorMilestones')
+    Require('Perks')
+    Require('PerkTree')
 
     ---@class STAT_WINDOW
     ---@field display function
@@ -58,10 +60,46 @@ OnInit.final("StatView", function(Require)
             { tag = "|cff6969ffCrystal|r", priority = 1, getter = function(u) local pid = GetPlayerId(GetOwningPlayer(u)) + 1 return GetCurrency(pid, CRYSTAL) end},
         },
         {
-            { tag = "|cffffcc00Perk Points|r", priority = 1, getter = function(u) local pid = GetPlayerId(GetOwningPlayer(u)) + 1 return "1" end},
+            { tag = "|cffffcc00Available Perk Points|r", priority = 1, getter = function(u) local pid = GetPlayerId(GetOwningPlayer(u)) + 1 return Perks.getAvailable(pid) end},
+            { tag = "|cffffcc00Allocated Perk Points|r", priority = 1, getter = function(u) local pid = GetPlayerId(GetOwningPlayer(u)) + 1 return Perks.getSpent(pid) end},
+            { tag = "|cffffcc00Total Perk Points|r", priority = 1, getter = function(u) local pid = GetPlayerId(GetOwningPlayer(u)) + 1 return Perks.getTotal(pid) end},
+            { tag = "|cffffcc00Free Reset|r", priority = 1, getter = function(u) local pid = GetPlayerId(GetOwningPlayer(u)) + 1 return Perks.hasReset(pid) and "Available" or "Unavailable" end},
         },
         {}, -- lifetime Honor milestones use their own paginated renderer
     }
+
+    local perk_bonuses = {
+        { "Primary Attribute", "primary_percent", 100., "%" },
+        { "Total Damage", "damage_percent", 100., "%" },
+        { "Critical Chance", "crit_chance", 1., "%" },
+        { "Critical Damage", "crit_damage", 1., "%" },
+        { "Spellboost", "spellboost", 100., "%" },
+        { "Armor", "armor_percent", 100., "%" },
+        { "Health Regeneration", "regen_percent", 100., "%" },
+        { "Damage Reduction", "damage_reduction", 100., "%" },
+        { "Movespeed", "movespeed", 1., "" },
+        { "Gold Find", "gold_rate", 1., "%" },
+        { "Shared Experience", "shared_xp", 100., "%" },
+        { "New Character Levels", "inheritance", 5., "" },
+        { "New Character Gold", "inheritance", 25000., "" },
+        { "Kill Quest Auto Turn-In", "huntsman", 1., "" },
+    }
+    for _, definition in ipairs(perk_bonuses) do
+        local bonus = definition
+        tab_tags[3][#tab_tags[3] + 1] = {
+            tag = bonus[1],
+            priority = 1,
+            getter = function(u)
+                local pid = GetPlayerId(GetOwningPlayer(u)) + 1
+                local value = Perks.getBonuses(pid)[bonus[2]] or 0
+                if bonus[2] == "huntsman" then
+                    return value > 0 and "Enabled" or "Disabled"
+                end
+                local result = math.floor(value * bonus[3] + .5)
+                return (result > 0 and "+" or "") .. result .. bonus[4]
+            end,
+        }
+    end
 
     local function build_tab_order(tab)
         local order = {}
@@ -77,6 +115,7 @@ OnInit.final("StatView", function(Require)
     local frame = BlzCreateFrame("ListBoxWar3", BlzGetFrameByName("ConsoleUIBackdrop", 0), 0, 0)
 
     local MAX_ROWS = 32
+    local PERKS_TAB = 3
     local HONOR_TAB = 4
     local MILESTONES_PER_PAGE = 7
     local tab_ui = {} -- tab_ui[page] = { rows = { [1]=slot,... }, order = ..., entries = ... }
@@ -150,6 +189,12 @@ OnInit.final("StatView", function(Require)
             tab_ui[page].rows[line] = slot
             BlzFrameSetVisible(slot.tag, false)
             BlzFrameSetVisible(slot.val, false)
+
+            if page == PERKS_TAB then
+                BlzFrameClearAllPoints(slot.val)
+                BlzFrameSetPoint(slot.val, FRAMEPOINT_TOPLEFT, frame,
+                    FRAMEPOINT_TOPLEFT, 0.205, y)
+            end
 
             if page == HONOR_TAB and line >= 4 then
                 BlzFrameClearAllPoints(slot.icon)
@@ -246,6 +291,24 @@ OnInit.final("StatView", function(Require)
     -- escape button
     local esc_button = SimpleButton.create(frame, "ReplaceableTextures\\CommandButtons\\BTNCancel.blp", 0.015, 0.015, FRAMEPOINT_TOPRIGHT, FRAMEPOINT_TOPRIGHT, -0.02, -0.02, onClose, "Close 'B'", FRAMEPOINT_BOTTOM, FRAMEPOINT_TOP, 0., 0.01)
     RegisterHotkeyTooltip(esc_button, 6)
+
+    local manage_perks = BlzCreateFrameByType("GLUETEXTBUTTON", "", frame,
+        "ScriptDialogButton", 0)
+    BlzFrameSetPoint(manage_perks, FRAMEPOINT_BOTTOM, frame, FRAMEPOINT_BOTTOM,
+        0., 0.018)
+    BlzFrameSetSize(manage_perks, 0.11, 0.026)
+    BlzFrameSetText(manage_perks, "View Perks")
+    BlzFrameSetVisible(manage_perks, false)
+    local manage_perks_trigger = CreateTrigger()
+    BlzTriggerRegisterFrameEvent(manage_perks_trigger, manage_perks,
+        FRAMEEVENT_CONTROL_CLICK)
+    TriggerAddCondition(manage_perks_trigger, Condition(function()
+        local pid = GetPlayerId(GetTriggerPlayer()) + 1
+        BlzFrameSetEnable(manage_perks, false)
+        BlzFrameSetEnable(manage_perks, true)
+        PerkTree.display(pid)
+        return false
+    end))
 
     local function ViewPlayersClick()
         local pid   = GetPlayerId(GetTriggerPlayer()) + 1 ---@type integer 
@@ -509,6 +572,7 @@ OnInit.final("StatView", function(Require)
         local tpid = GetPlayerId(GetOwningPlayer(u)) + 1
         local name = (u == Hero[tpid] and User[tpid - 1].nameColored) or GetUnitName(u)
         BlzFrameSetText(title, name)
+        BlzFrameSetVisible(manage_perks, page == PERKS_TAB and tpid == pid)
 
         -- hero vs non-hero gating
         local ishero = (u == Hero[tpid] and 3) or 2
@@ -649,6 +713,15 @@ OnInit.final("StatView", function(Require)
         local pid = GetPlayerId(GetLocalPlayer()) + 1
         local selected = viewing[pid].unit
         if selected and viewing[pid].page == HONOR_TAB
+            and GetPlayerId(GetOwningPlayer(selected)) + 1 == changed_pid then
+            STAT_WINDOW.refresh(pid)
+        end
+    end)
+
+    Perks.registerChangedAction(function(changed_pid)
+        local pid = GetPlayerId(GetLocalPlayer()) + 1
+        local selected = viewing[pid].unit
+        if selected and viewing[pid].page == PERKS_TAB
             and GetPlayerId(GetOwningPlayer(selected)) + 1 == changed_pid then
             STAT_WINDOW.refresh(pid)
         end

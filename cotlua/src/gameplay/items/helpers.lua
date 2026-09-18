@@ -81,7 +81,11 @@ OnInit.global("ItemHelpers", function(Require)
 
     ---@type fun(pid: integer, prof: integer): boolean
     function HasProficiency(pid, prof)
-        local id = Profile[pid].hero.unit_id
+        -- Prefer the live hero type. Persisted unit_id is a load-time DTO field
+        -- and may be stale while a character is being created or replaced.
+        local hero = Hero[pid]
+        local id = hero and GetUnitTypeId(hero)
+            or (Profile[pid] and Profile[pid].hero and Profile[pid].hero.unit_id)
         if not HERO_STATS[id] then return false end
         return BlzBitAnd(HERO_STATS[id].prof, prof) ~= 0
             or prof == 0 or prof == PROF_SHIELD or prof == PROF_POTION
@@ -244,21 +248,14 @@ OnInit.global("ItemHelpers", function(Require)
         return nil
     end
 
-    -- Kept for console/perk compatibility until backpack cosmetics are redesigned.
+    -- Kept as a global because the backpack ability tooltip may be refreshed by
+    -- console commands and future reward screens.
     function UpdateBackpackTooltips(pid)
-        local text = ""
         local user = User[pid - 1]
-        local unlocked = 0
-
-        for j = PUBLIC_SKINS + 2, TOTAL_SKINS do
-            if CosmeticTable[user.name][j] > 0 then unlocked = unlocked + 1 end
-        end
-
-        if unlocked >= 17 then
-            text = "Change your backpack's appearance.\n\nUnlocked skins: |c0000ff4017/17"
-        else
-            text = "Change your backpack's appearance.\n\nUnlocked skins: " .. unlocked .. "/17"
-        end
+        local unlocked, total = Cosmetics.getBackpackProgress(pid)
+        local count = unlocked >= total and "|c0000ff40" .. unlocked .. "/" .. total .. "|r"
+            or unlocked .. "/" .. total
+        local text = "Change your backpack's appearance.\n\nHonor skins unlocked: " .. count
 
         if GetLocalPlayer() == user.player then
             BlzSetAbilityExtendedTooltip(FourCC('A0KX'), text, 0)

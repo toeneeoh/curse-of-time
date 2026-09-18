@@ -7,6 +7,7 @@ OnInit.final("Currency", function(Require)
     Require('Users')
     Require('ItemEventRegistry')
     Require('EconomyEffects')
+    Require('RewardNotifications')
 
     local CURRENCY = __jarray(0) ---@type integer[]
     local PLAT_VALUE = 1000000
@@ -199,8 +200,12 @@ OnInit.final("Currency", function(Require)
         platWon = goldWon // PLAT_VALUE
         goldWon = goldWon - platWon * PLAT_VALUE
 
-        AddCurrency(pid, PLATINUM, platWon)
-        AddCurrency(pid, GOLD, goldWon)
+        if platWon > 0 then
+            AddCurrency(pid, PLATINUM, platWon)
+        else
+            RuntimeMetrics.rewards.currency_writes_saved = RuntimeMetrics.rewards.currency_writes_saved + 1
+        end
+        if goldWon > 0 then AddCurrency(pid, GOLD, goldWon) end
 
         if displaymessage then
             if platWon > 0 then
@@ -211,18 +216,7 @@ OnInit.final("Currency", function(Require)
             end
         end
 
-        local s = "+" .. goldWon
-
-        if goldWon >= 100000 then
-            s = concat({"+", goldWon // 1000, "K"})
-        end
-
-        if platWon > 0 then
-            s = concat({"|cffcccccc+", platWon, "|r |cffffcc00", s, "|r"})
-            FloatingTextUnit(s, Hero[pid], 1.5, 75, -100, 9., 255, 255, 255, 0, false)
-        else
-            FloatingTextUnit(s, Hero[pid], 1.5, 75, -100, 9., 255, 255, 0, 0, false)
-        end
+        RewardNotifications.gold(pid, goldWon, platWon)
     end
 
     ---@type fun(pid: integer, price: number, successMsg: string): boolean

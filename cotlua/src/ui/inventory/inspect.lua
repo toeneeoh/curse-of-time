@@ -10,6 +10,7 @@ OnInit.final("Inspect", function(Require)
     Require('Events')
 
     local backdrop = BlzCreateFrameByType("BACKDROP", "", BlzGetOriginFrame(ORIGIN_FRAME_GAME_UI, 0), "", 0)
+    INSPECT_HUD_ANCHOR = backdrop
     BlzFrameSetSize(backdrop, 0.001, 0.001)
     BlzFrameSetTexture(backdrop, "trans32.blp", 0, true)
     BlzFrameSetAbsPoint(backdrop, FRAMEPOINT_BOTTOM, 0.518, 0.15)

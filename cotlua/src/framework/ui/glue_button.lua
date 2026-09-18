@@ -336,6 +336,7 @@ OnInit.final("Gluebutton", function(Require)
     ---@field spriteFrame framehandle
     ---@field chargeFrame framehandle
     ---@field chargeText framehandle
+    ---@field rarityBorder? framehandle
     ---@field charges integer
     ---@field cooldownText framehandle
     ---@field cooldownFrame framehandle

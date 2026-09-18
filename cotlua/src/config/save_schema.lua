@@ -10,6 +10,10 @@ OnInit.global("SaveSchema", function(Require)
     Require('Variables')
 
     MAX_SLOTS = 40
+    PROFILE_PERK_SLOTS = 8
+    -- Thirty allocation bits per word keeps profile values within a safe
+    -- positive integer range while reserving room for ninety stable nodes.
+    PROFILE_PERK_NODE_WORDS = 3
 
     SaveWire = {}
 

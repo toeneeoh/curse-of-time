@@ -15,6 +15,7 @@ OnInit.final("SaveLoad", function(Require)
     Require('Items')
     Require('SaveSchema')
     Require('PersistencePaths')
+    Require('Perks')
 
     --[[ profile load order
             slot code hash checksums
@@ -103,9 +104,14 @@ OnInit.final("SaveLoad", function(Require)
             return false
         end
         received_slots[pid][slot] = true
+        received_slots[pid].count = (received_slots[pid].count or 0) + 1
 
         if code:len() > 1 then
             Profile[pid]:preload_character(code, slot)
+        end
+
+        if received_slots[pid].count == MAX_SLOTS then
+            Profile.notifyStorageChanged(pid)
         end
 
         return false

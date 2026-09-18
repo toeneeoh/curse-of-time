@@ -364,10 +364,14 @@ OnInit.final("Items", function(Require)
             -- determine if immediately useable in recipes
             self.nocraft = tbl[ITEM_NOCRAFT] ~= 0
 
-            -- determine if saveable (ITEM_TYPE_MISCELLANEOUS yields 6 instead of proper value of 7)
-            local type = GetItemType(self.obj)
-            if (GetHandleId(type) == 7 or type == ITEM_TYPE_PERMANENT or type == ITEM_TYPE_PURCHASABLE) and self.id > CUSTOM_ITEM_OFFSET then
-                SAVE_TABLE.KEY_ITEMS[self.id] = self.id - CUSTOM_ITEM_OFFSET
+            -- Any custom item that reaches the managed inventory must retain
+            -- its identity regardless of its object-editor item class. The old
+            -- type allowlist silently encoded Artifact equipment as an empty
+            -- slot. Powerups still never enter HeroData.items, so registering
+            -- their rawcode does not make consumed items persist.
+            local save_index = self.id - CUSTOM_ITEM_OFFSET
+            if save_index > 0 and save_index <= 0x1FFF then
+                SAVE_TABLE.KEY_ITEMS[self.id] = save_index
 
                 -- hide the item according to item drop settings
                 if not IS_ITEM_DROP[GetPlayerId(GetLocalPlayer()) + 1] then
@@ -401,6 +405,15 @@ OnInit.final("Items", function(Require)
                 self:update()
             else
                 self:cache_stats()
+                -- Inventory frames render wrapper text rather than reading the
+                -- native handle every refresh. Tierless utility items never run
+                -- update(), so leaving these fields nil made their slot retain
+                -- whichever tooltip had previously occupied it.
+                local base_tooltip = (definition and definition.flavor)
+                    or tbl.tooltip
+                self.tooltip = (base_tooltip ~= nil and base_tooltip ~= 0)
+                    and base_tooltip or ""
+                self.alt_tooltip = self.tooltip
             end
 
             Item[self.obj] = self
@@ -1223,6 +1236,7 @@ OnInit.final("Items", function(Require)
 
             BlzSetItemIconPath(self.obj, ItemData[self.id].path)
             BlzSetItemName(self.obj, definition and definition.name and definition.name(self) or ItemData[self.id].name)
+            BlzSetItemTooltip(self.obj, ItemData[self.id].name)
             BlzSetItemDescription(self.obj, self.tooltip)
             BlzSetItemExtendedTooltip(self.obj, self.tooltip)
 

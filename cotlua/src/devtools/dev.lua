@@ -26,6 +26,7 @@ OnInit.final("Dev", function(Require)
     Require('Variables')
     Require('Items')
     Require('ItemHelpers')
+    Require('Perks')
     local pack, find, lower = string.pack, string.find, string.lower
     local searchable = {} ---@type boolean[]
     local dev_cmds, wipe_item_stats, find_item, event_setup
@@ -42,6 +43,9 @@ OnInit.final("Dev", function(Require)
         ["sp"] = "Set the amount of platinum you have to #. usage: -sp [#]",
         ["sc"] = "Set the amount of crystals you have to #. usage: -sc [#]",
         ["sh"] = "Set the amount of honor you have to #. usage: -sh [#]",
+        ["perks"] = "Set the temporary Perk Point total to #. usage: -perks [#]",
+        ["rewardmetrics"] = "Print reward HUD counters, or reset them with -rewardmetrics reset.",
+        ["levelmetrics"] = "Print level-up timing stages, or reset them with -levelmetrics reset.",
         ["sf"] = "Set the amount of faction points you have to #. usage: -sf [#]",
         ["lvl"] = "Set the selected hero's level to #. usage: -lvl [1-500]",
         ["str"] = "Set the selected hero's strength to #. usage: -str [#]",
@@ -210,6 +214,49 @@ modifiers:
         end,
         ["sh"] = function(p, pid, args)
             Honor.setTotal(pid, S2I(args[2]))
+        end,
+        ["perks"] = function(p, pid, args)
+            local amount = math.max(0, S2I(args[2]))
+            Perks.setDevPoints(pid, amount)
+            DisplayTextToPlayer(p, 0., 0., "Temporary Perk Point total: " .. amount)
+        end,
+        ["rewardmetrics"] = function(p, pid, args)
+            local metrics = RuntimeMetrics.rewards
+            if args[2] == "reset" then
+                for key in pairs(metrics) do metrics[key] = 0 end
+                DisplayTextToPlayer(p, 0., 0., "Reward metrics reset.")
+                return
+            end
+            DisplayTextToPlayer(p, 0., 0., "Reward metrics: gold=" .. metrics.gold_events
+                .. " xp=" .. metrics.xp_events
+                .. " quests=" .. metrics.quest_updates
+                .. " hud flushes=" .. metrics.hud_flushes
+                .. " text tags removed=" .. metrics.world_text_tags_removed
+                .. " currency writes saved=" .. metrics.currency_writes_saved
+                .. " XP refreshes saved=" .. metrics.xp_rate_refreshes_saved)
+        end,
+        ["levelmetrics"] = function(p, pid, args)
+            local metrics = RuntimeMetrics.leveling
+            if args[2] == "reset" then
+                for key, value in pairs(metrics) do
+                    metrics[key] = type(value) == "number" and 0 or value
+                end
+                DisplayTextToPlayer(p, 0., 0., "Level metrics reset.")
+                return
+            end
+            local divisor = math.max(1, metrics.events)
+            local award_divisor = math.max(1, metrics.leveling_awards)
+            DisplayTextToPlayer(p, 0., 0., string.format(
+                "Level metrics: events=%d avg=%.2fms max=%.2fms | XP level awards=%d avg=%.2fms max=%.2fms",
+                metrics.events, metrics.total_time / divisor * 1000., metrics.max_time * 1000.,
+                metrics.leveling_awards, metrics.leveling_award_time / award_divisor * 1000.,
+                metrics.max_leveling_award_time * 1000.))
+            DisplayTextToPlayer(p, 0., 0., string.format(
+                "Stages avg: hero event %.2fms, backpack %.2fms, items %.2fms, stat sync %.2fms, stat event %.2fms, finish %.2fms",
+                metrics.hero_event_time / divisor * 1000., metrics.backpack_time / divisor * 1000.,
+                metrics.item_time / divisor * 1000., metrics.stat_sync_time / divisor * 1000.,
+                metrics.stat_event_time / divisor * 1000.,
+                metrics.finish_time / divisor * 1000.))
         end,
         ["sf"] = function(p, pid, args)
             SetCurrency(pid, FACTION, S2I(args[2]))
@@ -972,7 +1019,7 @@ modifiers:
             SetupDefaultHotkeys(pid)
         end
 
-        dev_cmds["go"](p, pid, {"go", "dark summoner"})
+        dev_cmds["go"](p, pid, {"go", "vampire"})
 
         SetUnitXBounded(Hero[pid], x)
         SetUnitYBounded(Hero[pid], y)

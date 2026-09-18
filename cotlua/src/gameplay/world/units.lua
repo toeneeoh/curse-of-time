@@ -13,9 +13,102 @@ OnInit.final("Units", function(Require)
     Require('Damage')
     Require('BossAbilities')
     Require('Shopkeeper')
+    Require('Events')
+    Require('TimerQueue')
+    Require('Users')
 
     GHOST_UNITS = {} ---@type unit[]
     UnitData = {}
+
+    local GROUP_SCALING_RANGE = 1800.
+    local HEALTH_PER_EXTRA_PLAYER = 0.5
+    local DAMAGE_PER_EXTRA_PLAYER = 0.15
+    local GROUP_SCALING_RESET_DELAY = 5.
+
+    ---@param creep unit
+    ---@param party_size integer
+    local function apply_group_scaling(creep, party_size)
+        local data = Unit[creep]
+        local previous_max = math.max(1., data.hp)
+        local health_fraction = math.max(0., math.min(1.,
+            GetWidgetLife(creep) / previous_max))
+        local extra_players = math.max(0, party_size - 1)
+        local health_multiplier = 1. + HEALTH_PER_EXTRA_PLAYER * extra_players
+        local damage_multiplier = 1. + DAMAGE_PER_EXTRA_PLAYER * extra_players
+
+        data.bonus_hp = data.overworld_base_bonus_hp
+            + data.overworld_base_hp * (health_multiplier - 1.)
+        data.dm = data.overworld_base_dm * damage_multiplier
+        data.overworld_party_size = party_size
+        SetWidgetLife(creep, data.hp * health_fraction)
+    end
+
+    ---@param creep unit
+    local function reset_group_scaling(creep)
+        if not UnitAlive(creep) then return end
+
+        local data = Unit[creep]
+        if data.target then
+            TimerQueue:callDelayed(GROUP_SCALING_RESET_DELAY,
+                reset_group_scaling, creep)
+            return
+        end
+
+        apply_group_scaling(creep, 1)
+        data.overworld_scaling_reset_pending = false
+    end
+
+    ---@param creep unit
+    ---@return integer
+    local function count_nearby_eligible_players(creep)
+        local count = 0
+        local creep_level = GetUnitLevel(creep)
+        local user = User.first
+
+        while user do
+            local hero = Hero[user.id]
+            if hero and UnitAlive(hero)
+                and IsUnitInRange(hero, creep, GROUP_SCALING_RANGE)
+                and GetHeroLevel(hero) >= creep_level - 20 then
+                count = count + 1
+            end
+            user = user.next
+        end
+
+        return math.max(1, count)
+    end
+
+    ---@param creep unit
+    local function scale_overworld_engagement(creep)
+        local data = Unit[creep]
+        local party_size = count_nearby_eligible_players(creep)
+
+        -- Scaling may increase as players join, but never falls during combat.
+        if party_size > data.overworld_party_size then
+            apply_group_scaling(creep, party_size)
+        end
+
+        if data.overworld_party_size > 1
+            and not data.overworld_scaling_reset_pending then
+            data.overworld_scaling_reset_pending = true
+            TimerQueue:callDelayed(GROUP_SCALING_RESET_DELAY,
+                reset_group_scaling, creep)
+        end
+    end
+
+    ---@param creep unit
+    local function initialize_overworld_creep(creep)
+        local data = Unit[creep]
+        data.overworld_base_hp = data.hp
+        data.overworld_base_bonus_hp = data.bonus_hp
+        data.overworld_base_dm = data.dm
+        data.overworld_party_size = 1
+        data.overworld_scaling_reset_pending = false
+        EVENT_ON_AGGRO:register_unit_action(creep, scale_overworld_engagement)
+        -- Register before damage is applied so a coordinated opening AoE cannot
+        -- bypass the health scaling by killing an idle pack in one frame.
+        EVENT_ON_STRUCK:register_unit_action(creep, scale_overworld_engagement)
+    end
 
     ---@return boolean
     local function respawn_filter()
@@ -31,7 +124,6 @@ OnInit.final("Units", function(Require)
 
     ---@type fun(u: unit)
     local function revive_ghost(u)
-        HideEffect(Unit[u].ghost)
         PauseUnit(u, false)
         UnitRemoveAbility(u, ABIL_AVUL)
         ShowUnit(u, true)
@@ -40,6 +132,8 @@ OnInit.final("Units", function(Require)
     end
 
     local function ghost_respawn(creep)
+        if GetUnitTypeId(creep) == 0 then return end
+
         local ug = CreateGroup()
 
         GroupEnumUnitsInRange(ug, GetUnitX(creep), GetUnitY(creep), 800., Condition(respawn_filter))
@@ -62,21 +156,13 @@ OnInit.final("Units", function(Require)
 
             local creep = CreateUnit(PLAYER_CREEP, uid, x, y, math.random(0, 359))
             EVENT_ON_UNIT_DEATH:register_unit_action(creep, func)
+            initialize_overworld_creep(creep)
 
             if FirstOfGroup(ug) ~= nil then
-                BlzSetItemSkin(PATH_ITEM, BlzGetUnitSkin(creep))
-                local sfx = AddSpecialEffect(BlzGetItemStringField(PATH_ITEM, ITEM_SF_MODEL_USED), x, y)
                 GHOST_UNITS[#GHOST_UNITS + 1] = creep
                 PauseUnit(creep, true)
                 UnitAddAbility(creep, ABIL_AVUL)
                 ShowUnit(creep, false)
-                BlzSetItemSkin(PATH_ITEM, BlzGetUnitSkin(DUMMY_UNIT))
-                BlzSetSpecialEffectColorByPlayer(sfx, PLAYER_CREEP)
-                BlzSetSpecialEffectColor(sfx, 175, 175, 175)
-                BlzSetSpecialEffectAlpha(sfx, 127)
-                BlzSetSpecialEffectScale(sfx, BlzGetUnitRealField(creep, UNIT_RF_SCALING_VALUE))
-                BlzSetSpecialEffectYaw(sfx, bj_DEGTORAD * GetUnitFacing(creep))
-                Unit[creep].ghost = sfx
                 TimerQueue:callDelayed(1., ghost_respawn, creep)
             end
 
@@ -180,6 +266,7 @@ OnInit.final("Units", function(Require)
                         y = GetRandomReal(GetRectMinY(myregion), GetRectMaxY(myregion))
                     until IsTerrainWalkable(x, y)
                     local u = CreateUnit(PLAYER_CREEP, id, x, y, GetRandomInt(0, 359))
+                    initialize_overworld_creep(u)
 
                     -- on death logic
                     EVENT_ON_UNIT_DEATH:register_unit_action(u, on_death)

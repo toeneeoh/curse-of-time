@@ -70,7 +70,9 @@ OnInit.final("DialogWindow", function(Require)
         BlzFrameSetAbsPoint(main, FRAMEPOINT_TOP, 0.4, 0.542)
         BlzFrameSetSize(main, MAIN_WIDTH, 0.20)
         BlzFrameSetEnable(main, false)
-        BlzFrameSetLevel(main, 20)
+        -- Dialogs are modal confirmations and must remain above feature views
+        -- such as the saved-character browser.
+        BlzFrameSetLevel(main, 100)
 
         local title = BlzCreateFrame("TitleText", main, 0, 0)
         BlzFrameSetPoint(title, FRAMEPOINT_TOP, main, FRAMEPOINT_TOP, 0.0, -0.015)
@@ -344,8 +346,8 @@ OnInit.final("DialogWindow", function(Require)
         end
 
         close_button = SimpleButton.create(main, "ReplaceableTextures\\CommandButtons\\BTNCancel.blp", 0.015, 0.015, FRAMEPOINT_TOPRIGHT, FRAMEPOINT_TOPRIGHT, -0.018, -0.018, onClose, "Close", FRAMEPOINT_BOTTOM, FRAMEPOINT_TOP, 0.0, 0.01)
-        previous_button = SimpleButton.create(main, "ReplaceableTextures\\CommandButtons\\BTNReplay-SpeedDown.blp", 0.022, 0.022, FRAMEPOINT_BOTTOMRIGHT, FRAMEPOINT_BOTTOMRIGHT, -0.17, 0.015, onPrevious, "Previous Page", FRAMEPOINT_BOTTOM, FRAMEPOINT_TOP, 0.0, 0.01)
-        next_button = SimpleButton.create(main, "ReplaceableTextures\\CommandButtons\\BTNReplay-SpeedUp.blp", 0.022, 0.022, FRAMEPOINT_BOTTOMLEFT, FRAMEPOINT_BOTTOMLEFT, 0.17, 0.015, onNext, "Next Page", FRAMEPOINT_BOTTOM, FRAMEPOINT_TOP, 0.0, 0.01)
+        previous_button = SimpleButton.create(main, "ReplaceableTextures\\CommandButtons\\BTNCycleLeft.blp", 0.022, 0.022, FRAMEPOINT_BOTTOMRIGHT, FRAMEPOINT_BOTTOMRIGHT, -0.17, 0.015, onPrevious, "Previous Page", FRAMEPOINT_BOTTOM, FRAMEPOINT_TOP, 0.0, 0.01)
+        next_button = SimpleButton.create(main, "ReplaceableTextures\\CommandButtons\\BTNCycleRight.blp", 0.022, 0.022, FRAMEPOINT_BOTTOMLEFT, FRAMEPOINT_BOTTOMLEFT, 0.17, 0.015, onNext, "Next Page", FRAMEPOINT_BOTTOM, FRAMEPOINT_TOP, 0.0, 0.01)
 
         AddToEsc(cancelCurrent)
 

@@ -12,6 +12,31 @@ do
         events = { triggers = 0, callbacks = 0 },
         damage = { events = 0 },
         enemy_ai = { evaluations = 0, dispatches = 0 },
+        rewards = {
+            gold_events = 0,
+            xp_events = 0,
+            quest_updates = 0,
+            hud_flushes = 0,
+            world_text_tags_removed = 0,
+            currency_writes_saved = 0,
+            xp_rate_refreshes_saved = 0,
+        },
+        leveling = {
+            events = 0,
+            xp_awards = 0,
+            leveling_awards = 0,
+            xp_award_time = 0.,
+            leveling_award_time = 0.,
+            max_leveling_award_time = 0.,
+            total_time = 0.,
+            max_time = 0.,
+            hero_event_time = 0.,
+            backpack_time = 0.,
+            item_time = 0.,
+            stat_sync_time = 0.,
+            stat_event_time = 0.,
+            finish_time = 0.,
+        },
         movespeed = {
             active = 0,
             peak = 0,
@@ -293,12 +318,16 @@ dofile('gameplay/abilities/spells.lua')
 
 dofile('framework/ui/prompt.lua')
 dofile('framework/ui/simple_button.lua')
+dofile('ui/dialogs/character_browser.lua')
 dofile('ui/inventory/item_details.lua')
 dofile('framework/ui/glue_button.lua')
 dofile('ui/hud/spell_view.lua')
 dofile('ui/hud/frames.lua')
 dofile('ui/hud/currency_display.lua')
+dofile('ui/hud/reward_feed.lua')
+dofile('ui/hud/quest_tracker.lua')
 dofile('ui/hud/stat_values.lua')
+dofile('ui/dialogs/perk_tree.lua')
 dofile('ui/hud/stat_view.lua')
 dofile('ui/hud/multiboard.lua')
 dofile('ui/hud/hide_min_damage.lua')
@@ -365,7 +394,9 @@ dofile('gameplay/world/dungeons.lua')
 dofile('gameplay/world/fountain.lua')
 dofile('gameplay/world/unit_queries.lua')
 dofile('gameplay/world/player_camera.lua')
+dofile('gameplay/players/reward_notifications.lua')
 dofile('gameplay/players/progression.lua')
+dofile('gameplay/players/perks.lua')
 dofile('gameplay/players/lifecycle.lua')
 dofile('gameplay/world/world_transitions.lua')
 dofile('gameplay/world/summon_helpers.lua')

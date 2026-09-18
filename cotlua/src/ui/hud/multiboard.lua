@@ -60,6 +60,24 @@ OnInit.final("Multiboard", function(Require)
         MB.lookingAt = __jarray(1) ---@type integer[]
         MB.previousMb = __jarray(1)
         MB.minimized = __jarray(false)
+        local view_changed_actions = {}
+
+        ---@param callback fun(pid: integer, body: framehandle, minimized: boolean)
+        function MB.registerViewChangedAction(callback)
+            for index = 1, #view_changed_actions do
+                if view_changed_actions[index] == callback then return false end
+            end
+            view_changed_actions[#view_changed_actions + 1] = callback
+            return true
+        end
+
+        local function notify_view_changed(pid)
+            local body = MB.bodies[MB.lookingAt[pid]]
+            if not body then return end
+            for index = 1, #view_changed_actions do
+                view_changed_actions[index](pid, body.frame, MB.minimized[pid])
+            end
+        end
 
         -- 1 = main, 2, ready queue, 3 = boss, 4 = damage log
         MB.bodies = {} ---@type table[]
@@ -160,6 +178,7 @@ OnInit.final("Multiboard", function(Require)
                             self.open()
                         end
                     end
+                    notify_view_changed(pid)
                 end
             end,
 
@@ -278,6 +297,7 @@ OnInit.final("Multiboard", function(Require)
                     end
                 end
             end
+            notify_view_changed(pid)
         end
 
         local function onMinimize()

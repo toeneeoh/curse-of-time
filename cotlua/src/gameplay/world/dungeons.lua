@@ -12,6 +12,7 @@ OnInit.final("Dungeons", function(Require)
     Require('Death')
     Require('Gluebutton')
     Require('WorldTransitions')
+    Require('Perks')
 
     QUEUE_DUNGEON = false
     QUEUE_GROUP   = {} ---@type player[]
@@ -350,6 +351,10 @@ OnInit.final("Dungeons", function(Require)
 
         local function onComplete()
             StartSound(bj_questCompletedSound)
+
+            for index = 1, #thistype.players do
+                Perks.completeMilestone(thistype.players[index], "naga")
+            end
 
             thistype.chest = CreateUnit(Player(PLAYER_NEUTRAL_PASSIVE), FourCC('h002'), -22141, -10500, 0)
             DisplayTextToTable(thistype.players, "You have vanquished the Ancient Nagas!")

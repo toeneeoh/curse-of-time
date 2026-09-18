@@ -11,6 +11,7 @@ OnInit.final("Inventory", function(Require)
     Require('Frames')
     Require('Currency')
     Require('PlayerSync')
+    Require('Items')
 
     local INVENTORY_WIDTH   = 0.1981
     local INVENTORY_HEIGHT  = 0.232
@@ -113,6 +114,31 @@ OnInit.final("Inventory", function(Require)
         local synced_context, synced_target = {}, {}
         local ui_mode = __jarray(0) -- 0 = normal, 1 = context menu open
         local right_click_origin = __jarray(0)
+
+        ---@param itm Item
+        ---@return string
+        local function get_rarity_border(itm)
+            local definition = ItemRuntime.definitions[itm.id]
+            local rarity_index = 0
+
+            if itm.level > 0 and not (definition and definition.custom_level) then
+                rarity_index = math.min(MAX_ITEM_RARITY_INDEX,
+                    (itm.level + 3) // itm.rarity)
+            end
+
+            return SPRITE_RARITY[rarity_index] or SPRITE_RARITY[0]
+        end
+
+        ---@param slot Button
+        ---@param texture string?
+        local function set_rarity_border(slot, texture)
+            if texture then
+                BlzFrameSetTexture(slot.rarityBorder, texture, 0, true)
+                BlzFrameSetVisible(slot.rarityBorder, true)
+            else
+                BlzFrameSetVisible(slot.rarityBorder, false)
+            end
+        end
 
         -- determines what item slot a user has their cursor over
         ---@return integer
@@ -504,8 +530,10 @@ OnInit.final("Inventory", function(Require)
                     update_socket_tooltips(slots[i].tooltip, itm)
                     slots[i]:visible(true)
                     slots[i]:charge(itm.charges)
+                    set_rarity_border(slots[i], get_rarity_border(itm))
                 else
                     update_socket_tooltips(slots[i].tooltip)
+                    set_rarity_border(slots[i])
                     slots[i]:visible(false)
                 end
             end
@@ -896,6 +924,12 @@ OnInit.final("Inventory", function(Require)
                 local offy   = y_offset(kind)
 
                 slots[id] = Button.create(parent, INVENTORY_SLOT_SIZE, INVENTORY_SLOT_SIZE, offx, offy, false)
+                slots[id].rarityBorder = BlzCreateFrameByType("BACKDROP", "", slots[id].iconFrame, "", 0)
+                BlzFrameSetAllPoints(slots[id].rarityBorder, slots[id].iconFrame)
+                BlzFrameSetEnable(slots[id].rarityBorder, false)
+                BlzFrameSetLevel(slots[id].rarityBorder, 1)
+                BlzFrameSetLevel(slots[id].chargeFrame, 2)
+                BlzFrameSetVisible(slots[id].rarityBorder, false)
                 slots[id].tooltip:enableAttachments()
                 slots[id]:visible(false)
                 slots[id].index = id

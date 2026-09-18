@@ -7,8 +7,16 @@
 OnInit.final("Quests", function(Require)
     Require('MainMap')
     Require('Progression')
+    Require('Perks')
     Require('ItemEventRegistry')
     Require('Units')
+    Require('RewardNotifications')
+
+    -- Kill-quest turn-ins add half of the accumulated base XP from their
+    -- required kills. Ordinary solo kills pay 1.2 times base XP, making the
+    -- quest a substantial ~42% bonus to the combat XP rather than the former
+    -- ~7% bonus. Party and overlevel adjustments still apply afterward.
+    local KILL_QUEST_XP_SHARE = 0.5
 
     GODS_QUEST_MARKER = AddSpecialEffectTarget("Abilities\\Spells\\Other\\TalkToMe\\TalkToMe.mdl", god_angel, "overhead")
     Evil_Shopkeeper_Quest_1 = CreateQuestBJ(bj_QUESTTYPE_OPT_UNDISCOVERED, "The Evil Shopkeeper", "The greedy Evil Shopkeeper finally has a bounty on his head! After mercilessly selling stolen n' smuggled items at outrageous prices and double-crossing everyone that simply crossed his path he has finally got the people angry enough to want him dead. Kill him, and put his evil deeds to and end. But be warned! He is tricky.", "ReplaceableTextures\\CommandButtons\\BTNAcolyte.tga")
@@ -387,39 +395,102 @@ OnInit.final("Quests", function(Require)
         KillQuest[PRECHAOS] = {}
         KillQuest[CHAOS] = {}
 
-        ---@param pid integer
-        function DisplayQuestProgress(pid)
-            local i = 0 ---@type integer 
-            local flag = (CHAOS_MODE and 1) or 0
-            local id = KillQuest[flag][i]
-            local kq = KillQuest[id]
+        local function target_level(kq)
+            if kq.contribution_count == 0 then return 0. end
+            return kq.mob_level_total / kq.contribution_count
+        end
 
-            while kq do
-                local s = (kq.count == kq.goal and "|cff40ff40") or ""
+        local function contribution_quality(kq)
+            if kq.contribution_count == 0 then return 1. end
+            return kq.quality_total / kq.contribution_count
+        end
 
-                DisplayTimedTextToPlayer(Player(pid - 1), 0, 0, 10, kq.name .. ": " .. s .. (kq.count) .. "/" .. (kq.goal) .. "|r |cffffcc01LVL " .. (kq.min) .. "-" .. (kq.max))
-                i = i + 1
-                id = KillQuest[flag][i]
-                kq = KillQuest[id]
+        local function notify_quest(kq, replaced_text_tag)
+            RewardNotifications.quest(kq.id, kq.name, kq.count, kq.goal,
+                kq.status, kq.min, target_level(kq), contribution_quality(kq),
+                replaced_text_tag)
+        end
+
+        local function complete_kill_quest(kq)
+            if kq.status ~= "COMPLETE" then return false end
+
+            -- Claim the shared completion before distributing rewards so two
+            -- simultaneous item/callback paths cannot award it twice.
+            kq.status = "TURNING_IN"
+            local min, goal = kq.min, kq.goal
+            local target = target_level(kq)
+            local minimum_reward_level = math.max(min, target - LEECH_CONSTANT)
+            local shared_quality = contribution_quality(kq)
+            local recipient_weight = 0.
+            local user = User.first
+
+            while user do
+                local profile = Profile[user.id]
+                local hero = Hero[user.id]
+                if profile and profile.playing and hero
+                    and GetHeroLevel(hero) >= minimum_reward_level then
+                    recipient_weight = recipient_weight
+                        + RewardNotifications.questLevelMultiplier(GetHeroLevel(hero), target)
+                end
+                user = user.next
             end
+
+            local divisor = 0.5 + recipient_weight * 0.5
+            user = User.first
+            while user do
+                local profile = Profile[user.id]
+                local hero = Hero[user.id]
+                if profile and profile.playing and hero
+                    and GetHeroLevel(hero) >= minimum_reward_level then
+                    local reward_multiplier = shared_quality
+                        * RewardNotifications.questLevelMultiplier(GetHeroLevel(hero), target)
+                    DisplayTimedTextToPlayer(user.player, 0, 0, 10,
+                        "|c00c0c0c0" .. kq.name .. " quest completed!|r"
+                            .. (reward_multiplier < 0.995
+                                and " |cffffcc00(" .. math.floor(reward_multiplier * 100. + 0.5)
+                                    .. "% reward)|r" or ""))
+                    AwardGold(user.id,
+                        kq.gold_value * 0.5 * reward_multiplier / divisor, true)
+                    local xp = math.floor(kq.xp_value * Unit[hero].xp_rate * 0.01
+                        * KILL_QUEST_XP_SHARE * reward_multiplier / divisor)
+                    AwardXP(user.id, xp)
+                end
+                user = user.next
+            end
+
+            kq.status = "IN_PROGRESS"
+            kq.count = 0
+            kq.goal = math.min(goal + 3, 100)
+            kq.mob_level_total = 0.
+            kq.quality_total = 0.
+            kq.contribution_count = 0
+            kq.gold_value = 0.
+            kq.xp_value = 0.
+            notify_quest(kq)
+
+            -- Increase max spawns based on the last unit killed until the
+            -- maximum goal is reached.
+            if kq.goal < 100 and ModuloInteger(kq.goal, 2) == 0 then
+                local region = SelectGroupedRegion(UnitData[kq.last].spawn)
+                local x, y
+                repeat
+                    x = GetRandomReal(GetRectMinX(region), GetRectMaxX(region))
+                    y = GetRandomReal(GetRectMinY(region), GetRectMaxY(region))
+                until IsTerrainWalkable(x, y)
+                CreateUnit(PLAYER_CREEP, kq.last, x, y, GetRandomInt(0, 359))
+                DisplayTimedTextToForce(FORCE_PLAYING, 20.,
+                    "An additional " .. GetObjectName(kq.last) .. " has spawned in the area.")
+            end
+            return true
         end
 
         local function kill_quest_handler(p, pid, _, itm)
-            local kq          = KillQuest[itm.id] ---@type table 
-            local min         = kq.min ---@type integer 
-            local max         = kq.max ---@type integer 
-            local avg         = (min + max) // 2
-            local goal        = kq.goal ---@type integer 
-            local playercount = 0 ---@type integer 
-            local U           = User.first ---@type User 
-            local x           = 0.
-            local y           = 0.
-            local myregion    = nil ---@type rect 
+            local kq  = KillQuest[itm.id] ---@type table
+            local min = kq.min ---@type integer
+            local goal = kq.goal ---@type integer
 
             if GetUnitLevel(Hero[pid]) < min then
                 DisplayTimedTextToPlayer(p, 0,0, 10, "You must be level |cffffcc00" .. (min) .. "|r to begin this quest.")
-            elseif GetUnitLevel(Hero[pid]) > max then
-                DisplayTimedTextToPlayer(p, 0,0, 10, "You are too high level to do this quest.")
             -- progress
             elseif kq.status == "IN_PROGRESS" then
                 DisplayTimedTextToPlayer(p, 0,0, 10, "Killed " .. (kq.count) .. "/" .. (goal) .. " " .. kq.name)
@@ -427,60 +498,30 @@ OnInit.final("Quests", function(Require)
             -- start quest
             elseif kq.status == "NOT_STARTED" then
                 kq.status = "IN_PROGRESS"
+                notify_quest(kq)
                 DisplayTimedTextToPlayer(p, 0, 0, 10, "|cffffcc00QUEST:|r Kill " .. (goal) .. " " .. kq.name .. " for a reward.")
                 PingMinimap(GetRectCenterX(kq.region), GetRectCenterY(kq.region), 5)
             -- completion
             elseif kq.status == "COMPLETE" then
-                while U do
-                    if Profile[U.id].playing and GetUnitLevel(Hero[U.id]) >= min and GetUnitLevel(Hero[U.id]) <= max then
-                        playercount = playercount + 1
-                    end
-
-                    U = U.next
-                end
-
-                U = User.first
-
-                while U do
-                    if GetHeroLevel(Hero[U.id]) >= min and GetHeroLevel(Hero[U.id]) <= max then
-                        DisplayTimedTextToPlayer(U.player, 0, 0, 10, "|c00c0c0c0" .. kq.name .. " quest completed!|r")
-                        local GOLD = GOLD_TABLE[avg] * goal * 0.5 / (0.5 + playercount * 0.5)
-                        AwardGold(U.id, GOLD, true)
-                        local XP = math.floor(EXPERIENCE_TABLE[max] * Unit[Hero[U.id]].xp_rate * goal * 0.0008) / (0.5 + playercount * 0.5)
-                        AwardXP(U.id, XP)
-                    end
-
-                    U = U.next
-                end
-
-                -- reset
-                kq.status = "IN_PROGRESS"
-                kq.count = 0
-                kq.goal = math.min(goal + 3, 100)
-
-                -- increase max spawns based on last unit killed (until max goal of 100 is reached)
-                if (kq.goal) < 100 and ModuloInteger(kq.goal, 2) == 0 then
-                    myregion = SelectGroupedRegion(UnitData[kq.last].spawn)
-                    repeat
-                        x = GetRandomReal(GetRectMinX(myregion), GetRectMaxX(myregion))
-                        y = GetRandomReal(GetRectMinY(myregion), GetRectMaxY(myregion))
-                    until IsTerrainWalkable(x, y)
-                    CreateUnit(PLAYER_CREEP, kq.last, x, y, GetRandomInt(0, 359))
-                    DisplayTimedTextToForce(FORCE_PLAYING, 20., "An additional " .. GetObjectName(kq.last) .. " has spawned in the area.")
-                end
+                complete_kill_quest(kq)
             end
         end
 
-        local function setup_kill_quest(id, itemid, goal, min, max, name, region, chaos)
+        local function setup_kill_quest(id, itemid, goal, min, name, region, chaos)
             KillQuest[chaos][count] = id
             local kq = {
+                id = id,
                 goal = goal,
                 min = min,
-                max = max,
                 name = name,
                 region = region,
                 count = 0,
                 status = "NOT_STARTED",
+                mob_level_total = 0.,
+                quality_total = 0.,
+                contribution_count = 0,
+                gold_value = 0.,
+                xp_value = 0.,
             }
 
             count = count + 1
@@ -489,44 +530,64 @@ OnInit.final("Quests", function(Require)
             ITEM_LOOKUP[itemid] = kill_quest_handler
         end
 
-        setup_kill_quest(FourCC('n0tb'), FourCC('I07D'), 15, 1, 8, "Trolls", gg_rct_Troll_Demon_1, PRECHAOS)
-        setup_kill_quest(FourCC('n0ts'), FourCC('I058'), 20, 3, 14, "Tuskarr", gg_rct_Tuskar_Horror_1, PRECHAOS)
-        setup_kill_quest(FourCC('n0ss'), FourCC('I05F'), 20, 5, 24, "Spiders", gg_rct_Spider_Horror_3, PRECHAOS)
-        setup_kill_quest(FourCC('n0uw'), FourCC('I04U'), 25, 8, 34, "Ursae", gg_rct_Ursa_Abyssal_2, PRECHAOS)
-        setup_kill_quest(FourCC('n0dm'), FourCC('I04V'), 20, 12, 46, "Polar Bears & Mammoths", gg_rct_Bear_2, PRECHAOS)
-        setup_kill_quest(FourCC('n01G'), FourCC('I05B'), 25, 20, 62, "Taurens & Ogres", gg_rct_OgreTauren_Void_5, PRECHAOS)
-        setup_kill_quest(FourCC('n0ud'), FourCC('I05L'), 25, 29, 84, "Unbroken", gg_rct_Unbroken_Dimensional_2, PRECHAOS)
-        setup_kill_quest(FourCC('n0hs'), FourCC('I05E'), 20, 44, 110, "Hellspawn", gg_rct_Hell_4, PRECHAOS)
-        setup_kill_quest(FourCC('n024'), FourCC('I0GD'), 20, 56, 134, "Centaurs", gg_rct_Centaur_Nightmare_5, PRECHAOS)
-        setup_kill_quest(FourCC('n01M'), FourCC('I05K'), 20, 70, 162, "Magnataurs", gg_rct_Magnataur_Despair_1, PRECHAOS)
-        setup_kill_quest(FourCC('n02P'), FourCC('I05M'), 20, 92, 182, "Dragons", gg_rct_Dragon_Astral_8, PRECHAOS)
-        setup_kill_quest(FourCC('n02L'), FourCC('I022'), 20, 110, 198, "Devourers", gg_rct_Devourer_entry, PRECHAOS)
+        setup_kill_quest(FourCC('n0tb'), FourCC('I07D'), 15, 1, "Trolls", gg_rct_Troll_Demon_1, PRECHAOS)
+        setup_kill_quest(FourCC('n0ts'), FourCC('I058'), 20, 3, "Tuskarr", gg_rct_Tuskar_Horror_1, PRECHAOS)
+        setup_kill_quest(FourCC('n0ss'), FourCC('I05F'), 20, 5, "Spiders", gg_rct_Spider_Horror_3, PRECHAOS)
+        setup_kill_quest(FourCC('n0uw'), FourCC('I04U'), 25, 8, "Ursae", gg_rct_Ursa_Abyssal_2, PRECHAOS)
+        setup_kill_quest(FourCC('n0dm'), FourCC('I04V'), 20, 12, "Polar Bears & Mammoths", gg_rct_Bear_2, PRECHAOS)
+        setup_kill_quest(FourCC('n01G'), FourCC('I05B'), 25, 20, "Taurens & Ogres", gg_rct_OgreTauren_Void_5, PRECHAOS)
+        setup_kill_quest(FourCC('n0ud'), FourCC('I05L'), 25, 29, "Unbroken", gg_rct_Unbroken_Dimensional_2, PRECHAOS)
+        setup_kill_quest(FourCC('n0hs'), FourCC('I05E'), 20, 44, "Hellspawn", gg_rct_Hell_4, PRECHAOS)
+        setup_kill_quest(FourCC('n024'), FourCC('I0GD'), 20, 56, "Centaurs", gg_rct_Centaur_Nightmare_5, PRECHAOS)
+        setup_kill_quest(FourCC('n01M'), FourCC('I05K'), 20, 70, "Magnataurs", gg_rct_Magnataur_Despair_1, PRECHAOS)
+        setup_kill_quest(FourCC('n02P'), FourCC('I05M'), 20, 92, "Dragons", gg_rct_Dragon_Astral_8, PRECHAOS)
+        setup_kill_quest(FourCC('n02L'), FourCC('I022'), 20, 110, "Devourers", gg_rct_Devourer_entry, PRECHAOS)
         count = 0
-        setup_kill_quest(FourCC('n034'), FourCC('I03H'), 20, 166, 256, "Demons", gg_rct_Troll_Demon_1, CHAOS)
-        setup_kill_quest(FourCC('n03A'), FourCC('I09J'), 20, 190, 260, "Horror Beasts", gg_rct_Tuskar_Horror_1, CHAOS)
-        setup_kill_quest(FourCC('n03F'), FourCC('I03C'), 20, 210, 280, "Despairs", gg_rct_Magnataur_Despair_1, CHAOS)
-        setup_kill_quest(FourCC('n08N'), FourCC('I02A'), 20, 229, 299, "Abyssals", gg_rct_Ursa_Abyssal_2, CHAOS)
-        setup_kill_quest(FourCC('n031'), FourCC('I03I'), 20, 250, 320, "Voids", gg_rct_OgreTauren_Void_5, CHAOS)
-        setup_kill_quest(FourCC('n020'), FourCC('I0GE'), 20, 270, 340, "Nightmares", gg_rct_Centaur_Nightmare_5, CHAOS)
-        setup_kill_quest(FourCC('n03D'), FourCC('I03J'), 20, 290, 360, "Hellspawn", gg_rct_Hell_4, CHAOS)
-        setup_kill_quest(FourCC('n03J'), FourCC('I02G'), 30, 310, 380, "Existences", gg_rct_Devourer_entry, CHAOS)
-        setup_kill_quest(FourCC('n03M'), FourCC('I039'), 20, 330, 400, "Astrals", gg_rct_Dragon_Astral_8, CHAOS)
-        setup_kill_quest(FourCC('n026'), FourCC('I0Q1'), 20, 350, 420, "Dimensionals", gg_rct_Unbroken_Dimensional_2, CHAOS)
+        setup_kill_quest(FourCC('n034'), FourCC('I03H'), 20, 166, "Demons", gg_rct_Troll_Demon_1, CHAOS)
+        setup_kill_quest(FourCC('n03A'), FourCC('I09J'), 20, 190, "Horror Beasts", gg_rct_Tuskar_Horror_1, CHAOS)
+        setup_kill_quest(FourCC('n03F'), FourCC('I03C'), 20, 210, "Despairs", gg_rct_Magnataur_Despair_1, CHAOS)
+        setup_kill_quest(FourCC('n08N'), FourCC('I02A'), 20, 229, "Abyssals", gg_rct_Ursa_Abyssal_2, CHAOS)
+        setup_kill_quest(FourCC('n031'), FourCC('I03I'), 20, 250, "Voids", gg_rct_OgreTauren_Void_5, CHAOS)
+        setup_kill_quest(FourCC('n020'), FourCC('I0GE'), 20, 270, "Nightmares", gg_rct_Centaur_Nightmare_5, CHAOS)
+        setup_kill_quest(FourCC('n03D'), FourCC('I03J'), 20, 290, "Hellspawn", gg_rct_Hell_4, CHAOS)
+        setup_kill_quest(FourCC('n03J'), FourCC('I02G'), 30, 310, "Existences", gg_rct_Devourer_entry, CHAOS)
+        setup_kill_quest(FourCC('n03M'), FourCC('I039'), 20, 330, "Astrals", gg_rct_Dragon_Astral_8, CHAOS)
+        setup_kill_quest(FourCC('n026'), FourCC('I0Q1'), 20, 350, "Dimensionals", gg_rct_Unbroken_Dimensional_2, CHAOS)
 
         local function on_death(pid, killed, killer)
             local uid      = GetUnitTypeId(killed)
             local unitType = GetType(uid)
             local kpid     = GetPlayerId(GetOwningPlayer(killer)) + 1
             local kq       = KillQuest[unitType]
+            local killer_hero = Hero[kpid]
 
-            if unitType > 0 and kq and kq.status == "IN_PROGRESS" and GetHeroLevel(Hero[kpid]) <= kq.max + LEECH_CONSTANT then
+            if unitType > 0 and kq and kq.status == "IN_PROGRESS" and killer_hero then
+                local mob_level = math.max(1, math.min(MAX_LEVEL, GetUnitLevel(killed)))
+                local killer_level = GetHeroLevel(killer_hero)
+                local quality = RewardNotifications.questLevelMultiplier(killer_level, mob_level)
+
                 kq.count = kq.count + 1
-                FloatingTextUnit(kq.name .. " " .. (kq.count) .. "/" .. (kq.goal), killed, 3.1 ,80, 90, 9, 125, 200, 200, 0, true)
+                kq.mob_level_total = kq.mob_level_total + mob_level
+                kq.quality_total = kq.quality_total + quality
+                kq.contribution_count = kq.contribution_count + 1
+                kq.gold_value = kq.gold_value + GOLD_TABLE[mob_level]
+                kq.xp_value = kq.xp_value + EXPERIENCE_TABLE[mob_level]
+                notify_quest(kq, true)
 
                 if kq.count >= kq.goal then
                     kq.status = "COMPLETE"
                     kq.last = uid
-                    DisplayTimedTextToForce(FORCE_PLAYING, 12, kq.name .. " quest completed, talk to the Huntsman for your reward.")
+                    notify_quest(kq)
+                    local minimum_reward_level = math.max(kq.min,
+                        target_level(kq) - LEECH_CONSTANT)
+                    if Perks.hasEligibleActiveOwner("huntsmans_favor", minimum_reward_level) then
+                        DisplayTimedTextToForce(FORCE_PLAYING, 12,
+                            kq.name .. " quest completed and was turned in by Huntsman's Favor.")
+                        complete_kill_quest(kq)
+                    else
+                        DisplayTimedTextToForce(FORCE_PLAYING, 12,
+                            kq.name .. " quest completed, talk to the Huntsman for your reward.")
+                    end
                 end
             end
         end

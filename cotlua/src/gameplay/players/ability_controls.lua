@@ -1,5 +1,6 @@
 OnInit.final("PlayerAbilityControls", function(Require)
     Require("Spells")
+    Require("Cosmetics")
 
     IS_HERO_PANEL_ON = {} ---@type boolean[] 
 
@@ -46,8 +47,8 @@ OnInit.final("PlayerAbilityControls", function(Require)
         
         if index ~= -1 then
             index = dw.data[index]
-            if CosmeticTable[User[pid - 1].name][index] == 0 and not CosmeticTable.skins[index].public then
-                DisplayTextToPlayer(GetTriggerPlayer(), 0, 0, CosmeticTable.skins[index].error)
+            if not Cosmetics.isSkinUnlocked(pid, index) then
+                DisplayTextToPlayer(GetTriggerPlayer(), 0, 0, Cosmetics.getSkinRequirement(index))
             else
                 Profile[pid]:skin(index)
             end
@@ -61,13 +62,18 @@ OnInit.final("PlayerAbilityControls", function(Require)
     -- Displays backpack selection dialog
     ---@param pid integer
     function BackpackSkin(pid)
-        local name = User[pid - 1].name
         local dw   = DialogWindow.create(pid, "Select Appearance", BackpackSkinClick) ---@type DialogWindow 
 
         for i, v in ipairs(CosmeticTable.skins) do
-            local text = ((v.req and CosmeticTable[name][i] > 0) and "|cff00ff00" .. v.name .. "|r") or v.name
+            local unlocked = Cosmetics.isSkinUnlocked(pid, i)
+            local text = v.name
+            if v.honor then
+                text = unlocked
+                    and "|cff00ff00" .. v.name .. "|r"
+                    or "|cff808080" .. v.name .. " (" .. v.honor .. " Honor)|r"
+            end
 
-            if CosmeticTable[name][i] > 0 or v.public == true then
+            if unlocked or v.honor then
                 dw:addButton(text, i)
             end
         end
@@ -197,5 +203,4 @@ OnInit.final("PlayerAbilityControls", function(Require)
         end,
     }
 end, Debug and Debug.getLine())
-
 

@@ -251,22 +251,40 @@ OnInit.final("HeroSelect", function(Require)
     ---@param pid integer
     ---@param id integer
     function SelectHero(pid, id)
-        local p = Player(pid - 1)
-
         Profile[pid]:new_character(id)
         Profile[pid].hero.hardcore = (hardcore[pid] and 1) or 0
         SELECTING_HERO[pid] = false
 
-        if (GetLocalPlayer() == p) then
+        CharacterSetup(pid, false)
+    end
+
+    ---Closes every local hero-select presentation layer. Existing-character
+    ---loads bypass SelectHero, so teardown must not live only in its callback.
+    ---@param pid integer
+    function CloseHeroSelect(pid)
+        local player = Player(pid - 1)
+        if GetLocalPlayer() == player then
             ClearTextMessages()
+            EnablePreSelect(true, true)
+            EnableSelect(true, true)
             ClearSelection()
-            SelectUnit(Hero[pid], true)
+            if Hero[pid] then
+                SelectUnit(Hero[pid], true)
+            end
             ResetToGameCamera(0)
             BlzFrameSetVisible(sprite_frame, false)
             BlzFrameSetVisible(frame, false)
         end
+    end
 
-        CharacterSetup(pid, false)
+    ---Hides the selection presentation without ending selection mode. This is
+    ---used while the saved-character browser is in front of it.
+    ---@param pid integer
+    function HideHeroSelect(pid)
+        if GetLocalPlayer() == Player(pid - 1) then
+            BlzFrameSetVisible(sprite_frame, false)
+            BlzFrameSetVisible(frame, false)
+        end
     end
 
     function StartHeroSelect(pid)
