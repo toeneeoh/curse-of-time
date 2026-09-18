@@ -112,7 +112,7 @@ OnInit.final("BuffsHeroesDarkSavior", function(Require)
     do
         local thistype = DarkAscensionBuff
         thistype.NAME            = "Dark Ascension"
-        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNhelmofdomination.blp"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNBTNhelmofdomination.blp"
         thistype.DESC            = "This unit has splash attacks, !$bat base attack time, and +^#dm% total damage"
         thistype.DISPEL_TYPE     = BUFF_POSITIVE
         thistype.STACK_TYPE      = BUFF_STACK_NONE
@@ -231,7 +231,7 @@ OnInit.final("BuffsHeroesDarkSavior", function(Require)
     do
         local thistype = DarkShieldBuff
         thistype.NAME            = "Dark Shield"
-        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNShieldOfDarkOn.dds"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNShieldOfMagicVol3.blp"
         thistype.DESC            = "This unit has +^#dr% damage resist and drains |cffffcc002|r mana per |cffffcc001|r damage taken"
         thistype.DISPEL_TYPE     = BUFF_POSITIVE
         thistype.STACK_TYPE      = BUFF_STACK_NONE
@@ -252,7 +252,7 @@ OnInit.final("BuffsHeroesDarkSavior", function(Require)
             u:removeEffect(self.sfx)
 
             if GetLocalPlayer() == u.owner then
-                BlzSetAbilityIcon(DARKSHIELD.id, "ReplaceableTextures\\CommandButtons\\BTNShieldOfDark.dds")
+                BlzSetAbilityIcon(DARKSHIELD.id, "ReplaceableTextures\\CommandButtons\\BTNShieldOfMagicVol1.blp")
             end
 
             u.dr = u.dr / self.dr
@@ -269,7 +269,7 @@ OnInit.final("BuffsHeroesDarkSavior", function(Require)
             u.dr = u.dr * self.dr
 
             if GetLocalPlayer() == u.owner then
-                BlzSetAbilityIcon(DARKSHIELD.id, "ReplaceableTextures\\CommandButtons\\BTNShieldOfDarkOn.dds")
+                BlzSetAbilityIcon(DARKSHIELD.id, "ReplaceableTextures\\CommandButtons\\BTNShieldOfMagicVol3.blp")
             end
 
             EVENT_ON_STRUCK_FINAL:register_unit_action(self.target, on_struck)

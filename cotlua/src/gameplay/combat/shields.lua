@@ -18,29 +18,40 @@ OnInit.global("Shield", function(Require)
     ---@field create function
     ---@field destroy function
     ---@field queue TimerQueue
+    ---@field destroyed boolean?
     local shieldtimer = {}
     do
         local thistype = shieldtimer
         local mt = { __index = thistype }
 
         function thistype:destroy()
-            TQ:disableCallback(self.queue)
-            TableRemove(self.shield.timers, self)
-            setmetatable(self, nil)
+            if self.destroyed then return end
+            self.destroyed = true
+            if self.queue then
+                TQ:disableCallback(self.queue)
+                self.queue = nil
+            end
+            if self.shield and self.shield.timers then
+                TableRemove(self.shield.timers, self)
+            end
         end
 
         ---@type fun(self: shieldtimer)
         local function expire(self)
-            self.shield.max = self.shield.max - self.amount
-            self.shield.hp = self.shield.hp - self.amount
+            local shield = self.shield
+            if self.destroyed then return end
+            if not shield or shield.destroyed then return thistype.destroy(self) end
+
+            shield.max = shield.max - self.amount
+            shield.hp = shield.hp - self.amount
 
             -- remove self before removing shield object
             self:destroy()
 
-            if self.shield.hp <= 0 then
-                self.shield:destroy()
+            if shield.hp <= 0 then
+                shield:destroy()
             else
-                self.shield:refresh()
+                shield:refresh()
             end
         end
 
@@ -77,6 +88,7 @@ OnInit.global("Shield", function(Require)
     ---@field timers shieldtimer[]
     ---@field shieldheight number[]
     ---@field list Shield[]
+    ---@field destroyed boolean?
     Shield = {}
     do
         local thistype = Shield
@@ -154,12 +166,14 @@ OnInit.global("Shield", function(Require)
             end
 
             -- move shield visual positions
-            for i = 1, #thistype.list do
+            local i = 1
+            while i <= #thistype.list do
                 local s = thistype.list[i]
                 if UnitAlive(s.target) then
                     BlzSetSpecialEffectX(s.sfx, GetUnitX(s.target))
                     BlzSetSpecialEffectY(s.sfx, GetUnitY(s.target))
                     BlzSetSpecialEffectZ(s.sfx, BlzGetUnitZ(s.target) + thistype.shieldheight[GetUnitTypeId(s.target)])
+                    i = i + 1
                 else
                     s:destroy()
                 end
@@ -175,12 +189,15 @@ OnInit.global("Shield", function(Require)
 
         -- shield fully expires
         function thistype:onDestroy()
+            if self.destroyed then return end
+            self.destroyed = true
             BlzSetSpecialEffectAlpha(self.sfx, 0)
             DestroyEffect(self.sfx)
+            self.sfx = nil
 
             -- destroy all active shieldtimers
-            for _, v in ipairs(self.timers) do
-                v:destroy()
+            while #self.timers > 0 do
+                self.timers[#self.timers]:destroy()
             end
 
             TableRemove(thistype.list, self)
@@ -195,9 +212,9 @@ OnInit.global("Shield", function(Require)
         end
 
         function thistype:destroy()
+            if self.destroyed then return end
             self:onDestroy()
             thistype[self.target] = nil
-            setmetatable(self, nil)
         end
 
         ---@type fun(self: Shield, amount: number, dur: number)

@@ -230,13 +230,19 @@ OnInit.final("Azazoth", function(Require)
         local SPIRE_SPAWN_RADIUS = 500.
         local ANGLE_FACING_DOWN = 306.
 
-        local function on_death()
+        local function clear_prison()
             AstralChainsDebuff:removeAll()
             AstralPrisonDebuff:removeAll()
         end
 
+        local function on_spire_death(spire)
+            clear_prison()
+            RemoveUnit(spire)
+        end
+
         local function onStruck(target)
-            if CastSpell(target, thistype.id, 1., SPELL_ANIM, 1.) then
+            if not AstralPrisonDebuff:has(nil, target)
+                and CastSpell(target, thistype.id, 1., SPELL_ANIM, 1.) then
                 FloatingTextUnit(thistype.tag, target, 3, 70, 0, 12, 255, 255, 255, 0, true)
                 local angle = math.random() * 2 * bj_PI
 
@@ -251,13 +257,13 @@ OnInit.final("Azazoth", function(Require)
                 SetWidgetLife(buff.spire, total_hp)
                 Unit[buff.spire].hit_based_health = true
 
-                EVENT_ON_UNIT_DEATH:register_unit_action(buff.spire, on_death)
+                EVENT_ON_UNIT_DEATH:register_unit_action(buff.spire, on_spire_death)
             end
         end
 
         function thistype.onSetup(u)
             EVENT_ENEMY_AI:register_unit_action(u, onStruck)
-            EVENT_ON_UNIT_DEATH:register_unit_action(u, on_death)
+            EVENT_ON_UNIT_DEATH:register_unit_action(u, clear_prison)
         end
     end
 
@@ -273,7 +279,10 @@ OnInit.final("Azazoth", function(Require)
 
         local function apply_debuff(source, target)
             if UnitAlive(source) then
-                AstralChainsDebuff:add(source, target)
+                local prison = AstralPrisonDebuff:get(nil, source)
+                if prison and UnitAlive(prison.spire) then
+                    AstralChainsDebuff:add(prison.spire, target)
+                end
             end
         end
 

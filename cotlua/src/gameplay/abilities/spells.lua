@@ -17,12 +17,18 @@ OnInit.final("Spells", function(Require)
     Require("UnitTable")
     Require("Mouse")
 
-    -- this only exists to update mana costs if a spell is readded for any reason
+    -- Refresh dynamic spell data only when a registered spell is actually
+    -- added. The native return value is part of UnitAddAbility's contract and
+    -- is used by callers to decide whether one-time setup is necessary.
     local OldUnitAddAbility = UnitAddAbility
     UnitAddAbility = function(u, id)
-        OldUnitAddAbility(u, id)
+        local added = OldUnitAddAbility(u, id)
 
-        EVENT_STAT_CHANGE:trigger(u, "int")
+        if added and Spells and Spells[id] then
+            EVENT_STAT_CHANGE:trigger(u, "int")
+        end
+
+        return added
     end
 
     -- storage for spell definitions

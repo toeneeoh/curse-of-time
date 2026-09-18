@@ -22,8 +22,13 @@ OnInit.final("BuffsBossesAzazoth", function(Require)
         thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
 
         function thistype:onRemove()
-            Unit[self.target].mr = Unit[self.target].mr / self.mr
-            Unit[self.target]:removeEffect(self.sfx)
+            local target = Unit[self.target]
+            if not target then return end
+            target.mr = target.mr / self.mr
+            if self.sfx then
+                target:removeEffect(self.sfx)
+                self.sfx = nil
+            end
         end
 
         function thistype:onApply()
@@ -66,10 +71,10 @@ OnInit.final("BuffsBossesAzazoth", function(Require)
         }
         missile_template.__index = missile_template
 
-        local function delay(self, x, y, z, heal)
-            PauseUnit(self.target, false)
+        local function delay(target, pid, x, y, z, heal)
+            PauseUnit(target, false)
 
-            if not UnitAlive(self.target) then
+            if not UnitAlive(target) then
                 return
             end
 
@@ -79,10 +84,10 @@ OnInit.final("BuffsBossesAzazoth", function(Require)
             missile.z = z
             missile.visual = AddSpecialEffect("Abilities\\Spells\\Undead\\Darksummoning\\DarkSummonMissile.mdl", x, y)
             BlzSetSpecialEffectScale(missile.visual, 1.1)
-            missile.source = self.spire
-            missile.target = self.target
+            missile.source = target
+            missile.target = target
             missile.collideZ = true
-            missile.owner = Player(self.pid - 1)
+            missile.owner = Player(pid - 1)
             missile.heal = heal
             missile.lifetime = 4.
 
@@ -90,7 +95,8 @@ OnInit.final("BuffsBossesAzazoth", function(Require)
         end
 
         function thistype:onRemove()
-            Unit[self.target].dr = Unit[self.target].dr * self.dr
+            local target_data = Unit[self.target]
+            if target_data then target_data.dr = target_data.dr * self.dr end
 
             -- heal sequence
             if UnitAlive(self.spire) then
@@ -101,7 +107,7 @@ OnInit.final("BuffsBossesAzazoth", function(Require)
                     BlzSetUnitFacingEx(self.target, bj_RADTODEG * math.atan(y - GetUnitY(self.target), x - GetUnitX(self.target)))
                     PauseUnit(self.target, true)
                     SetUnitAnimationByIndex(self.target, 21)
-                    TQ:callDelayed(1.1, delay, self, x, y, z, heal)
+                    TQ:callDelayed(1.1, delay, self.target, self.pid, x, y, z, heal)
                     TQ:callDelayed(1.1, DestroyEffect, AddSpecialEffect("Abilities\\Spells\\Undead\\Darksummoning\\DarkSummonTarget.mdl", x, y))
 
                     KillUnit(self.spire)
@@ -132,6 +138,7 @@ OnInit.final("BuffsBossesAzazoth", function(Require)
         end
 
         local function soul_periodic(self)
+            if not self.chain then return end
             local chain = self.chain:get_source_unit()
             if UnitAlive(self.soul) and UnitAlive(chain) then
                 local x, y = GetUnitX(chain), GetUnitY(chain)
@@ -153,6 +160,7 @@ OnInit.final("BuffsBossesAzazoth", function(Require)
 
         function thistype:spawn_soul()
             if not UnitAlive(self.soul) then
+                if not self.chain then return end
                 local chain_source = self.chain:get_source_unit()
                 if not UnitAlive(chain_source) then
                     return
@@ -190,7 +198,7 @@ OnInit.final("BuffsBossesAzazoth", function(Require)
         end
 
         local function periodic(self)
-            if self.chain:update() then
+            if self.chain and self.chain:update() then
                 self.timer = TQ:callDelayed(FPS_32, periodic, self)
             else
                 self.timer = nil
@@ -198,15 +206,26 @@ OnInit.final("BuffsBossesAzazoth", function(Require)
         end
 
         function thistype:onRemove()
-            Unit[self.target]:removeEffect(self.sfx)
-            self.chain:destroy()
-            RemoveUnit(self.soul)
             TQ:disableCallback(self.timer)
             TQ:disableCallback(self.timer2)
+            self.timer = nil
+            self.timer2 = nil
+
+            local target = Unit[self.target]
+            if target and self.sfx then target:removeEffect(self.sfx) end
+            self.sfx = nil
+            if self.chain then
+                self.chain:destroy()
+                self.chain = nil
+            end
+            if self.soul then
+                RemoveUnit(self.soul)
+                self.soul = nil
+            end
         end
 
         function thistype:onApply()
-            local spire = AstralPrisonDebuff:get(nil, Boss[BOSS_AZAZOTH].unit).spire
+            local spire = self.source
             self.dist = 1000.
 
             local chain = Chain.create{

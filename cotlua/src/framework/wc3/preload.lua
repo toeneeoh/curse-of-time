@@ -7,6 +7,7 @@ OnInit.global("Preloader", function()
     gg_trg_map_preplaced = nil
 
     preload("Abilities\\Spells\\Human\\Thunderclap\\ThunderClapCaster.mdx")
+    preload("Abilities\\Spells\\Other\\Levelup\\LevelupCaster.mdl")
     preload("Abilities\\Spells\\Undead\\Impale\\ImpaleHitTarget.mdl")
     preload("Abilities\\Spells\\Undead\\OrbOfDeath\\AnnihilationMissile.mdl")
     preload("Abilities\\Spells\\Other\\Monsoon\\MonsoonBoltTarget.mdx")

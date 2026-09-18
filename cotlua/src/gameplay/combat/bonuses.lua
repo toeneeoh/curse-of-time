@@ -85,7 +85,10 @@ OnInit.final("Bonus", function(Require)
     function UnitSetBonus(u, bonus, amount)
         local abil = BONUS_ABIL[bonus] or 0
 
-        if UnitAddAbility(u, abil) then
+        -- Base-attribute setters do not use an ability. Do not feed rawcode 0
+        -- into UnitAddAbility, and avoid re-adding persistent bonus abilities
+        -- on every recalculation.
+        if abil ~= 0 and GetUnitAbilityLevel(u, abil) == 0 and UnitAddAbility(u, abil) then
             UnitMakeAbilityPermanent(u, true, abil)
         end
 
