@@ -530,14 +530,11 @@ OnInit.final("ArchitectureTests", function(Require)
         return true
     end)
 
-    ArchitectureTests.register("faction mining placeholder rawcodes are distinct", function()
+    ArchitectureTests.register("faction mining object records are configured", function()
         local rawcodes = FactionMining.RAWCODES
-        if rawcodes.common == rawcodes.rich
-            or rawcodes.common == rawcodes.rare
-            or rawcodes.rich == rawcodes.rare
-            or rawcodes.guardian == rawcodes.common
-            or rawcodes.guardian == rawcodes.rich
-            or rawcodes.guardian == rawcodes.rare then
+        if rawcodes.deposit == 0
+            or rawcodes.guardian == 0
+            or rawcodes.guardian == rawcodes.deposit then
             return false, "faction mining object records overlap"
         end
         return true

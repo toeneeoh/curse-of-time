@@ -12,12 +12,10 @@ OnInit.final("FactionMining", function(Require)
 
     FactionMining = {}
 
-    -- Placeholder object-editor records. Replace only these four rawcodes once
-    -- the deposit and guardian units exist; all mining behavior is data-driven.
+    -- Common, rich, and ancient deposits share one object-editor record. Their
+    -- names and presentation are assigned from deposit_types when they spawn.
     FactionMining.RAWCODES = {
-        common = FourCC('n0MD'),
-        rich = FourCC('n0MR'),
-        rare = FourCC('n0MA'),
+        deposit = FourCC('n0MD'),
         guardian = FourCC('n0MG'),
     }
 
@@ -39,7 +37,6 @@ OnInit.final("FactionMining", function(Require)
         common = {
             key = "common",
             name = "Common Deposit",
-            rawcode = FactionMining.RAWCODES.common,
             duration = 4.,
             reputation = 1,
             ore = 1,
@@ -51,7 +48,6 @@ OnInit.final("FactionMining", function(Require)
         rich = {
             key = "rich",
             name = "Rich Deposit",
-            rawcode = FactionMining.RAWCODES.rich,
             duration = 8.,
             reputation = 3,
             ore = 3,
@@ -63,7 +59,6 @@ OnInit.final("FactionMining", function(Require)
         rare = {
             key = "rare",
             name = "Ancient Deposit",
-            rawcode = FactionMining.RAWCODES.rare,
             duration = 30.,
             reputation = 8,
             ore = 8,
@@ -121,7 +116,7 @@ OnInit.final("FactionMining", function(Require)
     local function show_missing_data_warning()
         if warned_missing_data then return end
         warned_missing_data = true
-        print("|cffffcc00FactionMining:|r placeholder deposit rawcodes are not present in object data yet.")
+        print("|cffffcc00FactionMining:|r deposit or guardian object data is missing.")
     end
 
     local function respawn_deposit(kind)
@@ -188,6 +183,8 @@ OnInit.final("FactionMining", function(Require)
         local desired_damage = 500. + level * level * 0.5
         BlzSetUnitBaseDamage(guardian,
             math.max(1, math.floor(desired_damage / CHAOS_ATTACK_DAMAGE_MULTIPLIER)), 0)
+        BlzSetUnitWeaponBooleanField(guardian, UNIT_WEAPON_BF_ATTACKS_ENABLED, 0, true)
+        SetUnitAcquireRange(guardian, 800.)
         BlzSetUnitArmor(guardian, level * 0.75)
         BlzSetUnitIntegerField(guardian, UNIT_IF_DEFENSE_TYPE, ARMOR_CHAOS)
         BlzSetUnitWeaponIntegerField(guardian,
@@ -370,7 +367,8 @@ OnInit.final("FactionMining", function(Require)
             x, y, region_index = random_location()
         end
         if not config or not x then return false end
-        local unit = CreateUnit(Player(PLAYER_NEUTRAL_PASSIVE), config.rawcode, x, y, math.random(0, 359))
+        local unit = CreateUnit(Player(PLAYER_NEUTRAL_PASSIVE), FactionMining.RAWCODES.deposit,
+            x, y, math.random(0, 359))
         if not unit or GetUnitTypeId(unit) == 0 then
             show_missing_data_warning()
             return false
@@ -378,7 +376,10 @@ OnInit.final("FactionMining", function(Require)
 
         PauseUnit(unit, true)
         SetUnitPathing(unit, false)
-        UnitAddAbility(unit, ABIL_AVUL)
+        SetUnitInvulnerable(unit, true)
+        SetUnitAcquireRange(unit, 0.)
+        BlzSetUnitWeaponBooleanField(unit, UNIT_WEAPON_BF_ATTACKS_ENABLED, 0, false)
+        Unit[unit].hidehp = true
         BlzSetUnitName(unit, config.name)
         SetUnitVertexColor(unit, config.color[1], config.color[2], config.color[3], 255)
         SetUnitScale(unit, config.scale, config.scale, config.scale)
