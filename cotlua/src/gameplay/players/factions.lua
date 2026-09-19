@@ -111,6 +111,17 @@ OnInit.final("Faction", function(Require)
         return rank
     end
 
+    ---@return integer
+    function Faction.getMaxRank()
+        return #FACTION_RANK_THRESHOLDS
+    end
+
+    ---@param reputation integer
+    ---@return integer?
+    function Faction.getNextRankThreshold(reputation)
+        return FACTION_RANK_THRESHOLDS[Faction.getRank(reputation) + 1]
+    end
+
     ---@param pid integer
     ---@param amount integer
     function Faction.addReputation(pid, amount)
@@ -182,6 +193,12 @@ OnInit.final("Faction", function(Require)
     local function join_faction(pid)
         local faction = pending_faction[pid]
         if not faction then return false end
+        if not CHAOS_MODE then
+            pending_faction[pid] = nil
+            DisplayTextToPlayer(Player(pid - 1), 0., 0.,
+                "Factions become available after the world enters Chaos.")
+            return false
+        end
 
         player_faction[pid] = faction
         local hero = hero_data(pid)
@@ -212,6 +229,12 @@ OnInit.final("Faction", function(Require)
 
         if view then
             view.onSelected(faction, pid)
+        end
+
+        if not CHAOS_MODE then
+            DisplayTextToPlayer(Player(pid - 1), 0., 0.,
+                "Factions become available after the world enters Chaos.")
+            return
         end
 
         if not player_faction[pid] then
@@ -376,6 +399,10 @@ OnInit.final("Faction", function(Require)
             view.questAccepted(pid, quest, Quest.quests[pid])
         end
         quest:on_accept(pid)
+        StartSoundForPlayerBJ(Player(pid - 1), bj_questDiscoveredSound)
+        if view and player_faction[pid] then
+            view.refreshFaction(player_faction[pid], pid)
+        end
         return false
     end
 
@@ -390,8 +417,10 @@ OnInit.final("Faction", function(Require)
         DisplayTextToPlayer(Player(pid - 1), 0., 0., "|cffffcc00Faction quest complete:|r "
             .. quest.name .. "\n+" .. quest.faction_points .. " Faction Points and +"
             .. quest.reputation .. " Reputation")
+        StartSoundForPlayerBJ(Player(pid - 1), bj_questCompletedSound)
         if view then
             view.questCompleted(pid, quest)
+            view.refreshFaction(player_faction[pid], pid)
         end
     end
 
@@ -409,6 +438,7 @@ OnInit.final("Faction", function(Require)
         quest_progress[pid] = progress
         if view then
             view.refreshProgress(pid, quest, progress)
+            view.refreshFaction(player_faction[pid], pid)
         end
         if progress >= quest.goal then
             complete_quest(pid, quest)
@@ -416,7 +446,7 @@ OnInit.final("Faction", function(Require)
         return true
     end
 
-    ---Advances a contract only once for each distinct objective key.
+    ---Advances a quest only once for each distinct objective key.
     ---@param pid integer
     ---@param kind string
     ---@param key integer|string
@@ -464,7 +494,7 @@ OnInit.final("Faction", function(Require)
         return QUEST_REROLL_COST
     end
 
-    ---Cancels the active contract and immediately rolls a new set of offers.
+    ---Cancels the active quest and immediately rolls a new set of offers.
     ---@param pid integer
     ---@return boolean
     function Quest.reroll(pid)
@@ -474,12 +504,12 @@ OnInit.final("Faction", function(Require)
         end
         if reroll_used[pid] then
             DisplayTextToPlayer(Player(pid - 1), 0., 0.,
-                "You have already rerolled this contract rotation.")
+                "You have already rerolled this quest rotation.")
             return false
         end
         if GetCurrency(pid, FACTION) < QUEST_REROLL_COST then
             DisplayTextToPlayer(Player(pid - 1), 0., 0., "You need "
-                .. QUEST_REROLL_COST .. " Faction Points to reroll contracts.")
+                .. QUEST_REROLL_COST .. " Faction Points to reroll quests.")
             return false
         end
 
@@ -523,14 +553,14 @@ OnInit.final("Faction", function(Require)
     )
     miner_guild:addQuest(Quest.create(
         "Prospector's Route",
-        "Mine 3 deposits while this contract is active.\n\n|cffffcc00Reward:|r 5 Faction Points and 5 Reputation",
+        "Mine 3 ore deposits.\n\n|cffffcc00Reward:|r 5 Faction Points and 5 Reputation",
         "ReplaceableTextures\\CommandButtons\\BTNPickUpItem.blp",
         QUEST_DIFF_EASY,
         "mine_any", 3, 5, 5
     ))
     miner_guild:addQuest(Quest.create(
         "Arena Survey",
-        "Enter the Colosseum while this contract is active.\n\n|cffffcc00Reward:|r 5 Faction Points and 5 Reputation",
+        "Enter the Colosseum.\n\n|cffffcc00Reward:|r 5 Faction Points and 5 Reputation",
         "ReplaceableTextures\\CommandButtons\\BTNHelmutPurple.blp",
         QUEST_DIFF_EASY,
         "colosseum_enter", 1, 5, 5
@@ -544,14 +574,14 @@ OnInit.final("Faction", function(Require)
     ))
     miner_guild:addQuest(Quest.create(
         "Rich Veins",
-        "Mine 2 rich deposits while this contract is active.\n\n|cffffcc00Reward:|r 10 Faction Points and 10 Reputation",
+        "Mine 2 rich ore deposits.\n\n|cffffcc00Reward:|r 10 Faction Points and 10 Reputation",
         "ReplaceableTextures\\CommandButtons\\BTNGem.blp",
         QUEST_DIFF_MEDIUM,
         "mine_rich", 2, 10, 10, 2
     ))
     miner_guild:addQuest(Quest.create(
         "Endless Excavation",
-        "Clear 10 waves of the Infinite Struggle while this contract is active.\n\n|cffffcc00Reward:|r 10 Faction Points and 10 Reputation",
+        "Clear 10 waves of the Infinite Struggle.\n\n|cffffcc00Reward:|r 10 Faction Points and 10 Reputation",
         "ReplaceableTextures\\CommandButtons\\BTNPickUpItem.blp",
         QUEST_DIFF_MEDIUM,
         "struggle_wave", 10, 10, 10
@@ -572,21 +602,21 @@ OnInit.final("Faction", function(Require)
     ))
     miner_guild:addQuest(Quest.create(
         "Awakened Colossus",
-        "Defeat a golem awakened by a rare deposit. Nearby Cave Voyagers share credit.\n\n|cffffcc00Reward:|r 20 Faction Points and 20 Reputation",
+        "Defeat a golem awakened by a rare deposit.\n\n|cffffcc00Reward:|r 20 Faction Points and 20 Reputation",
         "ReplaceableTextures\\CommandButtons\\BTNStoneGiant.blp",
         QUEST_DIFF_HARD,
         "rare_guardian", 1, 20, 20, 5
     ))
     miner_guild:addQuest(Quest.create(
         "Deep Survey",
-        "Mine deposits in 3 distinct Chaos regions during this contract.\n\n|cffffcc00Reward:|r 20 Faction Points and 20 Reputation",
+        "Mine deposits in 3 distinct Chaos regions.\n\n|cffffcc00Reward:|r 20 Faction Points and 20 Reputation",
         "ReplaceableTextures\\CommandButtons\\BTNSpy.blp",
         QUEST_DIFF_HARD,
         "mining_region", 3, 20, 20
     ))
     miner_guild:addQuest(Quest.create(
         "Champion's Commission",
-        "Complete all 20 Colosseum waves while this contract is active.\n\n|cffffcc00Reward:|r 20 Faction Points and 20 Reputation",
+        "Complete all 20 Colosseum waves.\n\n|cffffcc00Reward:|r 20 Faction Points and 20 Reputation",
         "ReplaceableTextures\\CommandButtons\\BTNChestOfGold.blp",
         QUEST_DIFF_HARD,
         "colosseum_clear", 1, 20, 20

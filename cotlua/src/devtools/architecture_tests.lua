@@ -524,7 +524,10 @@ OnInit.final("ArchitectureTests", function(Require)
         if Faction.getRank(0) ~= 1
             or Faction.getRank(99) ~= 1
             or Faction.getRank(100) ~= 2
-            or Faction.getRank(3200) ~= 10 then
+            or Faction.getRank(3200) ~= 10
+            or Faction.getMaxRank() ~= 10
+            or Faction.getNextRankThreshold(0) ~= 100
+            or Faction.getNextRankThreshold(3200) ~= nil then
             return false, "faction reputation threshold changed unexpectedly"
         end
         return true

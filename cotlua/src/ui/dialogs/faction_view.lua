@@ -29,9 +29,14 @@ OnInit.final("FactionView", function(Require)
     BlzFrameSetEnable(title, false)
 
     local blurb = BlzCreateFrameByType("TEXT", "", main, "", 0)
-    BlzFrameSetPoint(blurb, FRAMEPOINT_TOP, main, FRAMEPOINT_TOP, 0.01, -0.07)
+    BlzFrameSetPoint(blurb, FRAMEPOINT_TOP, main, FRAMEPOINT_TOP, 0.01, -0.105)
     BlzFrameSetEnable(blurb, false)
     BlzFrameSetSize(blurb, 0.19, 1.0)
+
+    local status_title = BlzCreateFrame("TitleText", main, 0, 0)
+    BlzFrameSetPoint(status_title, FRAMEPOINT_TOP, main, FRAMEPOINT_TOP, 0.01, -0.062)
+    BlzFrameSetEnable(status_title, false)
+    BlzFrameSetText(status_title, "|cffffcc00Faction Status|r")
 
     local buff_frame = BlzCreateFrameByType("FRAME", "", main, "", 0)
     BlzFrameSetPoint(buff_frame, FRAMEPOINT_TOPRIGHT, main, FRAMEPOINT_TOPRIGHT, -0.02, 0.016)
@@ -41,10 +46,10 @@ OnInit.final("FactionView", function(Require)
     local buff_title = BlzCreateFrame("TitleText", buff_frame, 0, 0)
     BlzFrameSetPoint(buff_title, FRAMEPOINT_TOP, buff_frame, FRAMEPOINT_TOP, 0., -0.046)
     BlzFrameSetEnable(buff_title, false)
-    BlzFrameSetText(buff_title, "|cffffffffBuff|r")
+    BlzFrameSetText(buff_title, "|cffffcc00Faction Blessing|r")
 
     local buff_blurb = BlzCreateFrameByType("TEXT", "", buff_frame, "", 0)
-    BlzFrameSetPoint(buff_blurb, FRAMEPOINT_TOP, buff_frame, FRAMEPOINT_TOP, 0., -0.15)
+    BlzFrameSetPoint(buff_blurb, FRAMEPOINT_TOP, buff_frame, FRAMEPOINT_TOP, 0., -0.13)
     BlzFrameSetEnable(buff_blurb, false)
     BlzFrameSetSize(buff_blurb, 0.2, 1.0)
 
@@ -67,7 +72,15 @@ OnInit.final("FactionView", function(Require)
     local event_title = BlzCreateFrame("TitleText", event_frame, 0, 0)
     BlzFrameSetPoint(event_title, FRAMEPOINT_TOP, event_frame, FRAMEPOINT_TOP, -0.01, -0.05)
     BlzFrameSetEnable(event_title, false)
-    BlzFrameSetText(event_title, "|cffffffffEvent|r")
+    BlzFrameSetText(event_title, "|cffffcc00Hourly Event|r")
+
+    local event_blurb = BlzCreateFrameByType("TEXT", "", event_frame, "", 0)
+    BlzFrameSetPoint(event_blurb, FRAMEPOINT_TOP, event_frame, FRAMEPOINT_TOP, -0.01, -0.095)
+    BlzFrameSetSize(event_blurb, 0.2, 0.12)
+    BlzFrameSetTextAlignment(event_blurb, TEXT_JUSTIFY_CENTER, TEXT_JUSTIFY_TOP)
+    BlzFrameSetEnable(event_blurb, false)
+    BlzFrameSetText(event_blurb,
+        "|cff808080No faction event is currently active.|r")
 
     local function close(pid)
         if GetLocalPlayer() == Player(pid - 1) then
@@ -113,7 +126,7 @@ OnInit.final("FactionView", function(Require)
     local quest_title = BlzCreateFrame("TitleText", quest_frame, 0, 0)
     BlzFrameSetPoint(quest_title, FRAMEPOINT_TOP, quest_frame, FRAMEPOINT_TOP, 0., -0.04)
     BlzFrameSetEnable(quest_title, false)
-    BlzFrameSetText(quest_title, "|cffffffffQuests|r")
+    BlzFrameSetText(quest_title, "|cffffcc00Quests|r")
 
     local reroll_quests = SimpleButton.create(
         quest_frame,
@@ -125,7 +138,7 @@ OnInit.final("FactionView", function(Require)
         -0.005,
         0.044,
         nil,
-        "Reroll all contracts once per rotation for a cost.\n|cffff0000Cancels any active contract!|r"
+        "Reroll all quests once per rotation for a cost.\n|cffff0000Cancels any active quest!|r"
     )
     local reroll_icon = BlzCreateFrameByType("BACKDROP", "", reroll_quests.frame, "", 0)
     BlzFrameSetPoint(reroll_icon, FRAMEPOINT_LEFT, reroll_quests.frame, FRAMEPOINT_RIGHT, 0., 0.)
@@ -145,7 +158,7 @@ OnInit.final("FactionView", function(Require)
     end)
 
     local rotation_text = BlzCreateFrameByType("TEXT", "", quest_frame, "", 0)
-    BlzFrameSetPoint(rotation_text, FRAMEPOINT_BOTTOM, quest_frame, FRAMEPOINT_BOTTOM, 0., 0.014)
+    BlzFrameSetPoint(rotation_text, FRAMEPOINT_BOTTOM, quest_frame, FRAMEPOINT_BOTTOM, 0., 0.02)
     BlzFrameSetTextAlignment(rotation_text, TEXT_JUSTIFY_CENTER, TEXT_JUSTIFY_MIDDLE)
     BlzFrameSetScale(rotation_text, 0.85)
     BlzFrameSetEnable(rotation_text, false)
@@ -225,13 +238,30 @@ OnInit.final("FactionView", function(Require)
         local buff = faction.buff
         local reputation = Faction.getReputation(pid, faction.id)
         local rank = Faction.getRank(reputation)
+        local next_threshold = Faction.getNextRankThreshold(reputation)
+        local active_quest, progress = Quest.getActive(pid)
+        local reputation_line
+        if next_threshold then
+            reputation_line = reputation .. " / " .. next_threshold
+        else
+            reputation_line = reputation .. " |cff80ff80(MAX)|r"
+        end
+        local quest_line = "|cff808080None selected|r"
+        if active_quest then
+            quest_line = active_quest.name .. "\n|cffffcc00Progress:|r "
+                .. progress .. " / " .. active_quest.goal
+        end
         buff_icon:icon(buff.ICON)
         BlzFrameSetText(buff_blurb, "|cffffcc00" .. buff.NAME .. "|r\n\n" .. buff.DESC_FACTION)
         BlzFrameSetTextAlignment(buff_blurb, TEXT_JUSTIFY_LEFT, TEXT_JUSTIFY_CENTER)
-        BlzFrameSetText(blurb, "|cffffcc00Rank:|r " .. rank
-            .. "\n|cffffcc00Reputation:|r " .. reputation
-            .. "\n|cffffcc00Faction Points:|r " .. GetCurrency(pid, FACTION))
-        BlzFrameSetText(title, "|cffffffff" .. faction.name .. "|r")
+        BlzFrameSetText(blurb, "|cffffcc00Rank:|r " .. rank .. " / " .. Faction.getMaxRank()
+            .. "\n|cffffcc00Reputation:|r " .. reputation_line
+            .. (next_threshold and "\n|cffffcc00Next Rank:|r "
+                .. (next_threshold - reputation) .. " Reputation" or "")
+            .. "\n|cffffcc00Faction Points:|r " .. GetCurrency(pid, FACTION)
+            .. "\n\n|cffffcc00Active Quest|r\n" .. quest_line)
+        BlzFrameSetTextAlignment(blurb, TEXT_JUSTIFY_LEFT, TEXT_JUSTIFY_TOP)
+        BlzFrameSetText(title, "|cffffcc00" .. faction.name .. "|r")
     end
 
     function view.refreshQuest(pid, index, quest)
@@ -279,7 +309,7 @@ OnInit.final("FactionView", function(Require)
         local box = boxes[quest.diff]
         box.icon:icon("ReplaceableTextures\\CommandButtonsDisabled\\DIS" .. quest.icon:sub(36))
         BlzFrameSetText(box.text, "|cff808080" .. quest.name .. "\nCompleted|r")
-        box.icon:setTooltipText(quest.desc .. "\n\n|cff80ff80Completed. A new contract arrives with the next rotation.|r")
+        box.icon:setTooltipText(quest.desc .. "\n\n|cff80ff80Completed. A new quest arrives with the next rotation.|r")
     end
 
     function view.refreshRotation(pid)
@@ -287,7 +317,7 @@ OnInit.final("FactionView", function(Require)
         local remaining = math.max(0, math.ceil(Quest.getRotationRemaining(pid)))
         local minutes = remaining // 60
         local seconds = remaining % 60
-        BlzFrameSetText(rotation_text, string.format("Next rotation: %d:%02d", minutes, seconds))
+        BlzFrameSetText(rotation_text, string.format("Quests refresh in: %d:%02d", minutes, seconds))
         reroll_quests:enable(Quest.canReroll(pid))
     end
 
