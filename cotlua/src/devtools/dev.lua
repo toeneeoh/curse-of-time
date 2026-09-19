@@ -28,6 +28,7 @@ OnInit.final("Dev", function(Require)
     Require('ItemHelpers')
     Require('Perks')
     Require('FactionMining')
+    Require('FactionEvents')
     local pack, find, lower = string.pack, string.find, string.lower
     local searchable = {} ---@type boolean[]
     local dev_cmds, wipe_item_stats, find_item, event_setup
@@ -50,6 +51,7 @@ OnInit.final("Dev", function(Require)
         ["sf"] = "Set the amount of faction points you have to #. usage: -sf [#]",
         ["factionrep"] = "Set Cave Voyagers reputation to #. usage: -factionrep [#]",
         ["mining"] = "Spawn a common, rich, or rare deposit beside your hero. usage: -mining [common|rich|rare]",
+        ["factionevent"] = "Immediately start the next hourly faction event.",
         ["lvl"] = "Set the selected hero's level to #. usage: -lvl [1-500]",
         ["str"] = "Set the selected hero's strength to #. usage: -str [#]",
         ["agi"] = "Set the selected hero's agility to #. usage: -agi [#]",
@@ -272,6 +274,11 @@ modifiers:
             local hero = Hero[pid]
             if not FactionMining.spawn(kind, GetUnitX(hero) + 250., GetUnitY(hero)) then
                 DisplayTextToPlayer(p, 0., 0., "Unable to spawn deposit. Check its placeholder rawcode.")
+            end
+        end,
+        ["factionevent"] = function(p)
+            if not FactionEvents.startNow() then
+                DisplayTextToPlayer(p, 0., 0., "Unable to start the faction event.")
             end
         end,
         ["lvl"] = function(p, pid, args)

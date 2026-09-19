@@ -10,6 +10,7 @@ OnInit.final("Chaos", function(Require)
     Require('Boss')
     Require('ItemEventRegistry')
     Require('FactionMining')
+    Require('FactionEvents')
 
     god_portal = nil ---@type unit 
 
@@ -244,6 +245,7 @@ OnInit.final("Chaos", function(Require)
         MULTIBOARD.MAIN:display(id)
 
         FactionMining.activate()
+        FactionEvents.activate()
         CHAOS_LOADING = false
     end
 

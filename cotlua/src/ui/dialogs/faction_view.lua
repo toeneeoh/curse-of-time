@@ -2,6 +2,7 @@
 
 OnInit.final("FactionView", function(Require)
     Require('Faction')
+    Require('FactionEvents')
     Require('Currency')
     Require('Frames')
     Require('Prompt')
@@ -80,7 +81,7 @@ OnInit.final("FactionView", function(Require)
     BlzFrameSetTextAlignment(event_blurb, TEXT_JUSTIFY_CENTER, TEXT_JUSTIFY_TOP)
     BlzFrameSetEnable(event_blurb, false)
     BlzFrameSetText(event_blurb,
-        "|cff808080No faction event is currently active.|r")
+        "|cff808080Events become available after Chaos.|r")
 
     local function close(pid)
         if GetLocalPlayer() == Player(pid - 1) then
@@ -321,11 +322,17 @@ OnInit.final("FactionView", function(Require)
         reroll_quests:enable(Quest.canReroll(pid))
     end
 
+    function view.refreshEvent(pid)
+        if GetLocalPlayer() ~= Player(pid - 1) then return end
+        BlzFrameSetText(event_blurb, FactionEvents.getStatus(pid))
+    end
+
     TimerQueue:callPeriodically(1., nil, function()
         local user = User.first
         while user do
             if GetLocalPlayer() == user.player then
                 view.refreshRotation(user.id)
+                view.refreshEvent(user.id)
             end
             user = user.next
         end

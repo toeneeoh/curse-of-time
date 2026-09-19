@@ -45,6 +45,7 @@ OnInit.final("ArchitectureTests", function(Require)
     Require('CurrencyDisplay')
     Require('FactionView')
     Require('FactionMining')
+    Require('FactionEvents')
     Require('DropTable')
     Require('StruggleRewards')
     Require('Perks')
@@ -539,6 +540,14 @@ OnInit.final("ArchitectureTests", function(Require)
             or rawcodes.guardian == 0
             or rawcodes.guardian == rawcodes.deposit then
             return false, "faction mining object records overlap"
+        end
+        return true
+    end)
+
+    ArchitectureTests.register("faction hourly event service is available", function()
+        if type(FactionEvents.activate) ~= "function"
+            or type(FactionEvents.getStatus) ~= "function" then
+            return false, "faction hourly event API is incomplete"
         end
         return true
     end)
