@@ -92,6 +92,8 @@ OnInit.final("Profile", function(Require)
     ---@field registerStorageChangedAction function
     ---@field notifyStorageChanged function
     ---@field registerNewCharacterAction function
+    ---@field registerHeroLoadedAction function
+    local hero_loaded_actions = {}
     Profile = {} ---@type Profile | Profile[]
     do
         local thistype = Profile
@@ -162,6 +164,11 @@ OnInit.final("Profile", function(Require)
         ---@param action fun(pid: integer, hero: HeroData)
         function thistype.registerNewCharacterAction(action)
             new_character_actions[#new_character_actions + 1] = action
+        end
+
+        ---@param action fun(pid: integer, hero: HeroData)
+        function thistype.registerHeroLoadedAction(action)
+            hero_loaded_actions[#hero_loaded_actions + 1] = action
         end
 
         function thistype:preload_character(code, slot)
@@ -375,6 +382,8 @@ OnInit.final("Profile", function(Require)
             hero.crystal = 0
             hero.honor = 0
             hero.faction_points = 0
+            hero.faction_id = 0
+            hero.faction_reputation = __jarray(0)
             hero.time = 0
             hero.teleport = 1
             hero.reveal = 1
@@ -816,6 +825,8 @@ OnInit.final("Profile", function(Require)
     ---@field saved_items table[]
     ---@field honor integer
     ---@field faction_points integer
+    ---@field faction_id integer
+    ---@field faction_reputation integer[]
     ---@field teleport integer
     ---@field reveal integer
     ---@field skin integer
@@ -1173,6 +1184,10 @@ OnInit.final("Profile", function(Require)
                     self.experience or 0, item_count, socket_count))
             end
 
+            for index = 1, #hero_loaded_actions do
+                hero_loaded_actions[index](pid, self)
+            end
+
             return true
         end
 
@@ -1195,6 +1210,10 @@ OnInit.final("Profile", function(Require)
             result[#result + 1] = self.struggle_claim_wave or 0
             result[#result + 1] = self.perk_milestones or 0
             result[#result + 1] = self.experience or 0
+            result[#result + 1] = self.faction_id or 0
+            for faction_id = 1, 6 do
+                result[#result + 1] = (self.faction_reputation and self.faction_reputation[faction_id]) or 0
+            end
 
             return result
         end
@@ -1275,6 +1294,11 @@ OnInit.final("Profile", function(Require)
             self.struggle_claim_wave = read_value(data, index + 2)
             self.perk_milestones = read_value(data, index + 3)
             self.experience = read_value(data, index + 4)
+            self.faction_id = read_value(data, index + 5)
+            self.faction_reputation = __jarray(0)
+            for faction_id = 1, 6 do
+                self.faction_reputation[faction_id] = read_value(data, index + 5 + faction_id)
+            end
 
             return true
         end
@@ -1288,6 +1312,8 @@ OnInit.final("Profile", function(Require)
                 struggle_best_wave = 0,
                 struggle_claim_wave = 0,
                 perk_milestones = 0,
+                faction_id = 0,
+                faction_reputation = __jarray(0),
                 experience = 0,
             }, mt)
         end

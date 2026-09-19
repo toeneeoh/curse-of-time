@@ -10,6 +10,7 @@ OnInit.final("Colosseum", function(Require)
     Require('FloatingText')
     Require('Damage')
     Require('BuffsWorldColosseum')
+    Require('Faction')
 
     local GetRectCenterXY = function(whichRect)
         return { x = GetRectCenterX(whichRect), y = GetRectCenterY(whichRect) }
@@ -1214,6 +1215,7 @@ OnInit.final("Colosseum", function(Require)
 
         if cleared then
             Honor.award(pid, 1)
+            Quest.progress(pid, "colosseum_clear")
         end
 
         DisplayTextToPlayer(Player(pid - 1), 0., 0., "Colosseum reward: " .. coins .. " coins" .. (cleared and " and 1 Honor." or "."))
@@ -1258,6 +1260,7 @@ OnInit.final("Colosseum", function(Require)
 
     local enter_colosseum = function(pid)
         players[#players + 1] = pid
+        Quest.progress(pid, "colosseum_enter")
 
         -- adjust difficulty
         local hero = Hero[pid]

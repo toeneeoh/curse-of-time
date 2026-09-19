@@ -2,6 +2,7 @@
 
 OnInit.final("FactionView", function(Require)
     Require('Faction')
+    Require('Currency')
     Require('Frames')
     Require('Prompt')
     Require('SimpleButton')
@@ -130,7 +131,16 @@ OnInit.final("FactionView", function(Require)
     BlzFrameSetTexture(reroll_icon, "ShopFactionPoints.dds", 0, true)
     local reroll_cost = BlzCreateFrameByType("TEXT", "", reroll_icon, "", 0)
     BlzFrameSetPoint(reroll_cost, FRAMEPOINT_LEFT, reroll_icon, FRAMEPOINT_RIGHT, 0.004, 0.)
-    BlzFrameSetText(reroll_cost, "0")
+    BlzFrameSetText(reroll_cost, "5")
+    reroll_quests:onClick(function()
+        local clicked = BlzGetTriggerFrame()
+        local pid = GetPlayerId(GetTriggerPlayer()) + 1
+        if GetLocalPlayer() == Player(pid - 1) then
+            BlzFrameSetEnable(clicked, false)
+            BlzFrameSetEnable(clicked, true)
+        end
+        Quest.reroll(pid)
+    end)
 
     local difficulties = { "easy", "medium", "hard" }
     local colors = { "|cff6be038", "|cffffcf3e", "|cffea1111" }
@@ -205,10 +215,14 @@ OnInit.final("FactionView", function(Require)
     function view.refreshFaction(faction, pid)
         if GetLocalPlayer() ~= Player(pid - 1) then return end
         local buff = faction.buff
+        local reputation = Faction.getReputation(pid, faction.id)
+        local rank = Faction.getRank(reputation)
         buff_icon:icon(buff.ICON)
         BlzFrameSetText(buff_blurb, "|cffffcc00" .. buff.NAME .. "|r\n\n" .. buff.DESC_FACTION)
         BlzFrameSetTextAlignment(buff_blurb, TEXT_JUSTIFY_LEFT, TEXT_JUSTIFY_CENTER)
-        BlzFrameSetText(blurb, "|cffffcc00Reputation:|r 0")
+        BlzFrameSetText(blurb, "|cffffcc00Rank:|r " .. rank
+            .. "\n|cffffcc00Reputation:|r " .. reputation
+            .. "\n|cffffcc00Faction Points:|r " .. GetCurrency(pid, FACTION))
         BlzFrameSetText(title, "|cffffffff" .. faction.name .. "|r")
     end
 
@@ -241,6 +255,23 @@ OnInit.final("FactionView", function(Require)
                 BlzFrameSetText(boxes[index].text, "|cff808080" .. quest.name .. "|r")
             end
         end
+    end
+
+    function view.refreshProgress(pid, quest, progress)
+        if GetLocalPlayer() ~= Player(pid - 1) then return end
+        local box = boxes[quest.diff]
+        BlzFrameSetText(box.text, "|cffffcc00" .. quest.name .. "|r\n"
+            .. progress .. " / " .. quest.goal)
+        box.icon:setTooltipText(quest.desc .. "\n\n|cffffcc00Progress:|r "
+            .. progress .. " / " .. quest.goal)
+    end
+
+    function view.questCompleted(pid, quest)
+        if GetLocalPlayer() ~= Player(pid - 1) then return end
+        local box = boxes[quest.diff]
+        box.icon:icon("ReplaceableTextures\\CommandButtonsDisabled\\DIS" .. quest.icon:sub(36))
+        BlzFrameSetText(box.text, "|cff808080" .. quest.name .. "\nCompleted|r")
+        box.icon:setTooltipText(quest.desc .. "\n\n|cff80ff80Completed. A new contract arrives with the next rotation.|r")
     end
 
     ---@cast view FactionViewAdapter

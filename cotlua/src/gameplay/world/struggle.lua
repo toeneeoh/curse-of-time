@@ -35,6 +35,7 @@ OnInit.final("Struggle", function(Require)
     Require('Profile')
     Require('BuffsWorldStruggle')
     Require('StruggleSpecials')
+    Require('Faction')
 
     ---@class StruggleService
     Struggle = {}
@@ -337,6 +338,9 @@ OnInit.final("Struggle", function(Require)
         end
 
         completed_wave = wave
+        for index = 1, #players do
+            Quest.progress(players[index], "struggle_wave")
+        end
         if wave % CHECKPOINT_INTERVAL == 0 then
             begin_checkpoint()
         else

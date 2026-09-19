@@ -235,6 +235,9 @@ OnInit.final("ArchitectureTests", function(Require)
         source.struggle_claim_wave = 70
         source.perk_milestones = 3
         source.experience = 4321
+        source.faction_id = 1
+        source.faction_reputation[1] = 275
+        source.faction_reputation[3] = 40
 
         local current = source:values()
         local decoded = HeroData.create()
@@ -243,8 +246,22 @@ OnInit.final("ArchitectureTests", function(Require)
             or decoded.struggle_best_wave ~= 75
             or decoded.struggle_claim_wave ~= 70
             or decoded.perk_milestones ~= 3
-            or decoded.experience ~= 4321 then
+            or decoded.experience ~= 4321
+            or decoded.faction_id ~= 1
+            or decoded.faction_reputation[1] ~= 275
+            or decoded.faction_reputation[3] ~= 40 then
             return false, "trailing character fields did not round-trip"
+        end
+
+        for _ = 1, 7 do
+            current[#current] = nil
+        end
+        local before_factions = HeroData.create()
+        if not before_factions:propagate(current)
+            or before_factions.experience ~= 4321
+            or before_factions.faction_id ~= 0
+            or before_factions.faction_reputation[1] ~= 0 then
+            return false, "pre-Factions character did not default faction progress to zero"
         end
 
         current[#current] = nil
@@ -493,6 +510,16 @@ OnInit.final("ArchitectureTests", function(Require)
     ArchitectureTests.register("faction presentation is bound through its adapter", function()
         if not Faction.isViewBound() then
             return false, "faction view adapter was not bound"
+        end
+        return true
+    end)
+
+    ArchitectureTests.register("faction reputation ranks use stable thresholds", function()
+        if Faction.getRank(0) ~= 1
+            or Faction.getRank(99) ~= 1
+            or Faction.getRank(100) ~= 2
+            or Faction.getRank(3200) ~= 10 then
+            return false, "faction reputation threshold changed unexpectedly"
         end
         return true
     end)
