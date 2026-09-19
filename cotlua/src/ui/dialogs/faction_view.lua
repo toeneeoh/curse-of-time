@@ -6,6 +6,8 @@ OnInit.final("FactionView", function(Require)
     Require('Frames')
     Require('Prompt')
     Require('SimpleButton')
+    Require('TimerQueue')
+    Require('Users')
     Require('Variables')
 
     local view = {}
@@ -123,7 +125,7 @@ OnInit.final("FactionView", function(Require)
         -0.005,
         0.044,
         nil,
-        "Reroll all quests for a cost.\n|cffff0000Cancels any active quests!|r"
+        "Reroll all contracts once per rotation for a cost.\n|cffff0000Cancels any active contract!|r"
     )
     local reroll_icon = BlzCreateFrameByType("BACKDROP", "", reroll_quests.frame, "", 0)
     BlzFrameSetPoint(reroll_icon, FRAMEPOINT_LEFT, reroll_quests.frame, FRAMEPOINT_RIGHT, 0., 0.)
@@ -131,7 +133,7 @@ OnInit.final("FactionView", function(Require)
     BlzFrameSetTexture(reroll_icon, "ShopFactionPoints.dds", 0, true)
     local reroll_cost = BlzCreateFrameByType("TEXT", "", reroll_icon, "", 0)
     BlzFrameSetPoint(reroll_cost, FRAMEPOINT_LEFT, reroll_icon, FRAMEPOINT_RIGHT, 0.004, 0.)
-    BlzFrameSetText(reroll_cost, "5")
+    BlzFrameSetText(reroll_cost, tostring(Quest.getRerollCost()))
     reroll_quests:onClick(function()
         local clicked = BlzGetTriggerFrame()
         local pid = GetPlayerId(GetTriggerPlayer()) + 1
@@ -141,6 +143,12 @@ OnInit.final("FactionView", function(Require)
         end
         Quest.reroll(pid)
     end)
+
+    local rotation_text = BlzCreateFrameByType("TEXT", "", quest_frame, "", 0)
+    BlzFrameSetPoint(rotation_text, FRAMEPOINT_BOTTOM, quest_frame, FRAMEPOINT_BOTTOM, 0., 0.014)
+    BlzFrameSetTextAlignment(rotation_text, TEXT_JUSTIFY_CENTER, TEXT_JUSTIFY_MIDDLE)
+    BlzFrameSetScale(rotation_text, 0.85)
+    BlzFrameSetEnable(rotation_text, false)
 
     local difficulties = { "easy", "medium", "hard" }
     local colors = { "|cff6be038", "|cffffcf3e", "|cffea1111" }
@@ -273,6 +281,25 @@ OnInit.final("FactionView", function(Require)
         BlzFrameSetText(box.text, "|cff808080" .. quest.name .. "\nCompleted|r")
         box.icon:setTooltipText(quest.desc .. "\n\n|cff80ff80Completed. A new contract arrives with the next rotation.|r")
     end
+
+    function view.refreshRotation(pid)
+        if GetLocalPlayer() ~= Player(pid - 1) then return end
+        local remaining = math.max(0, math.ceil(Quest.getRotationRemaining(pid)))
+        local minutes = remaining // 60
+        local seconds = remaining % 60
+        BlzFrameSetText(rotation_text, string.format("Next rotation: %d:%02d", minutes, seconds))
+        reroll_quests:enable(Quest.canReroll(pid))
+    end
+
+    TimerQueue:callPeriodically(1., nil, function()
+        local user = User.first
+        while user do
+            if GetLocalPlayer() == user.player then
+                view.refreshRotation(user.id)
+            end
+            user = user.next
+        end
+    end)
 
     ---@cast view FactionViewAdapter
     Faction.bindView(view)

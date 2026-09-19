@@ -24,6 +24,7 @@ OnInit.final("Faction", function(Require)
     ---@field questAccepted fun(pid: integer, accepted: Quest, quests: Quest[])
     ---@field refreshProgress fun(pid: integer, quest: Quest, progress: integer)
     ---@field questCompleted fun(pid: integer, quest: Quest)
+    ---@field refreshRotation fun(pid: integer)
     local view ---@type FactionViewAdapter?
 
     ---@class Faction
@@ -57,6 +58,7 @@ OnInit.final("Faction", function(Require)
     local quest_progress = __jarray(0)
     local completed_offers = {}
     local quest_refresh_timer = {}
+    local reroll_used = {}
     local QUEST_REFRESH_PERIOD = 1800.
     local QUEST_REROLL_COST = 5
     local schedule_quest_refresh
@@ -157,8 +159,8 @@ OnInit.final("Faction", function(Require)
             FORCE_PLAYING,
             User[pid - 1].nameColored .. " has joined the " .. faction.name .. "!"
         )
-        display_faction(faction, pid)
         schedule_quest_refresh(pid)
+        display_faction(faction, pid)
         faction.buff:add(Hero[pid], Hero[pid])
         return false
     end
@@ -228,7 +230,10 @@ OnInit.final("Faction", function(Require)
     end
 
     ---@param pid integer
-    function Faction:refreshQuests(pid)
+    function Faction:refreshQuests(pid, unlock_reroll)
+        if unlock_reroll ~= false then
+            reroll_used[pid] = false
+        end
         completed_offers[pid] = {}
         for difficulty = 1, 3 do
             local quest = self:pickQuest(difficulty)
@@ -239,6 +244,9 @@ OnInit.final("Faction", function(Require)
         end
         if active_quest[pid] and view then
             view.refreshProgress(pid, active_quest[pid], quest_progress[pid])
+        end
+        if view then
+            view.refreshRotation(pid)
         end
     end
 
@@ -291,9 +299,9 @@ OnInit.final("Faction", function(Require)
         quest_refresh_timer[pid] = nil
         local faction = Faction.getFaction(pid)
         if faction then
-            faction:refreshQuests(pid)
             quest_refresh_timer[pid] = TimerQueue:callDelayed(
                 QUEST_REFRESH_PERIOD, refresh_player_quests, pid)
+            faction:refreshQuests(pid)
         end
     end
 
@@ -363,12 +371,37 @@ OnInit.final("Faction", function(Require)
         return active_quest[pid], quest_progress[pid]
     end
 
+    ---@param pid integer
+    ---@return number
+    function Quest.getRotationRemaining(pid)
+        local callback = quest_refresh_timer[pid]
+        return callback and (TimerQueue:getRemaining(callback) or 0.) or 0.
+    end
+
+    ---@param pid integer
+    ---@return boolean
+    function Quest.canReroll(pid)
+        return player_faction[pid] ~= nil
+            and reroll_used[pid] ~= true
+            and GetCurrency(pid, FACTION) >= QUEST_REROLL_COST
+    end
+
+    ---@return integer
+    function Quest.getRerollCost()
+        return QUEST_REROLL_COST
+    end
+
     ---Cancels the active contract and immediately rolls a new set of offers.
     ---@param pid integer
     ---@return boolean
     function Quest.reroll(pid)
         local faction = player_faction[pid]
         if not faction then
+            return false
+        end
+        if reroll_used[pid] then
+            DisplayTextToPlayer(Player(pid - 1), 0., 0.,
+                "You have already rerolled this contract rotation.")
             return false
         end
         if GetCurrency(pid, FACTION) < QUEST_REROLL_COST then
@@ -378,13 +411,16 @@ OnInit.final("Faction", function(Require)
         end
 
         AddCurrency(pid, FACTION, -QUEST_REROLL_COST)
+        reroll_used[pid] = true
         active_quest[pid] = nil
         pending_quest[pid] = nil
         quest_progress[pid] = 0
-        faction:refreshQuests(pid)
-        schedule_quest_refresh(pid)
+        -- A reroll changes the current offers without postponing the next
+        -- scheduled rotation. That rotation unlocks the button again.
+        faction:refreshQuests(pid, false)
         if view then
             view.refreshFaction(faction, pid)
+            view.refreshRotation(pid)
         end
         return true
     end
@@ -413,7 +449,7 @@ OnInit.final("Faction", function(Require)
     )
     miner_guild:addQuest(Quest.create(
         "Arena Survey",
-        "Enter the Colosseum and survey the mineral formations exposed by its battles.\n\n|cffffcc00Reward:|r 5 Faction Points and 5 Reputation",
+        "Enter the Colosseum while this contract is active.\n\n|cffffcc00Reward:|r 5 Faction Points and 5 Reputation",
         "ReplaceableTextures\\CommandButtons\\BTNHelmutPurple.blp",
         QUEST_DIFF_EASY,
         "colosseum_enter", 1, 5, 5
@@ -441,8 +477,8 @@ OnInit.final("Faction", function(Require)
         player_faction[pid] = Faction[hero.faction_id or 0]
         local faction = player_faction[pid]
         if faction then
-            Quest.setup(pid)
             schedule_quest_refresh(pid)
+            Quest.setup(pid)
             faction.buff:add(Hero[pid], Hero[pid])
         end
     end
@@ -455,6 +491,7 @@ OnInit.final("Faction", function(Require)
         quest_progress[pid] = 0
         Quest.quests[pid] = nil
         completed_offers[pid] = nil
+        reroll_used[pid] = nil
         if quest_refresh_timer[pid] then
             TimerQueue:disableCallback(quest_refresh_timer[pid])
             quest_refresh_timer[pid] = nil
