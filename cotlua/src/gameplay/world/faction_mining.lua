@@ -29,6 +29,7 @@ OnInit.final("FactionMining", function(Require)
     local GUARDIAN_REPUTATION_REWARD = 2
     local deposits = setmetatable({}, { __mode = 'k' })
     local active_mining = {}
+    local pending_mining = {}
     local guardians = setmetatable({}, { __mode = 'k' })
     local active = false
     local warned_missing_data = false
@@ -128,7 +129,6 @@ OnInit.final("FactionMining", function(Require)
     local function remove_deposit(deposit, respawn)
         local unit = deposit.unit
         if unit then
-            EVENT_ON_UNIT_SELECT:unregister_unit_action(unit)
             deposits[unit] = nil
             RemoveUnit(unit)
             deposit.unit = nil
@@ -158,7 +158,7 @@ OnInit.final("FactionMining", function(Require)
                     Quest.progress(pid, "rare_guardian")
                 end
                 local level = math.max(1, GetHeroLevel(hero))
-                AwardGold(pid, 5000 + level * level * 100, true)
+                AwardGold(pid, 5000 + level * level * 100, false)
             end
             user = user.next
         end
@@ -200,10 +200,10 @@ OnInit.final("FactionMining", function(Require)
         return guardian
     end
 
-    local function destroy_progress_tag(state)
-        if state.tag then
-            DestroyTextTag(state.tag)
-            state.tag = nil
+    local function destroy_progress_bar(state)
+        if state.progress_bar then
+            DestroyEffect(state.progress_bar)
+            state.progress_bar = nil
         end
     end
 
@@ -214,7 +214,7 @@ OnInit.final("FactionMining", function(Require)
         end
         active_mining[state.pid] = nil
         EVENT_ON_STRUCK_FINAL:unregister_unit_action(state.hero, state.damage_action)
-        destroy_progress_tag(state)
+        destroy_progress_bar(state)
         if UnitAlive(state.hero) then
             SetUnitAnimation(state.hero, "stand")
         end
@@ -255,10 +255,9 @@ OnInit.final("FactionMining", function(Require)
         end
     end
 
-    local function update_progress_tag(state)
-        local remaining = math.max(0., state.deposit.config.duration - state.elapsed)
-        SetTextTagText(state.tag, string.format("Mining %.1fs", remaining), 0.022)
-        SetTextTagPosUnit(state.tag, state.hero, 40.)
+    local function update_progress_bar(state)
+        BlzSetSpecialEffectTime(state.progress_bar,
+            math.min(1., state.elapsed / state.deposit.config.duration))
     end
 
     local function mining_tick(state)
@@ -296,7 +295,7 @@ OnInit.final("FactionMining", function(Require)
             return
         end
 
-        update_progress_tag(state)
+        update_progress_bar(state)
         state.callback = TimerQueue:callDelayed(CHANNEL_TICK, mining_tick, state)
     end
 
@@ -325,6 +324,8 @@ OnInit.final("FactionMining", function(Require)
             cancel_mining(active_mining[pid], "Previous mining attempt cancelled.")
         end
 
+        pending_mining[pid] = nil
+        IssueImmediateOrderById(hero, ORDER_ID_STOP)
         local state = {
             pid = pid,
             hero = hero,
@@ -339,26 +340,83 @@ OnInit.final("FactionMining", function(Require)
                 state.interrupted = true
             end
         end
-        state.tag = CreateTextTag()
-        SetTextTagColor(state.tag, 255, 220, 80, 255)
-        SetTextTagPermanent(state.tag, true)
-        SetTextTagVisibility(state.tag, GetLocalPlayer() == Player(pid - 1))
+        state.progress_bar = AddSpecialEffect("war3mapImported\\Progressbar.mdl",
+            GetUnitX(hero), GetUnitY(hero))
+        BlzSetSpecialEffectZ(state.progress_bar, BlzGetUnitZ(hero) + 200.)
+        BlzSetSpecialEffectTimeScale(state.progress_bar, 0.001)
+        BlzSetSpecialEffectColorByPlayer(state.progress_bar, Player(pid - 1))
+        BlzSetSpecialEffectScale(state.progress_bar, 1.25)
         deposit.miner_pid = pid
         active_mining[pid] = state
         EVENT_ON_STRUCK_FINAL:register_unit_action(hero, state.damage_action)
         SetUnitAnimation(hero, "spell")
-        update_progress_tag(state)
+        update_progress_bar(state)
         state.callback = TimerQueue:callDelayed(CHANNEL_TICK, mining_tick, state)
     end
 
-    local function on_deposit_selected(selected, pid)
-        local deposit = deposits[selected]
-        if not deposit then return end
-        if GetLocalPlayer() == Player(pid - 1) then
-            SelectUnit(selected, false)
-            if Hero[pid] then SelectUnit(Hero[pid], true) end
+    local function approach_deposit(state)
+        if pending_mining[state.pid] ~= state then return end
+        local hero = state.hero
+        local deposit = state.deposit
+        if not UnitAlive(hero) or not deposit.unit or GetUnitTypeId(deposit.unit) == 0 then
+            pending_mining[state.pid] = nil
+            return
         end
-        start_mining(deposit, pid)
+        if IsUnitInRange(hero, deposit.unit, INTERACTION_RANGE) then
+            pending_mining[state.pid] = nil
+            start_mining(deposit, state.pid)
+        else
+            state.callback = TimerQueue:callDelayed(CHANNEL_TICK, approach_deposit, state)
+        end
+    end
+
+    local function request_mining(deposit, pid, hero)
+        if current_faction_id(pid) ~= CAVE_VOYAGERS_ID then
+            IssueImmediateOrderById(hero, ORDER_ID_STOP)
+            DisplayTextToPlayer(Player(pid - 1), 0., 0., "Only active Cave Voyagers may mine deposits.")
+            return
+        end
+        local rank = Faction.getRank(Faction.getReputation(pid, CAVE_VOYAGERS_ID))
+        if rank < deposit.config.required_rank then
+            IssueImmediateOrderById(hero, ORDER_ID_STOP)
+            DisplayTextToPlayer(Player(pid - 1), 0., 0., deposit.config.name
+                .. " requires Cave Voyagers Rank " .. deposit.config.required_rank .. ".")
+            return
+        end
+        if deposit.miner_pid and deposit.miner_pid ~= pid then
+            IssueImmediateOrderById(hero, ORDER_ID_STOP)
+            DisplayTextToPlayer(Player(pid - 1), 0., 0., "Another player is already mining this deposit.")
+            return
+        end
+        if IsUnitInRange(hero, deposit.unit, INTERACTION_RANGE) then
+            start_mining(deposit, pid)
+            return
+        end
+
+        local state = { pid = pid, hero = hero, deposit = deposit }
+        pending_mining[pid] = state
+        state.callback = TimerQueue:callDelayed(CHANNEL_TICK, approach_deposit, state)
+    end
+
+    local function on_mining_order(source, target, order_id)
+        local pid = GetPlayerId(GetOwningPlayer(source)) + 1
+        if pid > PLAYER_CAP or source ~= Hero[pid] then return end
+        local deposit = target and deposits[target]
+        if order_id == ORDER_ID_SMART and deposit then
+            request_mining(deposit, pid, source)
+            return
+        end
+        pending_mining[pid] = nil
+        if active_mining[pid] then
+            cancel_mining(active_mining[pid], "Mining interrupted by another order.")
+        end
+    end
+
+    local function setup_mining_orders(unit)
+        local pid = GetPlayerId(GetOwningPlayer(unit)) + 1
+        if pid <= PLAYER_CAP and IsUnitType(unit, UNIT_TYPE_HERO) then
+            EVENT_ON_ORDER:register_unit_action(unit, on_mining_order)
+        end
     end
 
     spawn_deposit = function(kind, x, y, region_index)
@@ -391,11 +449,11 @@ OnInit.final("FactionMining", function(Require)
             next_ambush = 1,
         }
         deposits[unit] = deposit
-        EVENT_ON_UNIT_SELECT:register_unit_action(unit, on_deposit_selected)
         return true
     end
 
     local function cleanup_player(pid)
+        pending_mining[pid] = nil
         if active_mining[pid] then
             cancel_mining(active_mining[pid])
         end
@@ -418,6 +476,8 @@ OnInit.final("FactionMining", function(Require)
             return spawn_deposit(kind, x, y, 0)
         end
     end
+
+    Unit.onIndex(setup_mining_orders)
 
     local user = User.first
     while user do
