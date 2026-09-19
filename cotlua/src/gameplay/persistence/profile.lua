@@ -827,6 +827,7 @@ OnInit.final("Profile", function(Require)
     ---@field faction_points integer
     ---@field faction_id integer
     ---@field faction_reputation integer[]
+    ---@field faction_point_balances integer[]
     ---@field teleport integer
     ---@field reveal integer
     ---@field skin integer
@@ -1214,6 +1215,9 @@ OnInit.final("Profile", function(Require)
             for faction_id = 1, 6 do
                 result[#result + 1] = (self.faction_reputation and self.faction_reputation[faction_id]) or 0
             end
+            for faction_id = 1, 6 do
+                result[#result + 1] = (self.faction_point_balances and self.faction_point_balances[faction_id]) or 0
+            end
 
             return result
         end
@@ -1299,6 +1303,10 @@ OnInit.final("Profile", function(Require)
             for faction_id = 1, 6 do
                 self.faction_reputation[faction_id] = read_value(data, index + 5 + faction_id)
             end
+            self.faction_point_balances = __jarray(0)
+            for faction_id = 1, 6 do
+                self.faction_point_balances[faction_id] = read_value(data, index + 11 + faction_id)
+            end
 
             return true
         end
@@ -1314,6 +1322,7 @@ OnInit.final("Profile", function(Require)
                 perk_milestones = 0,
                 faction_id = 0,
                 faction_reputation = __jarray(0),
+                faction_point_balances = __jarray(0),
                 experience = 0,
             }, mt)
         end

@@ -48,6 +48,7 @@ OnInit.final("Faction", function(Require)
     ---@field goal integer
     ---@field faction_points integer
     ---@field reputation integer
+    ---@field min_rank integer
     Quest = {}
     Quest.__index = Quest
     Quest.quests = {}
@@ -56,6 +57,7 @@ OnInit.final("Faction", function(Require)
     local pending_quest = {}
     local active_quest = {}
     local quest_progress = __jarray(0)
+    local quest_unique_progress = {}
     local completed_offers = {}
     local quest_refresh_timer = {}
     local reroll_used = {}
@@ -68,6 +70,24 @@ OnInit.final("Faction", function(Require)
     local function hero_data(pid)
         local profile = Profile[pid]
         return profile and profile.hero
+    end
+
+    local function ensure_faction_balances(hero)
+        hero.faction_point_balances = hero.faction_point_balances or __jarray(0)
+        return hero.faction_point_balances
+    end
+
+    ---@param pid integer
+    ---@param faction_id? integer
+    ---@return integer
+    function Faction.getPoints(pid, faction_id)
+        local hero = hero_data(pid)
+        local faction = player_faction[pid]
+        faction_id = faction_id or (faction and faction.id) or 0
+        if not hero or faction_id <= 0 then
+            return 0
+        end
+        return ensure_faction_balances(hero)[faction_id] or 0
     end
 
     ---@param pid integer
@@ -116,6 +136,21 @@ OnInit.final("Faction", function(Require)
         end
     end
 
+    ---Sets a faction's saved reputation, primarily for development tools.
+    ---@param pid integer
+    ---@param faction_id integer
+    ---@param amount integer
+    function Faction.setReputation(pid, faction_id, amount)
+        local hero = hero_data(pid)
+        if not hero or not Faction[faction_id] then return false end
+        hero.faction_reputation = hero.faction_reputation or __jarray(0)
+        hero.faction_reputation[faction_id] = math.max(0, math.min(100000, amount))
+        if player_faction[pid] == Faction[faction_id] and view then
+            view.refreshFaction(player_faction[pid], pid)
+        end
+        return true
+    end
+
     ---@param adapter FactionViewAdapter
     function Faction.bindView(adapter)
         view = adapter
@@ -153,6 +188,7 @@ OnInit.final("Faction", function(Require)
         if hero then
             hero.faction_id = faction.id
             hero.faction_reputation = hero.faction_reputation or __jarray(0)
+            SetCurrency(pid, FACTION, ensure_faction_balances(hero)[faction.id] or 0)
         end
         pending_faction[pid] = nil
         DisplayTextToForce(
@@ -217,14 +253,24 @@ OnInit.final("Faction", function(Require)
     end
 
     ---@param difficulty integer
+    ---@param pid integer
+    ---@param excluded_id? integer
     ---@return Quest
-    function Faction:pickQuest(difficulty)
+    function Faction:pickQuest(difficulty, pid, excluded_id)
         local potential_quests = {}
+        local fallback_quests = {}
+        local rank = Faction.getRank(Faction.getReputation(pid, self.id))
         for index = 1, #self.quests do
             local quest = self.quests[index]
-            if quest.diff == difficulty then
-                potential_quests[#potential_quests + 1] = quest
+            if quest.diff == difficulty and rank >= quest.min_rank then
+                fallback_quests[#fallback_quests + 1] = quest
+                if quest.id ~= excluded_id then
+                    potential_quests[#potential_quests + 1] = quest
+                end
             end
+        end
+        if #potential_quests == 0 then
+            potential_quests = fallback_quests
         end
         return potential_quests[math.random(1, #potential_quests)]
     end
@@ -236,7 +282,9 @@ OnInit.final("Faction", function(Require)
         end
         completed_offers[pid] = {}
         for difficulty = 1, 3 do
-            local quest = self:pickQuest(difficulty)
+            local previous = Quest.quests[pid][difficulty]
+            local excluded_id = unlock_reroll == false and previous and previous.id or nil
+            local quest = self:pickQuest(difficulty, pid, excluded_id)
             Quest.quests[pid][difficulty] = quest
             if view then
                 view.refreshQuest(pid, difficulty, quest)
@@ -258,8 +306,9 @@ OnInit.final("Faction", function(Require)
     ---@param goal integer
     ---@param faction_points integer
     ---@param reputation integer
+    ---@param min_rank? integer
     ---@return Quest
-    function Quest.create(name, desc, icon, difficulty, kind, goal, faction_points, reputation)
+    function Quest.create(name, desc, icon, difficulty, kind, goal, faction_points, reputation, min_rank)
         local self = setmetatable({
             id = quest_count,
             name = name,
@@ -270,6 +319,7 @@ OnInit.final("Faction", function(Require)
             goal = goal,
             faction_points = faction_points,
             reputation = reputation,
+            min_rank = min_rank or 1,
         }, Quest)
         Quest[quest_count] = self
         quest_count = quest_count + 1
@@ -279,6 +329,7 @@ OnInit.final("Faction", function(Require)
     ---@param pid integer
     function Quest:on_accept(pid)
         quest_progress[pid] = 0
+        quest_unique_progress[pid] = {}
         if view then
             view.refreshProgress(pid, self, 0)
         end
@@ -331,6 +382,7 @@ OnInit.final("Faction", function(Require)
     local function complete_quest(pid, quest)
         active_quest[pid] = nil
         quest_progress[pid] = 0
+        quest_unique_progress[pid] = nil
         completed_offers[pid] = completed_offers[pid] or {}
         completed_offers[pid][quest.id] = true
         AddCurrency(pid, FACTION, quest.faction_points)
@@ -362,6 +414,27 @@ OnInit.final("Faction", function(Require)
             complete_quest(pid, quest)
         end
         return true
+    end
+
+    ---Advances a contract only once for each distinct objective key.
+    ---@param pid integer
+    ---@param kind string
+    ---@param key integer|string
+    function Quest.progressUnique(pid, kind, key)
+        local quest = active_quest[pid]
+        if not quest or quest.kind ~= kind then
+            return false
+        end
+        local seen = quest_unique_progress[pid]
+        if not seen then
+            seen = {}
+            quest_unique_progress[pid] = seen
+        end
+        if seen[key] then
+            return false
+        end
+        seen[key] = true
+        return Quest.progress(pid, kind)
     end
 
     ---@param pid integer
@@ -415,6 +488,7 @@ OnInit.final("Faction", function(Require)
         active_quest[pid] = nil
         pending_quest[pid] = nil
         quest_progress[pid] = 0
+        quest_unique_progress[pid] = nil
         -- A reroll changes the current offers without postponing the next
         -- scheduled rotation. That rotation unlocks the button again.
         faction:refreshQuests(pid, false)
@@ -448,6 +522,13 @@ OnInit.final("Faction", function(Require)
         "The Cave Voyagers are a mining faction that provide access to earth materials and a special defensive buff.|n|n|cffffcc00Membership, reputation, and unspent Faction Points are saved with this character.|r|n|nWill you join us?"
     )
     miner_guild:addQuest(Quest.create(
+        "Prospector's Route",
+        "Mine 3 deposits while this contract is active.\n\n|cffffcc00Reward:|r 5 Faction Points and 5 Reputation",
+        "ReplaceableTextures\\CommandButtons\\BTNPickUpItem.blp",
+        QUEST_DIFF_EASY,
+        "mine_any", 3, 5, 5
+    ))
+    miner_guild:addQuest(Quest.create(
         "Arena Survey",
         "Enter the Colosseum while this contract is active.\n\n|cffffcc00Reward:|r 5 Faction Points and 5 Reputation",
         "ReplaceableTextures\\CommandButtons\\BTNHelmutPurple.blp",
@@ -455,11 +536,53 @@ OnInit.final("Faction", function(Require)
         "colosseum_enter", 1, 5, 5
     ))
     miner_guild:addQuest(Quest.create(
+        "Stone Samples",
+        "Recover 8 ore samples from deposits. Rich and rare deposits provide more samples.\n\n|cffffcc00Reward:|r 5 Faction Points and 5 Reputation",
+        "ReplaceableTextures\\CommandButtons\\BTNStone.blp",
+        QUEST_DIFF_EASY,
+        "mine_ore", 8, 5, 5
+    ))
+    miner_guild:addQuest(Quest.create(
+        "Rich Veins",
+        "Mine 2 rich deposits while this contract is active.\n\n|cffffcc00Reward:|r 10 Faction Points and 10 Reputation",
+        "ReplaceableTextures\\CommandButtons\\BTNGem.blp",
+        QUEST_DIFF_MEDIUM,
+        "mine_rich", 2, 10, 10, 2
+    ))
+    miner_guild:addQuest(Quest.create(
         "Endless Excavation",
         "Clear 10 waves of the Infinite Struggle while this contract is active.\n\n|cffffcc00Reward:|r 10 Faction Points and 10 Reputation",
         "ReplaceableTextures\\CommandButtons\\BTNPickUpItem.blp",
         QUEST_DIFF_MEDIUM,
         "struggle_wave", 10, 10, 10
+    ))
+    miner_guild:addQuest(Quest.create(
+        "Cave-In Cleanup",
+        "Defeat 2 golems awakened by mining operations. Nearby Cave Voyagers share credit.\n\n|cffffcc00Reward:|r 10 Faction Points and 10 Reputation",
+        "ReplaceableTextures\\CommandButtons\\BTNHeroMountainKing.blp",
+        QUEST_DIFF_MEDIUM,
+        "mining_guardian", 2, 10, 10
+    ))
+    miner_guild:addQuest(Quest.create(
+        "Unbroken Extraction",
+        "Complete a rare deposit's 30-second extraction without being interrupted.\n\n|cffffcc00Reward:|r 20 Faction Points and 20 Reputation",
+        "ReplaceableTextures\\CommandButtons\\BTNHumanBuild.blp",
+        QUEST_DIFF_HARD,
+        "rare_extraction", 1, 20, 20, 5
+    ))
+    miner_guild:addQuest(Quest.create(
+        "Awakened Colossus",
+        "Defeat a golem awakened by a rare deposit. Nearby Cave Voyagers share credit.\n\n|cffffcc00Reward:|r 20 Faction Points and 20 Reputation",
+        "ReplaceableTextures\\CommandButtons\\BTNStoneGiant.blp",
+        QUEST_DIFF_HARD,
+        "rare_guardian", 1, 20, 20, 5
+    ))
+    miner_guild:addQuest(Quest.create(
+        "Deep Survey",
+        "Mine deposits in 3 distinct Chaos regions during this contract.\n\n|cffffcc00Reward:|r 20 Faction Points and 20 Reputation",
+        "ReplaceableTextures\\CommandButtons\\BTNSpy.blp",
+        QUEST_DIFF_HARD,
+        "mining_region", 3, 20, 20
     ))
     miner_guild:addQuest(Quest.create(
         "Champion's Commission",
@@ -474,12 +597,31 @@ OnInit.final("Faction", function(Require)
         active_quest[pid] = nil
         quest_progress[pid] = 0
         Quest.quests[pid] = nil
+        hero.faction_reputation = hero.faction_reputation or __jarray(0)
+        local balances = ensure_faction_balances(hero)
+        local has_new_balance = false
+        for faction_id = 1, 6 do
+            if (balances[faction_id] or 0) > 0 then
+                has_new_balance = true
+                break
+            end
+        end
+        -- Saves created before faction-specific balances used one shared field.
+        if not has_new_balance and (hero.faction_points or 0) > 0 then
+            local legacy_faction = (hero.faction_id or 0) > 0 and hero.faction_id or 1
+            balances[legacy_faction] = hero.faction_points
+        end
         player_faction[pid] = Faction[hero.faction_id or 0]
         local faction = player_faction[pid]
         if faction then
+            SetCurrency(pid, FACTION, balances[faction.id] or 0)
             schedule_quest_refresh(pid)
             Quest.setup(pid)
             faction.buff:add(Hero[pid], Hero[pid])
+        else
+            -- The HUD/shop currency represents only the active faction. Keep
+            -- saved balances inaccessible until that faction is joined.
+            SetCurrency(pid, FACTION, 0)
         end
     end
 
@@ -489,6 +631,7 @@ OnInit.final("Faction", function(Require)
         pending_quest[pid] = nil
         active_quest[pid] = nil
         quest_progress[pid] = 0
+        quest_unique_progress[pid] = nil
         Quest.quests[pid] = nil
         completed_offers[pid] = nil
         reroll_used[pid] = nil
@@ -498,7 +641,25 @@ OnInit.final("Faction", function(Require)
         end
     end
 
+    local function on_currency_changed(pid, currency, amount)
+        if currency ~= FACTION then return end
+        local faction = player_faction[pid]
+        local hero = hero_data(pid)
+        if faction and hero then
+            ensure_faction_balances(hero)[faction.id] = amount
+        end
+    end
+
+    HardHatBuff.getFactionReduction = function(target)
+        local pid = GetPlayerId(GetOwningPlayer(target)) + 1
+        local rank = Faction.getRank(Faction.getReputation(pid, 1))
+        if rank >= 7 then return 0.15 end
+        if rank >= 4 then return 0.11 end
+        return 0.08
+    end
+
     Profile.registerHeroLoadedAction(restore_faction)
+    RegisterCurrencyChangedAction(on_currency_changed)
     local user = User.first
     while user do
         EVENT_ON_CLEANUP:register_action(user.id, clear_player)

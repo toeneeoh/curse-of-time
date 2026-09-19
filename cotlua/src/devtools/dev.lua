@@ -27,6 +27,7 @@ OnInit.final("Dev", function(Require)
     Require('Items')
     Require('ItemHelpers')
     Require('Perks')
+    Require('FactionMining')
     local pack, find, lower = string.pack, string.find, string.lower
     local searchable = {} ---@type boolean[]
     local dev_cmds, wipe_item_stats, find_item, event_setup
@@ -47,6 +48,8 @@ OnInit.final("Dev", function(Require)
         ["rewardmetrics"] = "Print reward HUD counters, or reset them with -rewardmetrics reset.",
         ["levelmetrics"] = "Print level-up timing stages, or reset them with -levelmetrics reset.",
         ["sf"] = "Set the amount of faction points you have to #. usage: -sf [#]",
+        ["factionrep"] = "Set Cave Voyagers reputation to #. usage: -factionrep [#]",
+        ["mining"] = "Spawn a common, rich, or rare deposit beside your hero. usage: -mining [common|rich|rare]",
         ["lvl"] = "Set the selected hero's level to #. usage: -lvl [1-500]",
         ["str"] = "Set the selected hero's strength to #. usage: -str [#]",
         ["agi"] = "Set the selected hero's agility to #. usage: -agi [#]",
@@ -260,6 +263,16 @@ modifiers:
         end,
         ["sf"] = function(p, pid, args)
             SetCurrency(pid, FACTION, S2I(args[2]))
+        end,
+        ["factionrep"] = function(p, pid, args)
+            Faction.setReputation(pid, 1, S2I(args[2]))
+        end,
+        ["mining"] = function(p, pid, args)
+            local kind = args[2] or "common"
+            local hero = Hero[pid]
+            if not FactionMining.spawn(kind, GetUnitX(hero) + 250., GetUnitY(hero)) then
+                DisplayTextToPlayer(p, 0., 0., "Unable to spawn deposit. Check its placeholder rawcode.")
+            end
         end,
         ["lvl"] = function(p, pid, args)
             if GetHeroLevel(PLAYER_SELECTED_UNIT[pid]) > S2I(args[2]) then

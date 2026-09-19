@@ -13,7 +13,7 @@ OnInit.final("BuffsWorldFactions", function(Require)
         thistype.NAME            = "Hard Hat"
         thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNHelmOfValor.blp"
         thistype.DESC            = "This unit has +^#mult% damage resist"
-        thistype.DESC_FACTION    = "After standing still for 3 seconds gain |cffffcc0015%|r damage reduction."
+        thistype.DESC_FACTION    = "After standing still for 3 seconds gain |cffffcc008%|r damage reduction. Improves to |cffffcc0011%|r at Rank 4 and |cffffcc0015%|r at Rank 7."
         thistype.DISPEL_TYPE     = BUFF_POSITIVE
         thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
         thistype.CANNOT_PURGE    = true
@@ -28,7 +28,9 @@ OnInit.final("BuffsWorldFactions", function(Require)
                 self.count = self.count + 1
                 if self.count >= 3 then
                     u.dr = u.dr / self.mult
-                    self.mult = 0.85
+                    local reduction = thistype.getFactionReduction
+                        and thistype.getFactionReduction(self.target) or 0.08
+                    self.mult = 1. - reduction
                     u.dr = u.dr * self.mult
                 end
             else

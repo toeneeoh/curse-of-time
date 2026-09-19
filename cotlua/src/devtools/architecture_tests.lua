@@ -44,6 +44,7 @@ OnInit.final("ArchitectureTests", function(Require)
     Require('HintConfig')
     Require('CurrencyDisplay')
     Require('FactionView')
+    Require('FactionMining')
     Require('DropTable')
     Require('StruggleRewards')
     Require('Perks')
@@ -238,6 +239,8 @@ OnInit.final("ArchitectureTests", function(Require)
         source.faction_id = 1
         source.faction_reputation[1] = 275
         source.faction_reputation[3] = 40
+        source.faction_point_balances[1] = 35
+        source.faction_point_balances[3] = 12
 
         local current = source:values()
         local decoded = HeroData.create()
@@ -249,18 +252,21 @@ OnInit.final("ArchitectureTests", function(Require)
             or decoded.experience ~= 4321
             or decoded.faction_id ~= 1
             or decoded.faction_reputation[1] ~= 275
-            or decoded.faction_reputation[3] ~= 40 then
+            or decoded.faction_reputation[3] ~= 40
+            or decoded.faction_point_balances[1] ~= 35
+            or decoded.faction_point_balances[3] ~= 12 then
             return false, "trailing character fields did not round-trip"
         end
 
-        for _ = 1, 7 do
+        for _ = 1, 13 do
             current[#current] = nil
         end
         local before_factions = HeroData.create()
         if not before_factions:propagate(current)
             or before_factions.experience ~= 4321
             or before_factions.faction_id ~= 0
-            or before_factions.faction_reputation[1] ~= 0 then
+            or before_factions.faction_reputation[1] ~= 0
+            or before_factions.faction_point_balances[1] ~= 0 then
             return false, "pre-Factions character did not default faction progress to zero"
         end
 
@@ -520,6 +526,19 @@ OnInit.final("ArchitectureTests", function(Require)
             or Faction.getRank(100) ~= 2
             or Faction.getRank(3200) ~= 10 then
             return false, "faction reputation threshold changed unexpectedly"
+        end
+        return true
+    end)
+
+    ArchitectureTests.register("faction mining placeholder rawcodes are distinct", function()
+        local rawcodes = FactionMining.RAWCODES
+        if rawcodes.common == rawcodes.rich
+            or rawcodes.common == rawcodes.rare
+            or rawcodes.rich == rawcodes.rare
+            or rawcodes.guardian == rawcodes.common
+            or rawcodes.guardian == rawcodes.rich
+            or rawcodes.guardian == rawcodes.rare then
+            return false, "faction mining object records overlap"
         end
         return true
     end)
