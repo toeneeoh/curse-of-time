@@ -20,9 +20,9 @@ OnInit.final("FactionMining", function(Require)
     }
 
     local CAVE_VOYAGERS_ID = 1
-    local INTERACTION_RANGE = 350.
+    local INTERACTION_RANGE = 175.
     local CHANNEL_MOVE_TOLERANCE = 24.
-    local CHANNEL_TICK = 0.1
+    local CHANNEL_TICK = FPS_32
     local APPROACH_TICK = FPS_32
     local DEPOSIT_RESPAWN = 180.
     local GUARDIAN_SHARE_RANGE = 1800.
@@ -84,6 +84,19 @@ OnInit.final("FactionMining", function(Require)
         gg_rct_Dragon_Astral_2,
         gg_rct_Dragon_Astral_5,
         gg_rct_Devourer_Existence_1,
+        gg_rct_Ursa_Abyssal_1,
+        gg_rct_Ursa_Abyssal_2,
+        gg_rct_Ursa_Abyssal_3,
+        gg_rct_Ursa_Abyssal_4,
+        gg_rct_Ursa_Abyssal_5,
+        gg_rct_Ursa_Abyssal_6,
+        gg_rct_OgreTauren_Void_1,
+        gg_rct_OgreTauren_Void_2,
+        gg_rct_OgreTauren_Void_3,
+        gg_rct_OgreTauren_Void_4,
+        gg_rct_OgreTauren_Void_5,
+        gg_rct_OgreTauren_Void_6,
+        gg_rct_OgreTauren_Void_7,
     }
 
     local function current_faction_id(pid)
@@ -300,6 +313,7 @@ OnInit.final("FactionMining", function(Require)
             return
         end
 
+        QueueUnitAnimation(hero, "spell")
         update_progress_bar(state)
         state.callback = TimerQueue:callDelayed(CHANNEL_TICK, mining_tick, state)
     end
@@ -349,7 +363,7 @@ OnInit.final("FactionMining", function(Require)
         end
         state.progress_bar = AddSpecialEffect("war3mapImported\\Progressbar.mdl",
             GetUnitX(hero), GetUnitY(hero))
-        BlzSetSpecialEffectZ(state.progress_bar, BlzGetUnitZ(hero) + 200.)
+        BlzSetSpecialEffectZ(state.progress_bar, BlzGetUnitZ(hero) + 275.)
         BlzSetSpecialEffectTimeScale(state.progress_bar, 0.001)
         BlzSetSpecialEffectColorByPlayer(state.progress_bar, Player(pid - 1))
         BlzSetSpecialEffectScale(state.progress_bar, 1.25)
