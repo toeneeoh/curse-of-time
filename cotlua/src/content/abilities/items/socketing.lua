@@ -20,7 +20,10 @@ OnInit.final("ItemSocketingAbilities", function(Require)
         local function is_socket_target(itm, socket_limit)
             return itm ~= nil
                 and itm.type ~= TYPE_SOCKETABLE
-                and ItemIsUpgradeable(itm)
+                -- Boss items remain valid socket targets at their maximum
+                -- upgrade level. Upgrade eligibility and socket eligibility
+                -- are separate properties of the item definition.
+                and ItemData[itm.id][ITEM_UPGRADE_MAX] > 0
                 and #itm.sockets < socket_limit
         end
 

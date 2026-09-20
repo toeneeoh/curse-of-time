@@ -23,6 +23,7 @@ OnInit.final("FactionMining", function(Require)
     local INTERACTION_RANGE = 350.
     local CHANNEL_MOVE_TOLERANCE = 24.
     local CHANNEL_TICK = 0.1
+    local APPROACH_TICK = FPS_32
     local DEPOSIT_RESPAWN = 180.
     local GUARDIAN_SHARE_RANGE = 1800.
     local GUARDIAN_POINT_REWARD = 2
@@ -202,6 +203,10 @@ OnInit.final("FactionMining", function(Require)
 
     local function destroy_progress_bar(state)
         if state.progress_bar then
+            -- DestroyEffect plays the model's death animation. The progress
+            -- bar is deliberately frozen while channeling, so hide it before
+            -- destruction instead of leaving that animation on screen.
+            BlzSetSpecialEffectScale(state.progress_bar, 0.)
             DestroyEffect(state.progress_bar)
             state.progress_bar = nil
         end
@@ -325,7 +330,9 @@ OnInit.final("FactionMining", function(Require)
         end
 
         pending_mining[pid] = nil
-        IssueImmediateOrderById(hero, ORDER_ID_STOP)
+        -- Use the native order string here. ORDER_ID_STOP is retained for
+        -- legacy callers but resolves to the hold-position order in this map.
+        IssueImmediateOrder(hero, "stop")
         local state = {
             pid = pid,
             hero = hero,
@@ -364,27 +371,28 @@ OnInit.final("FactionMining", function(Require)
         end
         if IsUnitInRange(hero, deposit.unit, INTERACTION_RANGE) then
             pending_mining[state.pid] = nil
+            IssueImmediateOrder(hero, "stop")
             start_mining(deposit, state.pid)
         else
-            state.callback = TimerQueue:callDelayed(CHANNEL_TICK, approach_deposit, state)
+            state.callback = TimerQueue:callDelayed(APPROACH_TICK, approach_deposit, state)
         end
     end
 
     local function request_mining(deposit, pid, hero)
         if current_faction_id(pid) ~= CAVE_VOYAGERS_ID then
-            IssueImmediateOrderById(hero, ORDER_ID_STOP)
+            IssueImmediateOrder(hero, "stop")
             DisplayTextToPlayer(Player(pid - 1), 0., 0., "Only active Cave Voyagers may mine deposits.")
             return
         end
         local rank = Faction.getRank(Faction.getReputation(pid, CAVE_VOYAGERS_ID))
         if rank < deposit.config.required_rank then
-            IssueImmediateOrderById(hero, ORDER_ID_STOP)
+            IssueImmediateOrder(hero, "stop")
             DisplayTextToPlayer(Player(pid - 1), 0., 0., deposit.config.name
                 .. " requires Cave Voyagers Rank " .. deposit.config.required_rank .. ".")
             return
         end
         if deposit.miner_pid and deposit.miner_pid ~= pid then
-            IssueImmediateOrderById(hero, ORDER_ID_STOP)
+            IssueImmediateOrder(hero, "stop")
             DisplayTextToPlayer(Player(pid - 1), 0., 0., "Another player is already mining this deposit.")
             return
         end
@@ -395,7 +403,7 @@ OnInit.final("FactionMining", function(Require)
 
         local state = { pid = pid, hero = hero, deposit = deposit }
         pending_mining[pid] = state
-        state.callback = TimerQueue:callDelayed(CHANNEL_TICK, approach_deposit, state)
+        state.callback = TimerQueue:callDelayed(APPROACH_TICK, approach_deposit, state)
     end
 
     local function on_mining_order(source, target, order_id)
