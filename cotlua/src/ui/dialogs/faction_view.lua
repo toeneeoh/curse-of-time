@@ -42,10 +42,12 @@ OnInit.final("FactionView", function(Require)
         0.04,
         FRAMEPOINT_TOP,
         FRAMEPOINT_TOP,
-        0.01,
+        0.,
         -0.072
     )
     rank_icon:makeTooltip(FRAMEPOINT_TOPLEFT, 0.2)
+    rank_icon:setTooltipIcon(
+        "ReplaceableTextures\\CommandButtons\\BTNMedalionOfCourage.blp")
     local rank_charge = BlzCreateFrameByType("BACKDROP", "", rank_icon.frame, "", 0)
     BlzFrameSetSize(rank_charge, 0.018, 0.018)
     BlzFrameSetTexture(rank_charge,
@@ -79,8 +81,9 @@ OnInit.final("FactionView", function(Require)
         FRAMEPOINT_TOP,
         FRAMEPOINT_TOP,
         0.,
-        -0.09
+        -0.08
     )
+    buff_icon:makeTooltip(FRAMEPOINT_TOPLEFT, 0.2)
 
     local event_frame = BlzCreateFrameByType("FRAME", "", main, "", 0)
     BlzFrameSetPoint(event_frame, FRAMEPOINT_TOPRIGHT, main, FRAMEPOINT_TOPRIGHT, -0.01, -0.143)
@@ -90,7 +93,7 @@ OnInit.final("FactionView", function(Require)
     local event_title = BlzCreateFrame("TitleText", event_frame, 0, 0)
     BlzFrameSetPoint(event_title, FRAMEPOINT_TOP, event_frame, FRAMEPOINT_TOP, -0.01, -0.05)
     BlzFrameSetEnable(event_title, false)
-    BlzFrameSetText(event_title, "|cffffcc00Hourly Event|r")
+    BlzFrameSetText(event_title, "|cffffcc00Event|r")
 
     local event_blurb = BlzCreateFrameByType("TEXT", "", event_frame, "", 0)
     BlzFrameSetPoint(event_blurb, FRAMEPOINT_TOP, event_frame, FRAMEPOINT_TOP, -0.01, -0.13)
@@ -108,9 +111,11 @@ OnInit.final("FactionView", function(Require)
         FRAMEPOINT_TOP,
         FRAMEPOINT_TOP,
         -0.01,
-        -0.09
+        -0.08
     )
     event_icon:makeTooltip(FRAMEPOINT_TOPLEFT, 0.2)
+    event_icon:setTooltipIcon(
+        "ReplaceableTextures\\CommandButtons\\BTNTreasureChest.blp")
     event_icon:setTooltipName("Hold the Line")
     event_icon:setTooltipText(
         "Defend the Cave Voyagers' supply cache against five assault waves.")
@@ -296,6 +301,9 @@ OnInit.final("FactionView", function(Require)
         rank_icon:setTooltipText("Cave Voyagers Rank " .. rank .. " of "
             .. Faction.getMaxRank() .. ".\n\n|cffffcc00Reputation:|r " .. reputation_line)
         buff_icon:icon(buff.ICON)
+        buff_icon:setTooltipIcon(buff.ICON)
+        buff_icon:setTooltipName(buff.NAME)
+        buff_icon:setTooltipText(buff.DESC_FACTION)
         BlzFrameSetText(buff_blurb, "|cffffcc00" .. buff.NAME .. "|r\n\n" .. buff.DESC_FACTION)
         BlzFrameSetTextAlignment(buff_blurb, TEXT_JUSTIFY_LEFT, TEXT_JUSTIFY_CENTER)
         BlzFrameSetText(blurb, "|cffffcc00Reputation:|r " .. reputation_line
