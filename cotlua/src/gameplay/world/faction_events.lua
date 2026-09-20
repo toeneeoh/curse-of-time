@@ -332,7 +332,7 @@ OnInit.final("FactionEvents", function(Require)
         SetUnitVertexColor(objective, 255, 255, 255, 0)
         objective_effect = AddSpecialEffect(CACHE_MODEL,
             GetUnitX(objective), GetUnitY(objective))
-        BlzSetSpecialEffectScale(objective_effect, 1.35)
+        BlzSetSpecialEffectScale(objective_effect, 1.75)
         local max_health = math.min(2000000000.,
             (100000. + level * level * 800.) * (1. + math.max(0, party_size - 1) * 0.4))
         BlzSetUnitMaxHP(objective, math.floor(max_health))
@@ -361,16 +361,27 @@ OnInit.final("FactionEvents", function(Require)
             return "|cff808080Events become available after Chaos.|r"
         end
         if active then
-            local health = objective and GetWidgetLife(objective) or 0.
-            local max_health = objective and BlzGetUnitMaxHP(objective) or 1.
-            local remaining = timeout_callback and TimerQueue:getRemaining(timeout_callback) or 0.
-            return "|cffffcc00Hold the Line|r\nWave " .. wave .. " / " .. TOTAL_WAVES
-                .. "\nSupply Cache: " .. math.max(0, math.floor(health / max_health * 100.)) .. "%"
-                .. "\nTime Remaining: " .. format_time(remaining or 0.)
+            return "|cffffcc00Hold the Line|r\n\nDefend the Cave Voyagers' supply cache "
+                .. "against five assault waves.\n\n|cff80ff80Event in progress.|r"
         end
         local remaining = next_event_callback and TimerQueue:getRemaining(next_event_callback) or 0.
-        return "|cffffcc00Next:|r Hold the Line\nBegins in: "
+        return "|cffffcc00Hold the Line|r\n\nDefend the Cave Voyagers' supply cache "
+            .. "against five assault waves.\n\n|cffffcc00Begins in:|r "
             .. format_time(remaining or 0.)
+    end
+
+    ---@param pid integer
+    ---@return string?
+    function FactionEvents.getHudStatus(pid)
+        if not active or not member_faction(pid) then return nil end
+        local health = objective and GetWidgetLife(objective) or 0.
+        local max_health = objective and BlzGetUnitMaxHP(objective) or 1.
+        local remaining = timeout_callback and TimerQueue:getRemaining(timeout_callback) or 0.
+        local progress = wave > 0 and ("Wave " .. wave .. " / " .. TOTAL_WAVES)
+            or "First wave incoming"
+        return "|cffffcc00Hold the Line|r  |  " .. progress
+            .. "\nSupply Cache: " .. math.max(0, math.floor(health / max_health * 100.)) .. "%"
+            .. "  |  " .. format_time(remaining or 0.)
     end
 
     if DEV_ENABLED then

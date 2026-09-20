@@ -30,14 +30,31 @@ OnInit.final("FactionView", function(Require)
     BlzFrameSetEnable(title, false)
 
     local blurb = BlzCreateFrameByType("TEXT", "", main, "", 0)
-    BlzFrameSetPoint(blurb, FRAMEPOINT_TOP, main, FRAMEPOINT_TOP, 0.01, -0.105)
+    BlzFrameSetPoint(blurb, FRAMEPOINT_TOP, main, FRAMEPOINT_TOP, 0.01, -0.135)
     BlzFrameSetEnable(blurb, false)
     BlzFrameSetSize(blurb, 0.19, 1.0)
+    BlzFrameSetScale(blurb, 1.1)
 
-    local status_title = BlzCreateFrame("TitleText", main, 0, 0)
-    BlzFrameSetPoint(status_title, FRAMEPOINT_TOP, main, FRAMEPOINT_TOP, 0.01, -0.062)
-    BlzFrameSetEnable(status_title, false)
-    BlzFrameSetText(status_title, "|cffffcc00Faction Status|r")
+    local rank_icon = SimpleButton.create(
+        main,
+        "ReplaceableTextures\\CommandButtons\\BTNMedalionOfCourage.blp",
+        0.04,
+        0.04,
+        FRAMEPOINT_TOP,
+        FRAMEPOINT_TOP,
+        0.01,
+        -0.072
+    )
+    rank_icon:makeTooltip(FRAMEPOINT_TOPLEFT, 0.2)
+    local rank_charge = BlzCreateFrameByType("BACKDROP", "", rank_icon.frame, "", 0)
+    BlzFrameSetSize(rank_charge, 0.018, 0.018)
+    BlzFrameSetTexture(rank_charge,
+        "UI/Widgets/Console/Human/CommandButton/human-button-lvls-overlay.blp", 0, true)
+    BlzFrameSetPoint(rank_charge, FRAMEPOINT_BOTTOMRIGHT,
+        rank_icon.frame, FRAMEPOINT_BOTTOMRIGHT, 0.003, -0.003)
+    local rank_count = BlzCreateFrameByType("TEXT", "", rank_icon.frame, "", 0)
+    BlzFrameSetAllPoints(rank_count, rank_charge)
+    BlzFrameSetTextAlignment(rank_count, TEXT_JUSTIFY_CENTER, TEXT_JUSTIFY_MIDDLE)
 
     local buff_frame = BlzCreateFrameByType("FRAME", "", main, "", 0)
     BlzFrameSetPoint(buff_frame, FRAMEPOINT_TOPRIGHT, main, FRAMEPOINT_TOPRIGHT, -0.02, 0.016)
@@ -76,12 +93,40 @@ OnInit.final("FactionView", function(Require)
     BlzFrameSetText(event_title, "|cffffcc00Hourly Event|r")
 
     local event_blurb = BlzCreateFrameByType("TEXT", "", event_frame, "", 0)
-    BlzFrameSetPoint(event_blurb, FRAMEPOINT_TOP, event_frame, FRAMEPOINT_TOP, -0.01, -0.095)
-    BlzFrameSetSize(event_blurb, 0.2, 0.12)
-    BlzFrameSetTextAlignment(event_blurb, TEXT_JUSTIFY_CENTER, TEXT_JUSTIFY_TOP)
+    BlzFrameSetPoint(event_blurb, FRAMEPOINT_TOP, event_frame, FRAMEPOINT_TOP, -0.01, -0.13)
+    BlzFrameSetSize(event_blurb, 0.2, 1.0)
+    BlzFrameSetTextAlignment(event_blurb, TEXT_JUSTIFY_LEFT, TEXT_JUSTIFY_CENTER)
     BlzFrameSetEnable(event_blurb, false)
     BlzFrameSetText(event_blurb,
         "|cff808080Events become available after Chaos.|r")
+
+    local event_icon = SimpleButton.create(
+        event_frame,
+        "ReplaceableTextures\\CommandButtons\\BTNTreasureChest.blp",
+        0.04,
+        0.04,
+        FRAMEPOINT_TOP,
+        FRAMEPOINT_TOP,
+        -0.01,
+        -0.09
+    )
+    event_icon:makeTooltip(FRAMEPOINT_TOPLEFT, 0.2)
+    event_icon:setTooltipName("Hold the Line")
+    event_icon:setTooltipText(
+        "Defend the Cave Voyagers' supply cache against five assault waves.")
+
+    local event_hud = BlzCreateFrame("QuestButtonDisabledBackdropTemplate",
+        BlzGetFrameByName("ConsoleUIBackdrop", 0), 0, 0)
+    BlzFrameSetPoint(event_hud, FRAMEPOINT_TOP, RESOURCE_BAR, FRAMEPOINT_BOTTOM, 0., -0.006)
+    BlzFrameSetSize(event_hud, 0.235, 0.052)
+    BlzFrameSetLevel(event_hud, 5)
+    BlzFrameSetEnable(event_hud, false)
+    BlzFrameSetVisible(event_hud, false)
+    local event_hud_text = BlzCreateFrameByType("TEXT", "", event_hud, "", 0)
+    BlzFrameSetPoint(event_hud_text, FRAMEPOINT_CENTER, event_hud, FRAMEPOINT_CENTER, 0., 0.)
+    BlzFrameSetSize(event_hud_text, 0.22, 0.045)
+    BlzFrameSetTextAlignment(event_hud_text, TEXT_JUSTIFY_CENTER, TEXT_JUSTIFY_MIDDLE)
+    BlzFrameSetEnable(event_hud_text, false)
 
     local function close(pid)
         if GetLocalPlayer() == Player(pid - 1) then
@@ -240,28 +285,24 @@ OnInit.final("FactionView", function(Require)
         local reputation = Faction.getReputation(pid, faction.id)
         local rank = Faction.getRank(reputation)
         local next_threshold = Faction.getNextRankThreshold(reputation)
-        local active_quest, progress = Quest.getActive(pid)
         local reputation_line
         if next_threshold then
             reputation_line = reputation .. " / " .. next_threshold
         else
             reputation_line = reputation .. " |cff80ff80(MAX)|r"
         end
-        local quest_line = "|cff808080None selected|r"
-        if active_quest then
-            quest_line = active_quest.name .. "\n|cffffcc00Progress:|r "
-                .. progress .. " / " .. active_quest.goal
-        end
+        BlzFrameSetText(rank_count, "|cffffcc00" .. rank .. "|r")
+        rank_icon:setTooltipName("Rank " .. rank)
+        rank_icon:setTooltipText("Cave Voyagers Rank " .. rank .. " of "
+            .. Faction.getMaxRank() .. ".\n\n|cffffcc00Reputation:|r " .. reputation_line)
         buff_icon:icon(buff.ICON)
         BlzFrameSetText(buff_blurb, "|cffffcc00" .. buff.NAME .. "|r\n\n" .. buff.DESC_FACTION)
         BlzFrameSetTextAlignment(buff_blurb, TEXT_JUSTIFY_LEFT, TEXT_JUSTIFY_CENTER)
-        BlzFrameSetText(blurb, "|cffffcc00Rank:|r " .. rank .. " / " .. Faction.getMaxRank()
-            .. "\n|cffffcc00Reputation:|r " .. reputation_line
+        BlzFrameSetText(blurb, "|cffffcc00Reputation:|r " .. reputation_line
             .. (next_threshold and "\n|cffffcc00Next Rank:|r "
                 .. (next_threshold - reputation) .. " Reputation" or "")
-            .. "\n|cffffcc00Faction Points:|r " .. GetCurrency(pid, FACTION)
-            .. "\n\n|cffffcc00Active Quest|r\n" .. quest_line)
-        BlzFrameSetTextAlignment(blurb, TEXT_JUSTIFY_LEFT, TEXT_JUSTIFY_TOP)
+            .. "\n|cffffcc00Faction Points:|r " .. GetCurrency(pid, FACTION))
+        BlzFrameSetTextAlignment(blurb, TEXT_JUSTIFY_CENTER, TEXT_JUSTIFY_TOP)
         BlzFrameSetText(title, "|cffffcc00" .. faction.name .. "|r")
     end
 
@@ -325,6 +366,11 @@ OnInit.final("FactionView", function(Require)
     function view.refreshEvent(pid)
         if GetLocalPlayer() ~= Player(pid - 1) then return end
         BlzFrameSetText(event_blurb, FactionEvents.getStatus(pid))
+        local hud_status = FactionEvents.getHudStatus(pid)
+        BlzFrameSetVisible(event_hud, hud_status ~= nil)
+        if hud_status then
+            BlzFrameSetText(event_hud_text, hud_status)
+        end
     end
 
     TimerQueue:callPeriodically(1., nil, function()

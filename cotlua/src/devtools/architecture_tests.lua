@@ -546,7 +546,8 @@ OnInit.final("ArchitectureTests", function(Require)
 
     ArchitectureTests.register("faction hourly event service is available", function()
         if type(FactionEvents.activate) ~= "function"
-            or type(FactionEvents.getStatus) ~= "function" then
+            or type(FactionEvents.getStatus) ~= "function"
+            or type(FactionEvents.getHudStatus) ~= "function" then
             return false, "faction hourly event API is incomplete"
         end
         return true
