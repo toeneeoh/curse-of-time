@@ -10,6 +10,7 @@ OnInit.final("PerkTree", function(Require)
     Require('SimpleButton')
     Require('Events')
     Require('Mouse')
+    Require('Users')
 
     PerkTree = {}
 
@@ -108,12 +109,13 @@ OnInit.final("PerkTree", function(Require)
             and y - half >= VIEW_TOP - VIEW_HEIGHT and y + half <= VIEW_TOP
     end
 
-    local function edge_color(pid, edge)
-        if Perks.hasNode(pid, edge.parent.id) and Perks.hasNode(pid, edge.node.id) then
+    local function edge_color(target_pid, edge)
+        if Perks.hasNode(target_pid, edge.parent.id)
+            and Perks.hasNode(target_pid, edge.node.id) then
             return COLOR_ALLOCATED
         end
-        local available = Perks.canAllocate(pid, edge.node.id)
-        if available and Perks.hasNode(pid, edge.parent.id) then return COLOR_AVAILABLE end
+        local available = Perks.canAllocate(target_pid, edge.node.id)
+        if available and Perks.hasNode(target_pid, edge.parent.id) then return COLOR_AVAILABLE end
         return COLOR_LOCKED
     end
 
@@ -123,9 +125,11 @@ OnInit.final("PerkTree", function(Require)
         BlzFrameSetSize(segment, math.max(width, .0003), math.max(height, .0003))
     end
 
-    local function render(pid)
-        if not is_open[pid] or GetLocalPlayer() ~= Player(pid - 1) then return end
-        local state = state_for(pid)
+    local function render(viewer_pid)
+        if not is_open[viewer_pid]
+            or GetLocalPlayer() ~= Player(viewer_pid - 1) then return end
+        local state = state_for(viewer_pid)
+        local target_pid = state.target_pid or viewer_pid
 
         for index = 1, #edges do
             local edge = edges[index]
@@ -133,7 +137,7 @@ OnInit.final("PerkTree", function(Require)
             local x2, y2 = graph_position(state, edge.node)
             local visible = inside_view(x1, y1, node_size(edge.parent, state.zoom))
                 and inside_view(x2, y2, node_size(edge.node, state.zoom))
-            local color = edge_color(pid, edge)
+            local color = edge_color(target_pid, edge)
             local middle_x = (x1 + x2) * .5
             position_segment(edge.horizontal, middle_x, y1, math.abs(x2 - x1), EDGE_SIZE)
             position_segment(edge.vertical, x2, (y1 + y2) * .5, EDGE_SIZE, math.abs(y2 - y1))
@@ -152,8 +156,8 @@ OnInit.final("PerkTree", function(Require)
             BlzFrameClearAllPoints(button.frame)
             BlzFrameSetAbsPoint(button.frame, FRAMEPOINT_CENTER, x, y)
             BlzFrameSetSize(button.frame, size, size)
-            local allocated = Perks.hasNode(pid, id)
-            local available = Perks.canAllocate(pid, id)
+            local allocated = Perks.hasNode(target_pid, id)
+            local available = Perks.canAllocate(target_pid, id)
             button:icon(allocated and node_icons[id].normal or node_icons[id].disabled)
             button:iconColor(id == 1 and COLOR_ROOT
                 or allocated and COLOR_ALLOCATED
@@ -161,9 +165,12 @@ OnInit.final("PerkTree", function(Require)
             button:visible(inside_view(x, y, size))
         end
 
-        BlzFrameSetText(points, "Available: |cffffcc00" .. Perks.getAvailable(pid)
-            .. "|r    Allocated: |cffffcc00" .. Perks.getSpent(pid)
-            .. "|r    Total: |cffffcc00" .. Perks.getTotal(pid) .. "|r")
+        BlzFrameSetText(points, "Available: |cffffcc00" .. Perks.getAvailable(target_pid)
+            .. "|r    Allocated: |cffffcc00" .. Perks.getSpent(target_pid)
+            .. "|r    Total: |cffffcc00" .. Perks.getTotal(target_pid) .. "|r")
+        local user = User[target_pid - 1]
+        BlzFrameSetText(title, target_pid == viewer_pid and "Perks"
+            or ("Perks - " .. (user and user.nameColored or "Player")))
     end
 
     local nodes = Perks.getNodes()
@@ -180,6 +187,7 @@ OnInit.final("PerkTree", function(Require)
                 -- used to pan away from a node. Treat that gesture only as UI
                 -- navigation, never as an allocation request.
                 if state_for(pid).dragged then return end
+                if (state_for(pid).target_pid or pid) ~= pid then return end
                 local success, reason = Perks.allocateNode(pid, node_id)
                 if not success and reason and reason ~= "ALLOCATED" then
                     DisplayTimedTextToPlayer(Player(pid - 1), 0., 0., 4., reason)
@@ -226,6 +234,7 @@ OnInit.final("PerkTree", function(Require)
         0.026, 0.026, FRAMEPOINT_BOTTOMRIGHT, FRAMEPOINT_BOTTOMRIGHT, -0.018, 0.015,
         function()
             local pid = GetPlayerId(GetTriggerPlayer()) + 1
+            if (state_for(pid).target_pid or pid) ~= pid then return end
             local success, reason = Perks.reset(pid)
             if not success and reason then
                 DisplayTimedTextToPlayer(Player(pid - 1), 0., 0., 5., reason)
@@ -323,16 +332,28 @@ OnInit.final("PerkTree", function(Require)
     function PerkTree.refresh(pid)
         if not is_open[pid] or GetLocalPlayer() ~= Player(pid - 1) then return end
         render(pid)
-        local available = Perks.hasReset(pid)
+        local target_pid = state_for(pid).target_pid or pid
+        local owned = target_pid == pid
+        local available = owned and Perks.hasReset(pid)
+        reset:visible(owned)
         reset:enable(available and Perks.getSpent(pid) > 0)
-        BlzFrameSetText(reset_status,
-            available and "|cff00ff00Free Reset Available|r"
-                or "|cff777777No Reset Available|r")
+        if owned then
+            BlzFrameSetText(reset_status,
+                available and "|cff00ff00Free Reset Available|r"
+                    or "|cff777777No Reset Available|r")
+        else
+            BlzFrameSetText(reset_status, "|cffaaaaaaRead-only inspection|r")
+        end
     end
 
-    ---@param pid integer
-    function PerkTree.display(pid)
-        is_open[pid] = not is_open[pid]
+    ---@param pid integer Viewer player id.
+    ---@param target_pid? integer Player whose allocations should be displayed.
+    function PerkTree.display(pid, target_pid)
+        target_pid = target_pid or pid
+        local state = state_for(pid)
+        local same_target = state.target_pid == target_pid
+        state.target_pid = target_pid
+        is_open[pid] = not (is_open[pid] and same_target)
         if GetLocalPlayer() == Player(pid - 1) then
             BlzFrameSetVisible(frame, is_open[pid])
         end
@@ -340,7 +361,14 @@ OnInit.final("PerkTree", function(Require)
     end
 
     AddToEsc(close)
-    Perks.registerChangedAction(PerkTree.refresh)
+    Perks.registerChangedAction(function(changed_pid)
+        for viewer_pid = 1, PLAYER_CAP do
+            if is_open[viewer_pid]
+                and (state_for(viewer_pid).target_pid or viewer_pid) == changed_pid then
+                PerkTree.refresh(viewer_pid)
+            end
+        end
+    end)
     for pid = 1, PLAYER_CAP do
         EVENT_ON_M1_DOWN:register_action(pid, start_drag)
         EVENT_ON_M2_DOWN:register_action(pid, start_drag)

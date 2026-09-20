@@ -95,7 +95,12 @@ OnInit.final("StatValues", function(Require)
         local attack_speed = BlzGetUnitWeaponBooleanField(u, UNIT_WEAPON_BF_ATTACKS_ENABLED, 0) and 1. / Unit[u].bat or 0
         return format("%.2f", attack_speed) .. " attacks per second"
     end
-    STAT_TAG[ITEM_GOLD_GAIN].getter = function(u) return Unit[u].gold_rate end
+    STAT_TAG[ITEM_GOLD_GAIN].getter = function(u)
+        local rate = Unit[u].gold_rate
+        -- Lua preserves the sign bit on floating-point zero. Normalizing here
+        -- prevents reversible stat updates from rendering Gold Find as -0.0%.
+        return math.abs(rate) < 0.0005 and 0 or rate
+    end
     STAT_TAG[TOTAL_ATTACK_SPEED].getter = function(u)
         local attack_speed = BlzGetUnitWeaponBooleanField(u, UNIT_WEAPON_BF_ATTACKS_ENABLED, 0)
             and (1. / Unit[u].bat) * (1 + math.min(GetHeroAgi(u, true), 400) * 0.01) or 0

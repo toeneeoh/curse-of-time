@@ -10,6 +10,8 @@ OnInit.final("StatView", function(Require)
     Require('HonorMilestones')
     Require('Perks')
     Require('PerkTree')
+    Require('Faction')
+    Require('TimerQueue')
 
     ---@class STAT_WINDOW
     ---@field display function
@@ -52,12 +54,41 @@ OnInit.final("StatView", function(Require)
         xp_rate = XP_RATE,
     }
 
+    local function owner_pid(u)
+        return GetPlayerId(GetOwningPlayer(u)) + 1
+    end
+
+    local function faction_for(u)
+        return Faction.getFaction(owner_pid(u))
+    end
+
+    local function faction_reputation(u)
+        local faction = faction_for(u)
+        return faction and Faction.getReputation(owner_pid(u), faction.id) or 0
+    end
+
+    local difficulty_names = { "Easy", "Medium", "Hard" }
+
     local tab_tags = {
         ST,
         {
-            { tag = "|cffffcc00Gold|r", priority = 1, getter = function(u) local pid = GetPlayerId(GetOwningPlayer(u)) + 1 return GetCurrency(pid, GOLD) end},
-            { tag = "|cffccccccPlatinum|r", priority = 1, getter = function(u) local pid = GetPlayerId(GetOwningPlayer(u)) + 1 return GetCurrency(pid, PLATINUM) end},
-            { tag = "|cff6969ffCrystal|r", priority = 1, getter = function(u) local pid = GetPlayerId(GetOwningPlayer(u)) + 1 return GetCurrency(pid, CRYSTAL) end},
+            { tag = "|cffffcc00Gold|r", priority = 1, getter = function(u) return GetCurrency(owner_pid(u), GOLD) end},
+            { tag = "|cffccccccPlatinum|r", priority = 1, getter = function(u) return GetCurrency(owner_pid(u), PLATINUM) end},
+            { tag = "|cff6969ffCrystal|r", priority = 1, getter = function(u) return GetCurrency(owner_pid(u), CRYSTAL) end},
+            { tag = "|cffffcc00Spendable Honor|r", priority = 1, getter = function(u) return GetCurrency(owner_pid(u), HONOR) end},
+            { tag = "|cffffcc00Lifetime Honor|r", priority = 1, getter = function(u) return Honor.getTotal(owner_pid(u)) end},
+            { tag = "|cffffcc00Allocated Honor|r", priority = 1, getter = function(u) return Honor.getAllocated(owner_pid(u)) end},
+            { tag = "|cff80ff80Faction Points|r", priority = 1, getter = function(u) return Faction.getPoints(owner_pid(u)) end},
+            { tag = "|cffffff00Gold Find|r", priority = 1, getter = function(u)
+                local rate = Unit[u].gold_rate
+                if math.abs(rate) < 0.0005 then rate = 0 end
+                return rate .. "%"
+            end},
+            { tag = "|cffccccccCurrency Converter|r", priority = 1, getter = function(u)
+                local pid = owner_pid(u)
+                if not HasCurrencyConverter(pid) then return "Not Owned" end
+                return IsCurrencyConverterEnabled(pid) and "Enabled" or "Disabled"
+            end},
         },
         {
             { tag = "|cffffcc00Available Perk Points|r", priority = 1, getter = function(u) local pid = GetPlayerId(GetOwningPlayer(u)) + 1 return Perks.getAvailable(pid) end},
@@ -66,6 +97,45 @@ OnInit.final("StatView", function(Require)
             { tag = "|cffffcc00Free Reset|r", priority = 1, getter = function(u) local pid = GetPlayerId(GetOwningPlayer(u)) + 1 return Perks.hasReset(pid) and "Available" or "Unavailable" end},
         },
         {}, -- lifetime Honor milestones use their own paginated renderer
+        {
+            { tag = "|cffffcc00Faction|r", priority = 1, getter = function(u)
+                local faction = faction_for(u)
+                return faction and faction.name or "None"
+            end},
+            { tag = "|cffffcc00Rank|r", priority = 1, getter = function(u)
+                local faction = faction_for(u)
+                return faction and (Faction.getRank(faction_reputation(u))
+                    .. " / " .. Faction.getMaxRank()) or "-"
+            end},
+            { tag = "|cffffcc00Reputation|r", priority = 1, getter = function(u)
+                local faction = faction_for(u)
+                if not faction then return "-" end
+                local reputation = faction_reputation(u)
+                local threshold = Faction.getNextRankThreshold(reputation)
+                return threshold and (reputation .. " / " .. threshold)
+                    or (reputation .. " (MAX)")
+            end},
+            { tag = "|cff80ff80Faction Points|r", priority = 1, getter = function(u)
+                return faction_for(u) and Faction.getPoints(owner_pid(u)) or "-"
+            end},
+            { tag = "|cffffcc00Active Quest|r", priority = 1, getter = function(u)
+                local quest = Quest.getActive(owner_pid(u))
+                return quest and quest.name or "None"
+            end},
+            { tag = "|cffffcc00Difficulty|r", priority = 1, getter = function(u)
+                local quest = Quest.getActive(owner_pid(u))
+                return quest and (difficulty_names[quest.diff] or "Unknown") or "-"
+            end},
+            { tag = "|cffffcc00Progress|r", priority = 1, getter = function(u)
+                local quest, progress = Quest.getActive(owner_pid(u))
+                return quest and (progress .. " / " .. quest.goal) or "-"
+            end},
+            { tag = "|cffffcc00Quest Reward|r", priority = 1, getter = function(u)
+                local quest = Quest.getActive(owner_pid(u))
+                return quest and (quest.faction_points .. " Points / "
+                    .. quest.reputation .. " Reputation") or "-"
+            end},
+        },
     }
 
     local perk_bonuses = {
@@ -115,8 +185,10 @@ OnInit.final("StatView", function(Require)
     local frame = BlzCreateFrame("ListBoxWar3", BlzGetFrameByName("ConsoleUIBackdrop", 0), 0, 0)
 
     local MAX_ROWS = 32
+    local CURRENCY_TAB = 2
     local PERKS_TAB = 3
     local HONOR_TAB = 4
+    local FACTION_TAB = 5
     local MILESTONES_PER_PAGE = 7
     local tab_ui = {} -- tab_ui[page] = { rows = { [1]=slot,... }, order = ..., entries = ... }
 
@@ -306,7 +378,9 @@ OnInit.final("StatView", function(Require)
         local pid = GetPlayerId(GetTriggerPlayer()) + 1
         BlzFrameSetEnable(manage_perks, false)
         BlzFrameSetEnable(manage_perks, true)
-        PerkTree.display(pid)
+        local selected = viewing[pid].unit
+        local target_pid = selected and owner_pid(selected) or pid
+        PerkTree.display(pid, target_pid)
         return false
     end))
 
@@ -351,6 +425,7 @@ OnInit.final("StatView", function(Require)
         SimpleButton.create(tab_frame, "ReplaceableTextures\\CommandButtons\\BTNHeroPanelCurrencyButton.dds", 0.026, 0.026, FRAMEPOINT_TOPLEFT, FRAMEPOINT_TOPLEFT, 0.042, -0.0125, nil, "View Currency", FRAMEPOINT_BOTTOM, FRAMEPOINT_TOP, 0., 0.01),
         SimpleButton.create(tab_frame, "ReplaceableTextures\\CommandButtons\\BTNHeroPanelPerkButton.dds", 0.026, 0.026, FRAMEPOINT_TOPLEFT, FRAMEPOINT_TOPLEFT, 0.0715, -0.0125, nil, "View Perks", FRAMEPOINT_BOTTOM, FRAMEPOINT_TOP, 0., 0.01),
         SimpleButton.create(tab_frame, "ReplaceableTextures\\CommandButtons\\BTNMedalionOfCourage.blp", 0.026, 0.026, FRAMEPOINT_TOPLEFT, FRAMEPOINT_TOPLEFT, 0.101, -0.0125, nil, "View Honor Milestones", FRAMEPOINT_BOTTOM, FRAMEPOINT_TOP, 0., 0.01),
+        SimpleButton.create(tab_frame, "ReplaceableTextures\\CommandButtons\\BTNHumanCaptureFlag.blp", 0.026, 0.026, FRAMEPOINT_TOPLEFT, FRAMEPOINT_TOPLEFT, 0.1305, -0.0125, nil, "View Faction", FRAMEPOINT_BOTTOM, FRAMEPOINT_TOP, 0., 0.01),
     }
     for index = 2, #tabs do tabs[index]:enable(false) end
 
@@ -387,6 +462,7 @@ OnInit.final("StatView", function(Require)
     tabs[2]:onClick(switch_tab)
     tabs[3]:onClick(switch_tab)
     tabs[4]:onClick(switch_tab)
+    tabs[5]:onClick(switch_tab)
 
     local milestone_controls = BlzCreateFrameByType("FRAME", "", frame, "", 0)
     local milestone_page_text = BlzCreateFrameByType("TEXT", "", milestone_controls, "", 0)
@@ -572,7 +648,8 @@ OnInit.final("StatView", function(Require)
         local tpid = GetPlayerId(GetOwningPlayer(u)) + 1
         local name = (u == Hero[tpid] and User[tpid - 1].nameColored) or GetUnitName(u)
         BlzFrameSetText(title, name)
-        BlzFrameSetVisible(manage_perks, page == PERKS_TAB and tpid == pid)
+        BlzFrameSetVisible(manage_perks, page == PERKS_TAB)
+        BlzFrameSetText(manage_perks, tpid == pid and "Manage Perks" or "View Perk Tree")
 
         -- hero vs non-hero gating
         local ishero = (u == Hero[tpid] and 3) or 2
@@ -712,7 +789,26 @@ OnInit.final("StatView", function(Require)
     Honor.registerChangedAction(function(changed_pid)
         local pid = GetPlayerId(GetLocalPlayer()) + 1
         local selected = viewing[pid].unit
-        if selected and viewing[pid].page == HONOR_TAB
+        if selected and (viewing[pid].page == HONOR_TAB
+                or viewing[pid].page == CURRENCY_TAB)
+            and GetPlayerId(GetOwningPlayer(selected)) + 1 == changed_pid then
+            STAT_WINDOW.refresh(pid)
+        end
+    end)
+
+    RegisterCurrencyChangedAction(function(changed_pid)
+        local pid = GetPlayerId(GetLocalPlayer()) + 1
+        local selected = viewing[pid].unit
+        if selected and viewing[pid].page == CURRENCY_TAB
+            and GetPlayerId(GetOwningPlayer(selected)) + 1 == changed_pid then
+            STAT_WINDOW.refresh(pid)
+        end
+    end)
+
+    RegisterCurrencyConverterChangedAction(function(changed_pid)
+        local pid = GetPlayerId(GetLocalPlayer()) + 1
+        local selected = viewing[pid].unit
+        if selected and viewing[pid].page == CURRENCY_TAB
             and GetPlayerId(GetOwningPlayer(selected)) + 1 == changed_pid then
             STAT_WINDOW.refresh(pid)
         end
@@ -723,6 +819,15 @@ OnInit.final("StatView", function(Require)
         local selected = viewing[pid].unit
         if selected and viewing[pid].page == PERKS_TAB
             and GetPlayerId(GetOwningPlayer(selected)) + 1 == changed_pid then
+            STAT_WINDOW.refresh(pid)
+        end
+    end)
+
+    -- Quest progress can change without changing a conventional unit stat.
+    -- Keep the inspected faction summary current while that tab is visible.
+    TimerQueue:callPeriodically(1., nil, function()
+        local pid = GetPlayerId(GetLocalPlayer()) + 1
+        if is_open[pid] and viewing[pid].page == FACTION_TAB then
             STAT_WINDOW.refresh(pid)
         end
     end)
