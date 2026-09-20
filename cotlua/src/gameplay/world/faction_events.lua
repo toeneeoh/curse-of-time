@@ -333,6 +333,7 @@ OnInit.final("FactionEvents", function(Require)
         objective_effect = AddSpecialEffect(CACHE_MODEL,
             GetUnitX(objective), GetUnitY(objective))
         BlzSetSpecialEffectScale(objective_effect, 1.75)
+        BlzSetSpecialEffectYaw(objective_effect, 215)
         local max_health = math.min(2000000000.,
             (100000. + level * level * 800.) * (1. + math.max(0, party_size - 1) * 0.4))
         BlzSetUnitMaxHP(objective, math.floor(max_health))
