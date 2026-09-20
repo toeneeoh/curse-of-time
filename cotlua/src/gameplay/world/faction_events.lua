@@ -19,8 +19,8 @@ OnInit.final("FactionEvents", function(Require)
     local EVENT_WARNING = 300.
     local EVENT_TIMEOUT = 720.
     local EVENT_RADIUS = 2600.
-    local SPAWN_MIN_RADIUS = 1150.
-    local SPAWN_MAX_RADIUS = 1650.
+    local SPAWN_MIN_RADIUS = 1400.
+    local SPAWN_MAX_RADIUS = 1900.
     local WAVE_INTERVAL = 60.
     local TOTAL_WAVES = 5
     local PRESENCE_REWARD_THRESHOLD = 30
@@ -28,6 +28,7 @@ OnInit.final("FactionEvents", function(Require)
     local REPUTATION_REWARD = 30
     local MELEE_TEMPLATE = FourCC('n002')
     local RANGED_TEMPLATE = FourCC('n008')
+    local CACHE_MODEL = "Objects\\InventoryItems\\TreasureChest\\treasurechest.mdl"
     local skins = {
         melee = { FourCC('n03C'), FourCC('n033'), FourCC('n03E'), FourCC('n03A') },
         ranged = { FourCC('n01W'), FourCC('n00W'), FourCC('n02J') },
@@ -37,6 +38,7 @@ OnInit.final("FactionEvents", function(Require)
     local active = false
     local wave = 0
     local objective ---@type unit?
+    local objective_effect ---@type effect?
     local enemies = setmetatable({}, { __mode = 'k' })
     local enemy_count = 0
     local contribution = {}
@@ -101,6 +103,10 @@ OnInit.final("FactionEvents", function(Require)
         if objective then
             RemoveUnit(objective)
             objective = nil
+        end
+        if objective_effect then
+            DestroyEffect(objective_effect)
+            objective_effect = nil
         end
     end
 
@@ -185,7 +191,10 @@ OnInit.final("FactionEvents", function(Require)
         local extra_players = math.max(0, party_size - 1)
         local wave_multiplier = 0.8 + wave * 0.2
         local count_multiplier = math.max(0.6, math.sqrt(10. / math.max(1, count)))
-        local hp = (15000. + level * level * 300.)
+        -- Twenty times less health than the first prototype. A level-400 solo
+        -- wave now starts near 2.2 million health per enemy instead of 44m;
+        -- party size, wave pressure, and enemy count still scale separately.
+        local hp = (15000. + level * level * 15.)
             * (1. + extra_players * 0.55) * wave_multiplier * count_multiplier
         local damage = (250. + level * level * 0.45)
             * (1. + extra_players * 0.18) * wave_multiplier * count_multiplier
@@ -320,6 +329,10 @@ OnInit.final("FactionEvents", function(Require)
         PauseUnit(objective, true)
         SetUnitInvulnerable(objective, false)
         BlzSetUnitWeaponBooleanField(objective, UNIT_WEAPON_BF_ATTACKS_ENABLED, 0, false)
+        SetUnitVertexColor(objective, 255, 255, 255, 0)
+        objective_effect = AddSpecialEffect(CACHE_MODEL,
+            GetUnitX(objective), GetUnitY(objective))
+        BlzSetSpecialEffectScale(objective_effect, 1.35)
         local max_health = math.min(2000000000.,
             (100000. + level * level * 800.) * (1. + math.max(0, party_size - 1) * 0.4))
         BlzSetUnitMaxHP(objective, math.floor(max_health))
