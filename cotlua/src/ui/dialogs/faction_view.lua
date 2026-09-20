@@ -17,6 +17,7 @@ OnInit.final("FactionView", function(Require)
     local main = BlzCreateFrameByType("FRAME", "", BlzGetFrameByName("ConsoleUIBackdrop", 0), "", 0)
     BlzFrameSetAbsPoint(main, FRAMEPOINT_TOP, 0.4, 0.53)
     BlzFrameSetSize(main, 0.75, 0.35)
+    BlzFrameSetLevel(main, 10)
     BlzFrameSetEnable(main, false)
 
     local frame = BlzCreateFrameByType("BACKDROP", "", main, "", 0)
@@ -189,7 +190,8 @@ OnInit.final("FactionView", function(Require)
         -0.005,
         0.044,
         nil,
-        "Reroll all quests once per rotation for a cost.\n|cffff0000Cancels any active quest!|r"
+        "Reroll all quests once per rotation for a cost."
+            .. "\n|cffff0000Unavailable after completing a quest and cancels any active quest!|r"
     )
     local reroll_icon = BlzCreateFrameByType("BACKDROP", "", reroll_quests.frame, "", 0)
     BlzFrameSetPoint(reroll_icon, FRAMEPOINT_LEFT, reroll_quests.frame, FRAMEPOINT_RIGHT, 0., 0.)

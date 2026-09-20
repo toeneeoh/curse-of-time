@@ -61,6 +61,7 @@ OnInit.final("Faction", function(Require)
     local completed_offers = {}
     local quest_refresh_timer = {}
     local reroll_used = {}
+    local rotation_completed = {}
     local QUEST_REFRESH_PERIOD = 1800.
     local QUEST_REROLL_COST = 5
     local schedule_quest_refresh
@@ -302,8 +303,9 @@ OnInit.final("Faction", function(Require)
     function Faction:refreshQuests(pid, unlock_reroll)
         if unlock_reroll ~= false then
             reroll_used[pid] = false
+            rotation_completed[pid] = false
+            completed_offers[pid] = {}
         end
-        completed_offers[pid] = {}
         for difficulty = 1, 3 do
             local previous = Quest.quests[pid][difficulty]
             local excluded_id = unlock_reroll == false and previous and previous.id or nil
@@ -412,6 +414,7 @@ OnInit.final("Faction", function(Require)
         quest_unique_progress[pid] = nil
         completed_offers[pid] = completed_offers[pid] or {}
         completed_offers[pid][quest.id] = true
+        rotation_completed[pid] = true
         AddCurrency(pid, FACTION, quest.faction_points)
         Faction.addReputation(pid, quest.reputation)
         DisplayTextToPlayer(Player(pid - 1), 0., 0., "|cffffcc00Faction quest complete:|r "
@@ -486,6 +489,7 @@ OnInit.final("Faction", function(Require)
     function Quest.canReroll(pid)
         return player_faction[pid] ~= nil
             and reroll_used[pid] ~= true
+            and rotation_completed[pid] ~= true
             and GetCurrency(pid, FACTION) >= QUEST_REROLL_COST
     end
 
@@ -505,6 +509,11 @@ OnInit.final("Faction", function(Require)
         if reroll_used[pid] then
             DisplayTextToPlayer(Player(pid - 1), 0., 0.,
                 "You have already rerolled this quest rotation.")
+            return false
+        end
+        if rotation_completed[pid] then
+            DisplayTextToPlayer(Player(pid - 1), 0., 0.,
+                "Your faction quest is complete. New quests arrive with the next rotation.")
             return false
         end
         if GetCurrency(pid, FACTION) < QUEST_REROLL_COST then
@@ -533,7 +542,7 @@ OnInit.final("Faction", function(Require)
     ---@param index integer
     function Quest.select(pid, index)
         local quest = Quest.quests[pid] and Quest.quests[pid][index]
-        if quest and not active_quest[pid]
+        if quest and not active_quest[pid] and not rotation_completed[pid]
             and not (completed_offers[pid] and completed_offers[pid][quest.id])
             and view and view.promptQuest(quest, pid, accept_quest) then
             pending_quest[pid] = quest
@@ -665,6 +674,7 @@ OnInit.final("Faction", function(Require)
         Quest.quests[pid] = nil
         completed_offers[pid] = nil
         reroll_used[pid] = nil
+        rotation_completed[pid] = nil
         if quest_refresh_timer[pid] then
             TimerQueue:disableCallback(quest_refresh_timer[pid])
             quest_refresh_timer[pid] = nil
