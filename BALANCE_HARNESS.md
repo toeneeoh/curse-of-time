@@ -17,6 +17,7 @@ Documents\Warcraft III\CustomMapData\CoT Nevermore BETA\dev
 -balance snapshot [label]
 -balance start [seconds] [label]
 -balance stop
+-balance equip [average|perfect] [six item rawcodes]
 ```
 
 `-balance items` scans the custom item rawcode range in small batches and writes
@@ -55,6 +56,34 @@ remain distinguishable from the hero's own output. The report includes starting
 and ending builds, target defenses, distinct targets hit, hit count, total
 damage, DPS, actual applied damage, average hit, and maximum hit. `-balance
 stop` ends a session early.
+
+`-balance equip` replaces the hero's six currently equipped items with a
+generated benchmark loadout at maximum upgrade. `perfect` uses quality 63;
+`average` uses quality 32, the closest representable deterministic roll to the
+exact 64-roll expectation. The command is development-only and intentionally
+destroys the items it replaces.
+
+## Offline build analyzer
+
+Run `cotlua/tools/analyze_balance.ps1` after `-balance items` has produced fresh
+item and hero catalogs. It filters by acquisition path, level requirement,
+proficiency modifier, duplicate rawcodes, and shared item-limit groups, then
+uses a bounded deterministic search to produce six-item candidates. Example:
+
+```powershell
+./cotlua/tools/analyze_balance.ps1 -Hero 'Vampire Lord' -Levels 400
+```
+
+Pass `-Levels 50,100,200,300,400,500` for the complete breakpoint set,
+`-RequireProficiency` for intended-class gear only, or increase
+`-CandidateLimit` and `-BeamWidth` for a slower, wider search.
+
+The generated `BALANCE_BUILDS.md` includes attack, generic spell-throughput,
+balanced-damage, and durability candidates for average and perfect rolls plus
+copyable `-balance equip` commands. Spell scores are deliberately labeled as
+proxies: hero-specific coefficients, proc abilities, summon behavior, and
+rotation uptime require source profiles and in-engine recordings before they
+can be called DPS.
 
 ## Benchmark matrix
 

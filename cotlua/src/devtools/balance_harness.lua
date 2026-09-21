@@ -499,4 +499,57 @@ OnInit.final("BalanceHarness", function(Require)
         save_for_player(pid, filename, table.concat(lines, "\n") .. "\n")
         DisplayTextToPlayer(Player(pid - 1), 0., 0., "Balance snapshot saved to " .. filename .. ".")
     end
+
+    ---Replaces the six equipped items with a generated benchmark loadout.
+    ---`average` uses the nearest representable midpoint roll (quality 32),
+    ---while `perfect` uses quality 63. This is development-only and destructive
+    ---to the currently equipped items.
+    ---@param pid integer
+    ---@param roll string
+    ---@param rawcodes string[]
+    function BalanceHarness.equip(pid, roll, rawcodes)
+        if not Hero[pid] then
+            DisplayTextToPlayer(Player(pid - 1), 0., 0., "Select a hero before equipping a balance build.")
+            return
+        elseif roll ~= "average" and roll ~= "perfect" then
+            DisplayTextToPlayer(Player(pid - 1), 0., 0., "Roll must be 'average' or 'perfect'.")
+            return
+        elseif #rawcodes ~= 6 then
+            DisplayTextToPlayer(Player(pid - 1), 0., 0., "A balance build requires exactly six item rawcodes.")
+            return
+        end
+
+        local ids = {}
+        for index, code in ipairs(rawcodes) do
+            if code:len() ~= 4 then
+                DisplayTextToPlayer(Player(pid - 1), 0., 0., "Invalid item rawcode: " .. code)
+                return
+            end
+            ids[index] = FourCC(code)
+            if ItemData[ids[index]].name == 0 then
+                DisplayTextToPlayer(Player(pid - 1), 0., 0., "Unknown item rawcode: " .. code)
+                return
+            end
+        end
+
+        local inventory = Profile[pid].hero.items
+        for slot = 1, 6 do
+            local item = inventory[slot]
+            if item then item:destroy() end
+        end
+
+        local quality = roll == "perfect" and 63 or 32
+        for _, id in ipairs(ids) do
+            local item = ItemRuntime.create(id, GetUnitX(Hero[pid]), GetUnitY(Hero[pid]))
+            item.level = ItemData[id][ITEM_UPGRADE_MAX]
+            for index = 1, ITEM_ABILITY2 do
+                item.quality[index] = quality
+            end
+            item:update()
+            PlayerAddItem(pid, item)
+        end
+
+        DisplayTextToPlayer(Player(pid - 1), 0., 0.,
+            "Equipped " .. roll .. " benchmark build. Existing equipped items were removed.")
+    end
 end, Debug and Debug.getLine())
