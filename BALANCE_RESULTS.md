@@ -115,3 +115,53 @@ This establishes that the chaos transition currently acts as a near-uniform
 damage composition. Any chaos enemy-health comparison should therefore use
 roughly 1.06M DPS as this build's stationary single-target baseline, not its
 35.4M prechaos value.
+
+## Level 400 Vampire Lord: 300-armor chaos comparison
+
+Recordings:
+
+- `balance-combat-player-1-vampire-400-hybrid-300-chaos.pld`
+- `balance-combat-player-1-vampire-400-strict-attack-300-chaos.pld`
+- `balance-combat-player-1-vampire-400-unrestricted-attack-300-chaos.pld`
+
+All three sessions ran for approximately 120 seconds against the same immortal
+punching bag. The recorder confirmed 300 armor, defense type 6, and 1.0
+physical/magical taken multipliers in every session.
+
+| Build | Total DPS | Basic-attack DPS | Magical DPS | Physical share | Attack-rate realization |
+|---|---:|---:|---:|---:|---:|
+| Existing hybrid | 285,408 | 54,408 | 230,999 | 19.06% | 90.08% |
+| Strict-proficiency attack | 450,600 | 319,857 | 130,744 | 70.98% | 95.89% |
+| Unrestricted attack | 473,107 | 457,645 | 15,463 | 96.73% | 102.95% |
+
+Attack-rate realization is observed basic-attack events divided by the
+snapshot's calculated maximum event rate. The unrestricted result slightly
+exceeding 100% indicates that the estimator does not yet capture every engine
+timing or extra-event detail; it is not literal uptime above 100%.
+
+The strict attack build gained 57.88% total DPS over the existing hybrid. The
+unrestricted sword build gained 65.77% over the hybrid but only 4.99% over the
+strict dagger build. Its individual physical hits averaged 33.26% more damage
+than the strict build and it landed attacks 7.37% more frequently, producing
+43.08% more physical DPS. Conversely, the strict build produced 8.46 times as
+much magical DPS.
+
+This difference is a real Vampire mechanic rather than measurement noise. The
+hybrid and strict builds are Agility-dominant, so Blood Lord selects the
+offensive branch and halves the cooldowns of Blood Leech, Blood Nova, and Blood
+Domain. The unrestricted sword build is Strength-dominant, selects the
+damage-reduction branch, and uses the longer base cooldowns. Its 130% listed
+critical chance also means critical randomness cannot explain its advantage.
+
+The raw optimizer correctly found the highest stationary basic-attack package,
+but its generic spell proxy cannot model this branch transition. That is why
+the optimizer's large raw attack advantage became only a 5% total-DPS advantage
+in engine. Hero-specific breakpoint rules must be part of later build profiles.
+
+The builds also occupy very different defensive points. Before accounting for
+the Strength branch's temporary Blood Lord damage reduction, the hybrid has
+approximately 3.20 times the strict build's physical EHP and 4.54 times the
+unrestricted build's physical EHP from HP and armor alone. Its two magic-resist
+items also give it roughly 4.14 times the strict build's magic EHP and 3.54
+times the unrestricted build's magic EHP. Therefore the unrestricted result is
+a narrow stationary damage ceiling, not an unqualified best Vampire build.
