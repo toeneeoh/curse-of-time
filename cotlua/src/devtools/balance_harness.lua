@@ -9,11 +9,13 @@
 
 OnInit.final("BalanceHarness", function(Require)
     Require("DevRuntimeLog")
+    Require("DropTable")
     Require("Events")
     Require("HeroDefinitions")
     Require("ItemHelpers")
     Require("Items")
     Require("Profile")
+    Require("ShopCatalog")
     Require("TimerQueue")
 
     local ITEM_SCAN_LIMIT = 9000
@@ -64,7 +66,8 @@ OnInit.final("BalanceHarness", function(Require)
         if math.abs(value or 0.) < 0.0000005 then
             return "0"
         end
-        return string.format("%.6f", value):gsub("0+$", ""):gsub("%.$", "")
+        local formatted = string.format("%.6f", value):gsub("0+$", ""):gsub("%.$", "")
+        return formatted
     end
 
     local function damage_type_name(damage_type)
@@ -116,7 +119,7 @@ OnInit.final("BalanceHarness", function(Require)
         return values
     end
 
-    local function append_item_row(lines, id)
+    local function append_item_row(lines, availability, id)
         local name = GetObjectName(id)
         if name == "" or name == "Default string" then
             return
@@ -141,6 +144,9 @@ OnInit.final("BalanceHarness", function(Require)
             tostring(data[ITEM_TYPE]), tostring(data[ITEM_LEVEL_REQUIREMENT]),
             tostring(max_level), tostring(data[ITEM_TIER]),
             tostring(data[ITEM_RARITY]), tostring(data[ITEM_LIMIT]),
+            availability[id] and availability[id].drop and "1" or "0",
+            availability[id] and availability[id].shop and "1" or "0",
+            ItemRuntime.definitions[id] and "1" or "0",
         }
 
         for index = 1, #EXPORT_STATS do
@@ -161,6 +167,66 @@ OnInit.final("BalanceHarness", function(Require)
         item:destroy()
     end
 
+    local function build_availability()
+        local availability = {}
+        local function mark(id, source)
+            if not id or id == 0 then return end
+            availability[id] = availability[id] or {}
+            availability[id][source] = true
+        end
+
+        for _, pool in pairs(ItemDrops) do
+            if type(pool) == "table" then
+                for index = 1, pool[100] do
+                    mark(pool[index], "drop")
+                end
+            end
+        end
+
+        for _, shop_item in pairs(ShopItem.itempool) do
+            if type(shop_item) == "table" and shop_item.id then
+                local _, id = GetItem(shop_item.id)
+                mark(id, "shop")
+            end
+        end
+
+        return availability
+    end
+
+    local function export_heroes(pid)
+        local lines = {
+            "rawcode\tname\tproficiency_mask\tmain_attribute\trange\tbase_strength\tbase_agility\tbase_intelligence\tstrength_gain\tagility_gain\tintelligence_gain\tphysical_dealt\tphysical_taken\tmagical_taken\tbase_armor\tbase_crit_chance\tbase_crit_damage\tskills",
+        }
+
+        for id, definition in pairs(HERO_STATS) do
+            local skills = {}
+            for index, skill in ipairs(definition.skills or {}) do
+                skills[index] = skill
+            end
+            lines[#lines + 1] = table.concat({
+                rawcode(id), clean(GetObjectName(id)), definition.prof,
+                definition.main, definition.range,
+                number(definition.str), number(definition.agi), number(definition.int),
+                number(definition.str_gain), number(definition.agi_gain), number(definition.int_gain),
+                number(definition.phys_damage), number(definition.phys_resist),
+                number(definition.magic_resist), number(definition.armor),
+                number(definition.crit_chance), number(definition.crit_damage),
+                table.concat(skills, ","),
+            }, "\t")
+        end
+
+        table.sort(lines, function(a, b) return a < b end)
+        -- Keep the schema header above the sorted hero rows.
+        for index = 1, #lines do
+            if lines[index]:sub(1, 7) == "rawcode" then
+                lines[1], lines[index] = lines[index], lines[1]
+                break
+            end
+        end
+        save_for_player(pid, "balance-heroes-player-" .. pid .. ".pld",
+            table.concat(lines, "\n") .. "\n")
+    end
+
     ---Exports every custom item using the same parser and value calculation as
     ---the runtime item system. Values use maximum upgrade level; each stat has
     ---an expected-roll and perfect-roll column.
@@ -172,9 +238,11 @@ OnInit.final("BalanceHarness", function(Require)
         end
 
         BalanceHarness.exporting_items = true
+        local availability = build_availability()
         local lines = {}
         local header = {
             "rawcode", "name", "type", "requirement", "max_upgrade", "tier", "rarity", "limit",
+            "drop_pool", "shop_catalog", "runtime_definition",
         }
         for _, definition in ipairs(EXPORT_STATS) do
             header[#header + 1] = definition[2] .. "_average"
@@ -192,7 +260,7 @@ OnInit.final("BalanceHarness", function(Require)
         local function process_batch()
             local last = math.min(ITEM_SCAN_LIMIT, offset + ITEM_EXPORT_BATCH - 1)
             for index = offset, last do
-                append_item_row(lines, CUSTOM_ITEM_OFFSET + index)
+                append_item_row(lines, availability, CUSTOM_ITEM_OFFSET + index)
             end
             offset = last + 1
 
@@ -203,6 +271,7 @@ OnInit.final("BalanceHarness", function(Require)
 
             local filename = "balance-items-player-" .. pid .. ".pld"
             save_for_player(pid, filename, table.concat(lines, "\n") .. "\n")
+            export_heroes(pid)
             BalanceHarness.exporting_items = false
             DisplayTextToPlayer(Player(pid - 1), 0., 0.,
                 "Exported " .. (#lines - 1) .. " item definitions to " .. filename .. ".")

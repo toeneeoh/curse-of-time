@@ -20,9 +20,11 @@ Documents\Warcraft III\CustomMapData\CoT Nevermore BETA\dev
 ```
 
 `-balance items` scans the custom item rawcode range in small batches and writes
-`balance-items-player-1.pld`. Every item is parsed by `ParseItemTooltip` and
-evaluated by `Item:cache_stats` at its maximum upgrade. Each stat has two
-columns:
+`balance-items-player-1.pld` and the companion hero schema
+`balance-heroes-player-1.pld`. Every item is parsed by `ParseItemTooltip` and
+evaluated by `Item:cache_stats` at its maximum upgrade. Drop-pool, shop-catalog,
+and runtime-definition flags distinguish live acquisition paths from object
+data that merely exists. Each stat has two columns:
 
 - `*_average`: the exact expected midpoint of the 64 possible quality rolls.
 - `*_perfect`: quality roll 63, used for theoretical best-in-slot comparisons.
