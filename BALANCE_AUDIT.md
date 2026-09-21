@@ -1,8 +1,8 @@
 # Playable-character balance audit
 
-Snapshot: source commit `f887f53`, with object-editor data read from the current
-`builder/CoTN-RPG-1.36.w3x/war3map.w3a`. This is a static audit, not a combat-log
-benchmark. No runtime source was changed.
+Snapshot: current working tree on 2026-09-21, with object-editor data read from
+the current `builder/CoTN-RPG-1.36.w3x/war3map.w3a`. This is a static audit, not
+a combat-log benchmark. No runtime source was changed for this report.
 
 ## Scope and confidence limits
 
@@ -17,12 +17,16 @@ ubertips and rolled qualities also vary. Consequently:
   confidence.
 - Absolute DPS is not presented where it would require inventing an attack
   uptime, target count, item roll, or inherited SLK value.
-- The normalized durability table is an explicit gearless level-500 model. It
-  assumes Warcraft's usual 0.30 armor per Agility, omits small base HP, and does
-  not include active skills. It is useful for comparing curves, not predicting
-  an actual saved character.
+- Natural attribute growth is documented only as an early-progression input.
+  It must not be used as an endgame power proxy: purchased base attributes can
+  fill the shared `TomeCap`, while equipment supplies additional bonus
+  attributes outside that cap.
 - “Realistic build” below means a stat priority and legal equipment family, not
   a claim that every named best-in-slot roll is available to every save.
+- The old letter-grade table was not an exact DPS result. It has been replaced
+  with source-supported conversion measurements and explicitly provisional
+  ceiling groups. A defensible numeric roster ranking still requires exported
+  live builds and timed combat traces.
 
 ## 1. Combat system summary
 
@@ -145,9 +149,13 @@ resistance sources yield `0.95^10 = 0.599` damage taken, or 1.67x EHP, rather
 than 50% additive resistance.
 
 Chaos armor multiplies non-pure damage by 0.03. Chaos physical attacks then
-receive a 350x attack-type multiplier, for a net 10.5x before armor. Magic does
-not receive the 350x compensation. This creates three very different late-game
-lanes: chaos physical, heavily suppressed magic, and defense-bypassing pure.
+receive a 350x attack-type multiplier. These constants are part of a numeric
+representation change: chaos-era unit HP, damage, and armor are authored or
+generated on the corresponding compressed scale. They are therefore not, by
+themselves, evidence that a class becomes 350x stronger or that magic becomes
+unusable. Comparisons across the transition must use final applied damage and
+effective enemy durability after the authored compensation. Only an individual
+ability or unit that misses that compensation is a balance defect.
 
 ### Healing, shields, avoidance, and death prevention
 
@@ -206,6 +214,84 @@ regeneration, crit, crit damage, BAT, Spellboost, and magic resistance. Exact
 totals depend on item rarity/quality, but the definition-level conclusion is
 stable: Vampire can monetize all three attributes, while a single-stat caster
 usually wastes two-thirds of a tri-stat item's offensive budget.
+
+### Purchased-stat economy (material correction)
+
+The first version of this report gave innate level growth far too much weight.
+`TomeService` purchases ordinary `str`, `agi`, or `int`, and the shared base-stat
+cap is:
+
+```text
+TomeCap(level) = floor(0.000003*level^4 + 0.0005*level^3 + 10*level)
+```
+
+| Level | Shared STR+AGI+INT cap |
+|---:|---:|
+| 1 | 10 |
+| 100 | 1,800 |
+| 200 | 10,800 |
+| 300 | 40,800 |
+| 400 | 112,800 |
+| 500 | 255,000 |
+
+At level 500, the heroes' complete natural STR+AGI+INT totals range from
+1,820.4 (Phoenix Ranger) to 4,435.2 (Elementalist), or only **0.71% to 1.74%**
+of the tome cap. More importantly, natural stats count toward that cap. A
+stat-capped character does not keep Elementalist's larger natural total on top
+of 255,000 purchased stats; it merely buys slightly fewer points before
+reaching the same shared total. Equipment then adds `bonus_str`, `bonus_agi`,
+and `bonus_int`, which do not participate in this cap.
+
+Consequences for the audit:
+
+- Innate growth matters while leveling and changes the gold needed to approach
+  the cap, but contributes almost nothing to a capped character's ceiling.
+- Endgame comparisons must hold total purchased base stats constant, then add
+  legal item/socket packages. Comparing gearless level-500 heroes is not a
+  useful endgame balance test.
+- The meaningful class differences are conversion coefficients, access to
+  item families, percentage stats, attack/BAT behavior, target count, uptime,
+  and whether one purchased stat powers several independent effects.
+- Because the cap is shared across all three base attributes, hybrid heroes
+  pay a real allocation cost. Vampire can use all three attributes, but it
+  cannot simultaneously place the full 255,000 into each one through tomes.
+
+### Exact conversion examples
+
+These are exact local comparisons from source formulas. They are not presented
+as whole-character DPS rankings, because cooldown, target uptime, and the rest
+of the build still matter.
+
+| Investment and state | Exact conversion | Relative interpretation |
+|---|---:|---|
+| +20 effective crit chance, ordinary 100 crit-damage hero starting at 5% | expected attack multiplier 1.05 -> 1.25 (**+19.05%**) | baseline |
+| +20 effective crit chance, level-500 Master Rogue starting at 6% and 1,500 crit damage | 1.90 -> 4.90 (**+157.89%**) | the same increment is **8.29x as effective** as on the ordinary hero |
+| +1,000 Agility to level-500 Thunderblade's magic spells | every listed AGI coefficient receives the 2.1 Overload multiplier | **110% more spell damage per AGI** than an otherwise identical 1.0-mm spell |
+| +1,000 Armor to Shield Slam at rank `L` | `6,000L` raw magic damage per cast, plus physical EHP | exactly **6x** Shield Slam's raw per-point conversion from +1,000 Strength (`1,000L`), before Strength's HP/attack value |
+| +1,000 of one stat to Blood Nova | AGI: 3,000; STR: 2,000; INT: 12,000 raw magic | for Nova alone, INT is **4x AGI** and **6x STR**; this is not the ordering for Vampire's whole kit |
+| +1 percentage point Spellboost on one `BOOST` amount at current Spellboost `s` | relative gain `0.01/(1+s)` | 1.00% at 0%, 0.80% at 25%, 0.67% at 50%, 0.50% at 100% |
+| +1 percentage point Spellboost when one `BOOST` amount and one `LBOOST` time/count dimension multiply | relative gain `(1.01+s)/(1+s) * (1.005+0.5s)/(1+0.5s) - 1` | about **1.51%** at 0%, 1.25% at 25%, 1.07% at 50%, 0.84% at 100% |
+
+This is the format the completed model should use for every hero: compare the
+same additional purchasable or item budget at the same existing stat point.
+Quoting a coefficient without its denominator is not “stat efficiency.”
+
+For identical raw physical damage against the same target, the hero definitions
+also provide an exact first-order comparison through native `pm`:
+
+| Heroes | Native physical-dealt multiplier | Same physical stat budget versus a 1.0 hero |
+|---|---:|---:|
+| Casters/supports using the 1.0 default | 1.00 | 100% |
+| Oblivion Guard, Bloodzerker, Royal Guardian, Warrior, Savior | 1.20 | 120% (**20% more**) |
+| Vampire, Assassin, Thunderblade, Master Rogue | 1.25 | 125% (**25% more**) |
+| Elite Marksman, Phoenix Ranger | 1.30 | 130% (**30% more**) |
+
+This means a bow carry converts a point of weapon damage or primary attribute
+into the physical branch 8.33% more efficiently than a 1.20 melee hero and 4%
+more efficiently than a 1.25 hero, before crit, BAT, on-hit effects, armor, or
+class buffs. Thunderblade's magic spells separately reach 210% of the neutral
+magic conversion at level 500, and Master Rogue's crit interaction then creates
+the much larger nonlinear exception shown above.
 
 ## 2. Character-by-character analysis
 
@@ -333,10 +419,11 @@ adds `0.75*AGI+STR` magic on attacks. Its Strength branch reaches at most 20%
 general damage reduction from a full bank; its Agility branch halves core
 cooldowns.
 
-Best stats/build: genuinely hybrid. Agility improves attacks, Leech, Domain,
-Nova, and the offensive Blood Lord branch; Strength gives HP, attacks, every
-core spell, and sustain; Intelligence gives bank capacity and the very large
-Nova coefficient. BAT, Spellboost, and resistance then multiply the package.
+Best stats/build: genuinely hybrid. Agility improves armor/attack speed, Leech,
+Domain, Nova, and the offensive Blood Lord branch; Strength is the primary
+attack attribute and gives HP, Leech, Domain, Nova, and sustain; Intelligence
+gives bank capacity and the very large Nova coefficient. BAT, Spellboost, and
+resistance then multiply the package.
 
 Performance: high realistic AOE, high sustain, high burst, and excellent gear
 conversion despite only 2/2/1 innate gains. Its single-target boss output rises
@@ -438,8 +525,7 @@ mean output and 95th-percentile burst rather than only a deterministic rotation.
 
 ### Dark Summoner — persistent multi-unit carry / support
 
-At level 500 its innate Intelligence is 3,262.5 before gear, second only to
-Elementalist. Reaver inherits at least 25% of Summoner INT+STR as Strength,
+Reaver inherits at least 25% of Summoner INT+STR as Strength,
 level-scaled percentages of INT as Agility/Intelligence, and supplies cleave and
 wounds. Skull Brute receives 40% of INT+STR as Strength and 60% of INT as
 Agility, functioning as the durable tank. Destroyer receives 6.66% of INT+STR
@@ -462,9 +548,11 @@ requirements, and micro. The theoretical stationary-target ceiling is much
 higher because one Intelligence purchase is converted by multiple simultaneous
 units.
 
-Balance concern: 6.5 INT/level plus multi-body inheritance makes level and INT
-gear superlinear in practical party power even though each formula is linear.
-Benchmark summon uptime, not only target-dummy DPS.
+Balance concern: multi-body inheritance lets one purchased or itemized INT
+point contribute to several simultaneous units. The 6.5 INT/level growth is
+minor beside the tome and equipment budgets; the multi-body conversion is the
+part that should be benchmarked. Measure summon uptime, not only target-dummy
+DPS.
 
 ### Bard — raid amplifier / sustain support
 
@@ -500,9 +588,9 @@ channel/position. Tidal Wave's general vulnerability makes cooldown/coverage
 more valuable in parties than a small personal damage increase.
 
 Performance: high AOE, control, and party amplification; medium boss DPS unless
-the boss remains in persistent zones. Its 4.0 INT/level gives a strong but not
-outlying innate curve. Fifteen percent vulnerability is approximately 15% more
-combined party output when no mutually exclusive/refresh issue intervenes.
+the boss remains in persistent zones. Fifteen percent vulnerability is
+approximately 15% more combined party output when no mutually exclusive or
+refresh issue intervenes.
 
 ### High Priestess — primary healer / resurrection support
 
@@ -526,7 +614,7 @@ second plus `0.3*INT*BOOST` per second before healing amplification, making it
 scale with the recipient as well as the caster. Resurrection cannot be reduced
 to ordinary HPS and is strongest in long boss attempts.
 
-### Elementalist — highest innate spell scaler / AOE burst carry
+### Elementalist — repeated-coefficient spell scaler / AOE burst carry
 
 Element modes add different effects: Fire grants 15% Spellboost, Earth grants
 25% general resistance, Ice supplies regeneration/control, and Lightning adds
@@ -542,15 +630,11 @@ Best stats/build: Intelligence/Spellboost are overwhelmingly dominant, with
 mana and defense after them. Fire mode multiplicatively improves already high
 Spellboost builds; Earth mode is the safer frontier.
 
-Performance: top AOE burst and one of the best sustained caster curves, useful
-control, and low passive EHP. Its 8.4 INT/level produces 4,231.6 INT at level
-500 before gear—2.40x the roster median primary stat and about twice Arcanist or
-Hydromancer. The ultimate also includes enemy-stat scaling through pure
-current-HP damage. This is the strongest level-scaling outlier.
-
-Correctness concern: the Lightning ultimate branch reads `FirstOfGroup` before
-checking that the group contains a target; empty-area casts can pass nil to
-`GetWidgetLife`.
+Performance: top candidate for AOE burst and sustained caster output, useful
+control, and low passive EHP. The ultimate also includes enemy-stat scaling
+through pure current-HP damage. Its 8.4 INT/level is conspicuous in a gearless
+comparison but only changes how much INT must be purchased before reaching the
+shared cap; it is not an endgame ceiling advantage.
 
 ### Assassin — mobile burst / evasion skirmisher
 
@@ -655,85 +739,75 @@ reduce ramp value.
 
 ## 3. Cross-character comparison
 
-### Gearless level-500 growth model
+### Stat-cap scale at level 500
 
-Median is 100. `Main` is the hero's level-derived primary attribute. Physical
-and magic EHP use level-derived Strength HP, standard Agility armor, native
-`pr/mr`, and no item/active/buff/base-HP contribution.
+This replaces the misleading gearless EHP table. The natural total is shown
+only to establish how small it is beside the 255,000 purchased-stat cap.
 
-| Hero | Main | Physical EHP | Magic EHP |
-|---|---:|---:|---:|
-| Oblivion Guard | 100 | 251 | 307 |
-| Bloodzerker | 100 | 363 | 222 |
-| Royal Guardian | 106 | 476 | 281 |
-| Warrior | 100 | 528 | 266 |
-| Vampire | 57 | 308 | 152 |
-| Savior | 69 | 250 | 211 |
-| Dark Savior | 72 | 87 | 172 |
-| Crusader | 60 | 70 | 131 |
-| Arcanist | 114 | 10 | 18 |
-| Dark Summoner | 185 | 70 | 100 |
-| Bard | 63 | 35 | 65 |
-| Hydromancer | 114 | 26 | 43 |
-| High Priestess | 109 | 74 | 121 |
-| Elementalist | 240 | 4 | 28 |
-| Assassin | 103 | 153 | 39 |
-| Thunderblade | 97 | 238 | 64 |
-| Master Rogue | 100 | 196 | 51 |
-| Elite Marksman | 86 | 100 | 38 |
-| Phoenix Ranger | 72 | 84 | 38 |
+| Hero | Natural STR+AGI+INT | Share of cap |
+|---|---:|---:|
+| Oblivion Guard | 2,774.5 | 1.09% |
+| Bloodzerker | 2,726.6 | 1.07% |
+| Royal Guardian | 2,568.9 | 1.01% |
+| Warrior | 2,726.6 | 1.07% |
+| Vampire | 2,520.0 | 0.99% |
+| Savior | 1,922.2 | 0.75% |
+| Dark Savior | 2,383.3 | 0.93% |
+| Crusader | 1,907.2 | 0.75% |
+| Arcanist | 2,406.2 | 0.94% |
+| Dark Summoner | 4,326.4 | 1.70% |
+| Bard | 1,836.4 | 0.72% |
+| Hydromancer | 2,624.8 | 1.03% |
+| High Priestess | 3,070.9 | 1.20% |
+| Elementalist | 4,435.2 | 1.74% |
+| Assassin | 2,877.3 | 1.13% |
+| Thunderblade | 2,926.2 | 1.15% |
+| Master Rogue | 2,222.6 | 0.87% |
+| Elite Marksman | 2,072.9 | 0.81% |
+| Phoenix Ranger | 1,820.4 | 0.71% |
 
-This table demonstrates curves, not live balance. Items can add hundreds of
-thousands of attributes and active defenses can reverse the ordering. It does
-show that caster innate physical survivability differs by over an order of
-magnitude and that Elementalist/Dark Summoner receive far more free offensive
-stat than Bard/Crusader.
+The widest natural-total gap is 2,614.8, only 1.03% of the cap, and disappears
+from total base-stat ceiling after purchases. It remains relevant only before
+the character can afford to fill the gap.
 
-### Role-relative assessment
+### Provisional potential-damage groups
 
-These are source-supported tiers rather than fabricated DPS percentages.
+The previous letter grades implied precision the audit had not earned. The
+following are candidate ceiling groups, not a finished tier list. Placement is
+based on source-visible multipliers and target conditions; no percentage is
+assigned until the same legal item and purchased-stat budgets are simulated.
 
-| Hero | Sustained | Burst | Boss | AOE | Active defense/sustain | Party utility | Gear scaling |
-|---|---|---|---|---|---|---|---|
-| Oblivion Guard | B | A | S | A | S | A | S |
-| Bloodzerker | A | B | A | A | S-window / D baseline | B | A |
-| Royal Guardian | C | A | B | B | S+ | S+ | S+ armor |
-| Warrior | A | A | A | A | A | A | A |
-| Vampire | A | A | A | S | A | C | S hybrid |
-| Savior | B | A | B | A | S-window | A | A |
-| Dark Savior | S setup | A | A | S setup | S with mana | C | S density/BAT |
-| Crusader | C | C | A via allies | B | S party | S+ | S party |
-| Arcanist | A | S variance | B | S | D | A control | A |
-| Dark Summoner | S uptime | A | S uptime | A | B | A | S multi-body |
-| Bard | D | D | A via allies | B | A | S+ | A party |
-| Hydromancer | B | A | A via debuff | S | C | S control/amp | A |
-| High Priestess | D | D | A via survival | B | S+ | S+ | A |
-| Elementalist | S | S+ | S | S+ | C/S Earth | A | S+ |
-| Assassin | A | S | A | A | A evasion | C | A |
-| Thunderblade | A | S+ | A | S | A window | C | S magic |
-| Master Rogue | S | S crit | S+ | B | C | B debuff | S+ crit |
-| Elite Marksman | A | A | A | S+ targets | D | C | S Helicopter |
-| Phoenix Ranger | S uptime | A | A | S | C + revive | C | S attacks |
+| Scenario | Highest ceiling candidates | Why the ceiling can diverge |
+|---|---|---|
+| Stationary single-target sustained | Master Rogue, Dark Summoner, Dark Savior, Phoenix Ranger | crit singularity; multiple inherited bodies; density/BAT/on-hit scaling; attack ramp and BAT |
+| Ten-second personal burst | Thunderblade, Elementalist, Assassin, Vampire | 2.1x magic multiplier; repeated INT coefficients/current-HP strike; concentrated AGI sequences; tri-stat Nova/Lord overlap |
+| Dense target-rich AOE | Elite Marksman, Elementalist, Vampire, Dark Savior, Phoenix Ranger | uncapped cluster target count; repeated area strikes; Domain/Nova; splash on-hit setup; Searing/Multishot coverage |
+| Enemy-HP-driven ceiling | Oblivion Guard, Elementalist | current-HP damage scales with the encounter rather than only the player's budget |
+| Party-attributed damage | Crusader, Bard, Hydromancer, Royal Guardian | ally stat grant/echo; attack and Spellboost auras; vulnerability; immunity and enemy damage suppression increasing uptime |
+
+An exact tier list should report, for each hero, three numbers relative to the
+median: 60-second single-target damage, ten-second burst, and total damage to a
+fixed dense pack. Supports need a fourth number: party damage attributable to
+their buffs/debuffs. Ranking source formulas without those common inputs would
+repeat the original report's mistake.
 
 ## 4. Scaling outliers
 
-1. **Elementalist innate Intelligence:** 8.4/level yields 4,231.6 at 500,
-   2.40x roster-median primary stat before gear. Most of its kit then applies
-   large repeated INT coefficients.
-2. **Dark Summoner multi-body conversion:** 6.5 INT/level and INT inheritance
-   convert one stat purchase into several simultaneous damage/utility bodies.
-3. **Master Rogue crit chance:** at level 500, each additional crit-chance point
+1. **Dark Summoner multi-body conversion:** INT inheritance converts one stat
+   purchase into several simultaneous damage/utility bodies. This, not its
+   natural INT growth, is the potential scaling outlier.
+2. **Master Rogue crit chance:** at level 500, each additional crit-chance point
    gives about 7.89% relative expected physical output at the base 6% chance,
    versus 0.95% for a normal 5/100 hero.
-4. **Royal Plate:** `0.006L^5 + 10L^2 + 25L` reaches 23,700 armor at L20 and
+3. **Royal Plate:** `0.006L^5 + 10L^2 + 25L` reaches 23,700 armor at L20 and
    also fuels Shield Slam. This removes the normal tank offense tradeoff.
-5. **Spellboost compound users:** Elite Marksman Helicopter, Dark Savior Seal,
+4. **Spellboost compound users:** Elite Marksman Helicopter, Dark Savior Seal,
    Phoenix Ranger, and persistent AOE casters gain output from both amount and
    time/coverage. High Priestess/Crusader also gain group-wide defensive
    coverage, making their party return nonlinear in party size.
-6. **Enemy-stat scalers:** Oblivion Guard current-HP strikes and Elemental Storm
+5. **Enemy-stat scalers:** Oblivion Guard current-HP strikes and Elemental Storm
    pure current-HP lightning do not fall off when enemy health budgets grow.
-7. **Multiplicative defense:** general resistance, type resistance, armor, and
+6. **Multiplicative defense:** general resistance, type resistance, armor, and
    post-mitigation shields multiply. Royal Guardian, Savior, Dark Savior,
    Crusader, and Bard can layer these without a shared cap.
 
@@ -760,12 +834,8 @@ These are source-supported tiers rather than fabricated DPS percentages.
 - **Pure-damage item/ability effects:** disproportionately valuable after chaos
   armor because they skip the 0.03 modifier.
 
-Potential item-system correctness issues:
+Potential item-system concern:
 
-- `MANA_FLOW.onUnequip` and `HORSE_BOOST.onUnequip` write through
-  `Unit[itm.holder]` while subtracting from `Unit[orig_holder]`. If `itm.holder`
-  has already changed during a move/unequip, mana-regeneration bonuses can be
-  removed from the wrong unit.
 - Fixed percentage stats with flat-per-level syntax can become large while
   avoiding the main item multiplier. This is intentional parser behavior but
   should be included in item-budget spreadsheets.
@@ -790,9 +860,10 @@ switch. Each extra entrant adds 80% HP and 30% damage, plus special conversions.
 
 Consequences:
 
-- Percent-current-HP and pure damage become increasingly valuable after 200.
-- Physical carries need chaos attack type and/or penetration; ordinary magic
-  is suppressed to 3% before `mr/dr` and needs very high coefficients.
+- Compare wave 199 and wave 200 using effective HP and final applied damage,
+  not raw object fields; the type switch and numeric compression are paired.
+- Percent-current-HP and pure damage remain important because they bypass parts
+  of conventional scaling, but the chaos label alone does not prove a jump.
 - Uncapped AOE benefits from 25-40-unit waves; single-target burst must be
   rewarded by deleting ranged/fury/miasma specials quickly.
 - Tank/healer party scaling is stressed by +30% incoming damage per entrant,
@@ -826,9 +897,9 @@ level. Honor bonuses intentionally apply after the snapshot.
 - High armor: Hydromancer/Elementalist/Arcanist/Thunderblade gain relative to
   physical carries; Master Rogue, Phoenix Ranger, and Bloodzerker depend on
   penetration/debuff uptime.
-- Chaos armor: pure damage and compensated chaos physical dominate ordinary
-  magic. Compare heroes only after confirming their actual object-data attack
-  type at that progression point.
+- Chaos-era enemies: compare final time-to-kill after the content's HP/damage/
+  armor compression. Flag only specific unadjusted damage paths rather than the
+  representation scheme as a whole.
 - Very high HP: Oblivion Guard and Elementalist gain from current-HP mechanics;
   fixed-coefficient burst loses relative value.
 - Dense waves: Elite Marksman, Phoenix Ranger, Vampire, Elementalist,
@@ -845,26 +916,21 @@ level. Honor bonuses intentionally apply after the snapshot.
 - Master Rogue crit-chance conversion is many times the normal marginal return.
 - Royal Plate's formula reaches 23,700 armor at rank 20 and Shield Slam consumes
   current armor offensively.
-- Elementalist and Dark Summoner have substantially steeper innate primary-stat
-  curves than the rest of the roster.
 - Spellboost has compound effects well beyond displayed spell amounts.
-- Chaos armor heavily favors pure and compensated chaos physical damage over
-  ordinary magic.
 - Crusader Resonance re-applies source `dm` and target `dr` to an echo derived
   from post-mitigation damage.
 - Blood Cleave's heal estimate does not use the same full multiplier set as its
   actual damage.
-- The boss party-scaling loop adds bonus Strength every second without first
-  removing the previous party bonus. For every extra nearby player, each tick
-  adds `20 * base_STR`, not 20% of base Strength. It also assigns
-  `boss.damage_percent` rather than `Unit[boss.unit].damage_percent`. This is a
-  correctness defect, not merely a tuning opinion.
+- The current boss party-scaling translation is incorrect. The pre-refactor
+  code used `0.2 * base damage` and `0.2 * base Strength`; the current code uses
+  `20`, writes `boss.damage_percent` to a plain Boss record that has no reader,
+  and still accumulates the Strength addition once per second.
 
 ### Medium confidence
 
-- Elementalist is the top general caster at equal gear because coefficient,
-  innate INT, mode buffs, and percent-HP ultimate mechanics all point the same
-  way. Actual mana/position uptime may narrow the gap.
+- Elementalist is a top general-caster candidate at equal total stat and item
+  budgets because repeated coefficients, mode buffs, and a percent-HP ultimate
+  point the same way. Natural INT growth is not a meaningful endgame advantage.
 - Crusader and Bard can be composition-mandatory in six-player parties because
   their output scales across every ally.
 - Elite Marksman has a pathological target-rich Helicopter ceiling. Real target
@@ -883,6 +949,42 @@ level. Honor bonuses intentionally apply after the snapshot.
 - Mana starvation outside the obvious percentage-cost abilities.
 - Real six-player support value under movement, deaths, dispels, and range loss.
 
+### What the boss Strength finding actually means
+
+This is not a claim that boss balance is intentionally based on a hidden
+Strength formula. It is a translation error in `gameplay/world/boss.lua`.
+Git history shows the relevant pre-refactor code was:
+
+```text
+flat damage bonus = native base damage * 0.2 * (players - 1)
+bonus Strength   += base Strength * 0.2 * (players - 1)
+```
+
+The current translation instead does the equivalent of:
+
+```text
+BossRecord.damage_percent = 100 + 20 * (players - 1)
+UnitWrapper.bonus_str     += base Strength * 20 * (players - 1)
+```
+
+There are three separate issues:
+
+1. `damage_percent` uses multiplier units (`1.2`, not `120`) on `Unit`, while
+   the code writes percentage-looking units to the unrelated `Boss` record.
+   No code reads that Boss field, so the intended extra damage is not applied.
+2. Strength changed from `0.2` to `20`, a 100x translation error.
+3. The periodic loop uses `+=`, so even the old 20% value accumulates every
+   second instead of representing a stable party-size bonus.
+
+The least disruptive fix is to preserve the apparent original intent—20% of
+baseline damage and 20% of baseline Strength for each extra nearby player—but
+store the previously applied party bonus and apply only the delta when the
+effective nearby count changes. That avoids overwriting unrelated buffs and
+lets the five-second nearby-count linger continue to work. If Strength was only
+being used as an indirect way to add boss HP, a cleaner follow-up is to replace
+it with an explicit baseline-HP bonus so primary-attribute attack damage is not
+also changed accidentally.
+
 ## 8. Most important balance problems
 
 1. **Master Rogue's crit-chance singularity.** The passive creates 16x crits at
@@ -893,29 +995,24 @@ level. Honor bonuses intentionally apply after the snapshot.
    1,186x raw physical EHP during the buff before further resistance, and that
    armor also becomes Shield Slam damage. There is almost no offense/defense
    opportunity cost.
-3. **Innate stat-growth spread.** Level-500 Elementalist has 4,231.6 INT while
-   Bard has 1,118.8 and Crusader 1,063.9. Role differences justify some spread,
-   but 3.8-4.0x free primary stat makes global item and coefficient tuning hard.
-4. **Spellboost is an unpriced bundle of dimensions.** It can multiply amount,
+3. **Spellboost is an unpriced bundle of dimensions.** It can multiply amount,
    duration, area, count, chance, cooldown frequency, shields, and crowd-control
    duration. A 20% item may be near 20% on one spell and over 30-40% total-value
    gain on another before target-count effects.
-5. **Uncapped party multipliers.** Law of Might, Resonance, Aura of Justice,
+4. **Uncapped party multipliers.** Law of Might, Resonance, Aura of Justice,
    Inspire, Song of War, Fight Me, and general vulnerabilities scale with every
    ally. Personal-versus-party balance changes drastically from solo to six
    players.
-6. **Late-game damage lanes are discontinuous.** The 0.03/350 chaos system makes
-   ordinary magic, chaos physical, and pure damage incomparable without bespoke
-   coefficients. Enemy transitions can reorder the entire roster.
-7. **Boss scaling accumulates state.** The periodic `bonus_str += ...` line can
-   grow boss Strength by 20 times base Strength per second for each extra nearby
-   player, and the damage multiplier is written to the wrong table. Any live
-   multiplayer boss benchmark is suspect until this is fixed or proven
-   unreachable.
-8. **Post-mitigation echo double scaling.** Crusader Resonance derives an echo
+5. **Boss party scaling was mistranslated during refactoring.** Git history
+   shows the old flat damage expression used `0.2`; the current line uses `20`
+   and stores it on `Boss` rather than the unit wrapper. The Strength path also
+   adds its bonus every periodic tick instead of setting a stable party-size
+   bonus. This is a code defect, not a claim that bosses conceptually scale
+   from Strength.
+6. **Post-mitigation echo double scaling.** Crusader Resonance derives an echo
    from final physical damage and then applies `dm/dr` again as pure. It can be
    far above or below its nominal percentage depending on buffs and target.
-9. **Infernal Strike's boss reduction is selected by the primary target.** The
+7. **Infernal Strike's boss reduction is selected by the primary target.** The
    splash loop checks `target` rather than each `u`; players can potentially
    strike a nearby non-boss to bypass the boss half-damage rule.
 
@@ -957,10 +1054,11 @@ Add combat-log scenarios rather than relying on floating numbers:
 
 ## Recommended balance order
 
-Do not start with broad coefficient nerfs. First fix/verify the boss accumulator,
-Resonance double scaling, Cleave healing mismatch, and item unequip ownership.
-Then build the runtime snapshot/log harness and establish the three fixed-target
-benchmarks. After those correctness issues are removed, address crit chance for
-Master Rogue, Royal Plate's curve, and the level-growth spread. Only then tune
-party support and Spellboost, because both depend heavily on the corrected base
-measurements.
+Do not start with broad coefficient nerfs. First fix/verify the boss party-scale
+translation, Resonance double scaling, and Cleave healing mismatch. Then build
+the runtime snapshot/log harness and establish the three fixed-target
+benchmarks using equal purchased-stat budgets and legal item packages. After
+those correctness issues are removed, address crit chance for Master Rogue and
+Royal Plate's curve. Natural level-growth differences do not need endgame
+normalization because the shared tome cap already normalizes them. Tune party
+support and Spellboost only after the corrected measurements.
