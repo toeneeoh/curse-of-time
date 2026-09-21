@@ -78,3 +78,39 @@ a precise repeatable ceiling from only one critical-hit sample.
    runs. Those distinguish theoretical damage from AOE coverage and practical
    realization.
 
+## Level 400 Vampire Lord: solo, zero-armor chaos target
+
+Recording: `balance-combat-player-1-vampire-400-chaos.pld`
+
+This 60.065-second recording used the same build against defense type 6 with
+zero numerical armor. Its starting snapshot matches the prechaos run. The
+ending snapshot's additional 222,848 Agility, 6,685 armor, and reduced BAT are
+temporary Blood Lord state captured while the buff was active, not persistent
+build drift.
+
+| Source | Hits | Damage | DPS | Share |
+|---|---:|---:|---:|---:|
+| Basic Attack | 181 | 52,171,964 | 868,586 | 80.13% |
+| Blood Lord | 102 | 4,307,724 | 71,717 | 6.62% |
+| Blood Domain | 35 | 3,615,135 | 60,187 | 5.55% |
+| Blood Nova | 18 | 3,231,080 | 53,793 | 4.96% |
+| Blood Leech | 11 | 1,779,462 | 29,625 | 2.73% |
+| **Total** | 347 | **65,105,156** | **1,083,904** | **100%** |
+
+The run retained 3.0204% of the prechaos recording's DPS, a 96.9796%
+reduction. Individual spell average hits retained approximately 3% as well:
+Blood Lord 3.001%, Blood Domain 2.982%, Blood Nova 3.054%, and Blood Leech
+3.025%. Their small deviations come from `BOOST` variance.
+
+Basic-attack average damage retained only 2.806% because the two one-minute
+runs rolled different critical-hit distributions. The maximum basic hit
+retained almost exactly 3%, and the complete run is consistent with the same
+chaos multiplier applying to physical and magical damage. Applying the 3%
+multiplier to the prechaos crit-normalized/90%-uptime baseline predicts
+1,061,880 DPS; the observed 1,083,904 is only 2.07% higher.
+
+This establishes that the chaos transition currently acts as a near-uniform
+33.33-to-1 compression rather than changing Vampire's physical-versus-magical
+damage composition. Any chaos enemy-health comparison should therefore use
+roughly 1.06M DPS as this build's stationary single-target baseline, not its
+35.4M prechaos value.
