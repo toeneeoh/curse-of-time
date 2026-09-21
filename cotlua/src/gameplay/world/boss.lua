@@ -41,6 +41,10 @@ OnInit.final("Boss", function(Require)
     ---@field respawn_modifier number
     ---@field first_drop boolean
     ---@field nearby_count integer
+    ---@field nearby_linger_generation integer
+    ---@field nearby_linger_target integer?
+    ---@field party_bonus_damage integer
+    ---@field party_bonus_str integer
     ---@field target Unit
     ---@field init function
     ---@field reward function
@@ -287,6 +291,10 @@ OnInit.final("Boss", function(Require)
                 difficulty_vote = {},
                 first_drop = true,
                 nearby_count = 0,
+                nearby_linger_generation = 0,
+                nearby_linger_target = nil,
+                party_bonus_damage = 0,
+                party_bonus_str = 0,
                 target = nil,
                 threat = 100,
                 time = 0,
@@ -444,8 +452,42 @@ OnInit.final("Boss", function(Require)
             end
         end
 
-        local function bonus_linger(boss, subtraction)
-            boss.nearby_count = boss.nearby_count - subtraction
+        local function expire_nearby_linger(boss, generation, count)
+            if boss.nearby_linger_generation == generation then
+                boss.nearby_count = count
+                boss.nearby_linger_target = nil
+            end
+        end
+
+        local function update_nearby_count(boss, count)
+            if count >= boss.nearby_count then
+                boss.nearby_count = count
+
+                if boss.nearby_linger_target then
+                    boss.nearby_linger_generation = boss.nearby_linger_generation + 1
+                    boss.nearby_linger_target = nil
+                end
+            elseif boss.nearby_linger_target ~= count then
+                boss.nearby_linger_generation = boss.nearby_linger_generation + 1
+                boss.nearby_linger_target = count
+                TQ:callDelayed(5., expire_nearby_linger, boss, boss.nearby_linger_generation, count)
+            end
+        end
+
+        local function update_party_scaling(boss, bossUnit)
+            local extra_players = (CHAOS_MODE and max(0, boss.nearby_count - 1)) or 0
+            local damage = R2I(BlzGetUnitBaseDamage(boss.unit, 0) * 0.2 * extra_players)
+            local strength = R2I(bossUnit.str * 0.2 * extra_players)
+
+            if damage ~= boss.party_bonus_damage then
+                bossUnit.bonus_damage = bossUnit.bonus_damage - boss.party_bonus_damage + damage
+                boss.party_bonus_damage = damage
+            end
+
+            if strength ~= boss.party_bonus_str then
+                bossUnit.bonus_str = bossUnit.bonus_str - boss.party_bonus_str + strength
+                boss.party_bonus_str = strength
+            end
         end
 
         ---@type fun(boss: Boss)
@@ -494,11 +536,8 @@ OnInit.final("Boss", function(Require)
                         U = U.next
                     end
 
-                    boss.nearby_count = max(boss.nearby_count, numplayers)
-
-                    if numplayers < boss.nearby_count then
-                        TQ:callDelayed(5., bonus_linger, boss, boss.nearby_count - numplayers)
-                    end
+                    update_nearby_count(boss, numplayers)
+                    update_party_scaling(boss, bossUnit)
 
                     local hp = 1
 
@@ -515,11 +554,6 @@ OnInit.final("Boss", function(Require)
 
                     if numplayers == 0 then -- out of combat
                         hp = 2 -- 2 percent
-                    else -- bonus damage and health
-                        if CHAOS_MODE then
-                            boss.damage_percent = 100 + (20 * (boss.nearby_count - 1))
-                            bossUnit.bonus_str = bossUnit.bonus_str + R2I(bossUnit.str * 20 * (boss.nearby_count - 1))
-                        end
                     end
 
                     -- non-returning hp regeneration
@@ -546,6 +580,11 @@ OnInit.final("Boss", function(Require)
 
         function thistype:revive()
             self.unit = CreateUnit(PLAYER_BOSS, self.id, self.loc_x, self.loc_y, self.facing)
+            self.nearby_count = 0
+            self.nearby_linger_generation = self.nearby_linger_generation + 1
+            self.nearby_linger_target = nil
+            self.party_bonus_damage = 0
+            self.party_bonus_str = 0
             EVENT_ON_STRUCK_FINAL:register_unit_action(self.unit, BossAI)
             EVENT_ON_UNIT_DEATH:register_unit_action(self.unit, on_boss_death)
 
