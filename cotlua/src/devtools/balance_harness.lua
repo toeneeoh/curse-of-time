@@ -358,9 +358,10 @@ OnInit.final("BalanceHarness", function(Require)
         }, "\t")
     end
 
-    local function damage_recorder(pid, source, target, amount, damage_type, tag, is_basic_attack)
+    local function damage_recorder(pid, source, target, applied_amount, displayed_amount,
+            damage_type, tag, is_basic_attack)
         local session = BalanceHarness.sessions[pid]
-        if not session or amount <= 0. or not IsUnitEnemy(target, Player(pid - 1)) then
+        if not session or displayed_amount <= 0. or not IsUnitEnemy(target, Player(pid - 1)) then
             return
         end
 
@@ -375,14 +376,16 @@ OnInit.final("BalanceHarness", function(Require)
         }, "\t")
         local entry = session.damage[key]
         if not entry then
-            entry = { total = 0., count = 0, maximum = 0. }
+            entry = { total = 0., applied = 0., count = 0, maximum = 0. }
             session.damage[key] = entry
         end
 
-        entry.total = entry.total + amount
+        entry.total = entry.total + displayed_amount
+        entry.applied = entry.applied + applied_amount
         entry.count = entry.count + 1
-        entry.maximum = math.max(entry.maximum, amount)
-        session.total = session.total + amount
+        entry.maximum = math.max(entry.maximum, displayed_amount)
+        session.total = session.total + displayed_amount
+        session.applied_total = session.applied_total + applied_amount
         if not session.targets[target] then
             session.targets[target] = true
             session.target_count = session.target_count + 1
@@ -418,6 +421,7 @@ OnInit.final("BalanceHarness", function(Require)
 
         lines[#lines + 1] = table.concat({
             "total", number(session.total), "dps", number(session.total / elapsed),
+            "applied_total", number(session.applied_total),
             "targets_hit", session.target_count,
         }, "\t")
         for _, result in ipairs(entries) do
@@ -425,6 +429,7 @@ OnInit.final("BalanceHarness", function(Require)
             lines[#lines + 1] = table.concat({
                 "damage", result.key, "count", entry.count,
                 "total", number(entry.total), "dps", number(entry.total / elapsed),
+                "applied", number(entry.applied),
                 "average", number(entry.total / entry.count), "maximum", number(entry.maximum),
             }, "\t")
         end
@@ -459,6 +464,7 @@ OnInit.final("BalanceHarness", function(Require)
             filename = filename,
             damage = {},
             total = 0.,
+            applied_total = 0.,
             targets = setmetatable({}, { __mode = "k" }),
             target_count = 0,
             stopwatch = Stopwatch.create(true),

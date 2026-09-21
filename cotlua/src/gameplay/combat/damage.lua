@@ -335,7 +335,8 @@ OnInit.final("Damage", function(Require)
         local damage_observers = EVENT_PLAYER_DAMAGE_APPLIED.actions[source_pid]
         if damage_observers and #damage_observers > 0 then
             EVENT_PLAYER_DAMAGE_APPLIED:trigger(source_pid, source, target,
-                math.max(0., applied_amount), damage_type, tag, is_basic_attack)
+                math.max(0., applied_amount), math.max(0., display_amount),
+                damage_type, tag, is_basic_attack)
         end
 
         -- damage numbers

@@ -46,12 +46,15 @@ rendered tooltip text.
 * 0.90 uptime
 ```
 
-`-balance start` records final applied hostile damage for the requested period.
-It groups results by source unit rawcode, source name, damage type, and damage
-tag. Consequently, summoned-unit attacks and spell damage remain distinguishable
-from the hero's own output. The report includes starting and ending builds,
-target defenses, distinct targets hit, hit count, total damage, DPS, average
-hit, and maximum hit. `-balance stop` ends a session early.
+`-balance start` records final post-mitigation hostile damage for the requested
+period. It retains both displayed damage and actual health damage so immortal
+punching bags—which intentionally reduce applied damage to zero—remain valid
+benchmarks. Results are grouped by source unit rawcode, source name, damage
+type, and damage tag. Consequently, summoned-unit attacks and spell damage
+remain distinguishable from the hero's own output. The report includes starting
+and ending builds, target defenses, distinct targets hit, hit count, total
+damage, DPS, actual applied damage, average hit, and maximum hit. `-balance
+stop` ends a session early.
 
 ## Benchmark matrix
 
