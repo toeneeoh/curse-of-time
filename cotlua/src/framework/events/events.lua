@@ -221,6 +221,7 @@ OnInit.final("Events", function()
     EVENT_ON_HIT_MULTIPLIER          = EVENT.create() ---@type EVENT
     EVENT_ON_HIT_AFTER_REDUCTIONS    = EVENT.create() ---@type EVENT
     EVENT_ON_HIT_FINAL               = EVENT.create() ---@type EVENT
+    EVENT_PLAYER_DAMAGE_APPLIED      = PLAYER_EVENT.create() ---@type PLAYER_EVENT
     EVENT_ON_STRUCK                  = EVENT.create() ---@type EVENT
     EVENT_ON_STRUCK_MULTIPLIER       = EVENT.create() ---@type EVENT
     EVENT_ON_STRUCK_AFTER_REDUCTIONS = EVENT.create() ---@type EVENT

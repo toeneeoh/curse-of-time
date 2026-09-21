@@ -127,6 +127,7 @@ OnInit.final("Damage", function(Require)
     local EVENT_ON_HIT, EVENT_ON_HIT_EVADE, EVENT_ON_HIT_MULTIPLIER, EVENT_ON_HIT_AFTER_REDUCTIONS, EVENT_ON_HIT_FINAL = EVENT_ON_HIT, EVENT_ON_HIT_EVADE, EVENT_ON_HIT_MULTIPLIER, EVENT_ON_HIT_AFTER_REDUCTIONS, EVENT_ON_HIT_FINAL
     local EVENT_ON_STRUCK, EVENT_ON_STRUCK_MULTIPLIER, EVENT_ON_STRUCK_AFTER_REDUCTIONS, EVENT_ON_STRUCK_FINAL = EVENT_ON_STRUCK, EVENT_ON_STRUCK_MULTIPLIER, EVENT_ON_STRUCK_AFTER_REDUCTIONS, EVENT_ON_STRUCK_FINAL
     local EVENT_ON_FATAL_DAMAGE = EVENT_ON_FATAL_DAMAGE
+    local EVENT_PLAYER_DAMAGE_APPLIED = EVENT_PLAYER_DAMAGE_APPLIED
     local evaluate_enemy_ai = EnemyAI.evaluate
 
     ---@return boolean
@@ -325,6 +326,16 @@ OnInit.final("Damage", function(Require)
 
         if context then
             context.result = math.max(0., applied_amount)
+        end
+
+        -- Development observers need the amount after every mutating combat
+        -- stage without participating in calculation. Avoid adding an event
+        -- dispatch to the normal damage path when no recorder is active.
+        local source_pid = GetPlayerId(GetOwningPlayer(source)) + 1
+        local damage_observers = EVENT_PLAYER_DAMAGE_APPLIED.actions[source_pid]
+        if damage_observers and #damage_observers > 0 then
+            EVENT_PLAYER_DAMAGE_APPLIED:trigger(source_pid, source, target,
+                math.max(0., applied_amount), damage_type, tag, is_basic_attack)
         end
 
         -- damage numbers

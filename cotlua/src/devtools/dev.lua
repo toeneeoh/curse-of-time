@@ -29,6 +29,7 @@ OnInit.final("Dev", function(Require)
     Require('Perks')
     Require('FactionMining')
     Require('FactionEvents')
+    Require('BalanceHarness')
     local pack, find, lower = string.pack, string.find, string.lower
     local searchable = {} ---@type boolean[]
     local dev_cmds, wipe_item_stats, find_item, event_setup
@@ -48,6 +49,7 @@ OnInit.final("Dev", function(Require)
         ["perks"] = "Set the temporary Perk Point total to #. usage: -perks [#]",
         ["rewardmetrics"] = "Print reward HUD counters, or reset them with -rewardmetrics reset.",
         ["levelmetrics"] = "Print level-up timing stages, or reset them with -levelmetrics reset.",
+        ["balance"] = "Balance tools: -balance items, -balance start [seconds] [label], -balance stop, or -balance snapshot [label].",
         ["sf"] = "Set the amount of faction points you have to #. usage: -sf [#]",
         ["factionrep"] = "Set Cave Voyagers reputation to #. usage: -factionrep [#]",
         ["mining"] = "Spawn a common, rich, or rare deposit beside your hero. usage: -mining [common|rich|rare]",
@@ -466,6 +468,24 @@ modifiers:
             FogEnable(false)
             ExperienceControl(pid)
             grant_vampire_colosseum_loadout(pid)
+        end,
+        ["balance"] = function(p, pid, args)
+            local action = args[2] or "snapshot"
+
+            if action == "items" then
+                BalanceHarness.exportItems(pid)
+            elseif action == "start" then
+                local duration = tonumber(args[3]) or 60.
+                local label = #args >= 4 and table.concat(args, " ", 4) or nil
+                BalanceHarness.start(pid, duration, label)
+            elseif action == "stop" then
+                BalanceHarness.stop(pid)
+            elseif action == "snapshot" then
+                local label = #args >= 3 and table.concat(args, " ", 3) or nil
+                BalanceHarness.snapshot(pid, label)
+            else
+                DisplayTextToPlayer(p, 0., 0., help_table.balance)
+            end
         end,
         ["heal"] = function(p, pid, args)
             SetWidgetLife(PLAYER_SELECTED_UNIT[pid], BlzGetUnitMaxHP(PLAYER_SELECTED_UNIT[pid]))
