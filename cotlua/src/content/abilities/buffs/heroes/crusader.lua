@@ -166,10 +166,10 @@ OnInit.final("BuffsHeroesCrusader", function(Require)
         thistype.DISPEL_TYPE     = BUFF_POSITIVE
         thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
 
-        local function on_hit(source, target, amount, amount_after_red, damage_type, is_basic_attack)
+        local function on_hit(source, target, amount, amount_after_red)
             local self = thistype:get(nil, source)
 
-            if damage_type == PHYSICAL and is_basic_attack and amount_after_red > 0. then
+            if amount_after_red > 0. and IsUnitEnemy(target, GetOwningPlayer(source)) then
                 DamageTarget(source, target, amount_after_red * self.multiplier,
                     ATTACK_TYPE_NORMAL, PURE, LAWOFRESONANCE.tag, ECHO_DAMAGE_OPTIONS)
             end

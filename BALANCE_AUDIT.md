@@ -500,11 +500,12 @@ of its own highest stat times `LBOOST`, plus 10% of the Crusader's Intelligence.
 Resonance then adds a 50% pure-damage echo. In a six-player physical party its
 aggregate contribution can exceed several personal DPS slots.
 
-Resonance is restricted to basic physical attacks and derives its echo after
-ordinary mitigation and shield processing. The echo is marked as an
-already-scaled amount, so source/target multipliers, armor penetration, crit,
-and offensive proc events are not applied twice. The resulting pure-damage hit
-can still interact with the target's shields and fatal-damage mechanics.
+Resonance echoes hostile physical, magical, and pure damage, including spell
+damage, after ordinary mitigation and shield processing. The echo is marked as
+an already-scaled amount, so source/target multipliers, armor penetration,
+crit, and offensive proc events are not applied twice. The resulting
+pure-damage hit can still interact with the target's shields and fatal-damage
+mechanics.
 
 ### Arcanist — cooldown-reset AOE caster
 
@@ -1023,7 +1024,9 @@ Add combat-log scenarios rather than relying on floating numbers:
    and without an existing shield; then log Shield Slam from the same states.
 7. Crusader Resonance: hold raw attack constant while independently changing
    attacker `dm`, target `dr`, armor, penetration, shields, and chaos defense;
-   the echo should remain its stated percentage of the surviving attack.
+   the echo should remain its stated percentage of the surviving attack. Repeat
+   with physical, magical, and pure spells and confirm friendly/self damage is
+   not echoed.
 8. Blood Cleave: compare its heal with the sum of applied cleave damage under
    target `pr/dr`, source `dm/pm`, crit, evasion, armor, penetration, shields,
    and chaos armor.
