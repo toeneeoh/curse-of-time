@@ -83,3 +83,5 @@ primary comparisons should be total applied DPS, damage-source share, marginal
 gain per stat, burst versus sustained output, and single-target versus AOE
 realization. Healing, shields, control, and party amplification remain separate
 utility columns rather than being converted into arbitrary damage.
+
+Interpreted benchmark results are tracked in `BALANCE_RESULTS.md`.

@@ -52,10 +52,11 @@ OnInit.final("BalanceHarness", function(Require)
     }
 
     local function clean(value)
-        return tostring(value or "")
+        local cleaned = tostring(value or "")
             :gsub("|c%x%x%x%x%x%x%x%x", "")
             :gsub("|r", "")
             :gsub("[\t\r\n]", " ")
+        return cleaned
     end
 
     local function rawcode(id)
