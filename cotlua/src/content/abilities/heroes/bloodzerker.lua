@@ -139,6 +139,9 @@ OnInit.final("BloodzerkerSpells", function(Require)
     BLOODCLEAVE = Spell.define("A05X")
     do
         local thistype = BLOODCLEAVE
+        local CLEAVE_DAMAGE_OPTIONS = {
+            attack = false,
+        }
 
         thistype.values = {
             chance = 20.,
@@ -146,7 +149,9 @@ OnInit.final("BloodzerkerSpells", function(Require)
             dmg = function(pid) local ablev = GetUnitAbilityLevel(Hero[pid], thistype.id) return (0.45 + 0.05 * ablev) * (Unit[Hero[pid]].damage) end,
         }
 
-        local function on_hit(source, target)
+        local function on_hit(source, target, is_basic_attack)
+            if not is_basic_attack then return end
+
             local pid = GetPlayerId(GetOwningPlayer(source)) + 1
             local chance = BLOODCLEAVE.chance
             local double = 1
@@ -162,15 +167,15 @@ OnInit.final("BloodzerkerSpells", function(Require)
 
             if math.random() * 100. < chance * LBOOST[pid] then
                 local heal = 0
+                local damage = BLOODCLEAVE.dmg(pid) * BOOST[pid]
                 local ug = CreateGroup()
                 MakeGroupInRange(pid, ug, GetUnitX(source), GetUnitY(source), BLOODCLEAVE.aoe(pid) * LBOOST[pid], Condition(FilterEnemy))
                 DestroyEffect(AddSpecialEffectTarget("war3mapImported\\Reapers Claws Red.mdx", source, "chest"))
 
                 for u in each(ug) do
-                    local cd = (math.random() * 100. < Unit[source].cc and (1. + Unit[source].cd * 0.01)) or 1
                     DestroyEffect(AddSpecialEffectTarget("war3mapImported\\Coup de Grace.mdx", u, "chest"))
-                    heal = heal + BLOODCLEAVE.dmg(pid) * BOOST[pid] * ApplyArmorMult(source, target, PHYSICAL) * cd * Unit[source].pm
-                    DamageTarget(source, u, BLOODCLEAVE.dmg(pid) * BOOST[pid], ATTACK_TYPE_NORMAL, PHYSICAL, BLOODCLEAVE.tag)
+                    heal = heal + DamageTarget(source, u, damage, ATTACK_TYPE_NORMAL,
+                        PHYSICAL, BLOODCLEAVE.tag, CLEAVE_DAMAGE_OPTIONS)
                 end
 
                 DestroyGroup(ug)

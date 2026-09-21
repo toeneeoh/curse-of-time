@@ -155,27 +155,33 @@ OnInit.final("BuffsHeroesCrusader", function(Require)
     LawOfResonanceBuff = Buff.new()
     do
         local thistype = LawOfResonanceBuff
+        local ECHO_DAMAGE_OPTIONS = {
+            attack = false,
+            pre_scaled_final = true,
+            suppress_source_events = true,
+        }
         thistype.NAME            = "Law of Resonance"
         thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNDuality.blp"
         thistype.DESC            = "This unit's attacks are echoed for ^$multiplier% damage"
         thistype.DISPEL_TYPE     = BUFF_POSITIVE
         thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
 
-        local function on_hit(source, target, amount, amount_after_red, damage_type)
+        local function on_hit(source, target, amount, amount_after_red, damage_type, is_basic_attack)
             local self = thistype:get(nil, source)
 
-            if damage_type == PHYSICAL then
-                DamageTarget(source, target, amount_after_red * self.multiplier, ATTACK_TYPE_NORMAL, PURE, LAWOFRESONANCE.tag)
+            if damage_type == PHYSICAL and is_basic_attack and amount_after_red > 0. then
+                DamageTarget(source, target, amount_after_red * self.multiplier,
+                    ATTACK_TYPE_NORMAL, PURE, LAWOFRESONANCE.tag, ECHO_DAMAGE_OPTIONS)
             end
         end
 
         function thistype:onRemove()
-            EVENT_ON_HIT_AFTER_REDUCTIONS:unregister_unit_action(self.target, on_hit)
+            EVENT_ON_HIT_FINAL:unregister_unit_action(self.target, on_hit)
             Unit[self.target]:removeEffect(self.sfx)
         end
 
         function thistype:onApply()
-            EVENT_ON_HIT_AFTER_REDUCTIONS:register_unit_action(self.target, on_hit)
+            EVENT_ON_HIT_FINAL:register_unit_action(self.target, on_hit)
             self.multiplier = LAWOFRESONANCE.echo(self.pid) * 0.01
 
             self.sfx = Unit[self.target]:addEffect("Abilities\\Spells\\Other\\Parasite\\ParasiteTarget.mdl", "overhead")

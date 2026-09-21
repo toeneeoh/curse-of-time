@@ -352,9 +352,10 @@ Undying Rage changes burst survivability from worst-in-role to temporary
 invulnerability. The damage build is efficient only while it can keep hitting;
 control or target downtime is a severe opportunity cost.
 
-Correctness concern: Cleave healing estimates armor, crit, and `pm`, but omits
-some multipliers used by the actual damage event (`source.dm`, `target.dr`, and
-`target.pr`). Healing can therefore materially disagree with damage dealt.
+Blood Cleave now totals the damage pipeline's returned applied damage for each
+secondary target, after that target's evasion, crit, multipliers, armor,
+shields, and fatal prevention. Its healing therefore follows damage actually
+dealt rather than independently estimating mitigation from the primary target.
 
 ### Royal Guardian — primary tank / group immunity support
 
@@ -496,13 +497,14 @@ heroes, its best build is the one that maximizes the strongest ally's output.
 Performance: low personal burst, medium personal sustain, but the highest
 general party scaling in the roster. At Law of Might L6, a carry receives 40%
 of its own highest stat times `LBOOST`, plus 10% of the Crusader's Intelligence.
-Resonance then adds a nominal 50% echo. In a six-player physical party its
+Resonance then adds a 50% pure-damage echo. In a six-player physical party its
 aggregate contribution can exceed several personal DPS slots.
 
-Correctness concern: Resonance starts from already mitigated damage, then calls
-`DamageTarget` as pure without `pre_scaled_source`; source `dm` and target `dr`
-are applied again. The actual echo is not simply the tooltip percentage and can
-double-dip offensive buffs/general resistance.
+Resonance is restricted to basic physical attacks and derives its echo after
+ordinary mitigation and shield processing. The echo is marked as an
+already-scaled amount, so source/target multipliers, armor penetration, crit,
+and offensive proc events are not applied twice. The resulting pure-damage hit
+can still interact with the target's shields and fatal-damage mechanics.
 
 ### Arcanist — cooldown-reset AOE caster
 
@@ -917,14 +919,9 @@ level. Honor bonuses intentionally apply after the snapshot.
 - Royal Plate's formula reaches 23,700 armor at rank 20 and Shield Slam consumes
   current armor offensively.
 - Spellboost has compound effects well beyond displayed spell amounts.
-- Crusader Resonance re-applies source `dm` and target `dr` to an echo derived
-  from post-mitigation damage.
-- Blood Cleave's heal estimate does not use the same full multiplier set as its
-  actual damage.
-- The current boss party-scaling translation is incorrect. The pre-refactor
-  code used `0.2 * base damage` and `0.2 * base Strength`; the current code uses
-  `20`, writes `boss.damage_percent` to a plain Boss record that has no reader,
-  and still accumulates the Strength addition once per second.
+- Boss party scaling has been corrected to apply a stable 20% of baseline
+  damage and Strength per additional nearby player, including the existing
+  five-second nearby-count linger.
 
 ### Medium confidence
 
@@ -949,25 +946,24 @@ level. Honor bonuses intentionally apply after the snapshot.
 - Mana starvation outside the obvious percentage-cost abilities.
 - Real six-player support value under movement, deaths, dispels, and range loss.
 
-### What the boss Strength finding actually means
+### Resolved boss Strength regression
 
-This is not a claim that boss balance is intentionally based on a hidden
-Strength formula. It is a translation error in `gameplay/world/boss.lua`.
-Git history shows the relevant pre-refactor code was:
+This was not a claim that boss balance intentionally used a hidden Strength
+formula. Git history showed that the refactor had mistranslated this code:
 
 ```text
 flat damage bonus = native base damage * 0.2 * (players - 1)
 bonus Strength   += base Strength * 0.2 * (players - 1)
 ```
 
-The current translation instead does the equivalent of:
+The broken translation instead did the equivalent of:
 
 ```text
 BossRecord.damage_percent = 100 + 20 * (players - 1)
 UnitWrapper.bonus_str     += base Strength * 20 * (players - 1)
 ```
 
-There are three separate issues:
+It had three separate issues:
 
 1. `damage_percent` uses multiplier units (`1.2`, not `120`) on `Unit`, while
    the code writes percentage-looking units to the unrelated `Boss` record.
@@ -976,14 +972,13 @@ There are three separate issues:
 3. The periodic loop uses `+=`, so even the old 20% value accumulates every
    second instead of representing a stable party-size bonus.
 
-The least disruptive fix is to preserve the apparent original intent—20% of
-baseline damage and 20% of baseline Strength for each extra nearby player—but
-store the previously applied party bonus and apply only the delta when the
-effective nearby count changes. That avoids overwriting unrelated buffs and
-lets the five-second nearby-count linger continue to work. If Strength was only
-being used as an indirect way to add boss HP, a cleaner follow-up is to replace
-it with an explicit baseline-HP bonus so primary-attribute attack damage is not
-also changed accidentally.
+The implemented fix preserves the apparent original intent—20% of baseline
+damage and 20% of baseline Strength for each extra nearby player—and stores the
+previously applied party bonus so it can apply only the delta when the effective
+nearby count changes. This avoids overwriting unrelated buffs and preserves the
+five-second nearby-count linger. If Strength was only intended as an indirect
+way to add boss HP, a later balance change can replace it with an explicit
+baseline-HP bonus so primary-attribute attack damage is not also increased.
 
 ## 8. Most important balance problems
 
@@ -1003,16 +998,7 @@ also changed accidentally.
    Inspire, Song of War, Fight Me, and general vulnerabilities scale with every
    ally. Personal-versus-party balance changes drastically from solo to six
    players.
-5. **Boss party scaling was mistranslated during refactoring.** Git history
-   shows the old flat damage expression used `0.2`; the current line uses `20`
-   and stores it on `Boss` rather than the unit wrapper. The Strength path also
-   adds its bonus every periodic tick instead of setting a stable party-size
-   bonus. This is a code defect, not a claim that bosses conceptually scale
-   from Strength.
-6. **Post-mitigation echo double scaling.** Crusader Resonance derives an echo
-   from final physical damage and then applies `dm/dr` again as pure. It can be
-   far above or below its nominal percentage depending on buffs and target.
-7. **Infernal Strike's boss reduction is selected by the primary target.** The
+5. **Infernal Strike's boss reduction is selected by the primary target.** The
    splash loop checks `target` rather than each `u`; players can potentially
    strike a nearby non-boss to bypass the boss half-damage rule.
 
@@ -1036,10 +1022,11 @@ Add combat-log scenarios rather than relying on floating numbers:
 6. Royal Guardian: log armor and physical EHP at every Royal Plate rank, with
    and without an existing shield; then log Shield Slam from the same states.
 7. Crusader Resonance: hold raw attack constant while independently changing
-   attacker `dm`, target `dr`, armor, and chaos defense. Confirm whether the
-   intended echo is a percentage of raw or applied damage.
-8. Blood Cleave: compare its heal with applied damage under target `pr/dr`,
-   source `dm/pm`, crit, armor, penetration, and chaos armor.
+   attacker `dm`, target `dr`, armor, penetration, shields, and chaos defense;
+   the echo should remain its stated percentage of the surviving attack.
+8. Blood Cleave: compare its heal with the sum of applied cleave damage under
+   target `pr/dr`, source `dm/pm`, crit, evasion, armor, penetration, shields,
+   and chaos armor.
 9. Boss party scaling: keep one boss engaged for 60 seconds with two players and
    log Strength/max HP/damage each second; players entering/leaving should return
    stats to stable plateaus rather than accumulate.
@@ -1054,11 +1041,11 @@ Add combat-log scenarios rather than relying on floating numbers:
 
 ## Recommended balance order
 
-Do not start with broad coefficient nerfs. First fix/verify the boss party-scale
-translation, Resonance double scaling, and Cleave healing mismatch. Then build
-the runtime snapshot/log harness and establish the three fixed-target
-benchmarks using equal purchased-stat budgets and legal item packages. After
-those correctness issues are removed, address crit chance for Master Rogue and
-Royal Plate's curve. Natural level-growth differences do not need endgame
-normalization because the shared tome cap already normalizes them. Tune party
-support and Spellboost only after the corrected measurements.
+Do not start with broad coefficient nerfs. First verify the corrected boss
+party scaling, Resonance, and Blood Cleave behavior in-engine. Then build the
+runtime snapshot/log harness and establish the three fixed-target benchmarks
+using equal purchased-stat budgets and legal item packages. After those
+correctness checks, address crit chance for Master Rogue and Royal Plate's
+curve. Natural level-growth differences do not need endgame normalization
+because the shared tome cap already normalizes them. Tune party support and
+Spellboost only after the corrected measurements.

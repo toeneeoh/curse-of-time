@@ -28,6 +28,7 @@ OnInit.final("Damage", function(Require)
     ---@class DamageOptions
     ---@field attack boolean?
     ---@field pre_scaled_source boolean?
+    ---@field pre_scaled_final boolean? Amount has already passed source, target, and armor scaling.
     ---@field suppress_source_events boolean?
 
     ---@param source unit
@@ -37,17 +38,21 @@ OnInit.final("Damage", function(Require)
     ---@param damage_type damagetype
     ---@param tag string|nil
     ---@param options DamageOptions|nil
+    ---@return number applied_damage
     function DamageTarget(source, target, dmg, attack_type, damage_type, tag, options)
         DAMAGE_CONTEXT_DEPTH = DAMAGE_CONTEXT_DEPTH + 1
-        DAMAGE_CONTEXT[DAMAGE_CONTEXT_DEPTH] = {
+        local context = {
             tag = tag,
             consumed = false,
             options = options,
+            result = 0.,
         }
+        DAMAGE_CONTEXT[DAMAGE_CONTEXT_DEPTH] = context
         UnitDamageTarget(source, target, dmg, not options or options.attack ~= false,
             false, attack_type, damage_type, WEAPON_TYPE_WHOKNOWS)
         DAMAGE_CONTEXT[DAMAGE_CONTEXT_DEPTH] = nil
         DAMAGE_CONTEXT_DEPTH = DAMAGE_CONTEXT_DEPTH - 1
+        return context.result
     end
 
     local format = string.format
@@ -114,6 +119,7 @@ OnInit.final("Damage", function(Require)
     local blz_get_event_damage_target = BlzGetEventDamageTarget
     local get_event_damage = GetEventDamage
     local blz_get_event_damage_type = BlzGetEventDamageType
+    local blz_get_event_is_attack = BlzGetEventIsAttack
     local get_owning_player = GetOwningPlayer
     local blz_set_event_damage = BlzSetEventDamage
 
@@ -153,6 +159,8 @@ OnInit.final("Damage", function(Require)
         local options     = context and context.options
         local suppress_source_events = options and options.suppress_source_events
         local pre_scaled_source = options and options.pre_scaled_source
+        local pre_scaled_final = options and options.pre_scaled_final
+        local is_basic_attack = context == nil and blz_get_event_is_attack()
         local attack_amount
         local tag
         if context and not context.consumed then
@@ -196,7 +204,7 @@ OnInit.final("Damage", function(Require)
         if IsUnitEnemy(target, get_owning_player(source)) then
 
             -- physical damage
-            if damage_type == PHYSICAL then
+            if damage_type == PHYSICAL and not pre_scaled_final then
                 if not suppress_source_events then
                     local evade = target_tbl.evasion
 
@@ -208,7 +216,7 @@ OnInit.final("Damage", function(Require)
                         EVENT_ON_HIT_EVADE:trigger(source, target, amount)
                     end
 
-                    EVENT_ON_HIT:trigger(source, target)
+                    EVENT_ON_HIT:trigger(source, target, is_basic_attack)
                     EVENT_ON_HIT_MULTIPLIER:trigger(source, target, amount)
 
                     -- critical strike
@@ -230,41 +238,43 @@ OnInit.final("Damage", function(Require)
 
             -- any other damage type
 
-            EVENT_ON_STRUCK:trigger(target, source, damage_type)
-            EVENT_ON_STRUCK_MULTIPLIER:trigger(target, source, amount, damage_type)
+            if not pre_scaled_final then
+                EVENT_ON_STRUCK:trigger(target, source, damage_type)
+                EVENT_ON_STRUCK_MULTIPLIER:trigger(target, source, amount, damage_type)
 
-            -- armor pen
-            if source_tbl.armor_pen_percent > 0 then
-                amount.value = amount.value * ReduceArmorCalc(source, target)
-            end
-
-            -- source multipliers and target resistances
-            if not pre_scaled_source then
-                amount.value = amount.value * source_tbl.dm
-            end
-            amount.value = amount.value * target_tbl.dr
-
-            if damage_type == PHYSICAL then
-                if not pre_scaled_source then
-                    amount.value = amount.value * source_tbl.pm
+                -- Armor penetration changes only physical armor mitigation.
+                if damage_type == PHYSICAL and source_tbl.armor_pen_percent > 0 then
+                    amount.value = amount.value * ReduceArmorCalc(source, target)
                 end
-                amount.value = amount.value * target_tbl.pr
-            elseif damage_type == MAGIC then
+
+                -- source multipliers and target resistances
                 if not pre_scaled_source then
-                    amount.value = amount.value * source_tbl.mm
+                    amount.value = amount.value * source_tbl.dm
                 end
-                amount.value = amount.value * target_tbl.mr
+                amount.value = amount.value * target_tbl.dr
+
+                if damage_type == PHYSICAL then
+                    if not pre_scaled_source then
+                        amount.value = amount.value * source_tbl.pm
+                    end
+                    amount.value = amount.value * target_tbl.pr
+                elseif damage_type == MAGIC then
+                    if not pre_scaled_source then
+                        amount.value = amount.value * source_tbl.mm
+                    end
+                    amount.value = amount.value * target_tbl.mr
+                end
             end
         end
 
         -- after reductions
-        local armor_multiplier = ApplyArmorMult(source, target, damage_type)
+        local armor_multiplier = pre_scaled_final and 1. or ApplyArmorMult(source, target, damage_type)
         local amount_after_red = amount.value * armor_multiplier
 
         -- after reductions
         if not suppress_source_events then
             EVENT_ON_HIT_AFTER_REDUCTIONS:trigger(
-                source, target, amount, amount_after_red, damage_type, attack_amount)
+                source, target, amount, amount_after_red, damage_type, attack_amount, is_basic_attack)
         end
         EVENT_ON_STRUCK_AFTER_REDUCTIONS:trigger(target, source, amount, amount_after_red, damage_type)
 
@@ -277,7 +287,7 @@ OnInit.final("Damage", function(Require)
 
         -- final damage callbacks before applying engine damage
         if not suppress_source_events then
-            EVENT_ON_HIT_FINAL:trigger(source, target, amount, amount_after_red, damage_type)
+            EVENT_ON_HIT_FINAL:trigger(source, target, amount, amount_after_red, damage_type, is_basic_attack)
         end
         EVENT_ON_STRUCK_FINAL:trigger(target, source, amount, amount_after_red, damage_type)
 
@@ -302,6 +312,7 @@ OnInit.final("Damage", function(Require)
         blz_set_event_damage(amount.value)
 
         local display_amount = amount.display or amount_after_red
+        local applied_amount = amount_after_red
 
         -- hit count based health
         if target_tbl.hit_based_health then
@@ -309,6 +320,11 @@ OnInit.final("Damage", function(Require)
             blz_set_event_damage(0.00)
             SetWidgetLife(target, GetWidgetLife(target) - hit_dmg)
             display_amount = hit_dmg
+            applied_amount = hit_dmg
+        end
+
+        if context then
+            context.result = math.max(0., applied_amount)
         end
 
         -- damage numbers
