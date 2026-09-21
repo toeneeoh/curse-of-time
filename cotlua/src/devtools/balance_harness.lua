@@ -551,7 +551,8 @@ OnInit.final("BalanceHarness", function(Require)
                 return
             end
             ids[index] = FourCC(code)
-            if ItemData[ids[index]].name == 0 then
+            local name = GetObjectName(ids[index])
+            if name == "" or name == "Default string" then
                 DisplayTextToPlayer(Player(pid - 1), 0., 0., "Unknown item rawcode: " .. code)
                 return
             end

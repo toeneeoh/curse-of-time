@@ -25,6 +25,7 @@ OnInit.final("Dummy", function(Require)
 
     local DUMMY_STACK = {}
     local DUMMY_RECYCLE_TIME = 5.
+    local DUMMY_VISUAL_CLEANUP_TIME = 1.
 
     local DPS_TIMER          = TQ.create()
     local DPS_STOPWATCH      = Stopwatch.create(false) ---@type Stopwatch
@@ -41,6 +42,7 @@ OnInit.final("Dummy", function(Require)
     ---@field unit unit
     ---@field abil integer
     ---@field dynamic_abilities table<integer, boolean>
+    ---@field recycling boolean
     ---@field recycle function
     ---@field create function
     ---@field cast function
@@ -66,6 +68,17 @@ OnInit.final("Dummy", function(Require)
                     dummy.dynamic_abilities[id] = nil
                 end
             end
+        end
+
+        ---Makes a visually cleaned dummy available only after native lightning
+        ---and buff effects have had time to release their unit endpoints. Pooled
+        ---dummies remain hidden at their last position; moving them to the map
+        ---corner was what stretched lingering lightning across the screen.
+        ---@param dummy Dummy
+        local function finish_recycle(dummy)
+            PauseUnit(dummy.unit, true)
+            dummy.recycling = false
+            DUMMY_STACK[#DUMMY_STACK + 1] = dummy
         end
 
         ---@param source unit
@@ -117,9 +130,13 @@ OnInit.final("Dummy", function(Require)
 
         ---@type fun(self: Dummy)
         function thistype:recycle()
+            if self.recycling then return end
+            self.recycling = true
+
             BlzUnitClearOrders(self.unit, false)
             BlzSetUnitWeaponBooleanField(self.unit, UNIT_WEAPON_BF_ATTACKS_ENABLED, 0, false)
             purge_dynamic_abilities(self)
+            UnitRemoveBuffs(self.unit, true, true)
             self.abil = 0
             self.source = nil
             self.spell_source = nil
@@ -130,8 +147,6 @@ OnInit.final("Dummy", function(Require)
             BlzSetUnitName(self.unit, " ")
             SetUnitOwner(self.unit, Player(PLAYER_NEUTRAL_PASSIVE), true)
             BlzSetUnitSkin(self.unit, DUMMY_CASTER)
-            SetUnitXBounded(self.unit, 30000.)
-            SetUnitYBounded(self.unit, 30000.)
             UnitAddAbility(self.unit, ABIL_ALOC)
             UnitAddAbility(self.unit, ABIL_AVUL)
             SetUnitFlyHeight(self.unit, GetUnitDefaultFlyHeight(self.unit), 0)
@@ -139,10 +154,10 @@ OnInit.final("Dummy", function(Require)
             SetUnitVertexColor(self.unit, 255, 255, 255, 255)
             SetUnitTimeScale(self.unit, 1.)
             BlzUnitDisableAbility(self.unit, FourCC('Amov'), false, false)
-            PauseUnit(self.unit, true)
             UnitAddBonus(self.unit, BONUS_ATTACK_SPEED, 4.)
-            DUMMY_STACK[#DUMMY_STACK + 1] = self
             EVENT_DUMMY_ON_HIT:unregister_unit_action(self.unit)
+            ShowUnit(self.unit, false)
+            TQ:callDelayed(DUMMY_VISUAL_CLEANUP_TIME, finish_recycle, self)
         end
 
         local function onAggro(source, target)
@@ -160,6 +175,7 @@ OnInit.final("Dummy", function(Require)
                     unit = CreateUnit(Player(PLAYER_NEUTRAL_PASSIVE), DUMMY_CASTER, x, y, 0),
                     abil = 0,
                     dynamic_abilities = {},
+                    recycling = false,
                 }
                 UnitAddAbility(self.unit, FourCC('Amrf'))
                 UnitRemoveAbility(self.unit, FourCC('Amrf'))
@@ -196,6 +212,7 @@ OnInit.final("Dummy", function(Require)
 
             SetUnitXBounded(self.unit, x)
             SetUnitYBounded(self.unit, y)
+            ShowUnit(self.unit, true)
 
             return self
         end
