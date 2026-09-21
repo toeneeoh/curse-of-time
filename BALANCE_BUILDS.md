@@ -6,7 +6,7 @@ Every loadout has six equipped items, honors level and item-limit rules,
 and applies the live 75% penalty to proficiency-sensitive stats when needed.
 
 Attack is a formula estimate using primary attribute, item damage, crit, BAT,
-Agility attack speed, and physical-dealt multipliers. Spell is an explicitly
+Agility attack speed, physical-dealt multipliers, and target armor. Spell is an explicitly
 generic attribute-throughput proxy with weights STR=1, AGI=1, INT=1;
 it is not claimed as spell DPS. Item ability effects are listed but not scored.
 Durability is the geometric mean of physical and magical EHP. Final rankings
@@ -16,9 +16,11 @@ must use in-engine combat recordings, especially for proc and summon items.
 
 ### Level 400
 
+Target profile: `300.0` armor, `chaos` defense.
+
 #### Attack — Average rolls
 
-* Score: `234,312,421.88`; Attack `234,312,421.88`; Spell proxy `136,103.78`; Physical EHP `1,120,908,242`; Magical EHP `1,043,592`.
+* Score: `439,335.79`; Attack `439,335.79`; Spell proxy `4,083.11`; Physical EHP `1,120,908,242`; Magical EHP `1,043,592`.
 * STR `62,616`; AGI `17,158`; INT `16,754`; Spellboost `41.00%`; Crit `130.00%` / `3,400.00%`; BAT factor `1.0000`.
 
 | Item | Rawcode | Proficiency | Abilities |
@@ -34,7 +36,7 @@ Dev command: `-balance equip average I0BC I04L I0CG I0E0 I05J I0DX`
 
 #### Spell — Average rolls
 
-* Score: `2,575,678.00`; Attack `1,647,949.48`; Spell proxy `2,575,678.00`; Physical EHP `5,116,067,615`; Magical EHP `7,533,467`.
+* Score: `77,270.34`; Attack `3,089.91`; Spell proxy `77,270.34`; Physical EHP `5,116,067,615`; Magical EHP `7,533,467`.
 * STR `452,008`; AGI `452,008`; INT `451,604`; Spellboost `90.00%`; Crit `5.00%` / `100.00%`; BAT factor `1.0000`.
 
 | Item | Rawcode | Proficiency | Abilities |
@@ -50,7 +52,7 @@ Dev command: `-balance equip average I018 I018 I018 I018 I018 I018`
 
 #### Balanced — Average rolls
 
-* Score: `11,219,014.14`; Attack `98,908,880.56`; Spell proxy `1,272,547.80`; Physical EHP `3,557,888,046`; Magical EHP `2,146,633`.
+* Score: `84,142.61`; Attack `185,454.15`; Spell proxy `38,176.43`; Physical EHP `3,557,888,046`; Magical EHP `2,146,633`.
 * STR `128,798`; AGI `548,218`; INT `128,394`; Spellboost `58.00%`; Crit `60.00%` / `2,900.00%`; BAT factor `1.0000`.
 
 | Item | Rawcode | Proficiency | Abilities |
@@ -66,7 +68,7 @@ Dev command: `-balance equip average I0BE I0AJ I04E I0CI I018 I0DZ`
 
 #### Durability — Average rolls
 
-* Score: `693,502,130.33`; Attack `997,193.53`; Spell proxy `442,679.20`; Physical EHP `36,471,507,068`; Magical EHP `13,186,875`.
+* Score: `693,502,130.33`; Attack `1,869.74`; Spell proxy `13,280.38`; Physical EHP `36,471,507,068`; Magical EHP `13,186,875`.
 * STR `201,673`; AGI `90,176`; INT `89,772`; Spellboost `16.00%`; Crit `5.00%` / `100.00%`; BAT factor `0.8100`.
 
 | Item | Rawcode | Proficiency | Abilities |
@@ -82,7 +84,7 @@ Dev command: `-balance equip average I06M I0BY I0FH I0BV I0B7 I0O1`
 
 #### Attack — Perfect rolls
 
-* Score: `234,312,421.88`; Attack `234,312,421.88`; Spell proxy `136,103.78`; Physical EHP `1,120,908,242`; Magical EHP `1,043,592`.
+* Score: `439,335.79`; Attack `439,335.79`; Spell proxy `4,083.11`; Physical EHP `1,120,908,242`; Magical EHP `1,043,592`.
 * STR `62,616`; AGI `17,158`; INT `16,754`; Spellboost `41.00%`; Crit `130.00%` / `3,400.00%`; BAT factor `1.0000`.
 
 | Item | Rawcode | Proficiency | Abilities |
@@ -98,7 +100,7 @@ Dev command: `-balance equip perfect I0BC I04L I0CG I0E0 I05J I0DX`
 
 #### Spell — Perfect rolls
 
-* Score: `2,575,678.00`; Attack `1,647,949.48`; Spell proxy `2,575,678.00`; Physical EHP `5,116,067,615`; Magical EHP `7,533,467`.
+* Score: `77,270.34`; Attack `3,089.91`; Spell proxy `77,270.34`; Physical EHP `5,116,067,615`; Magical EHP `7,533,467`.
 * STR `452,008`; AGI `452,008`; INT `451,604`; Spellboost `90.00%`; Crit `5.00%` / `100.00%`; BAT factor `1.0000`.
 
 | Item | Rawcode | Proficiency | Abilities |
@@ -114,7 +116,7 @@ Dev command: `-balance equip perfect I018 I018 I018 I018 I018 I018`
 
 #### Balanced — Perfect rolls
 
-* Score: `11,219,014.14`; Attack `98,908,880.56`; Spell proxy `1,272,547.80`; Physical EHP `3,557,888,046`; Magical EHP `2,146,633`.
+* Score: `84,142.61`; Attack `185,454.15`; Spell proxy `38,176.43`; Physical EHP `3,557,888,046`; Magical EHP `2,146,633`.
 * STR `128,798`; AGI `548,218`; INT `128,394`; Spellboost `58.00%`; Crit `60.00%` / `2,900.00%`; BAT factor `1.0000`.
 
 | Item | Rawcode | Proficiency | Abilities |
@@ -130,7 +132,7 @@ Dev command: `-balance equip perfect I0BE I0AJ I04E I0CI I018 I0DZ`
 
 #### Durability — Perfect rolls
 
-* Score: `693,502,130.33`; Attack `997,193.53`; Spell proxy `442,679.20`; Physical EHP `36,471,507,068`; Magical EHP `13,186,875`.
+* Score: `693,502,130.33`; Attack `1,869.74`; Spell proxy `13,280.38`; Physical EHP `36,471,507,068`; Magical EHP `13,186,875`.
 * STR `201,673`; AGI `90,176`; INT `89,772`; Spellboost `16.00%`; Crit `5.00%` / `100.00%`; BAT factor `0.8100`.
 
 | Item | Rawcode | Proficiency | Abilities |

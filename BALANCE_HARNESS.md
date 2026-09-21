@@ -50,7 +50,9 @@ rendered tooltip text.
 `-balance start` records final post-mitigation hostile damage for the requested
 period. It retains both displayed damage and actual health damage so immortal
 punching bags—which intentionally reduce applied damage to zero—remain valid
-benchmarks. Results are grouped by source unit rawcode, source name, damage
+benchmarks. The first hit on each distinct target captures its actual armor,
+defense type, HP, and physical/magical taken multipliers; any zero-armor target
+marks the recording as calibration-only. Results are grouped by source unit rawcode, source name, damage
 type, and damage tag. Consequently, summoned-unit attacks and spell damage
 remain distinguishable from the hero's own output. The report includes starting
 and ending builds, target defenses, distinct targets hit, hit count, total
@@ -76,7 +78,10 @@ uses a bounded deterministic search to produce six-item candidates. Example:
 
 Pass `-Levels 50,100,200,300,400,500` for the complete breakpoint set,
 `-RequireProficiency` for intended-class gear only, or increase
-`-CandidateLimit` and `-BeamWidth` for a slower, wider search.
+`-CandidateLimit` and `-BeamWidth` for a slower, wider search. Target armor
+defaults to `0.75 * level`, matching the neutral Struggle role; defense defaults
+to normal below level 200 and chaos at level 200+. Override these with
+`-TargetArmor` and `-TargetDefense` when reproducing a particular encounter.
 
 The generated `BALANCE_BUILDS.md` includes attack, generic spell-throughput,
 balanced-damage, and durability candidates for average and perfect rolls plus
@@ -94,13 +99,19 @@ Use levels 50, 100, 200, 300, 400, and 500. At each breakpoint compare:
 3. Optimized legal perfect-roll equipment for the ceiling, clearly separated
    from the normal-build result.
 
-Run each build in these scenarios:
+Zero armor is only a one-time damage-pipeline calibration and must not be used
+for hero rankings. Run each build against an armored target in these scenarios:
 
 - One stationary target for single-target burst and sustained output.
 - Six clustered targets for ordinary AOE.
 - A replenishing target group for uncapped or long-duration AOE.
 - A moving boss course for realization loss from channels, projectiles,
   summons, and melee travel.
+
+Use the target's real armor whenever testing an encounter. For standardized
+cross-hero tests, use `0.75 * hero level` armor, normal defense below level 200,
+and chaos defense at level 200 or above. Add a higher-armor boss profile at
+levels where bosses materially exceed that baseline.
 
 Use a 60-second session after cooldowns and resources have been reset. Record
 one unbuffed solo run first. Party-support runs should use a separately named,

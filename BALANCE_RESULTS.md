@@ -4,13 +4,14 @@ These results are produced by the in-engine commands documented in
 `BALANCE_HARNESS.md`. Raw recordings remain in Warcraft III's CustomMapData
 directory; this file records the interpreted, comparable results.
 
-## Level 400 Vampire Lord: solo, zero-armor prechaos target
+## Calibration: level 400 Vampire Lord, zero-armor prechaos target
 
 Recording: `balance-combat-player-1-vampire-400-solo2.pld`
 
 Duration: 60.057 seconds. The target was an immortal punching bag, so
 `applied_total` is intentionally zero and displayed post-mitigation damage is
-the benchmark quantity.
+the measured quantity. This is a damage-pipeline calibration, not a balance
+baseline: real enemies have armor, which materially lowers the physical share.
 
 ### Build
 
@@ -78,7 +79,7 @@ a precise repeatable ceiling from only one critical-hit sample.
    runs. Those distinguish theoretical damage from AOE coverage and practical
    realization.
 
-## Level 400 Vampire Lord: solo, zero-armor chaos target
+## Calibration: level 400 Vampire Lord, zero-armor chaos target
 
 Recording: `balance-combat-player-1-vampire-400-chaos.pld`
 

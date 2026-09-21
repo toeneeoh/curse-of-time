@@ -12,6 +12,9 @@ param(
     [double] $StrengthWeight = 1.0,
     [double] $AgilityWeight = 1.0,
     [double] $IntelligenceWeight = 1.0,
+    [double] $TargetArmor = -1.0,
+    [ValidateSet('Auto', 'Normal', 'Chaos')]
+    [string] $TargetDefense = 'Auto',
     [ValidateRange(20, 300)]
     [int] $CandidateLimit = 40,
     [ValidateRange(50, 5000)]
@@ -21,6 +24,8 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $Invariant = [Globalization.CultureInfo]::InvariantCulture
+$script:ActiveTargetArmor = 0.0
+$script:ActiveChaosMultiplier = 1.0
 
 $StatNames = @(
     'health', 'mana', 'damage', 'armor', 'strength', 'agility',
@@ -116,15 +121,22 @@ function Get-Metrics($HeroRow, [int] $Level, [double[]] $Stats,
     $attackSpeed = (1.0 / 1.8) * $BatFactor * (1.0 + [math]::Min(400.0, $agility) * 0.01)
     $physicalDealt = (Get-HeroNumber $HeroRow 'physical_dealt') * (1.0 + $Stats[11] * 0.01)
     $magicDealt = 1.0 + $Stats[12] * 0.01
-    $attack = [math]::Max(1.0, $main + $Stats[2] + 1.0) * $critMultiplier *
+    $targetArmorMultiplier = if ($script:ActiveTargetArmor -ge 0) {
+        1.0 / (1.0 + 0.05 * $script:ActiveTargetArmor)
+    } else {
+        2.0 - [math]::Pow(0.94, -$script:ActiveTargetArmor)
+    }
+    $rawAttack = [math]::Max(1.0, $main + $Stats[2] + 1.0) * $critMultiplier *
         $attackSpeed * $physicalDealt
+    $attack = $rawAttack * $targetArmorMultiplier * $script:ActiveChaosMultiplier
 
     # This is deliberately a transparent gear-throughput proxy. Exact spell
     # DPS remains hero/rotation specific and is supplied by combat recordings.
     $weightedAttributes = $StrengthWeight * $strength +
         $AgilityWeight * $agility + $IntelligenceWeight * $intelligence
-    $spell = [math]::Max(1.0, $weightedAttributes) *
+    $rawSpell = [math]::Max(1.0, $weightedAttributes) *
         (1.0 + $Stats[15] * 0.01) * $magicDealt
+    $spell = $rawSpell * $script:ActiveChaosMultiplier
 
     $health = [math]::Max(1.0, $Stats[0] + 25.0 * $strength)
     $armor = (Get-HeroNumber $HeroRow 'base_armor') + $Stats[3] + 0.03 * $agility
@@ -142,6 +154,8 @@ function Get-Metrics($HeroRow, [int] $Level, [double[]] $Stats,
         Strength = $strength
         Agility = $agility
         Intelligence = $intelligence
+        RawAttack = $rawAttack
+        RawSpell = $rawSpell
         Attack = $attack
         Spell = $spell
         Balanced = [math]::Sqrt($attack * $spell)
@@ -271,7 +285,7 @@ $lines.Add('Every loadout has six equipped items, honors level and item-limit ru
 $lines.Add('and applies the live 75% penalty to proficiency-sensitive stats when needed.')
 $lines.Add('')
 $lines.Add('Attack is a formula estimate using primary attribute, item damage, crit, BAT,')
-$lines.Add('Agility attack speed, and physical-dealt multipliers. Spell is an explicitly')
+$lines.Add('Agility attack speed, physical-dealt multipliers, and target armor. Spell is an explicitly')
 $lines.Add("generic attribute-throughput proxy with weights STR=$StrengthWeight, AGI=$AgilityWeight, INT=$IntelligenceWeight;")
 $lines.Add('it is not claimed as spell DPS. Item ability effects are listed but not scored.')
 $lines.Add('Durability is the geometric mean of physical and magical EHP. Final rankings')
@@ -282,7 +296,18 @@ foreach ($heroRow in $selectedHeroes) {
     $lines.Add("## $($heroRow.name) ($($heroRow.rawcode))")
     $lines.Add('')
     foreach ($level in ($Levels | Sort-Object -Unique)) {
+        $script:ActiveTargetArmor = if ($TargetArmor -ge 0) { $TargetArmor } else { 0.75 * $level }
+        $useChaos = switch ($TargetDefense) {
+            'Chaos' { $true }
+            'Normal' { $false }
+            default { $level -ge 200 }
+        }
+        $script:ActiveChaosMultiplier = if ($useChaos) { 0.03 } else { 1.0 }
+        $defenseLabel = if ($useChaos) { 'chaos' } else { 'normal' }
         $lines.Add("### Level $level")
+        $lines.Add('')
+        $lines.Add(('Target profile: `{0:N1}` armor, `{1}` defense.' -f
+            $script:ActiveTargetArmor, $defenseLabel))
         $lines.Add('')
         foreach ($roll in $rolls) {
             $availableRows = @($itemRows | Where-Object {

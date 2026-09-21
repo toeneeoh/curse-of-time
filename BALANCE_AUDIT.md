@@ -1010,9 +1010,11 @@ Add combat-log scenarios rather than relying on floating numbers:
 1. Export a runtime snapshot for each hero at levels 100, 200, 350, and 500:
    final attributes, weapon damage, BAT, attack-speed bonus, armor, `dm/mm/pm`,
    `dr/pr/mr`, crit, Spellboost, and all eight equipped-item stat tables.
-2. Use four fixed targets: 0 armor/normal defense, 400 armor/normal defense,
-   400 armor/chaos defense, and a chaos boss. Give each 10 million and then 1
-   billion HP to expose percent-HP scaling.
+2. Use armored targets for balance comparisons: a level-scaled normal target,
+   the same armor with chaos defense where appropriate, and a higher-armor
+   chaos boss. Zero armor is useful only once as a pipeline calibration; it is
+   not a ranking target because it systematically favors physical damage. Give
+   targets 10 million and then 1 billion HP to expose percent-HP scaling.
 3. Measure 60-second and 10-second windows separately. Record raw event damage
    by tag, applied damage, casts, attacks, crits, target uptime, and mana ending.
 4. Run every DPS hero at 0/20/40/60% crit chance. Master Rogue should be graphed

@@ -390,6 +390,20 @@ OnInit.final("BalanceHarness", function(Require)
         if not session.targets[target] then
             session.targets[target] = true
             session.target_count = session.target_count + 1
+            local unit = Unit[target]
+            local armor = BlzGetUnitArmor(target)
+            session.target_profiles[#session.target_profiles + 1] = table.concat({
+                "target", session.target_count, rawcode(GetUnitTypeId(target)),
+                clean(GetUnitName(target)), "level", GetUnitLevel(target),
+                "health", number(BlzGetUnitMaxHP(target)),
+                "armor", number(armor),
+                "defense_type", BlzGetUnitIntegerField(target, UNIT_IF_DEFENSE_TYPE),
+                "physical_taken", number(unit.dr * unit.pr),
+                "magical_taken", number(unit.dr * unit.mr),
+            }, "\t")
+            if armor <= 0. then
+                session.unarmored_target = true
+            end
         end
     end
 
@@ -413,6 +427,12 @@ OnInit.final("BalanceHarness", function(Require)
                 "reason", clean(reason or "manual") }, "\t"),
         }
         append_snapshot(lines, pid, "end")
+        for _, target_profile in ipairs(session.target_profiles) do
+            lines[#lines + 1] = target_profile
+        end
+        if session.unarmored_target then
+            lines[#lines + 1] = "warning\tunarmored_target\tcalibration_only"
+        end
 
         local entries = {}
         for key, entry in pairs(session.damage) do
@@ -440,6 +460,10 @@ OnInit.final("BalanceHarness", function(Require)
         DisplayTextToPlayer(Player(pid - 1), 0., 0.,
             string.format("Balance recording complete: %.1f seconds, %.1f DPS. Saved to %s.",
                 elapsed, session.total / elapsed, filename))
+        if session.unarmored_target then
+            DisplayTextToPlayer(Player(pid - 1), 0., 0.,
+                "|cffffcc00Balance warning: an unarmored target makes this recording calibration-only.|r")
+        end
     end
 
     ---@param pid integer
@@ -467,6 +491,7 @@ OnInit.final("BalanceHarness", function(Require)
             total = 0.,
             applied_total = 0.,
             targets = setmetatable({}, { __mode = "k" }),
+            target_profiles = {},
             target_count = 0,
             stopwatch = Stopwatch.create(true),
         }
