@@ -165,3 +165,42 @@ unrestricted build's physical EHP from HP and armor alone. Its two magic-resist
 items also give it roughly 4.14 times the strict build's magic EHP and 3.54
 times the unrestricted build's magic EHP. Therefore the unrestricted result is
 a narrow stationary damage ceiling, not an unqualified best Vampire build.
+
+## Level 400 Elementalist: Ice sustain against 300-armor chaos
+
+Recording: `balance-combat-player-1-elementalist-400-ice-sustain-300-chaos.pld`
+
+The legal average-roll build used Azazoth's Staff, Legion's Staff, Lexium
+Crystal, Dimensional Set Staff, Ring of Existence, and Thanatos's Boots of Rift
+Walking. It supplied 693,771 Intelligence and 86% Spellboost before elemental
+stance bonuses. The rotation remained in Ice element to trade Fire's 15%
+Spellboost for 1.5% maximum-mana regeneration per second.
+
+| Source | Hits | DPS | Fixed-damage share |
+|---|---:|---:|---:|
+| Frozen Orb | 35 | 66,327 | 28.37% |
+| Flame Breath | 97 | 65,134 | 27.86% |
+| Ball of Lightning | 21 | 62,183 | 26.60% |
+| Elemental Storm (magical) | 36 | 38,235 | 16.36% |
+| Basic Attack | 114 | 1,903 | 0.81% |
+| **Comparable fixed damage** | 303 | **233,779** | **100%** |
+| Elemental Storm (% current health) | 4 | 53,217 | excluded |
+| **Displayed total** | 307 | **286,995** | — |
+
+Elemental Storm's pure component is excluded from the primary result because
+the immortal punching bag returns to 100 million health after every hit. A
+real target loses health, so repeated current-health hits decay instead of
+remaining near 1.6 million damage each. This conditional contribution remains
+listed separately for encounter-specific boss modeling.
+
+Ice sustain produced 21.92% more comparable fixed DPS than the preliminary
+Fire run (233,779 versus 191,751). Relative to the strict-proficiency Vampire
+baseline, Elementalist delivered 51.88% as much stationary single-target fixed
+DPS. That does not yet establish a balance deficit: Frozen Orb, Flame Breath,
+Ball of Lightning, and Elemental Storm all gain substantial value from clustered
+targets, whereas this test hit only one unit.
+
+No Astral Freeze item-active damage was recorded. This matches the current
+Vampire comparison, which also omitted its equipped Instill Fear active, so the
+comparison currently measures hero-kit output with passive equipment stats
+rather than player-triggered item abilities.
