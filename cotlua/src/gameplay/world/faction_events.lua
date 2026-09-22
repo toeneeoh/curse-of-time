@@ -17,6 +17,10 @@ OnInit.final("FactionEvents", function(Require)
     local CAVE_VOYAGERS_ID = 1
     local providers = {}
     local service_activated = false
+    local last_faction_id = 0
+    local next_faction_id ---@type integer?
+    local next_event_callback ---@type integer?
+    local warning_callback ---@type integer?
     local EVENT_INTERVAL = 3600.
     local EVENT_WARNING = 300.
     local EVENT_TIMEOUT = 720.
@@ -44,8 +48,6 @@ OnInit.final("FactionEvents", function(Require)
     local enemies = setmetatable({}, { __mode = 'k' })
     local enemy_count = 0
     local contribution = {}
-    local next_event_callback ---@type integer?
-    local warning_callback ---@type integer?
     local wave_callback ---@type integer?
     local timeout_callback ---@type integer?
     local presence_callback ---@type integer?
@@ -110,17 +112,6 @@ OnInit.final("FactionEvents", function(Require)
             DestroyEffect(objective_effect)
             objective_effect = nil
         end
-    end
-
-    local function schedule_event()
-        disable_callback(next_event_callback)
-        disable_callback(warning_callback)
-        next_event_callback = TimerQueue:callDelayed(EVENT_INTERVAL, start_event)
-        warning_callback = TimerQueue:callDelayed(EVENT_INTERVAL - EVENT_WARNING, function()
-            warning_callback = nil
-            announce("|cffffcc00Faction Event:|r Hold the Line begins in 5 minutes.",
-                bj_questWarningSound)
-        end)
     end
 
     local function event_center()
@@ -300,23 +291,17 @@ OnInit.final("FactionEvents", function(Require)
         cleanup_units()
         contribution = {}
         wave = 0
-        schedule_event()
         return true
     end
 
     start_event = function()
-        next_event_callback = nil
-        disable_callback(warning_callback)
-        warning_callback = nil
         if active or not CHAOS_MODE then
-            schedule_event()
             return false
         end
 
         local faction = Faction[CAVE_VOYAGERS_ID]
         local center_x, center_y = event_center()
         if not faction or not center_x then
-            schedule_event()
             return false
         end
 
@@ -353,13 +338,12 @@ OnInit.final("FactionEvents", function(Require)
     local function activate_cave_event()
         if activated then return false end
         activated = true
-        schedule_event()
         return true
     end
 
     ---@param pid integer
     ---@return string
-    local function get_cave_event_status(pid)
+    local function get_cave_event_status(pid, remaining)
         if not activated then
             return "|cff808080Events become available after Chaos.|r"
         end
@@ -367,7 +351,6 @@ OnInit.final("FactionEvents", function(Require)
             return "|cffffcc00Hold the Line|r\n\nDefend the Cave Voyagers' supply cache "
                 .. "against five assault waves.\n\n|cff80ff80Event in progress.|r"
         end
-        local remaining = next_event_callback and TimerQueue:getRemaining(next_event_callback) or 0.
         return "|cffffcc00Hold the Line|r\n\nDefend the Cave Voyagers' supply cache "
             .. "against five assault waves.\n\n|cffffcc00Begins in:|r "
             .. format_time(remaining or 0.)
@@ -390,34 +373,140 @@ OnInit.final("FactionEvents", function(Require)
     local start_cave_event_now
     if DEV_ENABLED then
         start_cave_event_now = function()
-            disable_callback(next_event_callback)
-            disable_callback(warning_callback)
-            next_event_callback = nil
-            warning_callback = nil
             if active then
                 finish_event(false)
-                disable_callback(next_event_callback)
-                disable_callback(warning_callback)
-                next_event_callback = nil
-                warning_callback = nil
             end
             return start_event()
         end
     end
 
+    local function warn_cave_event()
+        announce("|cffffcc00Faction Event:|r Hold the Line begins in 5 minutes.",
+            bj_questWarningSound)
+    end
+
     ---@class FactionEventProvider
     ---@field activate fun(): boolean
-    ---@field getStatus fun(pid: integer): string
+    ---@field start fun(): boolean
+    ---@field warning fun()
+    ---@field isActive fun(): boolean
+    ---@field getStatus fun(pid: integer, remaining: number): string
     ---@field getHudStatus fun(pid: integer): string?
     ---@field startNow? fun(): boolean
 
-    ---Registers one faction's independently scheduled signature event.
+    local function represented_factions()
+        local represented = {}
+        local user = User.first
+        while user do
+            local faction = Faction.getFaction(user.id)
+            if faction and providers[faction.id] then
+                represented[faction.id] = true
+            end
+            user = user.next
+        end
+
+        local ids = {}
+        for faction_id in pairs(represented) do
+            ids[#ids + 1] = faction_id
+        end
+        table.sort(ids)
+        return ids
+    end
+
+    local function select_next_faction()
+        local ids = represented_factions()
+        -- Only one hourly world event may run. Rotate through factions which
+        -- currently have members; with a single represented faction, wrapping
+        -- naturally selects it again for the following hour.
+        for index = 1, #ids do
+            if ids[index] > last_faction_id then
+                return ids[index]
+            end
+        end
+        return ids[1]
+    end
+
+    local function is_represented(faction_id)
+        local ids = represented_factions()
+        for index = 1, #ids do
+            if ids[index] == faction_id then return true end
+        end
+        return false
+    end
+
+    local schedule_next_event
+
+    local function warn_next_event()
+        warning_callback = nil
+        if not next_faction_id or not is_represented(next_faction_id) then
+            next_faction_id = select_next_faction()
+        end
+        local provider = next_faction_id and providers[next_faction_id]
+        if provider then
+            provider.warning()
+        end
+    end
+
+    local function start_next_event()
+        next_event_callback = nil
+        disable_callback(warning_callback)
+        warning_callback = nil
+        if not next_faction_id or not is_represented(next_faction_id) then
+            next_faction_id = select_next_faction()
+        end
+
+        local faction_id = next_faction_id
+        local provider = faction_id and providers[faction_id]
+        if provider and provider.start() then
+            last_faction_id = faction_id
+        end
+        next_faction_id = nil
+        schedule_next_event()
+    end
+
+    schedule_next_event = function()
+        disable_callback(next_event_callback)
+        disable_callback(warning_callback)
+        next_faction_id = select_next_faction()
+        next_event_callback = TimerQueue:callDelayed(EVENT_INTERVAL, start_next_event)
+        warning_callback = TimerQueue:callDelayed(
+            EVENT_INTERVAL - EVENT_WARNING, warn_next_event)
+    end
+
+    local function time_until_faction(faction_id)
+        local remaining = next_event_callback
+            and (TimerQueue:getRemaining(next_event_callback) or EVENT_INTERVAL)
+            or EVENT_INTERVAL
+        if not next_faction_id then
+            next_faction_id = select_next_faction()
+        end
+        if not next_faction_id or faction_id == next_faction_id then
+            return remaining
+        end
+
+        local ids = represented_factions()
+        local next_index, faction_index
+        for index = 1, #ids do
+            if ids[index] == next_faction_id then next_index = index end
+            if ids[index] == faction_id then faction_index = index end
+        end
+        if not next_index or not faction_index then
+            return remaining
+        end
+        local distance = (faction_index - next_index) % #ids
+        return remaining + distance * EVENT_INTERVAL
+    end
+
+    ---Registers one faction's signature event with the shared hourly rotation.
     ---@param faction_id integer
     ---@param provider FactionEventProvider
     function FactionEvents.register(faction_id, provider)
         providers[faction_id] = provider
         if service_activated then
             provider.activate()
+            if not next_faction_id then
+                next_faction_id = select_next_faction()
+            end
         end
     end
 
@@ -427,6 +516,7 @@ OnInit.final("FactionEvents", function(Require)
         for _, provider in pairs(providers) do
             provider.activate()
         end
+        schedule_next_event()
         return true
     end
 
@@ -438,11 +528,15 @@ OnInit.final("FactionEvents", function(Require)
     ---@param pid integer
     ---@return string
     function FactionEvents.getStatus(pid)
+        if not service_activated then
+            return "|cff808080Events become available after Chaos.|r"
+        end
+        local faction = Faction.getFaction(pid)
         local provider = provider_for(pid)
         if not provider then
             return "|cff808080This faction's hourly event is not yet available.|r"
         end
-        return provider.getStatus(pid)
+        return provider.getStatus(pid, time_until_faction(faction.id))
     end
 
     ---@param pid integer
@@ -456,12 +550,20 @@ OnInit.final("FactionEvents", function(Require)
         ---@param pid integer
         function FactionEvents.startNow(pid)
             local provider = provider_for(pid)
+            for _, current in pairs(providers) do
+                if current ~= provider and current.isActive() then
+                    return false
+                end
+            end
             return provider and provider.startNow and provider.startNow() or false
         end
     end
 
     FactionEvents.register(CAVE_VOYAGERS_ID, {
         activate = activate_cave_event,
+        start = start_event,
+        warning = warn_cave_event,
+        isActive = function() return active end,
         getStatus = get_cave_event_status,
         getHudStatus = get_cave_event_hud_status,
         startNow = DEV_ENABLED and start_cave_event_now or nil,
