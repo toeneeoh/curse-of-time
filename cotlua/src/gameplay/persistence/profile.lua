@@ -64,10 +64,17 @@ OnInit.final("Profile", function(Require)
             PauseUnit(hero, false)
         end
         if GetLocalPlayer() == Player(pid - 1) then
+            local was_selected = IsUnitSelected(hero, Player(pid - 1))
+            -- Warcraft can retain stale command state when a selected unit's
+            -- abilities or morph data change during the same setup frame.
+            -- Refresh after every setup subscriber has finished; this is the
+            -- same operation that manually deselecting/reselecting performs.
+            ClearSelection()
+            SelectUnit(hero, true)
             DevLog.write("CHARACTER", string.format(
-                "post-setup hero=%s paused=%s movespeed=%.1f order=%d move_ability=%d",
+                "post-setup hero=%s paused=%s selected=%s refreshed=true movespeed=%.1f order=%d move_ability=%d",
                 GetObjectName(GetUnitTypeId(hero)), tostring(was_paused),
-                GetUnitMoveSpeed(hero), GetUnitCurrentOrder(hero),
+                tostring(was_selected), GetUnitMoveSpeed(hero), GetUnitCurrentOrder(hero),
                 GetUnitAbilityLevel(hero, FourCC('Amov'))))
         end
     end
@@ -1425,7 +1432,7 @@ OnInit.final("Profile", function(Require)
 
         -- trigger setup event (for any innates)
         EVENT_ON_SETUP:trigger(pid)
-        TimerQueue:callDelayed(0., release_character_control, pid, hero)
+        TimerQueue:callDelayed(0.03, release_character_control, pid, hero)
 
         -- force click event on hero
         EVENT_ON_UNIT_SELECT:trigger(hero, pid)
