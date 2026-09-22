@@ -76,8 +76,7 @@ OnInit.global("Progression", function(Require)
             return math.min(1.5, 1. - difference * 0.025)
         end
 
-        local scale = math.max(10., enemy_level * 0.2)
-        local ratio = difference / scale
+        local ratio = difference / LEVEL_REWARD_FALLOFF
         return 1. / (1. + ratio * ratio)
     end
 

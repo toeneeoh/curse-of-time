@@ -14,6 +14,8 @@ OnInit.final("ArchitectureTests", function(Require)
     Require('Recipe')
     Require('TimerQueue')
     Require('Profile')
+    Require('Progression')
+    Require('RewardNotifications')
     Require('SaveSchema')
     Require('DevRuntimeLog')
     Require('ShopServiceDialogs')
@@ -564,6 +566,22 @@ OnInit.final("ArchitectureTests", function(Require)
         local definition = HERO_STATS[HERO_VAMPIRE]
         if not definition or BlzBitAnd(definition.prof, PROF_LEATHER) == 0 then
             return false, "Vampire is missing PROF_LEATHER"
+        end
+        return true
+    end)
+
+    ArchitectureTests.register("level reward falloff uses a fixed gap", function()
+        local epsilon = 0.0001
+        local low = Progression.getLevelDifferenceMultiplier(150, 100)
+        local high = Progression.getLevelDifferenceMultiplier(450, 400)
+        local quest = RewardNotifications.questLevelMultiplier(450, 400)
+
+        if math.abs(low - 0.5) > epsilon
+            or math.abs(high - 0.5) > epsilon
+            or math.abs(quest - 0.5) > epsilon
+            or math.abs(Progression.getLevelDifferenceMultiplier(125, 100) - 0.8) > epsilon
+            or math.abs(Progression.getLevelDifferenceMultiplier(200, 100) - 0.2) > epsilon then
+            return false, "level reward falloff is not fixed at a 50-level scale"
         end
         return true
     end)

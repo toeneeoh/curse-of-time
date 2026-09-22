@@ -20,6 +20,7 @@ OnInit.global("Variables", function(Require)
     PLAYER_CAP = 6
     MAX_LEVEL = 500
     LEECH_CONSTANT = 50
+    LEVEL_REWARD_FALLOFF = 50.
     BOSS_RESPAWN_TIME = 600
     MIN_LIFE = 0.406
     ORDER_ID_SMART = 851971

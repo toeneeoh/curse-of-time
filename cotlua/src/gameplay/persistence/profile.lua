@@ -51,6 +51,27 @@ OnInit.final("Profile", function(Require)
     local MAX_STATS           = 255000
     local CHARACTER_SAVE_MAGIC = 271828
 
+    ---A newly created hero should never remain paused after character setup.
+    ---Delay this check until setup subscribers have finished so a leaked pause
+    ---can be identified and cleared without interfering with normal gameplay.
+    ---@param pid integer
+    ---@param hero unit
+    local function release_character_control(pid, hero)
+        if Hero[pid] ~= hero or GetUnitTypeId(hero) == 0 then return end
+
+        local was_paused = IsUnitPaused(hero)
+        if was_paused then
+            PauseUnit(hero, false)
+        end
+        if GetLocalPlayer() == Player(pid - 1) then
+            DevLog.write("CHARACTER", string.format(
+                "post-setup hero=%s paused=%s movespeed=%.1f order=%d move_ability=%d",
+                GetObjectName(GetUnitTypeId(hero)), tostring(was_paused),
+                GetUnitMoveSpeed(hero), GetUnitCurrentOrder(hero),
+                GetUnitAbilityLevel(hero, FourCC('Amov'))))
+        end
+    end
+
     ---@class Profile
     ---@field brand_new boolean
     ---@field new_char boolean
@@ -1404,6 +1425,7 @@ OnInit.final("Profile", function(Require)
 
         -- trigger setup event (for any innates)
         EVENT_ON_SETUP:trigger(pid)
+        TimerQueue:callDelayed(0., release_character_control, pid, hero)
 
         -- force click event on hero
         EVENT_ON_UNIT_SELECT:trigger(hero, pid)

@@ -5,7 +5,9 @@
     owns the values; local HUD modules decide how those values are presented.
 ]]
 
-OnInit.global("RewardNotifications", function()
+OnInit.global("RewardNotifications", function(Require)
+    Require('Variables')
+
     RewardNotifications = {}
 
     local reward_actions = {}
@@ -35,8 +37,7 @@ OnInit.global("RewardNotifications", function()
     ---@return number
     function RewardNotifications.questLevelMultiplier(hero_level, target_level)
         if target_level <= 0 or hero_level <= target_level then return 1. end
-        local falloff = math.max(10., target_level * 0.2)
-        local ratio = (hero_level - target_level) / falloff
+        local ratio = (hero_level - target_level) / LEVEL_REWARD_FALLOFF
         return 1. / (1. + ratio * ratio)
     end
 
