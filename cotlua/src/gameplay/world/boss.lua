@@ -38,6 +38,7 @@ OnInit.final("Boss", function(Require)
     ---@field total_damage number
     ---@field damage number[]
     ---@field difficulty_vote integer[]
+    ---@field evergreen boolean Counts as relevant content regardless of hero level.
     ---@field respawn_modifier number
     ---@field first_drop boolean
     ---@field nearby_count integer
@@ -289,6 +290,7 @@ OnInit.final("Boss", function(Require)
                 total_damage = 0,
                 damage = __jarray(0),
                 difficulty_vote = {},
+                evergreen = false,
                 first_drop = true,
                 nearby_count = 0,
                 nearby_linger_generation = 0,
@@ -322,6 +324,12 @@ OnInit.final("Boss", function(Require)
             self:setup_range_event()
 
             return self.unit
+        end
+
+        ---@param hero_level integer
+        ---@return boolean
+        function thistype:isQuestRelevant(hero_level)
+            return self.evergreen or math.abs(hero_level - self.level) <= 20
         end
 
         local function on_click(pid, boss)

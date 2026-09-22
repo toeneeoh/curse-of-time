@@ -3,6 +3,7 @@
 OnInit.final("Faction", function(Require)
     Require('Events')
     Require('Buffs')
+    Require('Boss')
     Require('FactionShop')
     Require('Currency')
     Require('Profile')
@@ -581,7 +582,7 @@ OnInit.final("Faction", function(Require)
         ),
         Quest.create(
             "Apex Predators",
-            "Help defeat 3 bosses within 20 levels of your hero.\n\n|cffffcc00Reward:|r 20 Faction Points and 20 Reputation",
+            "Help defeat 3 bosses within 20 levels of your hero. Endgame bosses always count.\n\n|cffffcc00Reward:|r 20 Faction Points and 20 Reputation",
             "ReplaceableTextures\\CommandButtons\\BTNMarkOfFire.blp",
             QUEST_DIFF_HARD,
             "kill_bosses", 3, 20, 20
@@ -597,8 +598,9 @@ OnInit.final("Faction", function(Require)
 
     local function on_rewarded_kill(pid, killed, _killer, quality, boss)
         Quest.progress(pid, "kill_units", quality)
-        if boss and Hero[pid]
-            and math.abs(GetHeroLevel(Hero[pid]) - GetUnitLevel(killed)) <= 20 then
+        local boss_data = boss and IsBoss(killed)
+        if boss_data and Hero[pid]
+            and boss_data:isQuestRelevant(GetHeroLevel(Hero[pid])) then
             Quest.progress(pid, "kill_bosses")
         end
     end
