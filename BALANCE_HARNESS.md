@@ -59,6 +59,11 @@ and ending builds, target defenses, distinct targets hit, hit count, total
 damage, DPS, actual applied damage, average hit, and maximum hit. `-balance
 stop` ends a session early.
 
+Each combat report also divides the session into ten-second intervals. Every
+interval records damage, DPS, starting/ending/minimum mana, and time spent at
+or below 1% mana. This exposes burst falloff and resource starvation while
+keeping one equipment build and one sustained recording per hero.
+
 `-balance equip` replaces the hero's six currently equipped items with a
 generated benchmark loadout at maximum upgrade. `perfect` uses quality 63;
 `average` uses quality 32, the closest representable deterministic roll to the

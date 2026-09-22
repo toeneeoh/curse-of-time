@@ -22,6 +22,8 @@ OnInit.final("BalanceHarness", function(Require)
     local ITEM_EXPORT_BATCH = 50
     local DEFAULT_DURATION = 60.
     local RIGHT_CLICK_UPTIME = 0.90
+    local INTERVAL_DURATION = 10.
+    local RESOURCE_SAMPLE_PERIOD = 0.25
 
     local EXPORT_STATS = {
         { ITEM_HEALTH, "health" },
@@ -80,6 +82,10 @@ OnInit.final("BalanceHarness", function(Require)
             return "pure"
         end
         return "other"
+    end
+
+    local function interval_index(elapsed)
+        return math.max(1, math.ceil(elapsed / INTERVAL_DURATION))
     end
 
     local function save_for_player(pid, filename, contents)
@@ -306,6 +312,8 @@ OnInit.final("BalanceHarness", function(Require)
             "armor", number(BlzGetUnitArmor(hero)),
             "health", number(BlzGetUnitMaxHP(hero)),
             "mana", number(BlzGetUnitMaxMana(hero)),
+            "current_mana", number(GetUnitState(hero, UNIT_STATE_MANA)),
+            "mana_regeneration", number(unit.mana_regen),
             "physical_dealt", number(unit.dm * unit.pm),
             "magical_dealt", number(unit.dm * unit.mm),
             "spellboost", number(unit.spellboost),
@@ -387,6 +395,8 @@ OnInit.final("BalanceHarness", function(Require)
         entry.maximum = math.max(entry.maximum, displayed_amount)
         session.total = session.total + displayed_amount
         session.applied_total = session.applied_total + applied_amount
+        local interval = interval_index(session.stopwatch:getElapsed())
+        session.interval_damage[interval] = (session.interval_damage[interval] or 0.) + displayed_amount
         if not session.targets[target] then
             session.targets[target] = true
             session.target_count = session.target_count + 1
@@ -407,6 +417,41 @@ OnInit.final("BalanceHarness", function(Require)
         end
     end
 
+    ---Samples resource pressure independently of damage events so periods spent
+    ---out of mana remain visible in sustained-DPS recordings.
+    ---@param pid integer
+    ---@param session table
+    local function sample_resources(pid, session)
+        local hero = session.hero
+        if not hero then return end
+
+        local elapsed = session.stopwatch:getElapsed()
+        local interval = interval_index(elapsed)
+        local mana = GetUnitState(hero, UNIT_STATE_MANA)
+        local max_mana = BlzGetUnitMaxMana(hero)
+        local sample = session.resource_intervals[interval]
+
+        if not sample then
+            sample = {
+                start_mana = mana,
+                end_mana = mana,
+                minimum_mana = mana,
+                starved_samples = 0,
+            }
+            session.resource_intervals[interval] = sample
+        end
+
+        sample.end_mana = mana
+        sample.minimum_mana = math.min(sample.minimum_mana, mana)
+        if max_mana > 0. and mana <= max_mana * 0.01 then
+            sample.starved_samples = sample.starved_samples + 1
+        end
+    end
+
+    local function session_finished(pid, session)
+        return BalanceHarness.sessions[pid] ~= session
+    end
+
     ---@param pid integer
     ---@param reason string?
     function BalanceHarness.stop(pid, reason)
@@ -416,6 +461,7 @@ OnInit.final("BalanceHarness", function(Require)
             return
         end
 
+        sample_resources(pid, session)
         BalanceHarness.sessions[pid] = nil
         EVENT_PLAYER_DAMAGE_APPLIED:unregister_action(pid, damage_recorder)
         local elapsed = math.max(0.001, session.stopwatch:getElapsed())
@@ -445,6 +491,26 @@ OnInit.final("BalanceHarness", function(Require)
             "applied_total", number(session.applied_total),
             "targets_hit", session.target_count,
         }, "\t")
+        local interval_count = math.max(1, math.ceil(elapsed / INTERVAL_DURATION))
+        for index = 1, interval_count do
+            local start_time = (index - 1) * INTERVAL_DURATION
+            local end_time = math.min(index * INTERVAL_DURATION, elapsed)
+            local interval_elapsed = math.max(0.001, end_time - start_time)
+            local interval_damage = session.interval_damage[index] or 0.
+            local resource = session.resource_intervals[index]
+            lines[#lines + 1] = table.concat({
+                "interval", index,
+                "start", number(start_time),
+                "end", number(end_time),
+                "damage", number(interval_damage),
+                "dps", number(interval_damage / interval_elapsed),
+                "mana_start", number(resource and resource.start_mana or 0.),
+                "mana_end", number(resource and resource.end_mana or 0.),
+                "mana_minimum", number(resource and resource.minimum_mana or 0.),
+                "mana_starved_seconds", number(
+                    (resource and resource.starved_samples or 0) * RESOURCE_SAMPLE_PERIOD),
+            }, "\t")
+        end
         for _, result in ipairs(entries) do
             local entry = result.data
             lines[#lines + 1] = table.concat({
@@ -493,10 +559,15 @@ OnInit.final("BalanceHarness", function(Require)
             targets = setmetatable({}, { __mode = "k" }),
             target_profiles = {},
             target_count = 0,
+            interval_damage = {},
+            resource_intervals = {},
             stopwatch = Stopwatch.create(true),
         }
         BalanceHarness.sessions[pid] = session
         EVENT_PLAYER_DAMAGE_APPLIED:register_action(pid, damage_recorder)
+        sample_resources(pid, session)
+        TimerQueue:callPeriodically(RESOURCE_SAMPLE_PERIOD, session_finished,
+            sample_resources, pid, session)
 
         local start_lines = {}
         append_snapshot(start_lines, pid, "start")
