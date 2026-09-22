@@ -51,7 +51,7 @@ OnInit.final("Dev", function(Require)
         ["levelmetrics"] = "Print level-up timing stages, or reset them with -levelmetrics reset.",
         ["balance"] = "Balance tools: -balance items, -balance start [seconds] [label], -balance stop, -balance snapshot [label], or -balance equip [average|perfect] [six rawcodes].",
         ["sf"] = "Set the amount of faction points you have to #. usage: -sf [#]",
-        ["factionrep"] = "Set Cave Voyagers reputation to #. usage: -factionrep [#]",
+        ["factionrep"] = "Set Cave Voyagers lifetime Faction Points to #. usage: -factionrep [#]",
         ["mining"] = "Spawn a common, rich, or rare deposit beside your hero. usage: -mining [common|rich|rare]",
         ["factionevent"] = "Immediately start the next hourly faction event.",
         ["lvl"] = "Set the selected hero's level to #. usage: -lvl [1-500]",

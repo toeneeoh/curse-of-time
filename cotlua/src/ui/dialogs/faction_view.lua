@@ -98,8 +98,8 @@ OnInit.final("FactionView", function(Require)
 
     local event_blurb = BlzCreateFrameByType("TEXT", "", event_frame, "", 0)
     BlzFrameSetPoint(event_blurb, FRAMEPOINT_TOP, event_frame, FRAMEPOINT_TOP, -0.01, -0.13)
-    BlzFrameSetSize(event_blurb, 0.2, 1.0)
-    BlzFrameSetTextAlignment(event_blurb, TEXT_JUSTIFY_LEFT, TEXT_JUSTIFY_CENTER)
+    BlzFrameSetSize(event_blurb, 0.2, 0.105)
+    BlzFrameSetTextAlignment(event_blurb, TEXT_JUSTIFY_CENTER, TEXT_JUSTIFY_TOP)
     BlzFrameSetEnable(event_blurb, false)
     BlzFrameSetText(event_blurb,
         "|cff808080Events become available after Chaos.|r")
@@ -120,6 +120,14 @@ OnInit.final("FactionView", function(Require)
     event_icon:setTooltipName("Hold the Line")
     event_icon:setTooltipText(
         "Defend the Cave Voyagers' supply cache against five assault waves.")
+
+    local event_timer = BlzCreateFrameByType("TEXT", "", event_frame, "", 0)
+    BlzFrameSetPoint(event_timer, FRAMEPOINT_BOTTOM,
+        event_frame, FRAMEPOINT_BOTTOM, -0.01, 0.016)
+    BlzFrameSetSize(event_timer, 0.2, 0.02)
+    BlzFrameSetTextAlignment(event_timer, TEXT_JUSTIFY_CENTER, TEXT_JUSTIFY_MIDDLE)
+    BlzFrameSetEnable(event_timer, false)
+    BlzFrameSetVisible(event_timer, false)
 
     local event_hud = BlzCreateFrame("QuestButtonDisabledBackdropTemplate",
         BlzGetFrameByName("ConsoleUIBackdrop", 0), 0, 0)
@@ -274,7 +282,19 @@ OnInit.final("FactionView", function(Require)
     function view.promptJoin(faction, pid, callback)
         return PromptFrame.create(pid, {
             name = "|cffffffff" .. faction.name .. "|r",
-            desc = faction.desc,
+            desc = faction.desc
+                .. "\n\n|cffffcc00Joining begins a 10-minute faction-change cooldown.|r",
+            func = callback,
+        })
+    end
+
+    function view.promptSwitch(current, faction, pid, callback)
+        return PromptFrame.create(pid, {
+            name = "|cffffffffJoin " .. faction.name .. "?|r",
+            desc = "Leave the " .. current.name .. " and join the " .. faction.name
+                .. "? Your rank and unspent Faction Points in both factions are retained."
+                .. " Any active faction quest will be abandoned."
+                .. "\n\n|cffffcc00Changing factions begins a 10-minute cooldown.|r",
             func = callback,
         })
     end
@@ -289,29 +309,35 @@ OnInit.final("FactionView", function(Require)
     function view.refreshFaction(faction, pid)
         if GetLocalPlayer() ~= Player(pid - 1) then return end
         local buff = faction.buff
-        local reputation = Faction.getReputation(pid, faction.id)
-        local rank = Faction.getRank(reputation)
-        local next_threshold = Faction.getNextRankThreshold(reputation)
-        local reputation_line
+        local lifetime_points = Faction.getReputation(pid, faction.id)
+        local rank = Faction.getRank(lifetime_points)
+        local next_threshold = Faction.getNextRankThreshold(lifetime_points)
+        local switch_remaining = math.max(0, math.ceil(Faction.getSwitchRemaining(pid)))
+        local switch_status = switch_remaining > 0
+            and string.format("%d:%02d", switch_remaining // 60, switch_remaining % 60)
+            or "|cff80ff80Ready|r"
+        local lifetime_line
         if next_threshold then
-            reputation_line = reputation .. " / " .. next_threshold
+            lifetime_line = lifetime_points .. " / " .. next_threshold
         else
-            reputation_line = reputation .. " |cff80ff80(MAX)|r"
+            lifetime_line = lifetime_points .. " |cff80ff80(MAX)|r"
         end
         BlzFrameSetText(rank_count, "|cffffcc00" .. rank .. "|r")
         rank_icon:setTooltipName("Rank " .. rank)
         rank_icon:setTooltipText(faction.name .. " Rank " .. rank .. " of "
-            .. Faction.getMaxRank() .. ".\n\n|cffffcc00Reputation:|r " .. reputation_line)
+            .. Faction.getMaxRank() .. ".\n\n|cffffcc00Lifetime Faction Points:|r "
+            .. lifetime_line)
         buff_icon:icon(buff.ICON)
         buff_icon:setTooltipIcon(buff.ICON)
         buff_icon:setTooltipName(buff.NAME)
         buff_icon:setTooltipText(buff.DESC_FACTION)
         BlzFrameSetText(buff_blurb, "|cffffcc00" .. buff.NAME .. "|r\n\n" .. buff.DESC_FACTION)
         BlzFrameSetTextAlignment(buff_blurb, TEXT_JUSTIFY_LEFT, TEXT_JUSTIFY_CENTER)
-        BlzFrameSetText(blurb, "|cffffcc00Reputation:|r " .. reputation_line
+        BlzFrameSetText(blurb, "|cffffcc00Lifetime Faction Points:|r " .. lifetime_line
             .. (next_threshold and "\n|cffffcc00Next Rank:|r "
-                .. (next_threshold - reputation) .. " Reputation" or "")
-            .. "\n|cffffcc00Faction Points:|r " .. GetCurrency(pid, FACTION))
+                .. (next_threshold - lifetime_points) .. " Points" or "")
+            .. "\n|cffffcc00Unspent Faction Points:|r " .. GetCurrency(pid, FACTION)
+            .. "\n|cffffcc00Faction Change:|r " .. switch_status)
         BlzFrameSetTextAlignment(blurb, TEXT_JUSTIFY_CENTER, TEXT_JUSTIFY_TOP)
         BlzFrameSetText(title, "|cffffcc00" .. faction.name .. "|r")
     end
@@ -376,7 +402,19 @@ OnInit.final("FactionView", function(Require)
 
     function view.refreshEvent(pid)
         if GetLocalPlayer() ~= Player(pid - 1) then return end
+        local presentation = FactionEvents.getPresentation(pid)
+        if presentation then
+            event_icon:icon(presentation.icon)
+            event_icon:setTooltipIcon(presentation.icon)
+            event_icon:setTooltipName(presentation.name)
+            event_icon:setTooltipText(presentation.description)
+        end
         BlzFrameSetText(event_blurb, FactionEvents.getStatus(pid))
+        local countdown = FactionEvents.getCountdown(pid)
+        BlzFrameSetVisible(event_timer, countdown ~= nil)
+        if countdown then
+            BlzFrameSetText(event_timer, countdown)
+        end
         local hud_status = FactionEvents.getHudStatus(pid)
         BlzFrameSetVisible(event_hud, hud_status ~= nil)
         if hud_status then
@@ -388,6 +426,10 @@ OnInit.final("FactionView", function(Require)
         local user = User.first
         while user do
             if GetLocalPlayer() == user.player then
+                local faction = Faction.getFaction(user.id)
+                if faction then
+                    view.refreshFaction(faction, user.id)
+                end
                 view.refreshRotation(user.id)
                 view.refreshEvent(user.id)
             end

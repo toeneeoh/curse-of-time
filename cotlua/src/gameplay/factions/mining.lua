@@ -263,7 +263,7 @@ OnInit.final("FactionMining", function(Require)
         end
 
         DisplayTextToPlayer(Player(state.pid - 1), 0., 0., "Mined " .. config.name
-            .. ": |cffffcc00+" .. config.reputation .. " Reputation|r and "
+            .. ": |cffffcc00+" .. config.reputation .. " Lifetime Faction Points|r and "
             .. config.ore .. " ore sample" .. (config.ore == 1 and "." or "s."))
         DestroyEffect(AddSpecialEffect("Abilities\\Spells\\Other\\Transmute\\PileofGold.mdl", x, y))
 

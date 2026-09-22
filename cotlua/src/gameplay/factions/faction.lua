@@ -12,6 +12,7 @@ OnInit.final("Faction", function(Require)
     Require('TimerQueue')
     Require('Users')
     Require('Variables')
+    Require('Weather')
 
     local faction_leader_type = FourCC('n000')
     local faction_shop_type = FourCC('n004')
@@ -20,6 +21,7 @@ OnInit.final("Faction", function(Require)
     ---@class FactionViewAdapter
     ---@field onSelected fun(faction: Faction, pid: integer)
     ---@field promptJoin fun(faction: Faction, pid: integer, callback: fun(pid: integer): boolean): boolean
+    ---@field promptSwitch fun(current: Faction, faction: Faction, pid: integer, callback: fun(pid: integer): boolean): boolean
     ---@field display fun(faction: Faction, pid: integer)
     ---@field refreshFaction fun(faction: Faction, pid: integer)
     ---@field refreshQuest fun(pid: integer, index: integer, quest: Quest)
@@ -63,10 +65,12 @@ OnInit.final("Faction", function(Require)
     local quest_unique_progress = {}
     local completed_offers = {}
     local quest_refresh_timer = {}
+    local faction_switch_timer = {}
     local reroll_used = {}
     local rotation_completed = {}
     local QUEST_REFRESH_PERIOD = 1800.
     local QUEST_REROLL_COST = 5
+    local FACTION_SWITCH_COOLDOWN = 600.
     local schedule_quest_refresh
 
     local FACTION_RANK_THRESHOLDS = { 0, 100, 250, 450, 700, 1000, 1400, 1900, 2500, 3200 }
@@ -192,6 +196,40 @@ OnInit.final("Faction", function(Require)
         end
     end
 
+    local function clear_quest_state(pid)
+        pending_quest[pid] = nil
+        active_quest[pid] = nil
+        quest_progress[pid] = 0
+        quest_unique_progress[pid] = nil
+        Quest.quests[pid] = nil
+        completed_offers[pid] = nil
+        reroll_used[pid] = nil
+        rotation_completed[pid] = nil
+        if quest_refresh_timer[pid] then
+            TimerQueue:disableCallback(quest_refresh_timer[pid])
+            quest_refresh_timer[pid] = nil
+        end
+    end
+
+    local function finish_switch_cooldown(pid)
+        faction_switch_timer[pid] = nil
+    end
+
+    local function start_switch_cooldown(pid)
+        if faction_switch_timer[pid] then
+            TimerQueue:disableCallback(faction_switch_timer[pid])
+        end
+        faction_switch_timer[pid] = TimerQueue:callDelayed(
+            FACTION_SWITCH_COOLDOWN, finish_switch_cooldown, pid)
+    end
+
+    ---@param pid integer
+    ---@return number
+    function Faction.getSwitchRemaining(pid)
+        local callback = faction_switch_timer[pid]
+        return callback and (TimerQueue:getRemaining(callback) or 0.) or 0.
+    end
+
     ---@param pid integer
     ---@return boolean
     local function join_faction(pid)
@@ -219,6 +257,47 @@ OnInit.final("Faction", function(Require)
         schedule_quest_refresh(pid)
         display_faction(faction, pid)
         faction.buff:add(Hero[pid], Hero[pid])
+        Weather.refreshUnit(Hero[pid])
+        start_switch_cooldown(pid)
+        return false
+    end
+
+    ---@param pid integer
+    ---@return boolean
+    local function switch_faction(pid)
+        local faction = pending_faction[pid]
+        local current = player_faction[pid]
+        pending_faction[pid] = nil
+        if not faction or not current or faction == current or not Hero[pid] then
+            return false
+        end
+
+        local remaining = Faction.getSwitchRemaining(pid)
+        if remaining > 0. then
+            DisplayTextToPlayer(Player(pid - 1), 0., 0.,
+                "You may change factions again in " .. math.ceil(remaining / 60.)
+                    .. " minute" .. (remaining > 60. and "s." or "."))
+            return false
+        end
+
+        local hero = hero_data(pid)
+        if not hero then return false end
+        ensure_faction_balances(hero)[current.id] = GetCurrency(pid, FACTION)
+        local current_buff = current.buff:get(nil, Hero[pid])
+        if current_buff then current_buff:remove() end
+        clear_quest_state(pid)
+
+        player_faction[pid] = faction
+        hero.faction_id = faction.id
+        hero.faction_reputation = hero.faction_reputation or __jarray(0)
+        SetCurrency(pid, FACTION, ensure_faction_balances(hero)[faction.id] or 0)
+        schedule_quest_refresh(pid)
+        display_faction(faction, pid)
+        faction.buff:add(Hero[pid], Hero[pid])
+        Weather.refreshUnit(Hero[pid])
+        start_switch_cooldown(pid)
+        DisplayTextToForce(FORCE_PLAYING, User[pid - 1].nameColored
+            .. " has joined the " .. faction.name .. "!")
         return false
     end
 
@@ -241,12 +320,22 @@ OnInit.final("Faction", function(Require)
             return
         end
 
-        if not player_faction[pid] then
+        local current = player_faction[pid]
+        if not current then
             if view and view.promptJoin(faction, pid, join_faction) then
                 pending_faction[pid] = faction
             end
+        elseif current ~= faction then
+            local remaining = Faction.getSwitchRemaining(pid)
+            if remaining > 0. then
+                DisplayTextToPlayer(Player(pid - 1), 0., 0.,
+                    "You may change factions again in " .. math.ceil(remaining / 60.)
+                        .. " minute" .. (remaining > 60. and "s." or "."))
+            elseif view and view.promptSwitch(current, faction, pid, switch_faction) then
+                pending_faction[pid] = faction
+            end
         else
-            display_faction(player_faction[pid], pid)
+            display_faction(current, pid)
         end
     end
 
@@ -421,8 +510,7 @@ OnInit.final("Faction", function(Require)
         AddCurrency(pid, FACTION, quest.faction_points)
         Faction.addReputation(pid, quest.reputation)
         DisplayTextToPlayer(Player(pid - 1), 0., 0., "|cffffcc00Faction quest complete:|r "
-            .. quest.name .. "\n+" .. quest.faction_points .. " Faction Points and +"
-            .. quest.reputation .. " Reputation")
+            .. quest.name .. "\n+" .. quest.faction_points .. " Faction Points")
         StartSoundForPlayerBJ(Player(pid - 1), bj_questCompletedSound)
         if view then
             view.questCompleted(pid, quest)
@@ -568,21 +656,21 @@ OnInit.final("Faction", function(Require)
     local generic_quests = {
         Quest.create(
             "Thinning the Ranks",
-            "Defeat 50 level-appropriate enemies. Enemies below your level grant reduced progress.\n\n|cffffcc00Reward:|r 5 Faction Points and 5 Reputation",
+            "Defeat 50 level-appropriate enemies. Enemies below your level grant reduced progress.\n\n|cffffcc00Reward:|r 5 Faction Points",
             "ReplaceableTextures\\CommandButtons\\BTNOrcMeleeUpOne.blp",
             QUEST_DIFF_EASY,
             "kill_units", 50, 5, 5
         ),
         Quest.create(
             "Field Medic",
-            "Restore health equal to 500% of allied heroes' Max Health. Only effective healing on another player's hero counts.\n\n|cffffcc00Reward:|r 10 Faction Points and 10 Reputation",
+            "Restore health equal to 500% of allied heroes' Max Health. Only effective healing on another player's hero counts.\n\n|cffffcc00Reward:|r 10 Faction Points",
             "ReplaceableTextures\\CommandButtons\\BTNHeal.blp",
             QUEST_DIFF_MEDIUM,
             "heal_allies", 500, 10, 10
         ),
         Quest.create(
             "Apex Predators",
-            "Help defeat 3 bosses within 20 levels of your hero. Endgame bosses always count.\n\n|cffffcc00Reward:|r 20 Faction Points and 20 Reputation",
+            "Help defeat 3 bosses within 20 levels of your hero. Endgame bosses always count.\n\n|cffffcc00Reward:|r 20 Faction Points",
             "ReplaceableTextures\\CommandButtons\\BTNMarkOfFire.blp",
             QUEST_DIFF_HARD,
             "kill_bosses", 3, 20, 20
@@ -657,17 +745,10 @@ OnInit.final("Faction", function(Require)
     local function clear_player(pid)
         player_faction[pid] = nil
         pending_faction[pid] = nil
-        pending_quest[pid] = nil
-        active_quest[pid] = nil
-        quest_progress[pid] = 0
-        quest_unique_progress[pid] = nil
-        Quest.quests[pid] = nil
-        completed_offers[pid] = nil
-        reroll_used[pid] = nil
-        rotation_completed[pid] = nil
-        if quest_refresh_timer[pid] then
-            TimerQueue:disableCallback(quest_refresh_timer[pid])
-            quest_refresh_timer[pid] = nil
+        clear_quest_state(pid)
+        if faction_switch_timer[pid] then
+            TimerQueue:disableCallback(faction_switch_timer[pid])
+            faction_switch_timer[pid] = nil
         end
     end
 

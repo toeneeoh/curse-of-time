@@ -501,6 +501,13 @@ OnInit.final("Weather", function(Require)
         change_actions[#change_actions + 1] = action
     end
 
+    ---Reapplies the current weather after a player-specific modifier changes.
+    ---@param target unit
+    function Weather.refreshUnit(target)
+        local current = buff:get(nil, target)
+        if current then current:refresh() end
+    end
+
     local function enter_filter()
         local u = GetFilterUnit()
         if not u then

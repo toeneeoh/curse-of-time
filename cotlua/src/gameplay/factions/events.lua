@@ -343,7 +343,7 @@ OnInit.final("FactionEvents", function(Require)
 
     ---@param pid integer
     ---@return string
-    local function get_cave_event_status(pid, remaining)
+    local function get_cave_event_status(pid, _remaining)
         if not activated then
             return "|cff808080Events become available after Chaos.|r"
         end
@@ -352,8 +352,7 @@ OnInit.final("FactionEvents", function(Require)
                 .. "against five assault waves.\n\n|cff80ff80Event in progress.|r"
         end
         return "|cffffcc00Hold the Line|r\n\nDefend the Cave Voyagers' supply cache "
-            .. "against five assault waves.\n\n|cffffcc00Begins in:|r "
-            .. format_time(remaining or 0.)
+            .. "against five assault waves."
     end
 
     ---@param pid integer
@@ -393,6 +392,9 @@ OnInit.final("FactionEvents", function(Require)
     ---@field getStatus fun(pid: integer, remaining: number): string
     ---@field getHudStatus fun(pid: integer): string?
     ---@field startNow? fun(): boolean
+    ---@field name string
+    ---@field icon string
+    ---@field description string
 
     local function represented_factions()
         local represented = {}
@@ -539,6 +541,24 @@ OnInit.final("FactionEvents", function(Require)
         return provider.getStatus(pid, time_until_faction(faction.id))
     end
 
+    ---Returns a fixed-position countdown separately from the variable-height
+    ---event description used by the faction view.
+    ---@param pid integer
+    ---@return string?
+    function FactionEvents.getCountdown(pid)
+        if not service_activated then return nil end
+        local faction = Faction.getFaction(pid)
+        local provider = provider_for(pid)
+        if not faction or not provider or provider.isActive() then return nil end
+        return "|cffffcc00Begins in:|r " .. format_time(time_until_faction(faction.id))
+    end
+
+    ---@param pid integer
+    ---@return FactionEventProvider?
+    function FactionEvents.getPresentation(pid)
+        return provider_for(pid)
+    end
+
     ---@param pid integer
     ---@return string?
     function FactionEvents.getHudStatus(pid)
@@ -560,6 +580,9 @@ OnInit.final("FactionEvents", function(Require)
     end
 
     FactionEvents.register(CAVE_VOYAGERS_ID, {
+        name = "Hold the Line",
+        icon = "ReplaceableTextures\\CommandButtons\\BTNChestOfGold.blp",
+        description = "Defend the Cave Voyagers' supply cache against five assault waves.",
         activate = activate_cave_event,
         start = start_event,
         warning = warn_cave_event,

@@ -25,26 +25,26 @@ OnInit.final("Stormwatch", function(Require)
         0.,
         15400.,
         StormwatchBuff,
-        "The Stormwatch study the skies and turn volatile weather to their advantage.|n|n|cffffcc00Membership, reputation, and unspent Faction Points are saved with this character.|r|n|nWill you join us?"
+        "The Stormwatch study the skies and turn volatile weather to their advantage.|n|n|cffffcc00Membership, rank progress, and unspent Faction Points are saved with this character.|r|n|nWill you join us?"
     )
 
     stormwatch:addQuest(Quest.create(
         "Changing Skies",
-        "Witness 3 changes in weather.\n\n|cffffcc00Reward:|r 5 Faction Points and 5 Reputation",
+        "Witness 3 changes in weather.\n\n|cffffcc00Reward:|r 5 Faction Points",
         "ReplaceableTextures\\CommandButtons\\BTNCloudOfFog.blp",
         QUEST_DIFF_EASY,
         "weather_change", 3, 5, 5
     ))
     stormwatch:addQuest(Quest.create(
         "Fair Forecast",
-        "Witness 2 changes to beneficial weather.\n\n|cffffcc00Reward:|r 10 Faction Points and 10 Reputation",
+        "Witness 2 changes to beneficial weather.\n\n|cffffcc00Reward:|r 10 Faction Points",
         "ReplaceableTextures\\CommandButtons\\BTNWispSplode.blp",
         QUEST_DIFF_MEDIUM,
         "weather_fair", 2, 10, 10
     ))
     stormwatch:addQuest(Quest.create(
         "Storm Chaser",
-        "Endure 2 changes to harmful weather.\n\n|cffffcc00Reward:|r 20 Faction Points and 20 Reputation",
+        "Endure 2 changes to harmful weather.\n\n|cffffcc00Reward:|r 20 Faction Points",
         "ReplaceableTextures\\CommandButtons\\BTNTornado.blp",
         QUEST_DIFF_HARD,
         "weather_harmful", 2, 20, 20, 3
@@ -364,7 +364,7 @@ OnInit.final("Stormwatch", function(Require)
             announce("|cffffcc00Eye of the Storm ended at "
                 .. math.floor(damage_fraction * 100. + 0.5) .. "% damage.|r "
                 .. rewarded .. " participant" .. (rewarded == 1 and " receives " or "s receive ")
-                .. point_reward .. " Faction Points and " .. reputation_reward .. " Reputation.",
+                .. point_reward .. " Faction Points.",
                 bj_questFailedSound)
         else
             announce("|cffff4040Eye of the Storm failed.|r The anomalies became unstable.",
@@ -408,7 +408,7 @@ OnInit.final("Stormwatch", function(Require)
         return true
     end
 
-    local function event_status(_pid, remaining)
+    local function event_status(_pid, _remaining)
         if active then
             if phase == "avatar" then
                 return "|cff80dfffEye of the Storm|r\n\nThe storm avatar has formed. Deal as much damage as possible within 5 minutes; rewards scale with damage dealt."
@@ -416,8 +416,7 @@ OnInit.final("Stormwatch", function(Require)
             return "|cff80dfffEye of the Storm|r\n\nStand near the anomalies to stabilize them while dodging lightning strikes.\n\n|cffffcc00Progress:|r "
                 .. stabilized .. " / " .. #nodes
         end
-        return "|cff80dfffEye of the Storm|r\n\nStabilize four anomalies while avoiding lightning, then damage the storm avatar within 5 minutes. Rewards scale with damage dealt.\n\n|cffffcc00Begins in:|r "
-            .. format_time(remaining or 0.)
+        return "|cff80dfffEye of the Storm|r\n\nStabilize four anomalies while avoiding lightning, then damage the storm avatar within 5 minutes. Rewards scale with damage dealt."
     end
 
     local function hud_status(pid)
@@ -447,6 +446,9 @@ OnInit.final("Stormwatch", function(Require)
     end
 
     FactionEvents.register(STORMWATCH_ID, {
+        name = "Eye of the Storm",
+        icon = "ReplaceableTextures\\CommandButtons\\BTNMonsoon.blp",
+        description = "Stabilize four storm anomalies, then damage the Lightning Revenant avatar before time expires.",
         activate = function() return true end,
         start = start_event,
         warning = warn_event,

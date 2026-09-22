@@ -78,7 +78,7 @@ OnInit.final("StatView", function(Require)
             { tag = "|cffffcc00Spendable Honor|r", priority = 1, getter = function(u) return GetCurrency(owner_pid(u), HONOR) end},
             { tag = "|cffffcc00Lifetime Honor|r", priority = 1, getter = function(u) return Honor.getTotal(owner_pid(u)) end},
             { tag = "|cffffcc00Allocated Honor|r", priority = 1, getter = function(u) return Honor.getAllocated(owner_pid(u)) end},
-            { tag = "|cff80ff80Faction Points|r", priority = 1, getter = function(u) return Faction.getPoints(owner_pid(u)) end},
+            { tag = "|cff80ff80Unspent Faction Points|r", priority = 1, getter = function(u) return Faction.getPoints(owner_pid(u)) end},
             { tag = "|cffffff00Gold Find|r", priority = 1, getter = function(u)
                 local rate = Unit[u].gold_rate
                 if math.abs(rate) < 0.0005 then rate = 0 end
@@ -107,7 +107,7 @@ OnInit.final("StatView", function(Require)
                 return faction and (Faction.getRank(faction_reputation(u))
                     .. " / " .. Faction.getMaxRank()) or "-"
             end},
-            { tag = "|cffffcc00Reputation|r", priority = 1, getter = function(u)
+            { tag = "|cffffcc00Lifetime Faction Points|r", priority = 1, getter = function(u)
                 local faction = faction_for(u)
                 if not faction then return "-" end
                 local reputation = faction_reputation(u)
@@ -115,7 +115,7 @@ OnInit.final("StatView", function(Require)
                 return threshold and (reputation .. " / " .. threshold)
                     or (reputation .. " (MAX)")
             end},
-            { tag = "|cff80ff80Faction Points|r", priority = 1, getter = function(u)
+            { tag = "|cff80ff80Unspent Faction Points|r", priority = 1, getter = function(u)
                 return faction_for(u) and Faction.getPoints(owner_pid(u)) or "-"
             end},
             { tag = "|cffffcc00Active Quest|r", priority = 1, getter = function(u)
@@ -132,8 +132,7 @@ OnInit.final("StatView", function(Require)
             end},
             { tag = "|cffffcc00Quest Reward|r", priority = 1, getter = function(u)
                 local quest = Quest.getActive(owner_pid(u))
-                return quest and (quest.faction_points .. " Points / "
-                    .. quest.reputation .. " Reputation") or "-"
+                return quest and (quest.faction_points .. " Faction Points") or "-"
             end},
         },
     }
