@@ -1,7 +1,7 @@
 OnInit.global("HelpText", function()
     INFO_STRING = {
         [0] = "Use -info # for see more info about your chosen catagory\n\n -info 1, Unit Respawning\n -info 2, Boss Respawning\n -info 3, Safezone\n -info 4, Hardcore\n -info 5, Perks\n -info 6, Proficiency",
-        "Units in the overworld will attempt to revive where they died 30 seconds after death. If a player hero/unit is within 800 range they will spawn frozen and invulnerable until no players are around.",
+        "Units in the overworld will attempt to revive where they died 20 seconds after death. If a player hero or unit is within 800 range, the respawn waits until the area is clear.",
         "Bosses respawn after 10 minutes and non-hero bosses respawn after 5 minutes, players may choose to fight a stronger version of the boss after defeating them once.%",
         "The town is protected from enemy invasion and any entering enemy will be teleported back to their original spawn.",
         [[Hardcore players that die without a reincarnation item/spell will be removed from the game and cannot save/load or start a new character.

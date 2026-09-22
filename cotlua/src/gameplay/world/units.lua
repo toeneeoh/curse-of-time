@@ -17,7 +17,6 @@ OnInit.final("Units", function(Require)
     Require('TimerQueue')
     Require('Users')
 
-    GHOST_UNITS = {} ---@type unit[]
     UnitData = {}
 
     local GROUP_SCALING_RANGE = 1800.
@@ -122,51 +121,26 @@ OnInit.final("Units", function(Require)
             GetPlayerId(GetOwningPlayer(u)) <= PLAYER_CAP
     end
 
-    ---@type fun(u: unit)
-    local function revive_ghost(u)
-        PauseUnit(u, false)
-        UnitRemoveAbility(u, ABIL_AVUL)
-        ShowUnit(u, true)
-        Unit[u].original_x = GetUnitX(u)
-        Unit[u].original_y = GetUnitY(u)
-    end
-
-    local function ghost_respawn(creep)
-        if GetUnitTypeId(creep) == 0 then return end
-
-        local ug = CreateGroup()
-
-        GroupEnumUnitsInRange(ug, GetUnitX(creep), GetUnitY(creep), 800., Condition(respawn_filter))
-        if BlzGroupGetSize(ug) == 0 then
-            TimerQueue:callDelayed(0.9, revive_ghost, creep)
-            TableRemove(GHOST_UNITS, creep)
-        else
-            TimerQueue:callDelayed(1., ghost_respawn, creep)
-        end
-
-        DestroyGroup(ug)
-    end
-
     ---@type fun(uid: integer, x: number, y: number, flag: integer, func: function)
     local function on_respawn(uid, x, y, flag, func)
         if CHAOS_MODE == flag then
             local ug = CreateGroup()
 
             GroupEnumUnitsInRange(ug, x, y, 800., Condition(respawn_filter))
+            local occupied = FirstOfGroup(ug) ~= nil
+            DestroyGroup(ug)
+
+            -- Hidden units retain collision in Warcraft III. Keep only the
+            -- respawn request while players are nearby so an invisible creep
+            -- cannot block movement or accumulate in a heavily farmed camp.
+            if occupied then
+                TimerQueue:callDelayed(1., on_respawn, uid, x, y, flag, func)
+                return
+            end
 
             local creep = CreateUnit(PLAYER_CREEP, uid, x, y, math.random(0, 359))
             EVENT_ON_UNIT_DEATH:register_unit_action(creep, func)
             initialize_overworld_creep(creep)
-
-            if FirstOfGroup(ug) ~= nil then
-                GHOST_UNITS[#GHOST_UNITS + 1] = creep
-                PauseUnit(creep, true)
-                UnitAddAbility(creep, ABIL_AVUL)
-                ShowUnit(creep, false)
-                TimerQueue:callDelayed(1., ghost_respawn, creep)
-            end
-
-            DestroyGroup(ug)
         end
     end
 

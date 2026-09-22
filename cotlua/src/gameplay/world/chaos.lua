@@ -126,12 +126,6 @@ OnInit.final("Chaos", function(Require)
 
         GroupEnumUnitsInRect(ug, WorldBounds.rect, Condition(ChaosTransition)) -- exception for struggle / colo
 
-        -- remove ghosts
-        for i = 1, #GHOST_UNITS do
-            RemoveUnit(GHOST_UNITS[i])
-        end
-        GHOST_UNITS = {}
-
         for target in each(ug) do
             if target ~= udg_SPONSOR then
                 RemoveUnit(target)
