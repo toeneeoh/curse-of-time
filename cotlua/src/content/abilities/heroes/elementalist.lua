@@ -499,7 +499,7 @@ OnInit.final("ElementalistSpells", function(Require)
                 if rand == ELEMENTICE.value then
                     TQ:callDelayed(2., DestroyEffect, AddSpecialEffect("Abilities\\Spells\\Undead\\FrostNova\\FrostNovaTarget.mdl", x2, y2))
                     MP(Hero[pt.pid], BlzGetUnitMaxMana(Hero[pt.pid]) * 0.15)
-                elseif rand == ELEMENTLIGHTNING.value then
+                elseif rand == ELEMENTLIGHTNING.value and target then
                     DamageTarget(Hero[pt.pid], target, GetWidgetLife(target) * 0.015, ATTACK_TYPE_NORMAL, PURE, thistype.tag)
                     DestroyEffect(AddSpecialEffectTarget("Abilities\\Weapons\\Bolt\\BoltImpact.mdl", target, "origin"))
                 elseif rand == ELEMENTEARTH.value then
