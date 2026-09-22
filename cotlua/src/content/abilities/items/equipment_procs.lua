@@ -123,7 +123,7 @@ OnInit.final("ItemEquipmentProcs", function(Require)
         local thistype = MANA_FLOW
 
         function thistype.onUnequip(itm, id, index, orig_holder)
-            Unit[itm.holder].mana_regen_percent = Unit[orig_holder].mana_regen_percent - 2
+            Unit[orig_holder].mana_regen_percent = Unit[orig_holder].mana_regen_percent - 2
         end
 
         function thistype.onEquip(itm, id, index)
@@ -136,7 +136,7 @@ OnInit.final("ItemEquipmentProcs", function(Require)
         local thistype = HORSE_BOOST
 
         function thistype.onUnequip(itm, id, index, orig_holder)
-            Unit[itm.holder].mana_regen_max = Unit[orig_holder].mana_regen_max - 0.7
+            Unit[orig_holder].mana_regen_max = Unit[orig_holder].mana_regen_max - 0.7
         end
 
         function thistype.onEquip(itm, id, index)
