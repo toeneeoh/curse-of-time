@@ -348,11 +348,9 @@ OnInit.final("FactionEvents", function(Require)
             return "|cff808080Events become available after Chaos.|r"
         end
         if active then
-            return "|cffffcc00Hold the Line|r\n\nDefend the Cave Voyagers' supply cache "
-                .. "against five assault waves.\n\n|cff80ff80Event in progress.|r"
+            return "|cffffcc00Hold the Line|r\n\nDefend the supply cache through five waves.\n|cff80ff80Event in progress.|r"
         end
-        return "|cffffcc00Hold the Line|r\n\nDefend the Cave Voyagers' supply cache "
-            .. "against five assault waves."
+        return "|cffffcc00Hold the Line|r\n\nDefend the supply cache through five waves."
     end
 
     ---@param pid integer
@@ -582,7 +580,7 @@ OnInit.final("FactionEvents", function(Require)
     FactionEvents.register(CAVE_VOYAGERS_ID, {
         name = "Hold the Line",
         icon = "ReplaceableTextures\\CommandButtons\\BTNChestOfGold.blp",
-        description = "Defend the Cave Voyagers' supply cache against five assault waves.",
+        description = "Defend the Cave Voyagers' supply cache against five assault waves. Remain nearby for at least 30 seconds to qualify.\n\n|cffffcc00Reward:|r 30 Faction Points",
         activate = activate_cave_event,
         start = start_event,
         warning = warn_cave_event,

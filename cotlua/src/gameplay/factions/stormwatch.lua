@@ -25,7 +25,7 @@ OnInit.final("Stormwatch", function(Require)
         0.,
         15400.,
         StormwatchBuff,
-        "The Stormwatch study the skies and turn volatile weather to their advantage.|n|n|cffffcc00Membership, rank progress, and unspent Faction Points are saved with this character.|r|n|nWill you join us?"
+        "The Stormwatch study the skies and turn volatile weather to their advantage.|n|n|cffffcc00Membership, rank progress, and unspent Faction Points are saved with this character.|r"
     )
 
     stormwatch:addQuest(Quest.create(
@@ -411,12 +411,12 @@ OnInit.final("Stormwatch", function(Require)
     local function event_status(_pid, _remaining)
         if active then
             if phase == "avatar" then
-                return "|cff80dfffEye of the Storm|r\n\nThe storm avatar has formed. Deal as much damage as possible within 5 minutes; rewards scale with damage dealt."
+                return "|cff80dfffEye of the Storm|r\n\nDamage the Storm Avatar before time expires."
             end
-            return "|cff80dfffEye of the Storm|r\n\nStand near the anomalies to stabilize them while dodging lightning strikes.\n\n|cffffcc00Progress:|r "
-                .. stabilized .. " / " .. #nodes
+            return "|cff80dfffEye of the Storm|r\n\nStabilize the storm anomalies. |cffffcc00"
+                .. stabilized .. " / " .. #nodes .. "|r"
         end
-        return "|cff80dfffEye of the Storm|r\n\nStabilize four anomalies while avoiding lightning, then damage the storm avatar within 5 minutes. Rewards scale with damage dealt."
+        return "|cff80dfffEye of the Storm|r\n\nStabilize four anomalies, then confront the Storm Avatar."
     end
 
     local function hud_status(pid)
@@ -448,7 +448,7 @@ OnInit.final("Stormwatch", function(Require)
     FactionEvents.register(STORMWATCH_ID, {
         name = "Eye of the Storm",
         icon = "ReplaceableTextures\\CommandButtons\\BTNMonsoon.blp",
-        description = "Stabilize four storm anomalies, then damage the Lightning Revenant avatar before time expires.",
+        description = "Stand near four storm anomalies while avoiding targeted lightning strikes. Once stabilized, your faction has 5 minutes to damage the Lightning Revenant avatar. Remain nearby for at least 30 seconds to qualify.\n\nAll eligible members receive up to |cffffcc0030 Faction Points|r based on the percentage of the avatar's health removed. Defeating it grants full rewards and event-completion credit.",
         activate = function() return true end,
         start = start_event,
         warning = warn_event,

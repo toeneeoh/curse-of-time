@@ -88,7 +88,7 @@ OnInit.final("FactionView", function(Require)
 
     local event_frame = BlzCreateFrameByType("FRAME", "", main, "", 0)
     BlzFrameSetPoint(event_frame, FRAMEPOINT_TOPRIGHT, main, FRAMEPOINT_TOPRIGHT, -0.01, -0.143)
-    BlzFrameSetSize(event_frame, 0.24, 0.38)
+    BlzFrameSetSize(event_frame, 0.24, 0.20)
     BlzFrameSetEnable(event_frame, false)
 
     local event_title = BlzCreateFrame("TitleText", event_frame, 0, 0)
@@ -98,8 +98,8 @@ OnInit.final("FactionView", function(Require)
 
     local event_blurb = BlzCreateFrameByType("TEXT", "", event_frame, "", 0)
     BlzFrameSetPoint(event_blurb, FRAMEPOINT_TOP, event_frame, FRAMEPOINT_TOP, -0.01, -0.13)
-    BlzFrameSetSize(event_blurb, 0.2, 0.105)
-    BlzFrameSetTextAlignment(event_blurb, TEXT_JUSTIFY_CENTER, TEXT_JUSTIFY_TOP)
+    BlzFrameSetSize(event_blurb, 0.2, 0.065)
+    BlzFrameSetTextAlignment(event_blurb, TEXT_JUSTIFY_CENTER, TEXT_JUSTIFY_MIDDLE)
     BlzFrameSetEnable(event_blurb, false)
     BlzFrameSetText(event_blurb,
         "|cff808080Events become available after Chaos.|r")
@@ -123,7 +123,7 @@ OnInit.final("FactionView", function(Require)
 
     local event_timer = BlzCreateFrameByType("TEXT", "", event_frame, "", 0)
     BlzFrameSetPoint(event_timer, FRAMEPOINT_BOTTOM,
-        event_frame, FRAMEPOINT_BOTTOM, -0.01, 0.016)
+        event_frame, FRAMEPOINT_BOTTOM, -0.01, 0.012)
     BlzFrameSetSize(event_timer, 0.2, 0.02)
     BlzFrameSetTextAlignment(event_timer, TEXT_JUSTIFY_CENTER, TEXT_JUSTIFY_MIDDLE)
     BlzFrameSetEnable(event_timer, false)
