@@ -3,6 +3,7 @@ OnInit.global("Progression", function(Require)
     Require('Users')
     Require('WorldUnitQueries')
     Require('RewardNotifications')
+    Require('RewardScaling')
 
     EXPERIENCE_TABLE = {}
     GOLD_TABLE = {}
@@ -76,8 +77,7 @@ OnInit.global("Progression", function(Require)
             return math.min(1.5, 1. - difference * 0.025)
         end
 
-        local ratio = difference / LEVEL_REWARD_FALLOFF
-        return 1. / (1. + ratio * ratio)
+        return RewardScaling.overlevelMultiplier(hero_level, enemy_level)
     end
 
     ---Registers the profile/lobby layer that supplies the shared XP bonus.

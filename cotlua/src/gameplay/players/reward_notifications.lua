@@ -6,7 +6,7 @@
 ]]
 
 OnInit.global("RewardNotifications", function(Require)
-    Require('Variables')
+    Require('RewardScaling')
 
     RewardNotifications = {}
 
@@ -36,9 +36,7 @@ OnInit.global("RewardNotifications", function(Require)
     ---@param target_level number
     ---@return number
     function RewardNotifications.questLevelMultiplier(hero_level, target_level)
-        if target_level <= 0 or hero_level <= target_level then return 1. end
-        local ratio = (hero_level - target_level) / LEVEL_REWARD_FALLOFF
-        return 1. / (1. + ratio * ratio)
+        return RewardScaling.overlevelMultiplier(hero_level, target_level)
     end
 
     ---Registers presentation refreshes for player-state changes which can

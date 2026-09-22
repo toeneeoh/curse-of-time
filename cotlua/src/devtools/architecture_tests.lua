@@ -570,18 +570,20 @@ OnInit.final("ArchitectureTests", function(Require)
         return true
     end)
 
-    ArchitectureTests.register("level reward falloff uses a fixed gap", function()
+    ArchitectureTests.register("overlevel rewards use exponential fixed-gap falloff", function()
         local epsilon = 0.0001
         local low = Progression.getLevelDifferenceMultiplier(150, 100)
         local high = Progression.getLevelDifferenceMultiplier(450, 400)
         local quest = RewardNotifications.questLevelMultiplier(450, 400)
 
-        if math.abs(low - 0.5) > epsilon
-            or math.abs(high - 0.5) > epsilon
-            or math.abs(quest - 0.5) > epsilon
-            or math.abs(Progression.getLevelDifferenceMultiplier(125, 100) - 0.8) > epsilon
-            or math.abs(Progression.getLevelDifferenceMultiplier(200, 100) - 0.2) > epsilon then
-            return false, "level reward falloff is not fixed at a 50-level scale"
+        if math.abs(low - 0.3233) > epsilon
+            or math.abs(high - 0.3233) > epsilon
+            or math.abs(quest - 0.3233) > epsilon
+            or math.abs(Progression.getLevelDifferenceMultiplier(115, 100) - 0.8225) > epsilon
+            or math.abs(Progression.getLevelDifferenceMultiplier(200, 100) - 0.0369) > epsilon
+            or Progression.getLevelDifferenceMultiplier(100, 100) ~= 1.
+            or Progression.getLevelDifferenceMultiplier(100, 120) ~= 1.5 then
+            return false, "overlevel rewards do not follow the shared exponential curve"
         end
         return true
     end)
