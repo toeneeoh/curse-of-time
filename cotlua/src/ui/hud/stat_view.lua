@@ -128,7 +128,7 @@ OnInit.final("StatView", function(Require)
             end},
             { tag = "|cffffcc00Progress|r", priority = 1, getter = function(u)
                 local quest, progress = Quest.getActive(owner_pid(u))
-                return quest and (progress .. " / " .. quest.goal) or "-"
+                return quest and (Quest.formatProgress(progress) .. " / " .. quest.goal) or "-"
             end},
             { tag = "|cffffcc00Quest Reward|r", priority = 1, getter = function(u)
                 local quest = Quest.getActive(owner_pid(u))

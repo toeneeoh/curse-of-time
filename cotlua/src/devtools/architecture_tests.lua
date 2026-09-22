@@ -45,6 +45,8 @@ OnInit.final("ArchitectureTests", function(Require)
     Require('HelpText')
     Require('HintConfig')
     Require('CurrencyDisplay')
+    Require('ResourceChanges')
+    Require('Faction')
     Require('FactionView')
     Require('FactionMining')
     Require('FactionEvents')
@@ -548,9 +550,36 @@ OnInit.final("ArchitectureTests", function(Require)
 
     ArchitectureTests.register("faction hourly event service is available", function()
         if type(FactionEvents.activate) ~= "function"
+            or type(FactionEvents.register) ~= "function"
             or type(FactionEvents.getStatus) ~= "function"
             or type(FactionEvents.getHudStatus) ~= "function" then
             return false, "faction hourly event API is incomplete"
+        end
+        return true
+    end)
+
+    ArchitectureTests.register("faction generic quest hooks are available", function()
+        local required = {
+            kill_units = false,
+            heal_allies = false,
+            kill_bosses = false,
+        }
+        local faction = Faction[1]
+        if not faction or type(Faction.addGenericQuests) ~= "function"
+            or type(Quest.formatProgress) ~= "function"
+            or type(RewardNotifications.registerKillAction) ~= "function"
+            or type(ResourceChanges.registerHealAction) ~= "function" then
+            return false, "generic faction quest API is incomplete"
+        end
+        for index = 1, #faction.quests do
+            if required[faction.quests[index].kind] ~= nil then
+                required[faction.quests[index].kind] = true
+            end
+        end
+        for kind, present in pairs(required) do
+            if not present then
+                return false, "missing generic faction quest: " .. kind
+            end
         end
         return true
     end)

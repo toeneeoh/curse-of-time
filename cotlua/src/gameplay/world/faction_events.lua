@@ -15,6 +15,8 @@ OnInit.final("FactionEvents", function(Require)
     FactionEvents = {}
 
     local CAVE_VOYAGERS_ID = 1
+    local providers = {}
+    local service_activated = false
     local EVENT_INTERVAL = 3600.
     local EVENT_WARNING = 300.
     local EVENT_TIMEOUT = 720.
@@ -348,7 +350,7 @@ OnInit.final("FactionEvents", function(Require)
         return true
     end
 
-    function FactionEvents.activate()
+    local function activate_cave_event()
         if activated then return false end
         activated = true
         schedule_event()
@@ -357,7 +359,7 @@ OnInit.final("FactionEvents", function(Require)
 
     ---@param pid integer
     ---@return string
-    function FactionEvents.getStatus(pid)
+    local function get_cave_event_status(pid)
         if not activated then
             return "|cff808080Events become available after Chaos.|r"
         end
@@ -373,7 +375,7 @@ OnInit.final("FactionEvents", function(Require)
 
     ---@param pid integer
     ---@return string?
-    function FactionEvents.getHudStatus(pid)
+    local function get_cave_event_hud_status(pid)
         if not active or not member_faction(pid) then return nil end
         local health = objective and GetWidgetLife(objective) or 0.
         local max_health = objective and BlzGetUnitMaxHP(objective) or 1.
@@ -385,8 +387,9 @@ OnInit.final("FactionEvents", function(Require)
             .. "  |  " .. format_time(remaining or 0.)
     end
 
+    local start_cave_event_now
     if DEV_ENABLED then
-        function FactionEvents.startNow()
+        start_cave_event_now = function()
             disable_callback(next_event_callback)
             disable_callback(warning_callback)
             next_event_callback = nil
@@ -401,6 +404,68 @@ OnInit.final("FactionEvents", function(Require)
             return start_event()
         end
     end
+
+    ---@class FactionEventProvider
+    ---@field activate fun(): boolean
+    ---@field getStatus fun(pid: integer): string
+    ---@field getHudStatus fun(pid: integer): string?
+    ---@field startNow? fun(): boolean
+
+    ---Registers one faction's independently scheduled signature event.
+    ---@param faction_id integer
+    ---@param provider FactionEventProvider
+    function FactionEvents.register(faction_id, provider)
+        providers[faction_id] = provider
+        if service_activated then
+            provider.activate()
+        end
+    end
+
+    function FactionEvents.activate()
+        if service_activated then return false end
+        service_activated = true
+        for _, provider in pairs(providers) do
+            provider.activate()
+        end
+        return true
+    end
+
+    local function provider_for(pid)
+        local faction = Faction.getFaction(pid)
+        return faction and providers[faction.id] or nil
+    end
+
+    ---@param pid integer
+    ---@return string
+    function FactionEvents.getStatus(pid)
+        local provider = provider_for(pid)
+        if not provider then
+            return "|cff808080This faction's hourly event is not yet available.|r"
+        end
+        return provider.getStatus(pid)
+    end
+
+    ---@param pid integer
+    ---@return string?
+    function FactionEvents.getHudStatus(pid)
+        local provider = provider_for(pid)
+        return provider and provider.getHudStatus(pid) or nil
+    end
+
+    if DEV_ENABLED then
+        ---@param pid integer
+        function FactionEvents.startNow(pid)
+            local provider = provider_for(pid)
+            return provider and provider.startNow and provider.startNow() or false
+        end
+    end
+
+    FactionEvents.register(CAVE_VOYAGERS_ID, {
+        activate = activate_cave_event,
+        getStatus = get_cave_event_status,
+        getHudStatus = get_cave_event_hud_status,
+        startNow = DEV_ENABLED and start_cave_event_now or nil,
+    })
 
     if CHAOS_MODE then
         FactionEvents.activate()

@@ -278,8 +278,8 @@ modifiers:
                 DisplayTextToPlayer(p, 0., 0., "Unable to spawn deposit. Check its placeholder rawcode.")
             end
         end,
-        ["factionevent"] = function(p)
-            if not FactionEvents.startNow() then
+        ["factionevent"] = function(p, pid)
+            if not FactionEvents.startNow(pid) then
                 DisplayTextToPlayer(p, 0., 0., "Unable to start the faction event.")
             end
         end,

@@ -181,6 +181,8 @@ OnInit.global("Progression", function(Require)
                 * level_multiplier)
             AwardGold(pid, team_gold, false)
             AwardXP(pid, xp)
+            RewardNotifications.kill(pid, killed, killer,
+                math.min(1., level_multiplier), boss ~= nil)
         end
     end
 end)

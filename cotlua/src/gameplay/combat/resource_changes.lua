@@ -2,11 +2,25 @@ OnInit.global("ResourceChanges", function(Require)
     Require('TextHelpers')
     Require('FloatingText')
 
+    ResourceChanges = {}
+
+    local heal_actions = {}
+
+    ---@param callback fun(source: unit, target: unit, amount: number, tag: string|nil)
+    function ResourceChanges.registerHealAction(callback)
+        for index = 1, #heal_actions do
+            if heal_actions[index] == callback then return false end
+        end
+        heal_actions[#heal_actions + 1] = callback
+        return true
+    end
+
     ---@type fun(source: unit, target: unit, hp: number, tag: string|nil)
     function HP(source, target, hp, tag)
         if not Unit[target].hit_based_health then
             hp = hp * Unit[target].regen_percent
             local text = RealToString(hp)
+            local previous_life = GetWidgetLife(target)
 
             if UndyingRageBuff:has(target, target) then
                 UndyingRageBuff:get(target, target):addRegen(hp)
@@ -18,6 +32,12 @@ OnInit.global("ResourceChanges", function(Require)
             end
 
             LogDamage(source, target, "|cff7dff7d" .. text .. "|r", true, tag)
+            local effective_healing = math.max(0., GetWidgetLife(target) - previous_life)
+            if effective_healing > 0. then
+                for index = 1, #heal_actions do
+                    heal_actions[index](source, target, effective_healing, tag)
+                end
+            end
         end
     end
 

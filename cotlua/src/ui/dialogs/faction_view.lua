@@ -300,7 +300,7 @@ OnInit.final("FactionView", function(Require)
         end
         BlzFrameSetText(rank_count, "|cffffcc00" .. rank .. "|r")
         rank_icon:setTooltipName("Rank " .. rank)
-        rank_icon:setTooltipText("Cave Voyagers Rank " .. rank .. " of "
+        rank_icon:setTooltipText(faction.name .. " Rank " .. rank .. " of "
             .. Faction.getMaxRank() .. ".\n\n|cffffcc00Reputation:|r " .. reputation_line)
         buff_icon:icon(buff.ICON)
         buff_icon:setTooltipIcon(buff.ICON)
@@ -350,10 +350,11 @@ OnInit.final("FactionView", function(Require)
     function view.refreshProgress(pid, quest, progress)
         if GetLocalPlayer() ~= Player(pid - 1) then return end
         local box = boxes[quest.diff]
+        local display_progress = Quest.formatProgress(progress)
         BlzFrameSetText(box.text, "|cffffcc00" .. quest.name .. "|r\n"
-            .. progress .. " / " .. quest.goal)
+            .. display_progress .. " / " .. quest.goal)
         box.icon:setTooltipText(quest.desc .. "\n\n|cffffcc00Progress:|r "
-            .. progress .. " / " .. quest.goal)
+            .. display_progress .. " / " .. quest.goal)
     end
 
     function view.questCompleted(pid, quest)

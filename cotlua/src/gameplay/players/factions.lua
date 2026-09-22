@@ -6,6 +6,8 @@ OnInit.final("Faction", function(Require)
     Require('FactionShop')
     Require('Currency')
     Require('Profile')
+    Require('ResourceChanges')
+    Require('RewardNotifications')
     Require('TimerQueue')
     Require('Users')
     Require('Variables')
@@ -430,16 +432,20 @@ OnInit.final("Faction", function(Require)
     ---Advances the active quest when an existing game activity reports progress.
     ---@param pid integer
     ---@param kind string
-    ---@param amount? integer
+    ---@param amount? number
     function Quest.progress(pid, kind, amount)
         local quest = active_quest[pid]
         if not quest or quest.kind ~= kind then
             return false
         end
 
-        local progress = math.min(quest.goal, quest_progress[pid] + (amount or 1))
+        local old_progress = quest_progress[pid]
+        local progress = math.min(quest.goal, old_progress + (amount or 1))
         quest_progress[pid] = progress
-        if view then
+        -- Fractional progress is retained for normalized kill/healing goals,
+        -- but presentation only needs to refresh when the visible integer moves.
+        if view and (math.floor(progress) ~= math.floor(old_progress)
+            or progress >= quest.goal) then
             view.refreshProgress(pid, quest, progress)
             view.refreshFaction(player_faction[pid], pid)
         end
@@ -475,6 +481,12 @@ OnInit.final("Faction", function(Require)
     ---@return integer
     function Quest.getActive(pid)
         return active_quest[pid], quest_progress[pid]
+    end
+
+    ---@param progress number
+    ---@return string
+    function Quest.formatProgress(progress)
+        return tostring(math.floor((progress or 0.) + 0.0001))
     end
 
     ---@param pid integer
@@ -552,6 +564,37 @@ OnInit.final("Faction", function(Require)
     local QUEST_DIFF_EASY = 1
     local QUEST_DIFF_MEDIUM = 2
     local QUEST_DIFF_HARD = 3
+    local generic_quests = {
+        Quest.create(
+            "Thinning the Ranks",
+            "Defeat 50 level-appropriate enemies. Enemies below your level grant reduced progress.\n\n|cffffcc00Reward:|r 5 Faction Points and 5 Reputation",
+            "ReplaceableTextures\\CommandButtons\\BTNOrcMeleeUpOne.blp",
+            QUEST_DIFF_EASY,
+            "kill_units", 50, 5, 5
+        ),
+        Quest.create(
+            "Field Medic",
+            "Restore health equal to 500% of allied heroes' Max Health. Only effective healing on another player's hero counts.\n\n|cffffcc00Reward:|r 10 Faction Points and 10 Reputation",
+            "ReplaceableTextures\\CommandButtons\\BTNHeal.blp",
+            QUEST_DIFF_MEDIUM,
+            "heal_allies", 500, 10, 10
+        ),
+        Quest.create(
+            "Apex Predators",
+            "Help defeat 3 level-appropriate bosses.\n\n|cffffcc00Reward:|r 20 Faction Points and 20 Reputation",
+            "ReplaceableTextures\\CommandButtons\\BTNMarkOfFire.blp",
+            QUEST_DIFF_HARD,
+            "kill_bosses", 3, 20, 20
+        ),
+    }
+
+    ---Adds the faction-neutral quest pool to a faction's themed objectives.
+    function Faction:addGenericQuests()
+        for index = 1, #generic_quests do
+            self:addQuest(generic_quests[index])
+        end
+    end
+
     local miner_guild = Faction.create(
         1,
         "Cave Voyagers",
@@ -630,6 +673,30 @@ OnInit.final("Faction", function(Require)
         QUEST_DIFF_HARD,
         "colosseum_clear", 1, 20, 20
     ))
+    miner_guild:addGenericQuests()
+
+    local function on_rewarded_kill(pid, _killed, _killer, quality, boss)
+        Quest.progress(pid, "kill_units", quality)
+        if boss then
+            Quest.progress(pid, "kill_bosses", quality)
+        end
+    end
+
+    local function on_effective_heal(source, target, amount)
+        if not source or not target then return end
+        local pid = GetPlayerId(GetOwningPlayer(source)) + 1
+        local target_pid = GetPlayerId(GetOwningPlayer(target)) + 1
+        if pid > PLAYER_CAP or target_pid > PLAYER_CAP or pid == target_pid
+            or target ~= Hero[target_pid] or not IsUnitAlly(target, Player(pid - 1)) then
+            return
+        end
+
+        local max_health = math.max(1., BlzGetUnitMaxHP(target))
+        Quest.progress(pid, "heal_allies", amount / max_health * 100.)
+    end
+
+    RewardNotifications.registerKillAction(on_rewarded_kill)
+    ResourceChanges.registerHealAction(on_effective_heal)
 
     local function restore_faction(pid, hero)
         pending_faction[pid] = nil

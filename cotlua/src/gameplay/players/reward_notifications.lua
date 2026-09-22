@@ -13,6 +13,7 @@ OnInit.global("RewardNotifications", function(Require)
     local reward_actions = {}
     local quest_actions = {}
     local eligibility_actions = {}
+    local kill_actions = {}
 
     local function register(actions, callback)
         for index = 1, #actions do
@@ -30,6 +31,11 @@ OnInit.global("RewardNotifications", function(Require)
     ---@param callback fun(id: integer, name: string, count: integer, goal: integer, status: string, min_level: integer, target_level: number, contribution_quality: number)
     function RewardNotifications.registerQuestAction(callback)
         return register(quest_actions, callback)
+    end
+
+    ---@param callback fun(pid: integer, killed: unit, killer: unit, quality: number, boss: boolean)
+    function RewardNotifications.registerKillAction(callback)
+        return register(kill_actions, callback)
     end
 
     ---@param hero_level number
@@ -66,6 +72,20 @@ OnInit.global("RewardNotifications", function(Require)
         metrics.world_text_tags_removed = metrics.world_text_tags_removed + 1
         for index = 1, #reward_actions do
             reward_actions[index](pid, "xp", amount, 0)
+        end
+    end
+
+    ---Publishes a rewarded kill. Quality is capped at one and uses the same
+    ---overlevel reduction as XP, allowing objectives to count meaningful
+    ---enemy equivalents instead of rewarding obsolete-unit farming.
+    ---@param pid integer
+    ---@param killed unit
+    ---@param killer unit
+    ---@param quality number
+    ---@param boss boolean
+    function RewardNotifications.kill(pid, killed, killer, quality, boss)
+        for index = 1, #kill_actions do
+            kill_actions[index](pid, killed, killer, quality, boss)
         end
     end
 
