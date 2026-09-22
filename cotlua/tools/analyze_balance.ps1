@@ -179,10 +179,14 @@ function Get-ObjectiveScore($Metrics, [string] $Name) {
 }
 
 function Test-LimitConflict($State, $Candidate) {
-    if ($Candidate.Limit -le 0) { return $false }
     foreach ($item in $State.Items) {
+        # Benchmark builds model obtainable equipment rather than allowing the
+        # beam search to clone a unique object-data item into several slots.
+        if ($item.Rawcode -eq $Candidate.Rawcode) { return $true }
+
+        if ($Candidate.Limit -le 0) { continue }
         if ($item.Limit -ne $Candidate.Limit) { continue }
-        if ($Candidate.Limit -ne 1 -or $item.Rawcode -eq $Candidate.Rawcode) {
+        if ($Candidate.Limit -ne 1) {
             return $true
         }
     }
