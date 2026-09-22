@@ -98,7 +98,7 @@ OnInit.final("Stormwatch", function(Require)
     local STABILIZE_RADIUS = 325.
     local STABILIZE_TIME = 12.
     local EVENT_TIMEOUT = 600.
-    local AVATAR_TIMEOUT = 120.
+    local AVATAR_TIMEOUT = 300.
     local STRIKE_INTERVAL = 3
     local STRIKE_DELAY = 1.5
     local STRIKE_RADIUS = 225.
@@ -114,6 +114,8 @@ OnInit.final("Stormwatch", function(Require)
     local nodes = {}
     local stabilized = 0
     local avatar ---@type unit?
+    local avatar_max_health = 0.
+    local avatar_damage = 0.
     local tick_callback ---@type integer?
     local timeout_callback ---@type integer?
     local contribution = {}
@@ -121,7 +123,7 @@ OnInit.final("Stormwatch", function(Require)
     local strike_generation = 0
     local strike_warnings = setmetatable({}, { __mode = 'k' })
 
-    local finish_event
+    local finish_event, track_avatar_damage
 
     local function format_time(time)
         local total = math.max(0, math.ceil(time))
@@ -162,9 +164,12 @@ OnInit.final("Stormwatch", function(Require)
         end
         strike_warnings = setmetatable({}, { __mode = 'k' })
         if avatar then
+            EVENT_ON_STRUCK_FINAL:unregister_unit_action(avatar, track_avatar_damage)
             RemoveUnit(avatar)
             avatar = nil
         end
+        avatar_max_health = 0.
+        avatar_damage = 0.
     end
 
     local function resolve_strike(generation, warning, x, y)
@@ -227,6 +232,14 @@ OnInit.final("Stormwatch", function(Require)
         return result
     end
 
+    track_avatar_damage = function(target, source, _amount, amount_after_red)
+        if target ~= avatar or not source or amount_after_red <= 0. then return end
+        local source_pid = GetPlayerId(GetOwningPlayer(source))
+        if source_pid >= PLAYER_CAP then return end
+        avatar_damage = math.min(avatar_max_health,
+            avatar_damage + math.min(amount_after_red, GetWidgetLife(target)))
+    end
+
     local function spawn_avatar()
         phase = "avatar"
         if timeout_callback then
@@ -251,6 +264,8 @@ OnInit.final("Stormwatch", function(Require)
         local damage = (350. + level * level * 0.85) * (1. + (party_size - 1) * 0.22)
         BlzSetUnitMaxHP(avatar, math.floor(health))
         SetWidgetLife(avatar, health)
+        avatar_max_health = health
+        avatar_damage = 0.
         BlzSetUnitBaseDamage(avatar,
             math.max(1, math.floor(damage / CHAOS_ATTACK_DAMAGE_MULTIPLIER)), 0)
         BlzSetUnitArmor(avatar, level * 0.75)
@@ -258,6 +273,7 @@ OnInit.final("Stormwatch", function(Require)
         BlzSetUnitWeaponIntegerField(avatar,
             UNIT_WEAPON_IF_ATTACK_ATTACK_TYPE, 0, ATTACK_CHAOS)
         BlzSetUnitIntegerField(avatar, UNIT_IF_LEVEL, level)
+        EVENT_ON_STRUCK_FINAL:register_unit_action(avatar, track_avatar_damage)
         EVENT_ON_UNIT_DEATH:register_unit_action(avatar, function()
             if active then finish_event(true) end
         end)
@@ -321,19 +337,35 @@ OnInit.final("Stormwatch", function(Require)
     finish_event = function(success)
         if not active then return false end
         active = false
-        if success then
-            local rewarded = 0
+        local damage_fraction = success and 1. or math.min(1.,
+            avatar_max_health > 0. and avatar_damage / avatar_max_health or 0.)
+        local point_reward = math.floor(POINT_REWARD * damage_fraction + 0.5)
+        local reputation_reward = math.floor(REPUTATION_REWARD * damage_fraction + 0.5)
+        local rewarded = 0
+        if point_reward > 0 then
             for pid, seconds in pairs(contribution) do
                 if is_member(pid) and seconds >= 30 then
-                    AddCurrency(pid, FACTION, POINT_REWARD)
-                    Faction.addReputation(pid, REPUTATION_REWARD)
-                    Quest.progress(pid, "faction_event")
-                    StartSoundForPlayerBJ(Player(pid - 1), bj_questCompletedSound)
+                    AddCurrency(pid, FACTION, point_reward)
+                    Faction.addReputation(pid, reputation_reward)
+                    if success then
+                        Quest.progress(pid, "faction_event")
+                        StartSoundForPlayerBJ(Player(pid - 1), bj_questCompletedSound)
+                    else
+                        StartSoundForPlayerBJ(Player(pid - 1), bj_questUpdatedSound)
+                    end
                     rewarded = rewarded + 1
                 end
             end
+        end
+        if success then
             announce("|cff80ff80Eye of the Storm complete!|r " .. rewarded
                 .. " participant" .. (rewarded == 1 and " was" or "s were") .. " rewarded.")
+        elseif damage_fraction > 0. then
+            announce("|cffffcc00Eye of the Storm ended at "
+                .. math.floor(damage_fraction * 100. + 0.5) .. "% damage.|r "
+                .. rewarded .. " participant" .. (rewarded == 1 and " receives " or "s receive ")
+                .. point_reward .. " Faction Points and " .. reputation_reward .. " Reputation.",
+                bj_questFailedSound)
         else
             announce("|cffff4040Eye of the Storm failed.|r The anomalies became unstable.",
                 bj_questFailedSound)
@@ -369,7 +401,7 @@ OnInit.final("Stormwatch", function(Require)
             }
         end
         announce("|cffffcc00Faction Event: Eye of the Storm|r\n"
-            .. "Stabilize each anomaly while dodging lightning strikes, then destroy the avatar within 2 minutes.",
+            .. "Stabilize each anomaly while dodging lightning strikes, then damage the avatar as much as possible within 5 minutes.",
             bj_questDiscoveredSound)
         tick_callback = TimerQueue:callDelayed(1., event_tick)
         timeout_callback = TimerQueue:callDelayed(EVENT_TIMEOUT, finish_event, false)
@@ -379,12 +411,12 @@ OnInit.final("Stormwatch", function(Require)
     local function event_status(_pid, remaining)
         if active then
             if phase == "avatar" then
-                return "|cff80dfffEye of the Storm|r\n\nThe storm avatar has formed. Destroy it within 2 minutes."
+                return "|cff80dfffEye of the Storm|r\n\nThe storm avatar has formed. Deal as much damage as possible within 5 minutes; rewards scale with damage dealt."
             end
             return "|cff80dfffEye of the Storm|r\n\nStand near the anomalies to stabilize them while dodging lightning strikes.\n\n|cffffcc00Progress:|r "
                 .. stabilized .. " / " .. #nodes
         end
-        return "|cff80dfffEye of the Storm|r\n\nStabilize four anomalies while avoiding lightning, then destroy the storm avatar within 2 minutes.\n\n|cffffcc00Begins in:|r "
+        return "|cff80dfffEye of the Storm|r\n\nStabilize four anomalies while avoiding lightning, then damage the storm avatar within 5 minutes. Rewards scale with damage dealt.\n\n|cffffcc00Begins in:|r "
             .. format_time(remaining or 0.)
     end
 

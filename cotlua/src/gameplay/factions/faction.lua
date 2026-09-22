@@ -581,7 +581,7 @@ OnInit.final("Faction", function(Require)
         ),
         Quest.create(
             "Apex Predators",
-            "Help defeat 3 boss equivalents. Bosses up to 20 levels above you count fully; higher bosses give no credit. Bosses below your level grant reduced progress using the same level scaling as experience.\n\n|cffffcc00Reward:|r 20 Faction Points and 20 Reputation",
+            "Help defeat 3 bosses within 20 levels of your hero.\n\n|cffffcc00Reward:|r 20 Faction Points and 20 Reputation",
             "ReplaceableTextures\\CommandButtons\\BTNMarkOfFire.blp",
             QUEST_DIFF_HARD,
             "kill_bosses", 3, 20, 20
@@ -595,10 +595,11 @@ OnInit.final("Faction", function(Require)
         end
     end
 
-    local function on_rewarded_kill(pid, _killed, _killer, quality, boss)
+    local function on_rewarded_kill(pid, killed, _killer, quality, boss)
         Quest.progress(pid, "kill_units", quality)
-        if boss then
-            Quest.progress(pid, "kill_bosses", quality)
+        if boss and Hero[pid]
+            and math.abs(GetHeroLevel(Hero[pid]) - GetUnitLevel(killed)) <= 20 then
+            Quest.progress(pid, "kill_bosses")
         end
     end
 
