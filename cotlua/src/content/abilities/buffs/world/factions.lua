@@ -54,4 +54,17 @@ OnInit.final("BuffsWorldFactions", function(Require)
         end
     end
 
+    ---@class StormwatchBuff : Buff
+    StormwatchBuff = Buff.new()
+    do
+        local thistype = StormwatchBuff
+        thistype.NAME            = "Stormwise"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNMonsoon.blp"
+        thistype.DESC            = "This unit is attuned to changing weather"
+        thistype.DESC_FACTION    = "Reduces harmful weather effects by |cffffcc0015%|r and improves beneficial weather effects by |cffffcc0010%|r. Improves at Ranks 4 and 7."
+        thistype.DISPEL_TYPE     = BUFF_POSITIVE
+        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
+        thistype.CANNOT_PURGE    = true
+    end
+
 end, Debug and Debug.getLine())

@@ -18,6 +18,9 @@ OnInit.final("Weather", function(Require)
     local callback
     local weather_periodic
     local weather_iterations = 0
+    local change_actions = {}
+
+    Weather = {}
 
     function buff:onRemove()
         local tbl = WeatherTable[CURRENT_WEATHER]
@@ -34,11 +37,14 @@ OnInit.final("Weather", function(Require)
 
     function buff:onApply()
         local tbl = WeatherTable[CURRENT_WEATHER]
-        self.as = 1. - (tbl.as or 0) * 0.01
-        self.atk = (tbl.atk or 0)
-        self.spellboost = (tbl.boost or 0) * 0.01
-        self.dr = (1. - (tbl.dr or 0) * 0.01)
-        self.ms = (tbl.ms or 0) * 0.01 * (math.min(1, Unit[self.target].ms_percent))
+        local magnitude = buff.getEffectMultiplier
+            and buff.getEffectMultiplier(self.target, tbl.bad == 1) or 1.
+        self.as = 1. - (tbl.as or 0) * magnitude * 0.01
+        self.atk = (tbl.atk or 0) * magnitude
+        self.spellboost = (tbl.boost or 0) * magnitude * 0.01
+        self.dr = (1. - (tbl.dr or 0) * magnitude * 0.01)
+        self.ms = (tbl.ms or 0) * magnitude * 0.01
+            * (math.min(1, Unit[self.target].ms_percent))
 
         Unit[self.target].damage_percent = Unit[self.target].damage_percent + self.atk * 0.01
         Unit[self.target].bonus_bat = Unit[self.target].bonus_bat / self.as
@@ -348,6 +354,10 @@ OnInit.final("Weather", function(Require)
         if CURRENT_WEATHER == WEATHER_FIRESTORM then
             TQ:callDelayed(3., firestorm_effect, dur)
         end
+
+        for index = 1, #change_actions do
+            change_actions[index](weather, WeatherTable[weather])
+        end
     end
 
     local function is_valid_weather(id, time)
@@ -467,6 +477,28 @@ OnInit.final("Weather", function(Require)
 
     if DEV_ENABLED then
         WEATHER_PERIODIC = weather_periodic
+    end
+
+    ---@return integer
+    function Weather.getCurrent()
+        return CURRENT_WEATHER
+    end
+
+    ---@param id? integer
+    ---@return table?
+    function Weather.getDefinition(id)
+        return WeatherTable[id or CURRENT_WEATHER]
+    end
+
+    ---@param id? integer
+    ---@return boolean
+    function Weather.isHarmful(id)
+        return is_bad_weather(id or CURRENT_WEATHER)
+    end
+
+    ---@param action fun(weather: integer, definition: table)
+    function Weather.registerChangeAction(action)
+        change_actions[#change_actions + 1] = action
     end
 
     local function enter_filter()
