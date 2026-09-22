@@ -4,6 +4,7 @@ OnInit.final("Stormwatch", function(Require)
     Require('Faction')
     Require('FactionEvents')
     Require('Currency')
+    Require('Damage')
     Require('Events')
     Require('MainMap')
     Require('Pathing')
@@ -97,10 +98,16 @@ OnInit.final("Stormwatch", function(Require)
     local STABILIZE_RADIUS = 325.
     local STABILIZE_TIME = 12.
     local EVENT_TIMEOUT = 600.
+    local AVATAR_TIMEOUT = 120.
+    local STRIKE_INTERVAL = 3
+    local STRIKE_DELAY = 1.5
+    local STRIKE_RADIUS = 225.
+    local STRIKE_HEALTH_FRACTION = 0.12
     local POINT_REWARD = 30
     local REPUTATION_REWARD = 30
     local AVATAR_TEMPLATE = FourCC('n002')
-    local AVATAR_SKIN = FourCC('n01W')
+    -- O02M uses the built-in Lightning Revenant model in this map's object data.
+    local AVATAR_SKIN = FourCC('O02M')
     local NODE_MODEL = "Abilities\\Spells\\Other\\Tornado\\TornadoElementalSmall.mdl"
     local active = false
     local phase = "idle"
@@ -110,6 +117,9 @@ OnInit.final("Stormwatch", function(Require)
     local tick_callback ---@type integer?
     local timeout_callback ---@type integer?
     local contribution = {}
+    local strike_countdown = STRIKE_INTERVAL
+    local strike_generation = 0
+    local strike_warnings = setmetatable({}, { __mode = 'k' })
 
     local finish_event
 
@@ -136,6 +146,7 @@ OnInit.final("Stormwatch", function(Require)
     end
 
     local function cleanup()
+        strike_generation = strike_generation + 1
         if tick_callback then TimerQueue:disableCallback(tick_callback) end
         if timeout_callback then TimerQueue:disableCallback(timeout_callback) end
         tick_callback = nil
@@ -146,9 +157,58 @@ OnInit.final("Stormwatch", function(Require)
             end
         end
         nodes = {}
+        for effect in pairs(strike_warnings) do
+            DestroyEffect(effect)
+        end
+        strike_warnings = setmetatable({}, { __mode = 'k' })
         if avatar then
             RemoveUnit(avatar)
             avatar = nil
+        end
+    end
+
+    local function resolve_strike(generation, warning, x, y)
+        if strike_warnings[warning] then
+            strike_warnings[warning] = nil
+            DestroyEffect(warning)
+        end
+        if generation ~= strike_generation or not active or phase ~= "stabilize" then
+            return
+        end
+
+        local impact = AddSpecialEffect(
+            "Abilities\\Spells\\Other\\Monsoon\\MonsoonBoltTarget.mdl", x, y)
+        BlzSetSpecialEffectScale(impact, 1.35)
+        DestroyEffect(impact)
+        local user = User.first
+        while user do
+            local hero = Hero[user.id]
+            if hero and UnitAlive(hero)
+                and IsUnitInRangeXY(hero, x, y, STRIKE_RADIUS) then
+                DamageTarget(DUMMY_UNIT, hero,
+                    BlzGetUnitMaxHP(hero) * STRIKE_HEALTH_FRACTION,
+                    ATTACK_TYPE_NORMAL, PURE, "Storm Strike")
+            end
+            user = user.next
+        end
+    end
+
+    local function launch_strikes(members)
+        local targets = math.min(3, #members)
+        local candidates = {}
+        for index = 1, #members do
+            candidates[index] = members[index]
+        end
+        for index = 1, targets do
+            local choice = math.random(index, #candidates)
+            candidates[index], candidates[choice] = candidates[choice], candidates[index]
+            local hero = Hero[candidates[index]]
+            local x, y = GetUnitX(hero), GetUnitY(hero)
+            local warning = AddSpecialEffect("Indicators\\circle.mdl", x, y)
+            BlzSetSpecialEffectScale(warning, STRIKE_RADIUS / 500.)
+            strike_warnings[warning] = true
+            TimerQueue:callDelayed(STRIKE_DELAY, resolve_strike,
+                strike_generation, warning, x, y)
         end
     end
 
@@ -169,6 +229,10 @@ OnInit.final("Stormwatch", function(Require)
 
     local function spawn_avatar()
         phase = "avatar"
+        if timeout_callback then
+            TimerQueue:disableCallback(timeout_callback)
+        end
+        timeout_callback = TimerQueue:callDelayed(AVATAR_TIMEOUT, finish_event, false)
         local x, y = event_center()
         local members = nearby_members(EVENT_RADIUS)
         local party_size = math.max(1, #members)
@@ -214,6 +278,11 @@ OnInit.final("Stormwatch", function(Require)
         end
 
         if phase == "stabilize" then
+            strike_countdown = strike_countdown - 1
+            if strike_countdown <= 0 and #members > 0 then
+                strike_countdown = STRIKE_INTERVAL
+                launch_strikes(members)
+            end
             for node_index = 1, #nodes do
                 local node = nodes[node_index]
                 if not node.complete then
@@ -273,6 +342,8 @@ OnInit.final("Stormwatch", function(Require)
         phase = "idle"
         contribution = {}
         stabilized = 0
+        strike_countdown = STRIKE_INTERVAL
+        strike_generation = strike_generation + 1
         return true
     end
 
@@ -298,7 +369,7 @@ OnInit.final("Stormwatch", function(Require)
             }
         end
         announce("|cffffcc00Faction Event: Eye of the Storm|r\n"
-            .. "Stand near each storm anomaly for 12 seconds, then destroy the avatar.",
+            .. "Stabilize each anomaly while dodging lightning strikes, then destroy the avatar within 2 minutes.",
             bj_questDiscoveredSound)
         tick_callback = TimerQueue:callDelayed(1., event_tick)
         timeout_callback = TimerQueue:callDelayed(EVENT_TIMEOUT, finish_event, false)
@@ -308,12 +379,12 @@ OnInit.final("Stormwatch", function(Require)
     local function event_status(_pid, remaining)
         if active then
             if phase == "avatar" then
-                return "|cff80dfffEye of the Storm|r\n\nThe storm avatar has formed. Destroy it before the event expires."
+                return "|cff80dfffEye of the Storm|r\n\nThe storm avatar has formed. Destroy it within 2 minutes."
             end
-            return "|cff80dfffEye of the Storm|r\n\nStand near the anomalies to stabilize them.\n\n|cffffcc00Progress:|r "
+            return "|cff80dfffEye of the Storm|r\n\nStand near the anomalies to stabilize them while dodging lightning strikes.\n\n|cffffcc00Progress:|r "
                 .. stabilized .. " / " .. #nodes
         end
-        return "|cff80dfffEye of the Storm|r\n\nStabilize four anomalies, then destroy the storm avatar.\n\n|cffffcc00Begins in:|r "
+        return "|cff80dfffEye of the Storm|r\n\nStabilize four anomalies while avoiding lightning, then destroy the storm avatar within 2 minutes.\n\n|cffffcc00Begins in:|r "
             .. format_time(remaining or 0.)
     end
 

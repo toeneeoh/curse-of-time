@@ -581,7 +581,7 @@ OnInit.final("Faction", function(Require)
         ),
         Quest.create(
             "Apex Predators",
-            "Help defeat 3 level-appropriate bosses.\n\n|cffffcc00Reward:|r 20 Faction Points and 20 Reputation",
+            "Help defeat 3 boss equivalents. Bosses up to 20 levels above you count fully; higher bosses give no credit. Bosses below your level grant reduced progress using the same level scaling as experience.\n\n|cffffcc00Reward:|r 20 Faction Points and 20 Reputation",
             "ReplaceableTextures\\CommandButtons\\BTNMarkOfFire.blp",
             QUEST_DIFF_HARD,
             "kill_bosses", 3, 20, 20
