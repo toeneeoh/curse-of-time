@@ -104,6 +104,9 @@ OnInit.final("UnitTable", function(Require)
     ---@field overworld_base_dm number
     ---@field overworld_party_size integer
     ---@field overworld_scaling_reset_pending boolean
+    ---@field overworld_rare boolean?
+    ---@field overworld_rare_health_multiplier number?
+    ---@field overworld_rare_damage_multiplier number?
     Unit = {}  ---@type Unit | Unit[]
     do
         local thistype = Unit

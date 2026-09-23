@@ -18,6 +18,7 @@ OnInit.final("Units", function(Require)
     Require('Users')
 
     UnitData = {}
+    OverworldCreeps = {}
 
     local GROUP_SCALING_RANGE = 1800.
     local HEALTH_PER_EXTRA_PLAYER = 0.5
@@ -32,8 +33,10 @@ OnInit.final("Units", function(Require)
         local health_fraction = math.max(0., math.min(1.,
             GetWidgetLife(creep) / previous_max))
         local extra_players = math.max(0, party_size - 1)
-        local health_multiplier = 1. + HEALTH_PER_EXTRA_PLAYER * extra_players
-        local damage_multiplier = 1. + DAMAGE_PER_EXTRA_PLAYER * extra_players
+        local health_multiplier = (1. + HEALTH_PER_EXTRA_PLAYER * extra_players)
+            * (data.overworld_rare_health_multiplier or 1.)
+        local damage_multiplier = (1. + DAMAGE_PER_EXTRA_PLAYER * extra_players)
+            * (data.overworld_rare_damage_multiplier or 1.)
 
         data.bonus_hp = data.overworld_base_bonus_hp
             + data.overworld_base_hp * (health_multiplier - 1.)
@@ -107,6 +110,46 @@ OnInit.final("Units", function(Require)
         -- Register before damage is applied so a coordinated opening AoE cannot
         -- bypass the health scaling by killing an idle pack in one frame.
         EVENT_ON_STRUCK:register_unit_action(creep, scale_overworld_engagement)
+    end
+
+    ---@param creep unit
+    ---@return boolean
+    function OverworldCreeps.isRegular(creep)
+        if not creep or not UnitAlive(creep)
+            or GetOwningPlayer(creep) ~= PLAYER_CREEP
+            or not UnitData[GetUnitTypeId(creep)] then
+            return false
+        end
+        local data = Unit[creep]
+        return data.overworld_base_hp ~= nil and not data.overworld_rare
+    end
+
+    ---@param creep unit
+    ---@param health_multiplier number
+    ---@param damage_multiplier number
+    ---@return boolean
+    function OverworldCreeps.promoteRare(creep, health_multiplier, damage_multiplier)
+        if not OverworldCreeps.isRegular(creep) then return false end
+        local data = Unit[creep]
+        data.overworld_rare = true
+        data.overworld_rare_health_multiplier = health_multiplier
+        data.overworld_rare_damage_multiplier = damage_multiplier
+        apply_group_scaling(creep, data.overworld_party_size or 1)
+        SetWidgetLife(creep, data.hp)
+        return true
+    end
+
+    ---@param creep unit
+    function OverworldCreeps.restore(creep)
+        if not creep or GetUnitTypeId(creep) == 0 then return end
+        local data = Unit[creep]
+        if not data.overworld_rare then return end
+        data.overworld_rare = nil
+        data.overworld_rare_health_multiplier = nil
+        data.overworld_rare_damage_multiplier = nil
+        if UnitAlive(creep) then
+            apply_group_scaling(creep, data.overworld_party_size or 1)
+        end
     end
 
     ---@return boolean

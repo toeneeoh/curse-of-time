@@ -54,6 +54,8 @@ OnInit.final("Faction", function(Require)
     ---@field faction_points integer
     ---@field reputation integer
     ---@field min_rank integer
+    ---@field accept_action? fun(pid: integer, quest: Quest)
+    ---@field end_action? fun(pid: integer, quest: Quest, completed: boolean)
     Quest = {}
     Quest.__index = Quest
     Quest.quests = {}
@@ -210,6 +212,9 @@ OnInit.final("Faction", function(Require)
     end
 
     local function clear_quest_state(pid)
+        if active_quest[pid] then
+            active_quest[pid]:on_end(pid, false)
+        end
         pending_quest[pid] = nil
         active_quest[pid] = nil
         quest_progress[pid] = 0
@@ -460,8 +465,19 @@ OnInit.final("Faction", function(Require)
     function Quest:on_accept(pid)
         quest_progress[pid] = 0
         quest_unique_progress[pid] = {}
+        if self.accept_action then
+            self.accept_action(pid, self)
+        end
         if view then
             view.refreshProgress(pid, self, 0)
+        end
+    end
+
+    ---@param pid integer
+    ---@param completed boolean
+    function Quest:on_end(pid, completed)
+        if self.end_action then
+            self.end_action(pid, self, completed)
         end
     end
 
@@ -514,6 +530,7 @@ OnInit.final("Faction", function(Require)
     end
 
     local function complete_quest(pid, quest)
+        quest:on_end(pid, true)
         active_quest[pid] = nil
         quest_progress[pid] = 0
         quest_unique_progress[pid] = nil
@@ -638,6 +655,9 @@ OnInit.final("Faction", function(Require)
 
         AddCurrency(pid, FACTION, -QUEST_REROLL_COST)
         reroll_used[pid] = true
+        if active_quest[pid] then
+            active_quest[pid]:on_end(pid, false)
+        end
         active_quest[pid] = nil
         pending_quest[pid] = nil
         quest_progress[pid] = 0

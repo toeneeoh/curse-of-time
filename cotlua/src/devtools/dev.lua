@@ -51,7 +51,7 @@ OnInit.final("Dev", function(Require)
         ["levelmetrics"] = "Print level-up timing stages, or reset them with -levelmetrics reset.",
         ["balance"] = "Balance tools: -balance items, -balance start [seconds] [label], -balance stop, -balance snapshot [label], or -balance equip [average|perfect] [six rawcodes].",
         ["sf"] = "Set the amount of faction points you have to #. usage: -sf [#]",
-        ["factionrep"] = "Set Cave Voyagers lifetime Faction Points to #. usage: -factionrep [#]",
+        ["factionrep"] = "Set the active faction's lifetime Faction Points to #. usage: -factionrep [#]",
         ["mining"] = "Spawn a common, rich, or rare deposit beside your hero. usage: -mining [common|rich|rare]",
         ["factionevent"] = "Immediately start the next hourly faction event.",
         ["lvl"] = "Set the selected hero's level to #. usage: -lvl [1-500]",
@@ -269,7 +269,12 @@ modifiers:
             SetCurrency(pid, FACTION, S2I(args[2]))
         end,
         ["factionrep"] = function(p, pid, args)
-            Faction.setReputation(pid, 1, S2I(args[2]))
+            local faction = Faction.getFaction(pid)
+            if faction then
+                Faction.setReputation(pid, faction.id, S2I(args[2]))
+            else
+                DisplayTextToPlayer(p, 0., 0., "Join a faction first.")
+            end
         end,
         ["mining"] = function(p, pid, args)
             local kind = args[2] or "common"
