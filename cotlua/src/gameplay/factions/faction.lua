@@ -130,6 +130,15 @@ OnInit.final("Faction", function(Require)
         return FACTION_RANK_THRESHOLDS[Faction.getRank(reputation) + 1]
     end
 
+    local function refresh_faction_buff(pid, faction)
+        local hero = Hero[pid]
+        local active_buff = hero and faction.buff:get(nil, hero)
+        if active_buff then
+            active_buff:remove()
+            faction.buff:add(hero, hero)
+        end
+    end
+
     ---@param pid integer
     ---@param amount integer
     function Faction.addReputation(pid, amount)
@@ -147,6 +156,7 @@ OnInit.final("Faction", function(Require)
         local rank = Faction.getRank(reputation)
 
         if rank > old_rank then
+            refresh_faction_buff(pid, faction)
             DisplayTextToPlayer(Player(pid - 1), 0., 0., "|cffffcc00Faction rank increased:|r "
                 .. faction.name .. " Rank " .. rank)
         end
@@ -164,8 +174,11 @@ OnInit.final("Faction", function(Require)
         if not hero or not Faction[faction_id] then return false end
         hero.faction_reputation = hero.faction_reputation or __jarray(0)
         hero.faction_reputation[faction_id] = math.max(0, math.min(100000, amount))
-        if player_faction[pid] == Faction[faction_id] and view then
-            view.refreshFaction(player_faction[pid], pid)
+        if player_faction[pid] == Faction[faction_id] then
+            refresh_faction_buff(pid, player_faction[pid])
+            if view then
+                view.refreshFaction(player_faction[pid], pid)
+            end
         end
         return true
     end
@@ -686,10 +699,14 @@ OnInit.final("Faction", function(Require)
 
     local function on_rewarded_kill(pid, killed, _killer, quality, boss)
         Quest.progress(pid, "kill_units", quality)
+        if quality >= 0.5 then
+            Quest.progressUnique(pid, "distinct_enemy_types", GetUnitTypeId(killed))
+        end
         local boss_data = boss and IsBoss(killed)
         if boss_data and Hero[pid]
             and boss_data:isQuestRelevant(GetHeroLevel(Hero[pid])) then
             Quest.progress(pid, "kill_bosses")
+            Quest.progressUnique(pid, "distinct_bosses", boss_data.id)
         end
     end
 

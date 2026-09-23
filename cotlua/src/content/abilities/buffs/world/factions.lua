@@ -67,4 +67,28 @@ OnInit.final("BuffsWorldFactions", function(Require)
         thistype.CANNOT_PURGE    = true
     end
 
+    ---@class AshenVanguardBuff : Buff
+    AshenVanguardBuff = Buff.new()
+    do
+        local thistype = AshenVanguardBuff
+        thistype.NAME            = "Battle Tested"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNArcaniteMelee.blp"
+        thistype.DESC            = "This unit has +^#mult% total damage"
+        thistype.DESC_FACTION    = "Increases total damage by |cffffcc005%|r. Improves to |cffffcc008%|r at Rank 4 and |cffffcc0012%|r at Rank 7."
+        thistype.DISPEL_TYPE     = BUFF_POSITIVE
+        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
+        thistype.CANNOT_PURGE    = true
+
+        function thistype:onRemove()
+            Unit[self.target].dm = Unit[self.target].dm / self.mult
+        end
+
+        function thistype:onApply()
+            local bonus = thistype.getFactionDamage
+                and thistype.getFactionDamage(self.target) or 0.05
+            self.mult = 1. + bonus
+            Unit[self.target].dm = Unit[self.target].dm * self.mult
+        end
+    end
+
 end, Debug and Debug.getLine())
