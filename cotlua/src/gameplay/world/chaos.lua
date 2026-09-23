@@ -246,6 +246,10 @@ OnInit.final("Chaos", function(Require)
     end
 
     function BeginChaos(killed)
+        if CHAOS_MODE or CHAOS_LOADING then
+            return
+        end
+
         -- 10 minute grace period for legion jumps
         TimerQueue:disableCallback(HUNT_TIMER)
         TimerQueue:callDelayed(600., function() TimerQueue:enableCallback(HUNT_TIMER) end)

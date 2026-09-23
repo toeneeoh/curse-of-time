@@ -38,6 +38,10 @@ OnInit.final("Town", function(Require)
     end
 
     KILL_VILLAGERS = function()
+        if not villagers then
+            return
+        end
+
         for i = 1, #villagers do
             local v = villagers[i]
             HideEffect(v.unit)
