@@ -662,6 +662,23 @@ OnInit.final("ArchitectureTests", function(Require)
     end)
 
     ArchitectureTests.register(
+        "equipment maximum changes use the more punitive resource value",
+        function()
+            local calculate = ItemRuntime.minimumResourceAfterMaxChange
+            if calculate(100000, 1000000, 10000000, 1) ~= 100000 then
+                return false, "equipping maximum health granted current health"
+            end
+            if calculate(5000000, 10000000, 1000000, 1) ~= 500000 then
+                return false,
+                       "unequipping maximum health did not preserve the lower percentage"
+            end
+            if calculate(0, 1000, 10000, 0) ~= 0 then
+                return false, "equipping maximum mana granted current mana"
+            end
+            return true
+        end)
+
+    ArchitectureTests.register(
         "inventory commands reject invalid slots without mutation", function()
             local invalid = {
                 InventoryService.move(1, 0, 1),

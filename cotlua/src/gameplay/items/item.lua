@@ -273,6 +273,7 @@
         ---@field create fun(id: string|integer|item, x: number?, y: number?, expire: number?): Item
         ---@field wrap fun(handle: item): Item
         ---@field commit_slot fun(self: Item, slot: integer, suppress_refresh: boolean?): boolean
+        ---@field minimumResourceAfterMaxChange fun(current: number, old_maximum: number, new_maximum: number, minimum?: number): number
         ---@class RuntimeItemDefinition
         ---@field custom_level? boolean
         ---@field prepare? fun(item: Item, data: table)
@@ -284,6 +285,30 @@
         ItemRuntime = {definitions = {}}
         local NativeCreateItem = CreateItem
         ItemRuntime.native_create = NativeCreateItem
+
+        ---Chooses the more punitive outcome between preserving an absolute
+        ---resource value and preserving its percentage when its maximum
+        ---changes. Raising a maximum grants no current resource; lowering a
+        ---maximum reduces the current value proportionally.
+        ---@param current number
+        ---@param old_maximum number
+        ---@param new_maximum number
+        ---@param minimum number?
+        ---@return number
+        function ItemRuntime.minimumResourceAfterMaxChange(current,
+                                                            old_maximum,
+                                                            new_maximum,
+                                                            minimum)
+            minimum = minimum or 0.
+            current = math.max(minimum, current or minimum)
+            old_maximum = math.max(0., old_maximum or 0.)
+            new_maximum = math.max(minimum, new_maximum or minimum)
+            local percentage_value = old_maximum > 0. and
+                                         current / old_maximum * new_maximum or
+                                         current
+            return math.max(minimum,
+                            math.min(current, new_maximum, percentage_value))
+        end
 
         ---@param id string|integer
         ---@param definition RuntimeItemDefinition
@@ -583,7 +608,8 @@
             }
         end
 
-        local function apply_item_stats(self, mult, holder)
+        local function apply_item_stats(self, mult, holder,
+                                        punish_resource_change)
             holder = holder or self.holder
 
             if not holder then return end
@@ -592,6 +618,8 @@
             local unit = Unit[u]
             local hp = get_widget_life(u) ---@type number
             local mana = get_unit_state(u, UNIT_STATE_MANA) ---@type number
+            local maximum_hp = BlzGetUnitMaxHP(u)
+            local maximum_mana = BlzGetUnitMaxMana(u)
             local mod = ItemProfMod(self.id, self.pid) ---@type number
             local cs = self.cached_stats
 
@@ -606,8 +634,17 @@
                 end
             end
 
-            set_widget_life(u, math.max(1, hp))
-            set_unit_state(u, UNIT_STATE_MANA, mana)
+            if punish_resource_change then
+                set_widget_life(u, ItemRuntime.minimumResourceAfterMaxChange(
+                                    hp, maximum_hp, BlzGetUnitMaxHP(u), 1.))
+                set_unit_state(u, UNIT_STATE_MANA,
+                               ItemRuntime.minimumResourceAfterMaxChange(
+                                   mana, maximum_mana, BlzGetUnitMaxMana(u),
+                                   0.))
+            else
+                set_widget_life(u, math.max(1, hp))
+                set_unit_state(u, UNIT_STATE_MANA, mana)
+            end
 
             -- shield
             if item_data(self)[ITEM_TYPE] == 5 then
@@ -1052,7 +1089,7 @@
             -- From equipped to backpack.
             if was_equipped and slot > 6 then
                 refresh_item_abilities(self, false, orig_holder)
-                apply_item_stats(self, -1)
+                apply_item_stats(self, -1, nil, true)
                 self.equipped = false
             end
 
@@ -1064,7 +1101,7 @@
                     self.owner = Player(self.pid - 1)
                 end
 
-                apply_item_stats(self, 1)
+                apply_item_stats(self, 1, nil, true)
             end
 
             items[slot] = self
@@ -1413,7 +1450,7 @@
             if self.equipped then
                 self.equipped = false
 
-                apply_item_stats(self, -1)
+                apply_item_stats(self, -1, nil, true)
             end
 
             SetItemPosition(self.obj, x or GetUnitX(self.holder),
