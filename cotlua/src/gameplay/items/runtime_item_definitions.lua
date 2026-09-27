@@ -16,6 +16,7 @@ OnInit.final("RuntimeItemDefinitions", function(Require)
     ---@field inherit_stats? integer[] Formula stats copied from the carrier.
     ---@field prepare_data? fun(data: table, carrier_data: table)
     ---@field adjust_cached_stats? fun(item: Item): table<integer, integer>?
+    ---@field initialize_item? fun(item: Item)
 
     ---@class RuntimeLogicalItemDefinition: RuntimeLogicalItemSpec
     ---@field key string
@@ -123,6 +124,9 @@ OnInit.final("RuntimeItemDefinitions", function(Require)
             BlzSetItemSkin(item.obj, definition.world_skin_id)
         end
         ItemRuntime.applyData(item, definition.data, initialize == true)
+        if initialize and definition.initialize_item then
+            definition.initialize_item(item)
+        end
         item:update(true)
         if initialize and item.type == TYPE_POTION_INDEX then
             item.charges = item.cached_stats[ITEM_CHARGES]

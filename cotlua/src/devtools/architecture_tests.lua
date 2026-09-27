@@ -195,9 +195,13 @@ OnInit.final("ArchitectureTests", function(Require)
             local case = cases[index]
             local item = PotionService.create(case[1], 30000., 30000.)
             local properties = PotionService.getProperties(item)
+            local customization = PotionService.getCustomization(item)
             local expected_skin = case[2] == FourCC('I00E') and
                                       FourCC('pman') or FourCC('phea')
             local valid = item and item.id == case[2] and properties and
+                              customization and customization.capacity == 1 and
+                              customization.prefix ~= nil and
+                              customization.suffix == nil and
                               item.runtime_definition.world_skin_id ==
                               expected_skin and
                               properties.level_requirement == case[3] and
@@ -302,14 +306,13 @@ OnInit.final("ArchitectureTests", function(Require)
                                function()
         local cases = {
             {
-                PotionService.GRAND_MANA_KEY, 2, FourCC('pman'),
-                PotionService.INFUSION_VAMPIRIC,
-                PotionService.CATALYST_ACCELERANT, 2.
+                PotionService.STONEBLOOD_KEY, 0, FourCC('phea'),
+                PotionService.INFUSION_TEMPEST, 0, 3.
             },
             {
-                PotionService.HUNTERS_KEY, 0, FourCC('phea'),
+                PotionService.LEGENDARY_CHAOS_KEY, 2, FourCC('phea'),
                 PotionService.INFUSION_STONE,
-                PotionService.CATALYST_POTENT, 3.
+                PotionService.CATALYST_ACCELERANT, 2.
             }
         }
 
@@ -323,7 +326,8 @@ OnInit.final("ArchitectureTests", function(Require)
 
             item.charges = case[2]
             if not PotionService.setInfusion(item, case[4]) or
-                not PotionService.setCatalyst(item, case[5]) then
+                (case[5] ~= 0 and
+                    not PotionService.setCatalyst(item, case[5])) then
                 item:destroy()
                 return false, "could not customize saved potion " ..
                            tostring(case[1])
@@ -355,9 +359,11 @@ OnInit.final("ArchitectureTests", function(Require)
                               math.abs(properties.cooldown - case[6]) < 0.001 and
                               restored.tooltip:find(
                                   customization.infusion.name .. ":", 1,
-                                  true) and restored.tooltip:find(
-                                  customization.catalyst.name .. ":", 1,
-                                  true)
+                                  true) and
+                              (not customization.catalyst or
+                                  restored.tooltip:find(
+                                      customization.catalyst.name .. ":", 1,
+                                      true))
 
             if restored then restored:destroy() end
             if not valid then
@@ -730,11 +736,11 @@ OnInit.final("ArchitectureTests", function(Require)
             return true
         end)
 
-    ArchitectureTests.register("magic shop services are registered as actions",
+    ArchitectureTests.register("shop services are registered",
                                function()
         local ids = {
-            'I0TS', 'I0TA', 'I0TI', 'I0TT', 'I0N0', 'I0JN', 'I0JS', 'I00J',
-            'I0PU', 'I0PV', 'I0PW', 'I084', 'I101', 'I102'
+            'I0TS', 'I0TA', 'I0TI', 'I0TT', 'I0N0', 'I0JN', 'I0JS', 'I084',
+            'I101', 'I102'
         }
         for index = 1, #ids do
             if not ShopAction.get(ids[index]) then
@@ -755,8 +761,7 @@ OnInit.final("ArchitectureTests", function(Require)
         end
         if type(PotionBrewingService.quote) ~= "function" or
             type(PotionBrewingService.commit) ~= "function" or
-            ShopAction.get('I00J').label ~= "REFILL" or
-            ShopAction.get('I0PU').label ~= "REROLL" then
+            type(PotionMasterServices.addToShop) ~= "function" then
             return false, "potion brewing service is not registered"
         end
         return true
@@ -765,7 +770,7 @@ OnInit.final("ArchitectureTests", function(Require)
     ArchitectureTests.register(
         "shop catalogs are registered independently of their views", function()
             local expected = {
-                {'n01A', 12, 40}, {'n01B', 0, 10}, {'n0P2', 1, 4},
+                {'n01A', 12, 40}, {'n01B', 0, 10}, {'n0P2', 1, 0},
                 {'n032', 2, 0},
                 {'n004', 2, 1}, {'n0P0', 2, 1}, {'n0P1', 2, 1},
                 {'n01F', 10, 11}, {'n02C', 12}, {'n09D', 11}
@@ -814,6 +819,11 @@ OnInit.final("ArchitectureTests", function(Require)
                                "Prize Vendor reward does not use Honor pricing"
                     end
                 end
+            end
+
+            local potion_master = ShopRegistry.get(FourCC('n0P2'))
+            if not potion_master or #potion_master.offers ~= 4 then
+                return false, "Potion Master service offers are incomplete"
             end
             return true
         end)

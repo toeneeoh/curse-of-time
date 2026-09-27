@@ -3,6 +3,7 @@
 OnInit.final("TownShops", function(Require)
     Require('ShopRegistry')
     Require('Prices')
+    Require('ShopServiceDialogs')
 
     local general_shop = FourCC('n01A')
     CreateShop(general_shop, 1000.)
@@ -68,10 +69,7 @@ OnInit.final("TownShops", function(Require)
     local potion_services = ShopAddCategory(potion_master,
         "ReplaceableTextures\\CommandButtons\\BTNPotionGreenSmall.blp",
         "Potion Services")
-    ShopAddItem(potion_master, 'I00J:0', potion_services)
-    ShopAddItem(potion_master, 'I0PU:0', potion_services)
-    ShopAddItem(potion_master, 'I0PV:0', potion_services)
-    ShopAddItem(potion_master, 'I0PW:0', potion_services)
+    PotionMasterServices.addToShop(potion_master, potion_services)
 
     local master = CreateUnit(Player(PLAYER_NEUTRAL_PASSIVE), potion_master,
                               1260., 880., 240.)

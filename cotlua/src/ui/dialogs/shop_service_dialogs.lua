@@ -4,8 +4,11 @@
 OnInit.final("ShopServiceDialogs", function(Require)
     Require('DialogWindow')
     Require('ShopActions')
+    Require('ShopRegistry')
     Require('ShopServices')
     Require('TomeService')
+
+    PotionMasterServices = {}
 
     local function failure(pid, reason)
         local messages = {
@@ -367,6 +370,61 @@ OnInit.final("ShopServiceDialogs", function(Require)
         return open_refill(pid)
     end
 
+    ---Adds object-free service entries to the dedicated Potion Master. These
+    ---are actions rather than purchasable items, so their detail panel never
+    ---leaks presentation from an arbitrary item carrier.
+    function PotionMasterServices.addToShop(shop_id, category)
+        ShopAddOffer(shop_id, {
+            key = "potion_master_refill",
+            name = "Refill Flasks",
+            tooltip = "Refill every flask in your potion slots and backpack.",
+            icon = "ReplaceableTextures\\CommandButtons\\BTNPotionGreenSmall.blp",
+            categories = category,
+            availability = function(pid)
+                local quote = PotionRefillService.quote(pid)
+                if quote.available then return true end
+                if quote.reason == "currency" then
+                    return false, "NOT ENOUGH"
+                end
+                return false, quote.reason
+            end,
+            purchase = open_refill_action
+        })
+        ShopAddOffer(shop_id, {
+            key = "potion_master_reroll",
+            name = "Reroll Flask",
+            tooltip = "Reroll the restoration values on a flask. Repeated rerolls on the same flask cost substantially more.",
+            icon = "ReplaceableTextures\\CommandButtons\\BTNStrongDrink.blp",
+            categories = category,
+            availability = function(pid)
+                return has_stored_potion(pid), "NO POTIONS"
+            end,
+            purchase = open_reroll
+        })
+        ShopAddOffer(shop_id, {
+            key = "potion_master_prefix",
+            name = "Transfer Prefix",
+            tooltip = "Transfer a prefix from another flask in your potion slots or backpack. The donor flask is destroyed.",
+            icon = "ReplaceableTextures\\CommandButtons\\BTNPotionOfVampirism.blp",
+            categories = category,
+            availability = function(pid)
+                return has_transfer_pair(pid), "NO DONOR"
+            end,
+            purchase = function(pid) return open_transfer(pid, "prefix") end
+        })
+        ShopAddOffer(shop_id, {
+            key = "potion_master_suffix",
+            name = "Transfer Suffix",
+            tooltip = "Transfer a suffix from another flask in your potion slots or backpack. The donor flask is destroyed.",
+            icon = "ReplaceableTextures\\CommandButtons\\BTNCloudOfFog.blp",
+            categories = category,
+            availability = function(pid)
+                return has_transfer_pair(pid), "NO DONOR"
+            end,
+            purchase = function(pid) return open_transfer(pid, "suffix") end
+        })
+    end
+
     local function open_converter(pid)
         local quote = CurrencyConverterService.commit(pid)
         if not quote.available then
@@ -435,46 +493,6 @@ OnInit.final("ShopServiceDialogs", function(Require)
         availability = function(pid) return service_availability(RechargeService.quote(pid)) end,
         open = open_recharge,
         cooldown = function(pid) return RECHARGE_COOLDOWN[pid], 180 end,
-    })
-    RegisterShopAction('I00J', {
-        name = "Refill Flasks",
-        tooltip = "Refill every flask in your potion slots and backpack.",
-        icon = "ReplaceableTextures\\CommandButtons\\BTNPotionGreenSmall.blp",
-        label = "REFILL",
-        availability = function(pid)
-            return service_availability(PotionRefillService.quote(pid))
-        end,
-        open = open_refill_action,
-    })
-    RegisterShopAction('I0PU', {
-        name = "Reroll Flask",
-        tooltip = "Reroll the restoration values on a flask. Repeated rerolls on the same flask cost substantially more.",
-        icon = "ReplaceableTextures\\CommandButtons\\BTNStrongDrink.blp",
-        label = "REROLL",
-        availability = function(pid)
-            return has_stored_potion(pid), "NO POTIONS"
-        end,
-        open = open_reroll,
-    })
-    RegisterShopAction('I0PV', {
-        name = "Transfer Prefix",
-        tooltip = "Transfer a prefix from another flask in your potion slots or backpack. The donor flask is destroyed.",
-        icon = "ReplaceableTextures\\CommandButtons\\BTNPotionOfVampirism.blp",
-        label = "TRANSFER",
-        availability = function(pid)
-            return has_transfer_pair(pid), "NO DONOR"
-        end,
-        open = function(pid) return open_transfer(pid, "prefix") end,
-    })
-    RegisterShopAction('I0PW', {
-        name = "Transfer Suffix",
-        tooltip = "Transfer a suffix from another flask in your potion slots or backpack. The donor flask is destroyed.",
-        icon = "ReplaceableTextures\\CommandButtons\\BTNCloudOfFog.blp",
-        label = "TRANSFER",
-        availability = function(pid)
-            return has_transfer_pair(pid), "NO DONOR"
-        end,
-        open = function(pid) return open_transfer(pid, "suffix") end,
     })
     RegisterShopAction('I084', {
         label = "4 PLATINUM",

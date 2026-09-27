@@ -38,6 +38,7 @@ OnInit.final("PotionService", function(Require)
     local STONEBLOOD_ID = 8
     local TEMPEST_ID = 9
     local HUNTERS_ID = 10
+    local LEGENDARY_CHAOS_ID = 11
     local BLOOD_FLASK_ICON =
         "ReplaceableTextures\\CommandButtons\\BTNPotionOfVampirism.blp"
     local HEALTH_FLASK_ID = FourCC('I02F')
@@ -53,6 +54,7 @@ OnInit.final("PotionService", function(Require)
     local STONEBLOOD_KEY = "stoneblood_flask"
     local TEMPEST_KEY = "tempest_flask"
     local HUNTERS_KEY = "hunters_flask"
+    local LEGENDARY_CHAOS_KEY = "legendary_chaos_flask"
     local cooldowns = {}
     local infusions = {}
     local catalysts = {}
@@ -128,6 +130,7 @@ OnInit.final("PotionService", function(Require)
     PotionService.STONEBLOOD_KEY = STONEBLOOD_KEY
     PotionService.TEMPEST_KEY = TEMPEST_KEY
     PotionService.HUNTERS_KEY = HUNTERS_KEY
+    PotionService.LEGENDARY_CHAOS_KEY = LEGENDARY_CHAOS_KEY
     PotionService.ROLLABLE_STATS = {
         ITEM_FLAT_HEAL, ITEM_PERCENT_HEAL, ITEM_FLAT_MANA, ITEM_PERCENT_MANA,
         ITEM_CHARGES
@@ -209,6 +212,15 @@ OnInit.final("PotionService", function(Require)
         spec.metadata = spec.metadata or {}
         spec.metadata.potion = behavior or {}
         spec.adjust_cached_stats = adjust_restoration_for_affixes
+        spec.initialize_item = function(item)
+            local potion = spec.metadata.potion
+            if potion.initial_prefix then
+                item.quality[INFUSION_QUALITY_INDEX] = potion.initial_prefix
+            end
+            if item.data[ITEM_LEVEL_REQUIREMENT] >= 200 then
+                item.quality[5] = GetRandomInt(1, 63)
+            end
+        end
         return RuntimeItemDefinitions.define(key, spec)
     end
 
@@ -222,13 +234,6 @@ OnInit.final("PotionService", function(Require)
         local item = RuntimeItemDefinitions.create(key, x, y, expire)
         if not item then return nil end
         local behavior = item.runtime_definition.metadata.potion
-        if behavior.initial_prefix and item.quality[INFUSION_QUALITY_INDEX] == 0 then
-            item.quality[INFUSION_QUALITY_INDEX] = behavior.initial_prefix
-        end
-        if item.data[ITEM_LEVEL_REQUIREMENT] >= 200 and
-            item.quality[5] == 0 then
-            item.quality[5] = GetRandomInt(1, 63)
-        end
         if roll_optional_affixes ~= false and behavior.suffix_roll_chance and
             item.quality[CATALYST_QUALITY_INDEX] == 0 and
             GetRandomReal(0., 1.) <= behavior.suffix_roll_chance then
@@ -439,16 +444,14 @@ OnInit.final("PotionService", function(Require)
         carrier = HEALTH_FLASK_ID,
         name = "Stoneblood Flask",
         icon = "ReplaceableTextures\\CommandButtons\\BTNStone.blp",
-        tooltip = "A legendary Cave Voyagers flask with room for a prefix " ..
-            "and suffix.",
+        tooltip = "A Cave Voyagers flask carrying one transferable prefix.",
         faction_rank_requirement = 4,
         inherit_stats = chaos_inherited_stats,
         prepare_data = prepare_chaos_flask(15000, 30, 0, 0)
     }, {
         cooldown = DEFAULT_USE_COOLDOWN,
         initial_prefix = INFUSION_STONE,
-        affix_capacity = 2,
-        suffix_roll_chance = 0.25
+        affix_capacity = 1
     })
 
     PotionService.define(TEMPEST_KEY, {
@@ -456,16 +459,14 @@ OnInit.final("PotionService", function(Require)
         carrier = MANA_FLASK_ID,
         name = "Tempest Flask",
         icon = "ReplaceableTextures\\CommandButtons\\BTNMonsoon.blp",
-        tooltip = "A legendary Stormwatch flask with room for a prefix " ..
-            "and suffix.",
+        tooltip = "A Stormwatch flask carrying one transferable prefix.",
         faction_rank_requirement = 4,
         inherit_stats = chaos_inherited_stats,
         prepare_data = prepare_chaos_flask(0, 0, 15000, 30)
     }, {
         cooldown = DEFAULT_USE_COOLDOWN,
         initial_prefix = INFUSION_TEMPEST,
-        affix_capacity = 2,
-        suffix_roll_chance = 0.25
+        affix_capacity = 1
     })
 
     PotionService.define(HUNTERS_KEY, {
@@ -473,16 +474,28 @@ OnInit.final("PotionService", function(Require)
         carrier = HEALTH_FLASK_ID,
         name = "Hunter's Flask",
         icon = BLOOD_FLASK_ICON,
-        tooltip = "A legendary Ashen Vanguard flask with room for a prefix " ..
-            "and suffix.",
+        tooltip = "An Ashen Vanguard flask carrying one transferable prefix.",
         faction_rank_requirement = 4,
         inherit_stats = chaos_inherited_stats,
         prepare_data = prepare_chaos_flask(7500, 15, 7500, 15)
     }, {
         cooldown = DEFAULT_USE_COOLDOWN,
         initial_prefix = INFUSION_VAMPIRIC,
-        affix_capacity = 2,
-        suffix_roll_chance = 0.25
+        affix_capacity = 1
+    })
+
+    PotionService.define(LEGENDARY_CHAOS_KEY, {
+        id = LEGENDARY_CHAOS_ID,
+        carrier = HEALTH_FLASK_ID,
+        name = "Legendary Chaos Flask",
+        icon = "ReplaceableTextures\\CommandButtons\\BTNStrongDrink.blp",
+        tooltip = "A rare Chaos flask base with room for both a prefix and " ..
+            "suffix.",
+        inherit_stats = chaos_inherited_stats,
+        prepare_data = prepare_chaos_flask(12000, 25, 12000, 25)
+    }, {
+        cooldown = DEFAULT_USE_COOLDOWN,
+        affix_capacity = 2
     })
 
     PotionService.define(BLOOD_FLASK_KEY, {
@@ -660,13 +673,6 @@ OnInit.final("PotionService", function(Require)
     function PotionService.refreshItem(item)
         if not item or not item.alive or item.type ~= TYPE_POTION_INDEX then
             return
-        end
-        local behavior = item.runtime_definition and
-                             item.runtime_definition.metadata.potion
-        if behavior and behavior.initial_prefix and
-            item.quality[INFUSION_QUALITY_INDEX] == 0 then
-            -- Migrates faction flasks saved before affixes became transferable.
-            item.quality[INFUSION_QUALITY_INDEX] = behavior.initial_prefix
         end
         item:update(true)
         local infusion = selected_customization(item, infusions,
