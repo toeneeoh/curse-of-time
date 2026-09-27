@@ -293,6 +293,47 @@ OnInit.final("ArchitectureTests", function(Require)
         return true
     end)
 
+    ArchitectureTests.register("runtime potion saves preserve identity and charges",
+                               function()
+        local cases = {
+            {PotionService.GRAND_MANA_KEY, 2, FourCC('pman')},
+            {PotionService.HUNTERS_KEY, 0, FourCC('phea')}
+        }
+
+        for index = 1, #cases do
+            local case = cases[index]
+            local item = PotionService.create(case[1], 30000., 30000.)
+            if not item then
+                return false, "could not create saved potion " ..
+                           tostring(case[1])
+            end
+
+            local maximum_charges = item.cached_stats[ITEM_CHARGES]
+            item.charges = case[2]
+            local saved_id = item:encode_id()
+            local saved_stats = item:encode_stats()
+            local saved_extra = item:encode_extra()
+            item:destroy()
+
+            local restored = Item.decode(saved_id, saved_stats, saved_extra)
+            local properties = PotionService.getProperties(restored)
+            local valid = restored and properties and
+                              RuntimeItemDefinitions.is(restored, case[1]) and
+                              restored.runtime_definition.world_skin_id ==
+                              case[3] and restored.charges == case[2] and
+                              properties.charges == case[2] and
+                              properties.maximum_charges == maximum_charges
+
+            if restored then restored:destroy() end
+            if not valid then
+                return false, "saved potion did not round trip " ..
+                           tostring(case[1])
+            end
+        end
+
+        return true
+    end)
+
     ArchitectureTests.register("owned helper families remain available",
                                function()
         local values = {"first", "second", "third"}
