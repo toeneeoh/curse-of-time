@@ -8,6 +8,8 @@ OnInit.final("EssenceOfDarknessAbilities", function(Require)
 
     local TQ = TimerQueue
     local random = math.random
+    local FREEZE_ID = FourCC('A02Q')
+    local freeze_next = setmetatable({}, {__mode = 'k'})
 
     ---@type fun(boss: unit, baseDamage: integer, hgroup: integer, speffect: string, tag: string)
     local function BossPlusSpell(boss, baseDamage, hgroup, speffect, tag)
@@ -84,7 +86,16 @@ OnInit.final("EssenceOfDarknessAbilities", function(Require)
         end
 
         local function onStruck(target, source)
+            -- The Mortify/Terrify and Freeze handlers share the same AI event.
+            -- Yield while Freeze is due so this earlier handler cannot claim
+            -- every available cast window.
+            if freeze_next[target] and
+                BlzGetUnitAbilityCooldownRemaining(target, FREEZE_ID) <= 0. then
+                return
+            end
+
             if CastSpell(target, thistype.id, 2., 0, 1) then
+                freeze_next[target] = true
                 BlzStartUnitAbilityCooldown(target, FourCC('A05U'), 5.)
                 local pt = TimerList[BOSS_ID]:add(target)
                 pt.source = target
@@ -96,7 +107,9 @@ OnInit.final("EssenceOfDarknessAbilities", function(Require)
                     pt.spell = 2
                 end
 
-                pt:after(4., expire)
+                -- Resolve when the telegraphed cast finishes and the boss
+                -- unpauses instead of leaving a second, hidden delay.
+                pt:after(2., expire)
             end
         end
 
@@ -125,9 +138,12 @@ OnInit.final("EssenceOfDarknessAbilities", function(Require)
         end
 
         local function onStruck(target, source)
+            if not freeze_next[target] then return end
+
             if CastSpell(target, thistype.id, 2., 5, 1.) then
+                freeze_next[target] = nil
                 FloatingTextUnit("||||| FREEZE |||||", target, 3, 70, 0, 11, 255, 255, 255, 0, true)
-                TQ:callDelayed(4., expire, target)
+                TQ:callDelayed(2., expire, target)
             end
         end
 
