@@ -164,8 +164,6 @@ OnInit.final("ShopServiceDialogs", function(Require)
         return dialog:display()
     end
 
-    local open_brew_menu
-
     local function brewing_confirm(dialog, _, data)
         local quote = PotionBrewingService.commit(dialog.pid, data.slot,
                                                    data.operation, data.value)
@@ -226,7 +224,7 @@ OnInit.final("ShopServiceDialogs", function(Require)
     end
 
     local function open_refinement(pid, slot)
-        local item = PotionService.getEquipped(pid, slot)
+        local item = PotionService.getStored(pid, slot)
         if not item then return false end
         local dialog = DialogWindow.create(pid, "Refine which property?",
                                            brewing_option,
@@ -240,103 +238,133 @@ OnInit.final("ShopServiceDialogs", function(Require)
         return dialog:display()
     end
 
-    local function open_affix_transfer(pid, slot, kind)
-        local donor_slot = slot == 1 and 2 or 1
-        local donor = PotionService.getEquipped(pid, donor_slot)
-        if not donor then
-            failure(pid, "NO DONOR")
+    local function stored_slot_name(slot)
+        if slot == POTION_INDEX then return "Potion Slot 1" end
+        if slot == POTION_INDEX + 1 then return "Potion Slot 2" end
+        return "Backpack " .. (slot - BACKPACK_INDEX + 1)
+    end
+
+    local function reroll_target(dialog, _, slot)
+        local pid = dialog.pid
+        dialog:destroy()
+        local item = PotionService.getStored(pid, slot)
+        if not item then return false end
+        if PotionService.canRerollRestoration(item) then
+            return confirm_brewing(pid, {
+                slot = slot,
+                operation = "reroll",
+                value = 0
+            })
+        end
+        return open_refinement(pid, slot)
+    end
+
+    local function open_reroll(pid)
+        local dialog = DialogWindow.create(pid, "Choose a flask to reroll",
+                                           reroll_target,
+                                           "potion-reroll-target")
+        for _, entry in ipairs(PotionService.getStoredAll(pid)) do
+            local item = entry.item
+            local refinable = PotionService.canRerollRestoration(item)
+            if not refinable then
+                for _, stat in ipairs(PotionService.ROLLABLE_STATS) do
+                    if PotionService.canRefine(item, stat) then
+                        refinable = true
+                        break
+                    end
+                end
+            end
+            if refinable then
+                dialog:addButton(stored_slot_name(entry.slot) .. ": " ..
+                                     GetItemName(item.obj), entry.slot,
+                                 BlzGetItemIconPath(item.obj))
+            end
+        end
+        if dialog.count == 0 then
+            dialog:destroy()
+            failure(pid, "NOT REFINABLE")
             return false
         end
-        local customization = PotionService.getCustomization(donor)
-        local affix = kind == "prefix" and customization.prefix or
-                          customization.suffix
-        if not affix then
+        return dialog:display()
+    end
+
+    local function transfer_donor(dialog, _, data)
+        local pid = dialog.pid
+        dialog:destroy()
+        return confirm_brewing(pid, data)
+    end
+
+    local function open_transfer_donors(pid, target_slot, kind)
+        local target = PotionService.getStored(pid, target_slot)
+        if not target then return false end
+        local dialog = DialogWindow.create(pid,
+            "Choose a donor. It will be destroyed.", transfer_donor,
+            "potion-affix-donor")
+        for _, entry in ipairs(PotionService.getStoredAll(pid)) do
+            if entry.slot ~= target_slot then
+                local available = PotionService.canTransferAffix(
+                                      target, entry.item, kind)
+                if available then
+                    local customization =
+                        PotionService.getCustomization(entry.item)
+                    local affix = kind == "prefix" and customization.prefix or
+                                      customization.suffix
+                    dialog:addButton(stored_slot_name(entry.slot) .. ": " ..
+                                         affix.name, {
+                        slot = target_slot,
+                        operation = kind,
+                        value = entry.slot
+                    }, affix.icon)
+                end
+            end
+        end
+        if dialog.count == 0 then
+            dialog:destroy()
             failure(pid, "NO DONOR AFFIX")
             return false
         end
-        local dialog = DialogWindow.create(pid,
-            "Extracting this affix destroys " .. GetItemName(donor.obj) .. ".",
-            brewing_option, "potion-affix-transfer")
-        add_brewing_option(dialog, slot, kind, donor_slot,
-                           "Extract " .. affix.name)
         return dialog:display()
     end
 
-    local function brewing_category(dialog, _, data)
+    local function transfer_target(dialog, _, data)
         local pid = dialog.pid
         dialog:destroy()
-        if data.operation == "refine" then
-            return open_refinement(pid, data.slot)
-        elseif data.operation == "reroll" then
-            return confirm_brewing(pid, data)
-        end
-        return open_affix_transfer(pid, data.slot, data.operation)
+        return open_transfer_donors(pid, data.slot, data.kind)
     end
 
-    open_brew_menu = function(pid, slot)
-        local item = PotionService.getEquipped(pid, slot)
-        if not item then return false end
+    local function open_transfer(pid, kind)
+        local potions = PotionService.getStoredAll(pid)
+        if #potions < 2 then
+            failure(pid, "NO DONOR")
+            return false
+        end
         local dialog = DialogWindow.create(pid,
-            "Customize " .. GetItemName(item.obj), brewing_category,
-            "potion-brewing")
-        local refinable = false
-        for _, stat in ipairs(PotionService.ROLLABLE_STATS) do
-            if PotionService.canRefine(item, stat) then
-                refinable = true
-                break
-            end
+            "Choose the flask receiving the " .. kind, transfer_target,
+            "potion-affix-target")
+        for _, entry in ipairs(potions) do
+            dialog:addButton(stored_slot_name(entry.slot) .. ": " ..
+                                 GetItemName(entry.item.obj), {
+                slot = entry.slot,
+                kind = kind
+            }, BlzGetItemIconPath(entry.item.obj))
         end
-        if refinable then
-            if PotionService.canRerollRestoration(item) then
-                local quote = PotionBrewingService.quote(pid, slot, "reroll", 0)
-                dialog:addButton("Reroll Restoration (" .. quote.price ..
-                                     " Gold)", {slot = slot, operation = "reroll",
-                                                 value = 0})
-            else
-                dialog:addButton("Refine Properties", {
-                    slot = slot,
-                    operation = "refine"
-                })
-            end
-        end
-        dialog:addButton("Transfer Prefix",
-                         {slot = slot, operation = "prefix"})
-        dialog:addButton("Transfer Suffix",
-                         {slot = slot, operation = "suffix"})
         return dialog:display()
     end
 
-    local function potion_service_choice(dialog, _, data)
-        local pid = dialog.pid
-        dialog:destroy()
-        if data == "refill" then return open_refill(pid) end
-        return open_brew_menu(pid, data)
+    local function has_stored_potion(pid)
+        return #PotionService.getStoredAll(pid) > 0
     end
 
-    local function open_potion_services(pid)
-        local first = PotionService.getEquipped(pid, 1)
-        local second = PotionService.getEquipped(pid, 2)
-        if not first and not second then
+    local function has_transfer_pair(pid)
+        return #PotionService.getStoredAll(pid) > 1
+    end
+
+    local function open_refill_action(pid)
+        if not has_stored_potion(pid) then
             failure(pid, "NO POTIONS")
             return false
         end
-        local dialog = DialogWindow.create(pid, "Potion Services",
-                                           potion_service_choice,
-                                           "potion-services")
-        local refill = PotionRefillService.quote(pid)
-        if refill.available then
-            dialog:addButton("Refill All (" .. refill.price .. " Gold)",
-                             "refill")
-        end
-        if first then
-            dialog:addButton("Customize " .. GetItemName(first.obj), 1,
-                             BlzGetItemIconPath(first.obj))
-        end
-        if second then
-            dialog:addButton("Customize " .. GetItemName(second.obj), 2,
-                             BlzGetItemIconPath(second.obj))
-        end
-        return dialog:display()
+        return open_refill(pid)
     end
 
     local function open_converter(pid)
@@ -409,13 +437,44 @@ OnInit.final("ShopServiceDialogs", function(Require)
         cooldown = function(pid) return RECHARGE_COOLDOWN[pid], 180 end,
     })
     RegisterShopAction('I00J', {
-        label = "BREW / REFILL",
+        name = "Refill Flasks",
+        tooltip = "Refill every flask in your potion slots and backpack.",
+        icon = "ReplaceableTextures\\CommandButtons\\BTNPotionGreenSmall.blp",
+        label = "REFILL",
         availability = function(pid)
-            return PotionService.getEquipped(pid, 1) ~= nil or
-                       PotionService.getEquipped(pid, 2) ~= nil,
-                   "NO POTIONS"
+            return service_availability(PotionRefillService.quote(pid))
         end,
-        open = open_potion_services,
+        open = open_refill_action,
+    })
+    RegisterShopAction('I0PU', {
+        name = "Reroll Flask",
+        tooltip = "Reroll the restoration values on a flask. Repeated rerolls on the same flask cost substantially more.",
+        icon = "ReplaceableTextures\\CommandButtons\\BTNStrongDrink.blp",
+        label = "REROLL",
+        availability = function(pid)
+            return has_stored_potion(pid), "NO POTIONS"
+        end,
+        open = open_reroll,
+    })
+    RegisterShopAction('I0PV', {
+        name = "Transfer Prefix",
+        tooltip = "Transfer a prefix from another flask in your potion slots or backpack. The donor flask is destroyed.",
+        icon = "ReplaceableTextures\\CommandButtons\\BTNPotionOfVampirism.blp",
+        label = "TRANSFER",
+        availability = function(pid)
+            return has_transfer_pair(pid), "NO DONOR"
+        end,
+        open = function(pid) return open_transfer(pid, "prefix") end,
+    })
+    RegisterShopAction('I0PW', {
+        name = "Transfer Suffix",
+        tooltip = "Transfer a suffix from another flask in your potion slots or backpack. The donor flask is destroyed.",
+        icon = "ReplaceableTextures\\CommandButtons\\BTNCloudOfFog.blp",
+        label = "TRANSFER",
+        availability = function(pid)
+            return has_transfer_pair(pid), "NO DONOR"
+        end,
+        open = function(pid) return open_transfer(pid, "suffix") end,
     })
     RegisterShopAction('I084', {
         label = "4 PLATINUM",

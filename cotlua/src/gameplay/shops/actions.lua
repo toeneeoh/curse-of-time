@@ -17,6 +17,9 @@ OnInit.final("ShopActions", function(Require)
     ---@field availability fun(pid: integer): boolean, string?
     ---@field open fun(pid: integer): boolean
     ---@field cooldown? fun(pid: integer): number, number?
+    ---@field name? string
+    ---@field tooltip? string
+    ---@field icon? string
 
     ---@param id string|integer
     ---@param definition ShopActionDefinition

@@ -15,6 +15,7 @@ OnInit.final("RuntimeItemDefinitions", function(Require)
     ---@field metadata? table Gameplay data owned by the defining subsystem.
     ---@field inherit_stats? integer[] Formula stats copied from the carrier.
     ---@field prepare_data? fun(data: table, carrier_data: table)
+    ---@field adjust_cached_stats? fun(item: Item): table<integer, integer>?
 
     ---@class RuntimeLogicalItemDefinition: RuntimeLogicalItemSpec
     ---@field key string

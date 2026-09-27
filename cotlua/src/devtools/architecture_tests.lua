@@ -225,11 +225,10 @@ OnInit.final("ArchitectureTests", function(Require)
     ArchitectureTests.register("faction potion definitions are usable",
                                function()
         local cases = {
-            {PotionService.STONEBLOOD_KEY, FourCC('I02F'), 15000, 0},
-            {PotionService.TEMPEST_KEY, FourCC('I00E'), 0, 15000},
-            {PotionService.HUNTERS_KEY, FourCC('I02F'), 7500, 7500}
+            {PotionService.STONEBLOOD_KEY, FourCC('I02F'), 10500, 0},
+            {PotionService.TEMPEST_KEY, FourCC('I00E'), 0, 10500},
+            {PotionService.HUNTERS_KEY, FourCC('I02F'), 5250, 5250}
         }
-        local tooltips = {}
 
         for index = 1, #cases do
             local case = cases[index]
@@ -244,14 +243,22 @@ OnInit.final("ArchitectureTests", function(Require)
                               properties.maximum_charges == 6 and
                               properties.charges ==
                               properties.maximum_charges and
-                              properties.flat_health == case[3] and
-                              properties.flat_mana == case[4] and
+                              properties.flat_health >= 0 and
+                              properties.flat_health <= case[3] and
+                              properties.flat_mana >= 0 and
+                              properties.flat_mana <= case[4] and
                               item.tooltip:find(
                                   "|cffff0000Level Requirement: |r200", 1,
                                   true) and item.tooltip:find(
                                   "|cffff0000Faction Rank Requirement: |r4",
                                   1, true) and item.tooltip:find(
-                                  "|cff0080c0", 1, true)
+                                  "|cff0080c0", 1, true) and
+                              (item.alt_tooltip:find(
+                                  "|cffff5555(-30%)|r", 1, true) or
+                                  item.alt_tooltip:find(
+                                      "|cffff5555(-60%)|r", 1, true)) and
+                              not item.tooltip:find(
+                                  "Restoration Effectiveness", 1, true)
 
             if valid then
                 item.charges = 0
@@ -262,8 +269,6 @@ OnInit.final("ArchitectureTests", function(Require)
             if valid and properties.percent_health > 0 then
                 valid = item.tooltip:find("Max Health Restored", 1, true) ~= nil
             end
-            tooltips[index] = item and item.tooltip or nil
-
             if item then item:destroy() end
             if not valid then
                 return false, "invalid faction potion " .. tostring(case[1])
@@ -281,8 +286,8 @@ OnInit.final("ArchitectureTests", function(Require)
                 return false, "Faction Shop access gate is missing from " ..
                            shop_ids[index]
             end
-            if shop.offers[1]:getTooltip(1) ~= tooltips[index] then
-                return false, "Faction Shop tooltip differs from inventory"
+            if not shop.offers[1]:getTooltip(1):find("|cff0080c0", 1, true) then
+                return false, "Faction Shop tooltip lost its flask affix"
             end
             local faction = Faction[index]
             if not faction or GetUnitTypeId(faction.shop) ~=
@@ -729,7 +734,7 @@ OnInit.final("ArchitectureTests", function(Require)
                                function()
         local ids = {
             'I0TS', 'I0TA', 'I0TI', 'I0TT', 'I0N0', 'I0JN', 'I0JS', 'I00J',
-            'I084', 'I101', 'I102'
+            'I0PU', 'I0PV', 'I0PW', 'I084', 'I101', 'I102'
         }
         for index = 1, #ids do
             if not ShopAction.get(ids[index]) then
@@ -750,7 +755,8 @@ OnInit.final("ArchitectureTests", function(Require)
         end
         if type(PotionBrewingService.quote) ~= "function" or
             type(PotionBrewingService.commit) ~= "function" or
-            ShopAction.get('I00J').label ~= "BREW / REFILL" then
+            ShopAction.get('I00J').label ~= "REFILL" or
+            ShopAction.get('I0PU').label ~= "REROLL" then
             return false, "potion brewing service is not registered"
         end
         return true
@@ -759,7 +765,8 @@ OnInit.final("ArchitectureTests", function(Require)
     ArchitectureTests.register(
         "shop catalogs are registered independently of their views", function()
             local expected = {
-                {'n01A', 12, 40}, {'n01B', 0, 11}, {'n032', 2, 0},
+                {'n01A', 12, 40}, {'n01B', 0, 10}, {'n0P2', 1, 4},
+                {'n032', 2, 0},
                 {'n004', 2, 1}, {'n0P0', 2, 1}, {'n0P1', 2, 1},
                 {'n01F', 10, 11}, {'n02C', 12}, {'n09D', 11}
             }

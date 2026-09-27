@@ -55,10 +55,26 @@ OnInit.final("TownShops", function(Require)
     ShopAddItem(magic_shop, 'I0N0:0', 0)
     ShopAddItem(magic_shop, 'I0JN:0', 0)
     ShopAddItem(magic_shop, 'I0JS:0', 0)
-    ShopAddItem(magic_shop, 'I00J:0', 0)
     SetItemPrice('I084', { platinum = 4 })
     ShopAddItem(magic_shop, 'I084:0', 0)
     ShopAddItem(magic_shop, 'I102:0', 0)
     ShopAddItem(magic_shop, 'I101:0', 0)
+
+    -- A dedicated service vendor keeps flask crafting out of the general
+    -- magic-shop catalog. The unit type is a custom clone of the Magic Shop
+    -- so it remains selectable through the standard custom-shop UI.
+    local potion_master = FourCC('n0P2')
+    CreateShop(potion_master, 1000.)
+    local potion_services = ShopAddCategory(potion_master,
+        "ReplaceableTextures\\CommandButtons\\BTNPotionGreenSmall.blp",
+        "Potion Services")
+    ShopAddItem(potion_master, 'I00J:0', potion_services)
+    ShopAddItem(potion_master, 'I0PU:0', potion_services)
+    ShopAddItem(potion_master, 'I0PV:0', potion_services)
+    ShopAddItem(potion_master, 'I0PW:0', potion_services)
+
+    local master = CreateUnit(Player(PLAYER_NEUTRAL_PASSIVE), potion_master,
+                              1260., 880., 240.)
+    BlzSetUnitName(master, "Potion Master")
 
 end, Debug and Debug.getLine())

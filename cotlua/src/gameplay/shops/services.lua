@@ -3,7 +3,6 @@
 
 OnInit.final("ShopServices", function(Require)
     Require('Currency')
-    Require('Faction')
     Require('ItemEventRegistry')
     Require('Items')
     Require('PotionService')
@@ -124,24 +123,24 @@ OnInit.final("ShopServices", function(Require)
         local quote = result(false, "NO POTIONS")
         quote.price = 0
         quote.potions = {}
-        local needs_refill = false
-        for slot = POTION_INDEX, POTION_INDEX + 1 do
+        local found_potion = false
+        for slot = POTION_INDEX, MAX_INVENTORY_SLOTS do
             local potion = Profile[pid].hero.items[slot]
             if potion then
                 local properties = PotionService.getProperties(potion)
                 if properties then
+                    found_potion = true
+                end
+                if properties and potion.charges <
+                    properties.maximum_charges then
                     quote.potions[#quote.potions + 1] = potion
                     quote.price = quote.price +
                                       PotionService.getRefillCost(potion)
                 end
-                if properties and potion.charges <
-                    properties.maximum_charges then
-                    needs_refill = true
-                end
             end
         end
         quote.price = math.floor(quote.price)
-        if #quote.potions > 0 and not needs_refill then
+        if found_potion and #quote.potions == 0 then
             quote.reason = "FULL"
         elseif quote.price > 0 then
             quote.available = GetCurrency(pid, GOLD) + GetCurrency(pid, PLATINUM) * 1000000 >= quote.price
@@ -173,12 +172,6 @@ OnInit.final("ShopServices", function(Require)
         [ITEM_CHARGES] = "Maximum Charges"
     }
 
-    local infusion_factions = {
-        [PotionService.INFUSION_STONE] = 1,
-        [PotionService.INFUSION_TEMPEST] = 2,
-        [PotionService.INFUSION_VAMPIRIC] = 3
-    }
-
     local function brewing_price(item, operation, value)
         local properties = PotionService.getProperties(item)
         local base = math.max(1000, properties.level_requirement ^ 2)
@@ -200,13 +193,13 @@ OnInit.final("ShopServices", function(Require)
     ---are Chaos brewing; stat refinement remains available to rolled
     ---pre-Chaos flasks.
     ---@param pid integer
-    ---@param slot integer Potion slot, 1 or 2.
+    ---@param slot integer Absolute potion or backpack inventory slot.
     ---@param operation string "refine", "reroll", "prefix", or "suffix".
     ---@param value integer Stat index or donor potion slot.
     ---@return table
     function PotionBrewingService.quote(pid, slot, operation, value)
         if not Hero[pid] then return result(false, "NO HERO") end
-        local item = PotionService.getEquipped(pid, slot)
+        local item = PotionService.getStored(pid, slot)
         if not item then return result(false, "NO POTION") end
 
         local available, reason
@@ -218,7 +211,7 @@ OnInit.final("ShopServices", function(Require)
             available = PotionService.canRerollRestoration(item)
             reason = available and nil or "NOT REFINABLE"
         elseif operation == "prefix" or operation == "suffix" then
-            local donor = PotionService.getEquipped(pid, value)
+            local donor = PotionService.getStored(pid, value)
             available, reason = PotionService.canTransferAffix(item, donor,
                                                                operation)
             if donor then
@@ -235,13 +228,6 @@ OnInit.final("ShopServices", function(Require)
             available, reason = false, "REQUIRES LEVEL 200"
         end
 
-        local faction_id = operation == "prefix" and option and
-                               infusion_factions[option.id] or nil
-        if available and faction_id and
-            Faction.getRank(Faction.getReputation(pid, faction_id)) < 4 then
-            available, reason = false, "REQUIRES RANK 4"
-        end
-
         local quote = result(available, reason)
         quote.item = item
         quote.slot = slot
@@ -249,7 +235,7 @@ OnInit.final("ShopServices", function(Require)
         quote.value = value
         quote.option = option
         quote.donor = (operation == "prefix" or operation == "suffix") and
-                          PotionService.getEquipped(pid, value) or nil
+                          PotionService.getStored(pid, value) or nil
         quote.price = brewing_price(item, operation, value)
         if available and GetCurrency(pid, GOLD) +
             GetCurrency(pid, PLATINUM) * 1000000 < quote.price then

@@ -56,6 +56,52 @@ OnInit.final("PotionService", function(Require)
     local cooldowns = {}
     local infusions = {}
     local catalysts = {}
+    local restoration_stats = {
+        ITEM_FLAT_HEAL, ITEM_PERCENT_HEAL, ITEM_FLAT_MANA, ITEM_PERCENT_MANA
+    }
+
+    local function affix_count(item)
+        local count = 0
+        if (item.quality[INFUSION_QUALITY_INDEX] or 0) ~= 0 then
+            count = count + 1
+        end
+        if (item.quality[CATALYST_QUALITY_INDEX] or 0) ~= 0 then
+            count = count + 1
+        end
+        return count
+    end
+
+    local function adjust_restoration_for_affixes(item)
+        local count = affix_count(item)
+        if count == 0 then
+            item.potion_unmodified_stats = nil
+            return nil
+        end
+        local reduction = count >= 2 and 60 or 30
+        local multiplier = (100 - reduction) * 0.01
+        local original = {}
+        for _, stat in ipairs(restoration_stats) do
+            original[stat] = item.cached_stats[stat]
+            item.cached_stats[stat] = math.floor(
+                                          item.cached_stats[stat] * multiplier +
+                                              0.5)
+            item.cached_base[stat] = math.floor(
+                                         item.cached_base[stat] * multiplier +
+                                             0.5)
+            item.cached_lower[stat] = math.floor(
+                                          item.cached_lower[stat] * multiplier +
+                                              0.5)
+            item.cached_upper[stat] = math.floor(
+                                          item.cached_upper[stat] * multiplier +
+                                              0.5)
+        end
+        item.potion_unmodified_stats = original
+        local adjustments = {}
+        for _, stat in ipairs(restoration_stats) do
+            if original[stat] ~= 0 then adjustments[stat] = reduction end
+        end
+        return adjustments
+    end
 
     PotionService.INFUSION_NONE = INFUSION_NONE
     PotionService.INFUSION_VAMPIRIC = INFUSION_VAMPIRIC
@@ -162,6 +208,7 @@ OnInit.final("PotionService", function(Require)
         end
         spec.metadata = spec.metadata or {}
         spec.metadata.potion = behavior or {}
+        spec.adjust_cached_stats = adjust_restoration_for_affixes
         return RuntimeItemDefinitions.define(key, spec)
     end
 
@@ -538,6 +585,25 @@ OnInit.final("PotionService", function(Require)
         return potion_at(pid, index)
     end
 
+    ---Returns a potion from its absolute saved inventory slot. This includes
+    ---the two potion slots and every backpack slot.
+    function PotionService.getStored(pid, slot)
+        local profile = Profile[pid]
+        local item = profile and profile.hero and profile.hero.items[slot]
+        return item and item.alive and item.type == TYPE_POTION_INDEX and item or
+                   nil
+    end
+
+    ---Returns all flasks available to the Potion Master in inventory order.
+    function PotionService.getStoredAll(pid)
+        local result = {}
+        for slot = POTION_INDEX, MAX_INVENTORY_SLOTS do
+            local item = PotionService.getStored(pid, slot)
+            if item then result[#result + 1] = {slot = slot, item = item} end
+        end
+        return result
+    end
+
     local function cooldown_table(pid)
         cooldowns[pid] = cooldowns[pid] or {}
         return cooldowns[pid]
@@ -582,19 +648,8 @@ OnInit.final("PotionService", function(Require)
         return behavior and behavior.affix_capacity or 0
     end
 
-    local function occupied_affixes(item)
-        local count = 0
-        if selected_customization(item, infusions, INFUSION_QUALITY_INDEX) then
-            count = count + 1
-        end
-        if selected_customization(item, catalysts, CATALYST_QUALITY_INDEX) then
-            count = count + 1
-        end
-        return count
-    end
-
     local function restoration_multiplier(item)
-        local count = occupied_affixes(item)
+        local count = affix_count(item)
         if count >= 2 then return 0.40 end
         if count == 1 then return 0.70 end
         return 1.
@@ -620,13 +675,6 @@ OnInit.final("PotionService", function(Require)
                                                 CATALYST_QUALITY_INDEX)
         append_customization(item, infusion)
         append_customization(item, catalyst)
-        local multiplier = restoration_multiplier(item)
-        if multiplier < 1. then
-            local line = "|n|cff808080Restoration Effectiveness:|r " ..
-                             math.floor(multiplier * 100) .. "%"
-            item.tooltip = (item.tooltip or "") .. line
-            item.alt_tooltip = (item.alt_tooltip or "") .. line
-        end
         BlzSetItemDescription(item.obj, item.tooltip)
         BlzSetItemExtendedTooltip(item.obj, item.tooltip)
     end
@@ -809,20 +857,20 @@ OnInit.final("PotionService", function(Require)
             not item.cached_stats then return nil end
 
         local stats = item.cached_stats
-        local multiplier = restoration_multiplier(item)
+        local original = item.potion_unmodified_stats or stats
         return {
             charges = item.charges,
             maximum_charges = stats[ITEM_CHARGES],
             level_requirement = item.data[ITEM_LEVEL_REQUIREMENT],
-            flat_health = stats[ITEM_FLAT_HEAL] * multiplier,
-            percent_health = stats[ITEM_PERCENT_HEAL] * multiplier,
-            flat_mana = stats[ITEM_FLAT_MANA] * multiplier,
-            percent_mana = stats[ITEM_PERCENT_MANA] * multiplier,
-            base_flat_health = stats[ITEM_FLAT_HEAL],
-            base_percent_health = stats[ITEM_PERCENT_HEAL],
-            base_flat_mana = stats[ITEM_FLAT_MANA],
-            base_percent_mana = stats[ITEM_PERCENT_MANA],
-            restoration_multiplier = multiplier,
+            flat_health = stats[ITEM_FLAT_HEAL],
+            percent_health = stats[ITEM_PERCENT_HEAL],
+            flat_mana = stats[ITEM_FLAT_MANA],
+            percent_mana = stats[ITEM_PERCENT_MANA],
+            base_flat_health = original[ITEM_FLAT_HEAL],
+            base_percent_health = original[ITEM_PERCENT_HEAL],
+            base_flat_mana = original[ITEM_FLAT_MANA],
+            base_percent_mana = original[ITEM_PERCENT_MANA],
+            restoration_multiplier = restoration_multiplier(item),
             cooldown = PotionService.getUseCooldown(item),
             behavior = potion_behavior(item)
         }
@@ -1038,20 +1086,17 @@ OnInit.final("PotionService", function(Require)
         end
 
         local stats = item.cached_stats
-        local restoration = restoration_multiplier(item)
         local behavior = potion_behavior(item)
         local customization = PotionService.getCustomization(item)
         local catalyst = customization and customization.catalyst or nil
         local replaces_restoration =
             behavior and behavior.replaces_restoration == true
         local heal =
-            replaces_restoration and 0. or restoration *
-                (stats[ITEM_FLAT_HEAL] + 0.01 *
-                    stats[ITEM_PERCENT_HEAL] * Unit[hero].hp)
+            replaces_restoration and 0. or stats[ITEM_FLAT_HEAL] + 0.01 *
+                stats[ITEM_PERCENT_HEAL] * Unit[hero].hp
         local mana =
-            replaces_restoration and 0. or restoration *
-                (stats[ITEM_FLAT_MANA] + 0.01 *
-                    stats[ITEM_PERCENT_MANA] * Unit[hero].mana)
+            replaces_restoration and 0. or stats[ITEM_FLAT_MANA] + 0.01 *
+                stats[ITEM_PERCENT_MANA] * Unit[hero].mana
 
         item.charges = item.charges - 1
         if heal > 0 then

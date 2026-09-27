@@ -287,6 +287,12 @@ OnInit.final("Shop", function(Require)
                 available, label = GetItemAvailability(self.item.id, pid)
                 price = GetItemPrice(self.item.id, pid)
                 action = ShopAction.get(self.item.id)
+                if action then
+                    self.button.tooltip:name(action.name or self.item.name)
+                    self.button.tooltip:text(action.tooltip or
+                                                 self.item.tooltip)
+                    self.button.tooltip:icon(action.icon or self.item.icon)
+                end
             end
 
             if self.shop.stock[self.item.id] == 0 then
@@ -308,8 +314,9 @@ OnInit.final("Shop", function(Require)
 
             local quote = ShopQuote.evaluate(self.shop.definition, self.item,
                                              pid)
-            self.button:icon(quote.can_buy and self.item.icon or
-                                 GetDisabledIcon(self.item))
+            local icon = action and action.icon or self.item.icon
+            self.button:icon(quote.can_buy and icon or
+                                 GetDisabledIcon({icon = icon}))
 
             if action and action.cooldown then
                 local remaining, total = action.cooldown(pid)

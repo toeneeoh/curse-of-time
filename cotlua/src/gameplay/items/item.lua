@@ -1233,6 +1233,16 @@
             -- cache stats
             self:cache_stats()
 
+            -- Logical items may transform their calculated values before any
+            -- gameplay or presentation consumer reads them. The returned map
+            -- contains percent adjustments shown only in the Alt tooltip.
+            local stat_adjustments
+            if self.runtime_definition and
+                self.runtime_definition.adjust_cached_stats then
+                stat_adjustments =
+                    self.runtime_definition.adjust_cached_stats(self)
+            end
+
             local cs = self.cached_stats
 
             -- body stats
@@ -1277,6 +1287,12 @@
                                                           "|r"
                             alt_text[#alt_text + 1] = "|cff00ff00)|r"
                         end
+                    end
+
+                    if stat_adjustments and stat_adjustments[index] then
+                        alt_text[#alt_text + 1] = " |cffff5555(-"
+                        alt_text[#alt_text + 1] = stat_adjustments[index]
+                        alt_text[#alt_text + 1] = "%)|r"
                     end
 
                     -- normal tooltip
