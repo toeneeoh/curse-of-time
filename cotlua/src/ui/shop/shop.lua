@@ -84,7 +84,7 @@ OnInit.final("Shop", function(Require)
     local COST_HEIGHT                    = 0.005 ---@type number 
     local COST_SCALE                     = 0.7 ---@type number 
     local STATUS_WIDTH                   = 0.075 ---@type number
-    local STATUS_SCALE                   = 0.55 ---@type number
+    local STATUS_SCALE                   = 0.65 ---@type number
     local COST_GAP                   = 0.009 ---@type number 
     local SLOT_GAP_X                     = 0.0145 ---@type number 
     local SLOT_GAP_Y                     = 0.038 ---@type number 
@@ -119,6 +119,32 @@ OnInit.final("Shop", function(Require)
     ---@return boolean
     local function IsCraftable(shop, pid, si)
         return ShopQuote.isCraftable(shop.definition, si, pid)
+    end
+
+    ---@param icon string
+    ---@return string
+    local function DisabledIcon(icon)
+        return (icon:gsub("CommandButtons\\BTN",
+                          "CommandButtonsDisabled\\DISBTN", 1))
+    end
+
+    ---@param item ShopItem|ShopOffer
+    ---@return string
+    local function GetDisabledIcon(item)
+        return item.disabled_icon or DisabledIcon(item.icon)
+    end
+
+    ---@param status string?
+    ---@return string
+    local function FormatStatus(status)
+        if not status then return "" end
+
+        local requirement = status:match("^REQUIRES%s+(.+)$")
+        if requirement then
+            return "REQUIRES|n" .. requirement
+        end
+
+        return status
     end
 
     --[[ ----------------------------------------------------------------------------------------- ]]
@@ -213,10 +239,9 @@ OnInit.final("Shop", function(Require)
                 local name = i.virtual and i:getName(pid) or i.name
                 local tooltip = i.virtual and i:getTooltip(pid) or i.tooltip
                 local icon = i.icon
-                if i.virtual and i.disabled_icon then
-                    local available = i:isAvailable(pid)
-                    icon = available and icon or i.disabled_icon
-                end
+                local available = i.virtual and i:isAvailable(pid) or
+                                      GetItemAvailability(i.id, pid)
+                icon = available and icon or GetDisabledIcon(i)
                 self.button:icon(icon)
                 self.button.tooltip:text(tooltip)
                 self.button.tooltip:name(name)
@@ -256,9 +281,6 @@ OnInit.final("Shop", function(Require)
                 available, label = self.item:isAvailable(pid)
                 price = self.item:getPrice(pid)
                 action = self.item
-                local icon = available and self.item.icon
-                    or self.item.disabled_icon or self.item.icon
-                self.button:icon(icon)
                 self.button.tooltip:name(self.item:getName(pid))
                 self.button.tooltip:text(self.item:getTooltip(pid))
             else
@@ -283,6 +305,11 @@ OnInit.final("Shop", function(Require)
             elseif not price and not self.item.virtual then
                 status = "NOT FOR SALE"
             end
+
+            local quote = ShopQuote.evaluate(self.shop.definition, self.item,
+                                             pid)
+            self.button:icon(quote.can_buy and self.item.icon or
+                                 GetDisabledIcon(self.item))
 
             if action and action.cooldown then
                 local remaining, total = action.cooldown(pid)
@@ -319,7 +346,9 @@ OnInit.final("Shop", function(Require)
             end
 
             BlzFrameSetVisible(self.status, status ~= nil)
-            BlzFrameSetText(self.status, status and "|cff999999" .. status .. "|r" or "")
+            BlzFrameSetText(self.status, status and
+                                "|cff999999" .. FormatStatus(status) .. "|r" or
+                                "")
         end
 
         ---@type fun(self: ShopSlot, row: integer, column: integer)
@@ -392,13 +421,13 @@ OnInit.final("Shop", function(Require)
                 BlzFrameSetVisible(self.cost[k], false)
             end
 
-            -- Status text is wider and centered independently of currency rows,
-            -- preventing labels such as NOT FOR SALE from clipping or spilling
-            -- into the next shop column.
+            -- A zero height lets multiline conditions grow downward instead of
+            -- clipping after the first line. Requirement labels use an explicit
+            -- break so their value remains readable without shrinking the font.
             BlzFrameSetPoint(self.status, FRAMEPOINT_TOP, self.slot, FRAMEPOINT_BOTTOM, 0., -0.004)
-            BlzFrameSetSize(self.status, STATUS_WIDTH, COST_HEIGHT)
+            BlzFrameSetSize(self.status, STATUS_WIDTH, 0.)
             BlzFrameSetScale(self.status, STATUS_SCALE)
-            BlzFrameSetTextAlignment(self.status, TEXT_JUSTIFY_CENTER, TEXT_JUSTIFY_CENTER)
+            BlzFrameSetTextAlignment(self.status, TEXT_JUSTIFY_TOP, TEXT_JUSTIFY_CENTER)
             BlzFrameSetEnable(self.status, false)
             BlzFrameSetVisible(self.status, false)
 
@@ -645,11 +674,8 @@ OnInit.final("Shop", function(Require)
             if i ~= 0 then
                 local name = i.virtual and i:getName(pid) or i.name
                 local tooltip = i.virtual and i:getTooltip(pid) or i.tooltip
-                local icon = i.icon
-                if i.virtual and i.disabled_icon then
-                    local available = i:isAvailable(pid)
-                    icon = available and icon or i.disabled_icon
-                end
+                local quote = ShopQuote.evaluate(self.shop.definition, i, pid)
+                local icon = quote.can_buy and i.icon or GetDisabledIcon(i)
                 self.item[pid] = i
                 self.count[pid] = 0
 
@@ -1593,6 +1619,15 @@ OnInit.final("Shop", function(Require)
         function thistype.refresh(pid)
             local self = registry[GetUnitTypeId(thistype.current[pid])][0] ---@type Shop
 
+            if self and not self.definition:canOpen(pid) then
+                if GetLocalPlayer() == Player(pid - 1) then
+                    self:visible(false)
+                end
+                self.current[pid] = nil
+                self.definition:setCurrent(pid, nil)
+                return false
+            end
+
             if self then
                 local slot = self.first
                 while slot do
@@ -1744,15 +1779,16 @@ OnInit.final("Shop", function(Require)
                 local p = GetTriggerPlayer()
                 local pid = GetPlayerId(p) + 1 ---@type integer 
                 local selected = GetTriggerEventId() == EVENT_PLAYER_UNIT_SELECTED
+                local visible = selected and self.definition:canOpen(pid)
 
                 -- Commit the active shop before visible() refreshes the detail UI.
                 -- Otherwise the affordability check sees a nil current shop and
                 -- leaves the purchase icon in its disabled state.
-                self.current[pid] = selected and GetTriggerUnit() or nil
+                self.current[pid] = visible and GetTriggerUnit() or nil
                 self.definition:setCurrent(pid, self.current[pid])
 
                 if GetLocalPlayer() == p then
-                    self:visible(selected)
+                    self:visible(visible)
                 end
             end
         end

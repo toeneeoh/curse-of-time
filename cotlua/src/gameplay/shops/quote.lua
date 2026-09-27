@@ -27,8 +27,12 @@ OnInit.final("ShopQuote", function(Require)
 
     local function inventory_components(pid)
         local inventory = __jarray(0)
+        local profile = Profile[pid]
+        local items = profile and profile.hero and profile.hero.items
+        if not items then return inventory end
+
         for slot = 1, MAX_INVENTORY_SLOTS do
-            local owned = Profile[pid].hero.items[slot]
+            local owned = items[slot]
             if owned and not owned.nocraft then
                 local id = GetItem(owned.id)
                 inventory[id] = inventory[id] + math.max(1, owned.charges)
@@ -89,7 +93,7 @@ OnInit.final("ShopQuote", function(Require)
             can_buy = false,
             reason = "invalid",
             cost = __jarray(0),
-            inventory = inventory_components(pid),
+            inventory = __jarray(0),
             consume = __jarray(0),
         }
         if item == 0 or not item then return quote end
@@ -97,6 +101,7 @@ OnInit.final("ShopQuote", function(Require)
             quote.reason = "range"
             return quote
         end
+        quote.inventory = inventory_components(pid)
 
         if item.virtual then
             local stock = shop:getStock(item.id)

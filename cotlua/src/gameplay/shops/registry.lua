@@ -17,6 +17,7 @@ OnInit.global("ShopRegistry", function(Require)
     ---@field item_by_id table<string, table>
     ---@field current unit[]
     ---@field visibility boolean
+    ---@field access? fun(pid: integer): boolean, string?
     ---@field view Shop?
     local ShopDefinition = {}
     ShopDefinition.__index = ShopDefinition
@@ -58,6 +59,14 @@ OnInit.global("ShopRegistry", function(Require)
     function ShopDefinition:isInRange(pid)
         local shop_unit = self.current[pid]
         return shop_unit ~= nil and IsUnitInRange(Hero[pid], shop_unit, self.aoe)
+    end
+
+    ---@param pid integer
+    ---@return boolean, string?
+    function ShopDefinition:canOpen(pid)
+        if not self.access then return true end
+        local allowed, reason = self.access(pid)
+        return allowed ~= false, reason
     end
 
     ---@param id integer
@@ -159,6 +168,16 @@ OnInit.global("ShopRegistry", function(Require)
     end
 
     ---@param id integer
+    ---@param access fun(pid: integer): boolean, string?
+    ---@return boolean
+    function ShopRegistry.setAccess(id, access)
+        local definition = ShopRegistry.definitions[id]
+        if not definition or type(access) ~= "function" then return false end
+        definition.access = access
+        return true
+    end
+
+    ---@param id integer
     ---@param item_id string|integer
     ---@param count integer
     function ShopRegistry.setStock(id, item_id, count)
@@ -233,5 +252,6 @@ OnInit.global("ShopRegistry", function(Require)
     ShopAddCategory = ShopRegistry.addCategory
     ShopAddItem = ShopRegistry.addItem
     ShopAddOffer = ShopRegistry.addOffer
+    ShopSetAccess = ShopRegistry.setAccess
     ShopSetStock = ShopRegistry.setStock
 end, Debug and Debug.getLine())

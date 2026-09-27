@@ -15,7 +15,11 @@ OnInit.final("Faction", function(Require)
     Require('Weather')
 
     local faction_leader_type = FourCC('n000')
-    local faction_shop_type = FourCC('n004')
+    local faction_shop_types = {
+        FourCC('n004'), -- Cave Voyagers
+        FourCC('n0P0'), -- Stormwatch
+        FourCC('n0P1')  -- Ashen Vanguard
+    }
     local player_faction = {}
     local pending_faction = {}
     ---@class FactionViewAdapter
@@ -365,15 +369,19 @@ OnInit.final("Faction", function(Require)
     ---@param desc string
     ---@return Faction
     function Faction.create(id, name, x, y, buff, desc)
+        local shop_type = faction_shop_types[id]
         local self = setmetatable({
             id = id,
             leader = CreateUnit(Player(PLAYER_NEUTRAL_PASSIVE), faction_leader_type, x, y, 270.),
-            shop = CreateUnit(Player(PLAYER_NEUTRAL_PASSIVE), faction_shop_type, x + 500., y, 270.),
+            shop = CreateUnit(Player(PLAYER_NEUTRAL_PASSIVE), shop_type,
+                              x + 500., y, 270.),
             name = name,
             quests = {},
             buff = buff,
             desc = desc,
         }, Faction)
+
+        BlzSetUnitName(self.shop, name .. " Quartermaster")
 
         EVENT_ON_UNIT_SELECT:register_unit_action(self.leader, on_faction_selected)
         Faction[self.leader] = self
@@ -719,9 +727,11 @@ OnInit.final("Faction", function(Require)
 
     local function on_rewarded_kill(pid, killed, _killer, quality, boss)
         Quest.progress(pid, "kill_units", quality)
-        if quality >= 0.5 then
-            Quest.progressUnique(pid, "distinct_enemy_types", GetUnitTypeId(killed))
-        end
+        -- Requiring different unit types already prevents one-pack farming.
+        -- A reward-quality cutoff would leave high-level heroes without four
+        -- eligible overworld families, so variety hunts count every rewarded
+        -- enemy type once.
+        Quest.progressUnique(pid, "distinct_enemy_types", GetUnitTypeId(killed))
         local boss_data = boss and IsBoss(killed)
         if boss_data and Hero[pid]
             and boss_data:isQuestRelevant(GetHeroLevel(Hero[pid])) then
