@@ -334,6 +334,53 @@ OnInit.final("ArchitectureTests", function(Require)
         return true
     end)
 
+    ArchitectureTests.register("charged items preserve charges when saved",
+                               function()
+        -- Sword of Revival exercises the ordinary managed-item path rather
+        -- than the runtime potion-definition path above. Zero is included so
+        -- rechargeable resurrection items remain empty after loading.
+        local saved_charge_counts = {0, 2}
+        for index = 1, #saved_charge_counts do
+            local charges = saved_charge_counts[index]
+            local item = ItemRuntime.create(FourCC('I01X'), 30000., 30000.)
+            if not item then return false, "could not create charged item" end
+
+            item.charges = charges
+            local saved_id = item:encode_id()
+            local saved_stats = item:encode_stats()
+            local saved_extra = item:encode_extra()
+            item:destroy()
+
+            local restored = Item.decode(saved_id, saved_stats, saved_extra)
+            local valid = restored and restored.id == FourCC('I01X') and
+                              restored.charges == charges
+            if restored then restored:destroy() end
+
+            if not valid then
+                return false, "charged item did not retain " .. charges ..
+                           " charges"
+            end
+        end
+
+        local legacy = ItemRuntime.create(FourCC('I01X'), 30000., 30000.)
+        if not legacy then return false, "could not create legacy charged item" end
+        local default_charges = legacy.charges
+        local legacy_id = legacy:encode_id()
+        local legacy_stats = legacy:encode_stats()
+        legacy:destroy()
+
+        -- Unmarked saves predate charge persistence and must keep the item's
+        -- object-data default rather than being interpreted as zero charges.
+        local restored_legacy = Item.decode(legacy_id, legacy_stats, 0)
+        local legacy_valid = restored_legacy and
+                                 restored_legacy.charges == default_charges
+        if restored_legacy then restored_legacy:destroy() end
+        if not legacy_valid then
+            return false, "legacy charged item lost its default charges"
+        end
+        return true
+    end)
+
     ArchitectureTests.register("owned helper families remain available",
                                function()
         local values = {"first", "second", "third"}

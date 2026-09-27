@@ -1351,16 +1351,16 @@
 
             itm:lvl(itm.level)
 
-            -- Potion charges are persistent. The high bit distinguishes the
-            -- new encoding from legacy saves, whose unused extra field was 0
-            -- and should continue loading with a full flask.
-            if itm.type == TYPE_POTION_INDEX then
-                local encoded_charges = itm.extra[1]
-                if (encoded_charges & 0x8000) ~= 0 then
-                    itm.charges = encoded_charges & 0x7FFF
-                else
-                    itm.charges = itm.cached_stats[ITEM_CHARGES]
-                end
+            -- Managed item charges are persistent. The high bit distinguishes
+            -- the charge encoding from legacy uses of the extra field. Old
+            -- potion saves still load full because they predate persistent
+            -- flask charges; other legacy items retain their native defaults.
+            local encoded_charges = itm.extra[1]
+            if (encoded_charges & 0x8000) ~= 0 then
+                itm.charges = encoded_charges & 0x7FFF
+                itm.extra[1] = 0
+            elseif itm.type == TYPE_POTION_INDEX then
+                itm.charges = itm.cached_stats[ITEM_CHARGES]
                 itm.extra[1] = 0
             end
 
@@ -1382,10 +1382,8 @@
         -- extra item metadata
         ---@type fun(self: Item): integer
         function thistype:encode_extra()
-            local first = self.extra[1]
-            if self.type == TYPE_POTION_INDEX then
-                first = 0x8000 | math.max(0, math.min(0x7FFF, self.charges))
-            end
+            local first = 0x8000 |
+                              math.max(0, math.min(0x7FFF, self.charges))
             local extra = (first << 16) + self.extra[2]
 
             return extra
