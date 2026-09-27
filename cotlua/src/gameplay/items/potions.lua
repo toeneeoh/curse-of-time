@@ -65,6 +65,13 @@ OnInit.final("PotionService", function(Require)
     PotionService.CATALYST_POTENT = CATALYST_POTENT
     PotionService.CATALYST_LINGERING = CATALYST_LINGERING
     PotionService.CATALYST_ACCELERANT = CATALYST_ACCELERANT
+    -- Compatibility names for callers written against the first prototype.
+    -- Player-facing brewing now treats these as prefix and suffix pools.
+    PotionService.PREFIX_NONE = INFUSION_NONE
+    PotionService.PREFIX_VAMPIRIC = INFUSION_VAMPIRIC
+    PotionService.PREFIX_STONE = INFUSION_STONE
+    PotionService.PREFIX_TEMPEST = INFUSION_TEMPEST
+    PotionService.SUFFIX_NONE = CATALYST_NONE
     PotionService.DEFAULT_USE_COOLDOWN = DEFAULT_USE_COOLDOWN
     PotionService.GREATER_HEALTH_KEY = GREATER_HEALTH_KEY
     PotionService.GREATER_MANA_KEY = GREATER_MANA_KEY
@@ -117,10 +124,17 @@ OnInit.final("PotionService", function(Require)
     ---@return PotionCustomizationEffect[]
     function PotionService.getCatalysts() return catalysts end
 
+    function PotionService.getPrefixes() return infusions end
+
+    function PotionService.getSuffixes() return catalysts end
+
     ---@class PotionBehavior
     ---@field cooldown? number|fun(item: Item): number
     ---@field replaces_restoration? boolean Suppress formula healing and mana.
     ---@field inherent_infusion? integer
+    ---@field initial_prefix? integer
+    ---@field affix_capacity? integer
+    ---@field suffix_roll_chance? number
     ---@field on_use? fun(context: PotionUseContext)
 
     ---@class PotionUseContext
@@ -155,9 +169,28 @@ OnInit.final("PotionService", function(Require)
     ---@param x number?
     ---@param y number?
     ---@param expire number?
+    ---@param roll_optional_affixes boolean? Defaults to true; previews disable it.
     ---@return Item?
-    function PotionService.create(key, x, y, expire)
-        return RuntimeItemDefinitions.create(key, x, y, expire)
+    function PotionService.create(key, x, y, expire, roll_optional_affixes)
+        local item = RuntimeItemDefinitions.create(key, x, y, expire)
+        if not item then return nil end
+        local behavior = item.runtime_definition.metadata.potion
+        if behavior.initial_prefix and item.quality[INFUSION_QUALITY_INDEX] == 0 then
+            item.quality[INFUSION_QUALITY_INDEX] = behavior.initial_prefix
+        end
+        if item.data[ITEM_LEVEL_REQUIREMENT] >= 200 and
+            item.quality[5] == 0 then
+            item.quality[5] = GetRandomInt(1, 63)
+        end
+        if roll_optional_affixes ~= false and behavior.suffix_roll_chance and
+            item.quality[CATALYST_QUALITY_INDEX] == 0 and
+            GetRandomReal(0., 1.) <= behavior.suffix_roll_chance then
+            item.quality[CATALYST_QUALITY_INDEX] = GetRandomInt(
+                                                       CATALYST_POTENT,
+                                                       CATALYST_ACCELERANT)
+        end
+        PotionService.refreshItem(item)
+        return item
     end
 
     ---Builds the same name, icon, and generated tooltip shown by an inventory
@@ -167,7 +200,7 @@ OnInit.final("PotionService", function(Require)
     ---@return string? icon
     ---@return string? description
     function PotionService.getCatalogPresentation(key)
-        local item = PotionService.create(key, 30000., 30000.)
+        local item = PotionService.create(key, 30000., 30000., nil, false)
         if not item then return nil end
         local name, icon, description = PotionService.describe(item)
         item:destroy()
@@ -304,14 +337,16 @@ OnInit.final("PotionService", function(Require)
         return function(data, carrier_data)
             data[ITEM_TIER] = 12
             data[ITEM_LEVEL_REQUIREMENT] = 200
-            data[ITEM_FLAT_HEAL] = flat_health
-            data[ITEM_FLAT_HEAL .. "fixed"] = 1
-            data[ITEM_PERCENT_HEAL] = percent_health
-            data[ITEM_PERCENT_HEAL .. "fixed"] = 1
-            data[ITEM_FLAT_MANA] = flat_mana
-            data[ITEM_FLAT_MANA .. "fixed"] = 1
-            data[ITEM_PERCENT_MANA] = percent_mana
-            data[ITEM_PERCENT_MANA .. "fixed"] = 1
+            local function restoration(stat, maximum)
+                if maximum <= 0 then return end
+                data[stat] = math.max(1, math.floor(maximum * 0.5))
+                data[stat .. "range"] = maximum
+                data[stat .. "fixed"] = 1
+            end
+            restoration(ITEM_FLAT_HEAL, flat_health)
+            restoration(ITEM_PERCENT_HEAL, percent_health)
+            restoration(ITEM_FLAT_MANA, flat_mana)
+            restoration(ITEM_PERCENT_MANA, percent_mana)
             data[ITEM_CHARGES] = math.max(6, carrier_data[ITEM_CHARGES])
             data[ITEM_CHARGES .. "fixed"] = 1
         end
@@ -357,18 +392,16 @@ OnInit.final("PotionService", function(Require)
         carrier = HEALTH_FLASK_ID,
         name = "Stoneblood Flask",
         icon = "ReplaceableTextures\\CommandButtons\\BTNStone.blp",
-        tooltip = "|cff0080c0Stoneblood:|r Reduces damage taken by " ..
-            "|cffffcc0015%|r for |cffffcc0012 seconds|r.|n" ..
-            "A Cave Voyagers flask.",
+        tooltip = "A legendary Cave Voyagers flask with room for a prefix " ..
+            "and suffix.",
         faction_rank_requirement = 4,
         inherit_stats = chaos_inherited_stats,
         prepare_data = prepare_chaos_flask(15000, 30, 0, 0)
     }, {
         cooldown = DEFAULT_USE_COOLDOWN,
-        inherent_infusion = INFUSION_STONE,
-        on_use = function(context)
-            apply_stone_effect(context, 0.15, 12.)
-        end
+        initial_prefix = INFUSION_STONE,
+        affix_capacity = 2,
+        suffix_roll_chance = 0.25
     })
 
     PotionService.define(TEMPEST_KEY, {
@@ -376,18 +409,16 @@ OnInit.final("PotionService", function(Require)
         carrier = MANA_FLASK_ID,
         name = "Tempest Flask",
         icon = "ReplaceableTextures\\CommandButtons\\BTNMonsoon.blp",
-        tooltip = "|cff0080c0Tempest:|r Ability cooldowns recover " ..
-            "|cffffcc00100%|r faster for |cffffcc008 seconds|r.|n" ..
-            "A Stormwatch flask.",
+        tooltip = "A legendary Stormwatch flask with room for a prefix " ..
+            "and suffix.",
         faction_rank_requirement = 4,
         inherit_stats = chaos_inherited_stats,
         prepare_data = prepare_chaos_flask(0, 0, 15000, 30)
     }, {
         cooldown = DEFAULT_USE_COOLDOWN,
-        inherent_infusion = INFUSION_TEMPEST,
-        on_use = function(context)
-            apply_tempest_effect(context, 1., 8.)
-        end
+        initial_prefix = INFUSION_TEMPEST,
+        affix_capacity = 2,
+        suffix_roll_chance = 0.25
     })
 
     PotionService.define(HUNTERS_KEY, {
@@ -395,18 +426,16 @@ OnInit.final("PotionService", function(Require)
         carrier = HEALTH_FLASK_ID,
         name = "Hunter's Flask",
         icon = BLOOD_FLASK_ICON,
-        tooltip = "|cff0080c0Hunter's Instinct:|r Restores " ..
-            "|cffffcc008%|r of damage dealt as Health for " ..
-            "|cffffcc0012 seconds|r.|nAn Ashen Vanguard flask.",
+        tooltip = "A legendary Ashen Vanguard flask with room for a prefix " ..
+            "and suffix.",
         faction_rank_requirement = 4,
         inherit_stats = chaos_inherited_stats,
         prepare_data = prepare_chaos_flask(7500, 15, 7500, 15)
     }, {
         cooldown = DEFAULT_USE_COOLDOWN,
-        inherent_infusion = INFUSION_VAMPIRIC,
-        on_use = function(context)
-            apply_vampiric_effect(context, 0.08, 12.)
-        end
+        initial_prefix = INFUSION_VAMPIRIC,
+        affix_capacity = 2,
+        suffix_roll_chance = 0.25
     })
 
     PotionService.define(BLOOD_FLASK_KEY, {
@@ -435,10 +464,10 @@ OnInit.final("PotionService", function(Require)
         key = "vampiric",
         name = "Vampiric Infusion",
         icon = BLOOD_FLASK_ICON,
-        description = "Restores |cffffcc005%|r of damage dealt as Health " ..
+        description = "Restores |cffffcc008%|r of damage dealt as Health " ..
             "for |cffffcc0012 seconds|r.",
         on_use = function(context)
-            apply_vampiric_effect(context, 0.05, 12.)
+            apply_vampiric_effect(context, 0.08, 12.)
         end
     })
 
@@ -447,10 +476,10 @@ OnInit.final("PotionService", function(Require)
         key = "stone",
         name = "Stone Infusion",
         icon = "ReplaceableTextures\\CommandButtons\\BTNStone.blp",
-        description = "Reduces damage taken by |cffffcc0010%|r for " ..
-            "|cffffcc0010 seconds|r.",
+        description = "Reduces damage taken by |cffffcc0015%|r for " ..
+            "|cffffcc0012 seconds|r.",
         on_use = function(context)
-            apply_stone_effect(context, 0.10, 10.)
+            apply_stone_effect(context, 0.15, 12.)
         end
     })
 
@@ -459,10 +488,10 @@ OnInit.final("PotionService", function(Require)
         key = "tempest",
         name = "Tempest Infusion",
         icon = "ReplaceableTextures\\CommandButtons\\BTNMonsoon.blp",
-        description = "Ability cooldowns recover |cffffcc0050%|r faster " ..
+        description = "Ability cooldowns recover |cffffcc00100%|r faster " ..
             "for |cffffcc008 seconds|r.",
         on_use = function(context)
-            apply_tempest_effect(context, 0.50, 8.)
+            apply_tempest_effect(context, 1., 8.)
         end
     })
 
@@ -547,11 +576,42 @@ OnInit.final("PotionService", function(Require)
         item.alt_tooltip = (item.alt_tooltip or "") .. line
     end
 
+    local function affix_capacity(item)
+        local behavior = item and item.runtime_definition and
+                             item.runtime_definition.metadata.potion
+        return behavior and behavior.affix_capacity or 0
+    end
+
+    local function occupied_affixes(item)
+        local count = 0
+        if selected_customization(item, infusions, INFUSION_QUALITY_INDEX) then
+            count = count + 1
+        end
+        if selected_customization(item, catalysts, CATALYST_QUALITY_INDEX) then
+            count = count + 1
+        end
+        return count
+    end
+
+    local function restoration_multiplier(item)
+        local count = occupied_affixes(item)
+        if count >= 2 then return 0.40 end
+        if count == 1 then return 0.70 end
+        return 1.
+    end
+
     ---Applies the item's dynamic presentation to its backing native handle.
     ---@param item Item
     function PotionService.refreshItem(item)
         if not item or not item.alive or item.type ~= TYPE_POTION_INDEX then
             return
+        end
+        local behavior = item.runtime_definition and
+                             item.runtime_definition.metadata.potion
+        if behavior and behavior.initial_prefix and
+            item.quality[INFUSION_QUALITY_INDEX] == 0 then
+            -- Migrates faction flasks saved before affixes became transferable.
+            item.quality[INFUSION_QUALITY_INDEX] = behavior.initial_prefix
         end
         item:update(true)
         local infusion = selected_customization(item, infusions,
@@ -560,6 +620,13 @@ OnInit.final("PotionService", function(Require)
                                                 CATALYST_QUALITY_INDEX)
         append_customization(item, infusion)
         append_customization(item, catalyst)
+        local multiplier = restoration_multiplier(item)
+        if multiplier < 1. then
+            local line = "|n|cff808080Restoration Effectiveness:|r " ..
+                             math.floor(multiplier * 100) .. "%"
+            item.tooltip = (item.tooltip or "") .. line
+            item.alt_tooltip = (item.alt_tooltip or "") .. line
+        end
         BlzSetItemDescription(item.obj, item.tooltip)
         BlzSetItemExtendedTooltip(item.obj, item.tooltip)
     end
@@ -630,7 +697,12 @@ OnInit.final("PotionService", function(Require)
             infusion_id = infusion and infusion_id or INFUSION_NONE,
             infusion = infusion,
             catalyst_id = catalyst and catalyst_id or CATALYST_NONE,
-            catalyst = catalyst
+            catalyst = catalyst,
+            prefix_id = infusion and infusion_id or INFUSION_NONE,
+            prefix = infusion,
+            suffix_id = catalyst and catalyst_id or CATALYST_NONE,
+            suffix = catalyst,
+            capacity = affix_capacity(item)
         }
     end
 
@@ -646,6 +718,13 @@ OnInit.final("PotionService", function(Require)
         local customization = PotionService.getCustomization(item)
         if customization.infusion_id == infusion then
             return false, "ALREADY APPLIED"
+        end
+        if infusion ~= INFUSION_NONE then
+            if customization.capacity <= 0 or
+                (customization.capacity == 1 and
+                    customization.suffix_id ~= CATALYST_NONE) then
+                return false, "NO AFFIX SLOT"
+            end
         end
         local behavior = item.runtime_definition and
                              item.runtime_definition.metadata and
@@ -669,8 +748,20 @@ OnInit.final("PotionService", function(Require)
         if PotionService.getCustomization(item).catalyst_id == catalyst then
             return false, "ALREADY APPLIED"
         end
+        local customization = PotionService.getCustomization(item)
+        if catalyst ~= CATALYST_NONE and
+            (customization.capacity <= 0 or
+                (customization.capacity == 1 and
+                    customization.prefix_id ~= INFUSION_NONE)) then
+            return false, "NO AFFIX SLOT"
+        end
         return true
     end
+
+    PotionService.setPrefix = PotionService.setInfusion
+    PotionService.setSuffix = PotionService.setCatalyst
+    PotionService.canSetPrefix = PotionService.canSetInfusion
+    PotionService.canSetSuffix = PotionService.canSetCatalyst
 
     ---@param pid integer
     ---@param index integer
@@ -718,14 +809,20 @@ OnInit.final("PotionService", function(Require)
             not item.cached_stats then return nil end
 
         local stats = item.cached_stats
+        local multiplier = restoration_multiplier(item)
         return {
             charges = item.charges,
             maximum_charges = stats[ITEM_CHARGES],
             level_requirement = item.data[ITEM_LEVEL_REQUIREMENT],
-            flat_health = stats[ITEM_FLAT_HEAL],
-            percent_health = stats[ITEM_PERCENT_HEAL],
-            flat_mana = stats[ITEM_FLAT_MANA],
-            percent_mana = stats[ITEM_PERCENT_MANA],
+            flat_health = stats[ITEM_FLAT_HEAL] * multiplier,
+            percent_health = stats[ITEM_PERCENT_HEAL] * multiplier,
+            flat_mana = stats[ITEM_FLAT_MANA] * multiplier,
+            percent_mana = stats[ITEM_PERCENT_MANA] * multiplier,
+            base_flat_health = stats[ITEM_FLAT_HEAL],
+            base_percent_health = stats[ITEM_PERCENT_HEAL],
+            base_flat_mana = stats[ITEM_FLAT_MANA],
+            base_percent_mana = stats[ITEM_PERCENT_MANA],
+            restoration_multiplier = multiplier,
             cooldown = PotionService.getUseCooldown(item),
             behavior = potion_behavior(item)
         }
@@ -810,6 +907,112 @@ OnInit.final("PotionService", function(Require)
         return true, old_value, item.cached_stats[stat]
     end
 
+    ---Chaos restoration is rerolled as one deterministic property group. The
+    ---next result is derived only from the flask seed and committed attempt,
+    ---so reloading a save cannot produce a different candidate.
+    ---@param item Item
+    ---@return boolean
+    function PotionService.canRerollRestoration(item)
+        if not item or item.type ~= TYPE_POTION_INDEX or
+            item.data[ITEM_LEVEL_REQUIREMENT] < 200 or
+            not item.runtime_definition then return false end
+        for _, stat in ipairs({ITEM_FLAT_HEAL, ITEM_PERCENT_HEAL,
+                               ITEM_FLAT_MANA, ITEM_PERCENT_MANA}) do
+            if refinement_index(item, stat) then return true end
+        end
+        return false
+    end
+
+    function PotionService.getRerollCount(item, kind)
+        local metadata = RuntimeItemDefinitions.getMetadata(item)
+        if kind == "prefix" then return (metadata >> 3) & 0x03 end
+        if kind == "suffix" then return (metadata >> 5) & 0x03 end
+        return metadata & 0x07
+    end
+
+    local function increment_reroll_count(item, kind)
+        local metadata = RuntimeItemDefinitions.getMetadata(item)
+        local shift, mask = 0, 0x07
+        if kind == "prefix" then
+            shift, mask = 3, 0x03
+        elseif kind == "suffix" then
+            shift, mask = 5, 0x03
+        end
+        local count = (metadata >> shift) & mask
+        count = math.min(mask, count + 1)
+        metadata = (metadata & ~(mask << shift)) | (count << shift)
+        RuntimeItemDefinitions.setMetadata(item, metadata)
+    end
+
+    ---@param item Item
+    ---@return boolean
+    function PotionService.rerollRestoration(item)
+        if not PotionService.canRerollRestoration(item) then return false end
+        local attempt = PotionService.getRerollCount(item)
+        local seed = item.quality[5]
+        if seed == 0 then
+            seed = ((item.runtime_definition.id * 29) % 63) + 1
+            item.quality[5] = seed
+        end
+
+        local changed = false
+        local roll = seed + attempt * 67
+        for _, stat in ipairs({ITEM_FLAT_HEAL, ITEM_PERCENT_HEAL,
+                               ITEM_FLAT_MANA, ITEM_PERCENT_MANA}) do
+            local quality_index = refinement_index(item, stat)
+            if quality_index then
+                roll = (roll * 37 + stat * 17 + 11) % 64
+                item.quality[quality_index] = roll
+                changed = true
+            end
+        end
+        if not changed then return false end
+        increment_reroll_count(item, "restoration")
+        PotionService.refreshItem(item)
+        if item.pid then NotifyItemChanged(item.pid) end
+        return true
+    end
+
+    ---Transfers one affix from a donor. Consumption is owned by the brewing
+    ---transaction so this function remains reversible until payment succeeds.
+    function PotionService.canTransferAffix(target, donor, kind)
+        if not target or not donor or target == donor then
+            return false, "NO DONOR"
+        end
+        local donor_customization = PotionService.getCustomization(donor)
+        if not donor_customization then return false, "NO DONOR" end
+        if kind == "prefix" then
+            if donor_customization.prefix_id == INFUSION_NONE then
+                return false, "NO DONOR AFFIX"
+            end
+            return PotionService.canSetPrefix(target,
+                                               donor_customization.prefix_id)
+        elseif kind == "suffix" then
+            if donor_customization.suffix_id == CATALYST_NONE then
+                return false, "NO DONOR AFFIX"
+            end
+            return PotionService.canSetSuffix(target,
+                                               donor_customization.suffix_id)
+        end
+        return false, "INVALID AFFIX"
+    end
+
+    function PotionService.transferAffix(target, donor, kind)
+        local available = PotionService.canTransferAffix(target, donor, kind)
+        if not available then return false end
+        local donor_customization = PotionService.getCustomization(donor)
+        local changed
+        if kind == "prefix" then
+            changed = PotionService.setPrefix(target,
+                                               donor_customization.prefix_id)
+        else
+            changed = PotionService.setSuffix(target,
+                                               donor_customization.suffix_id)
+        end
+        if changed then increment_reroll_count(target, kind) end
+        return changed
+    end
+
     ---Consumes one potion charge and applies its restoration and infusion.
     ---@param pid integer
     ---@param index integer Potion button index, 1 or 2.
@@ -835,17 +1038,20 @@ OnInit.final("PotionService", function(Require)
         end
 
         local stats = item.cached_stats
+        local restoration = restoration_multiplier(item)
         local behavior = potion_behavior(item)
         local customization = PotionService.getCustomization(item)
         local catalyst = customization and customization.catalyst or nil
         local replaces_restoration =
             behavior and behavior.replaces_restoration == true
         local heal =
-            replaces_restoration and 0. or stats[ITEM_FLAT_HEAL] + 0.01 *
-                stats[ITEM_PERCENT_HEAL] * Unit[hero].hp
+            replaces_restoration and 0. or restoration *
+                (stats[ITEM_FLAT_HEAL] + 0.01 *
+                    stats[ITEM_PERCENT_HEAL] * Unit[hero].hp)
         local mana =
-            replaces_restoration and 0. or stats[ITEM_FLAT_MANA] + 0.01 *
-                stats[ITEM_PERCENT_MANA] * Unit[hero].mana
+            replaces_restoration and 0. or restoration *
+                (stats[ITEM_FLAT_MANA] + 0.01 *
+                    stats[ITEM_PERCENT_MANA] * Unit[hero].mana)
 
         item.charges = item.charges - 1
         if heal > 0 then

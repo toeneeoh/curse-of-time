@@ -316,11 +316,6 @@ OnInit.final("ArchitectureTests", function(Require)
                            tostring(case[1])
             end
 
-            local maximum_charges = item.cached_stats[ITEM_CHARGES]
-            local flat_health = item.cached_stats[ITEM_FLAT_HEAL]
-            local percent_health = item.cached_stats[ITEM_PERCENT_HEAL]
-            local flat_mana = item.cached_stats[ITEM_FLAT_MANA]
-            local percent_mana = item.cached_stats[ITEM_PERCENT_MANA]
             item.charges = case[2]
             if not PotionService.setInfusion(item, case[4]) or
                 not PotionService.setCatalyst(item, case[5]) then
@@ -328,6 +323,8 @@ OnInit.final("ArchitectureTests", function(Require)
                 return false, "could not customize saved potion " ..
                            tostring(case[1])
             end
+            local expected = PotionService.getProperties(item)
+            local maximum_charges = item.cached_stats[ITEM_CHARGES]
             local saved_id = item:encode_id()
             local saved_stats = item:encode_stats()
             local saved_extra = item:encode_extra()
@@ -343,10 +340,10 @@ OnInit.final("ArchitectureTests", function(Require)
                               case[3] and restored.charges == case[2] and
                               properties.charges == case[2] and
                               properties.maximum_charges == maximum_charges and
-                              properties.flat_health == flat_health and
-                              properties.percent_health == percent_health and
-                              properties.flat_mana == flat_mana and
-                              properties.percent_mana == percent_mana and
+                              properties.flat_health == expected.flat_health and
+                              properties.percent_health == expected.percent_health and
+                              properties.flat_mana == expected.flat_mana and
+                              properties.percent_mana == expected.percent_mana and
                               customization and
                               customization.infusion_id == case[4] and
                               customization.catalyst_id == case[5] and
@@ -364,6 +361,35 @@ OnInit.final("ArchitectureTests", function(Require)
             end
         end
 
+        return true
+    end)
+
+    ArchitectureTests.register("potion rerolls are save deterministic",
+                               function()
+        local source = PotionService.create(PotionService.HUNTERS_KEY,
+                                            30000., 30000.)
+        if not source then return false, "could not create chaos flask" end
+        local saved_id = source:encode_id()
+        local saved_stats = source:encode_stats()
+        local saved_extra = source:encode_extra()
+        source:destroy()
+
+        local first = Item.decode(saved_id, saved_stats, saved_extra)
+        local second = Item.decode(saved_id, saved_stats, saved_extra)
+        local first_ok = PotionService.rerollRestoration(first)
+        local second_ok = PotionService.rerollRestoration(second)
+        local a = PotionService.getProperties(first)
+        local b = PotionService.getProperties(second)
+        local valid = first_ok and second_ok and a and b and
+                          a.base_flat_health == b.base_flat_health and
+                          a.base_percent_health == b.base_percent_health and
+                          a.base_flat_mana == b.base_flat_mana and
+                          a.base_percent_mana == b.base_percent_mana and
+                          PotionService.getRerollCount(first) == 1 and
+                          PotionService.getRerollCount(second) == 1
+        if first then first:destroy() end
+        if second then second:destroy() end
+        if not valid then return false, "identical saves produced different rerolls" end
         return true
     end)
 

@@ -183,8 +183,16 @@ OnInit.final("ShopServices", function(Require)
         local properties = PotionService.getProperties(item)
         local base = math.max(1000, properties.level_requirement ^ 2)
         if operation == "refine" then return math.floor(base * 0.5) end
-        if value == 0 then return math.floor(base * 0.25) end
-        if operation == "catalyst" then return math.floor(base * 0.75) end
+        if operation == "reroll" or operation == "prefix" or
+            operation == "suffix" then
+            -- Repeated work on one base rapidly becomes uneconomical. The
+            -- exponent is capped only to keep integer arithmetic safe; the
+            -- saved attempt counter continues increasing.
+            local attempts = PotionService.getRerollCount(item, operation)
+            local multiplier = operation == "reroll" and 0.5 or
+                                   operation == "suffix" and 0.75 or 1.
+            return math.floor(base * multiplier * (1.85 ^ attempts))
+        end
         return math.floor(base)
     end
 
@@ -193,8 +201,8 @@ OnInit.final("ShopServices", function(Require)
     ---pre-Chaos flasks.
     ---@param pid integer
     ---@param slot integer Potion slot, 1 or 2.
-    ---@param operation string "refine", "infusion", or "catalyst".
-    ---@param value integer Stat index or customization id.
+    ---@param operation string "refine", "reroll", "prefix", or "suffix".
+    ---@param value integer Stat index or donor potion slot.
     ---@return table
     function PotionBrewingService.quote(pid, slot, operation, value)
         if not Hero[pid] then return result(false, "NO HERO") end
@@ -206,17 +214,17 @@ OnInit.final("ShopServices", function(Require)
         if operation == "refine" then
             available = PotionService.canRefine(item, value)
             reason = available and nil or "NOT REFINABLE"
-        elseif operation == "infusion" then
-            available, reason = PotionService.canSetInfusion(item, value)
-            option = value == 0 and nil or PotionService.getInfusions()[value]
-            if available and value ~= 0 and not option then
-                available, reason = false, "INVALID INFUSION"
-            end
-        elseif operation == "catalyst" then
-            available, reason = PotionService.canSetCatalyst(item, value)
-            option = value == 0 and nil or PotionService.getCatalysts()[value]
-            if available and value ~= 0 and not option then
-                available, reason = false, "INVALID CATALYST"
+        elseif operation == "reroll" then
+            available = PotionService.canRerollRestoration(item)
+            reason = available and nil or "NOT REFINABLE"
+        elseif operation == "prefix" or operation == "suffix" then
+            local donor = PotionService.getEquipped(pid, value)
+            available, reason = PotionService.canTransferAffix(item, donor,
+                                                               operation)
+            if donor then
+                local customization = PotionService.getCustomization(donor)
+                option = operation == "prefix" and customization.prefix or
+                             customization.suffix
             end
         else
             return result(false, "INVALID BREW")
@@ -227,8 +235,8 @@ OnInit.final("ShopServices", function(Require)
             available, reason = false, "REQUIRES LEVEL 200"
         end
 
-        local faction_id = operation == "infusion" and
-                               infusion_factions[value] or nil
+        local faction_id = operation == "prefix" and option and
+                               infusion_factions[option.id] or nil
         if available and faction_id and
             Faction.getRank(Faction.getReputation(pid, faction_id)) < 4 then
             available, reason = false, "REQUIRES RANK 4"
@@ -240,6 +248,8 @@ OnInit.final("ShopServices", function(Require)
         quote.operation = operation
         quote.value = value
         quote.option = option
+        quote.donor = (operation == "prefix" or operation == "suffix") and
+                          PotionService.getEquipped(pid, value) or nil
         quote.price = brewing_price(item, operation, value)
         if available and GetCurrency(pid, GOLD) +
             GetCurrency(pid, PLATINUM) * 1000000 < quote.price then
@@ -269,10 +279,11 @@ OnInit.final("ShopServices", function(Require)
         if operation == "refine" then
             changed, old_value, new_value =
                 PotionService.refine(quote.item, value)
-        elseif operation == "infusion" then
-            changed = PotionService.setInfusion(quote.item, value)
+        elseif operation == "reroll" then
+            changed = PotionService.rerollRestoration(quote.item)
         else
-            changed = PotionService.setCatalyst(quote.item, value)
+            changed = PotionService.transferAffix(quote.item, quote.donor,
+                                                   operation)
         end
         if not changed then
             -- The quote was recomputed immediately before charging, so this is
@@ -286,6 +297,10 @@ OnInit.final("ShopServices", function(Require)
 
         quote.old_value = old_value
         quote.new_value = new_value
+        if quote.donor then
+            quote.donor_name = GetItemName(quote.donor.obj)
+            quote.donor:destroy()
+        end
         return quote
     end
 

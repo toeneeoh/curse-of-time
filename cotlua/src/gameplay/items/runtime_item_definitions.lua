@@ -27,6 +27,25 @@ OnInit.final("RuntimeItemDefinitions", function(Require)
     local by_id = {}
     local by_key = {}
     local definitions = {}
+    -- New runtime-item saves may use the upper half of extra[2] for
+    -- subsystem-owned state. Old saves contain the bare definition id and
+    -- continue to decode unchanged. The current catalog is deliberately
+    -- limited to eight-bit ids while this compact representation is in use.
+    local PACKED_MARKER = 0x8000
+    local DEFINITION_MASK = 0x00FF
+    local METADATA_MASK = 0x007F
+
+    local function saved_definition_id(value)
+        value = value or 0
+        if (value & PACKED_MARKER) ~= 0 then return value & DEFINITION_MASK end
+        return value
+    end
+
+    local function saved_metadata(value)
+        value = value or 0
+        if (value & PACKED_MARKER) == 0 then return 0 end
+        return (value >> 8) & METADATA_MASK
+    end
 
     local function resolve(key)
         if type(key) == "table" then return key end
@@ -40,7 +59,7 @@ OnInit.final("RuntimeItemDefinitions", function(Require)
     ---@param spec RuntimeLogicalItemSpec
     ---@return RuntimeLogicalItemDefinition?
     function RuntimeItemDefinitions.define(key, spec)
-        if type(key) ~= "string" or spec.id <= 0 or spec.id > 0xFFFF or
+        if type(key) ~= "string" or spec.id <= 0 or spec.id > DEFINITION_MASK or
             by_key[key] or by_id[spec.id] then
             print("Invalid or duplicate runtime item definition: " ..
                       tostring(key))
@@ -96,7 +115,9 @@ OnInit.final("RuntimeItemDefinitions", function(Require)
         end
 
         item.runtime_definition = definition
-        item.extra[2] = definition.id
+        local metadata = saved_metadata(item.extra[2])
+        item.extra[2] = metadata == 0 and definition.id or
+                            (PACKED_MARKER | definition.id | (metadata << 8))
         if definition.world_skin_id then
             BlzSetItemSkin(item.obj, definition.world_skin_id)
         end
@@ -123,7 +144,7 @@ OnInit.final("RuntimeItemDefinitions", function(Require)
     ---@param item Item
     ---@return boolean
     function RuntimeItemDefinitions.restore(item)
-        local definition = by_id[item.extra[2] or 0]
+        local definition = by_id[saved_definition_id(item.extra[2])]
         if not definition or definition.carrier_id ~= item.id then
             return false
         end
@@ -137,6 +158,26 @@ OnInit.final("RuntimeItemDefinitions", function(Require)
         local definition = resolve(key)
         return definition ~= nil and item ~= nil and item.runtime_definition ==
                    definition
+    end
+
+    ---Returns subsystem state stored beside a runtime definition. Values are
+    ---limited to seven bits and survive ordinary apply/restore operations.
+    ---@param item Item
+    ---@return integer
+    function RuntimeItemDefinitions.getMetadata(item)
+        return item and saved_metadata(item.extra[2]) or 0
+    end
+
+    ---@param item Item
+    ---@param value integer
+    ---@return boolean
+    function RuntimeItemDefinitions.setMetadata(item, value)
+        local definition = item and item.runtime_definition
+        if not definition then return false end
+        value = math.max(0, math.min(METADATA_MASK, math.floor(value or 0)))
+        item.extra[2] = value == 0 and definition.id or
+                            (PACKED_MARKER | definition.id | (value << 8))
+        return true
     end
 
     ---@param key string|integer
@@ -157,7 +198,7 @@ OnInit.final("RuntimeItemDefinitions", function(Require)
     ---@param encoded_extra integer
     ---@return RuntimeLogicalItemDefinition?
     function RuntimeItemDefinitions.fromSaved(carrier_id, encoded_extra)
-        local id = (encoded_extra or 0) & 0xFFFF
+        local id = saved_definition_id((encoded_extra or 0) & 0xFFFF)
         local definition = by_id[id]
         if definition and definition.carrier_id == carrier_id then
             return definition

@@ -23,6 +23,9 @@ OnInit.final("ShopServiceDialogs", function(Require)
             ["REQUIRES RANK 4"] =
                 "That infusion requires Rank 4 with its faction.",
             ["BREW FAILED"] = "The potion could not be customized.",
+            ["NO DONOR"] = "Equip the donor flask in the other potion slot.",
+            ["NO DONOR AFFIX"] = "The donor flask does not have that affix.",
+            ["NO AFFIX SLOT"] = "That flask has no available affix slot.",
             ["NO STATS"] = "You have no stats available to refund.",
             COOLDOWN = "This service is currently on cooldown.",
             OWNED = "You already own this service.",
@@ -185,11 +188,10 @@ OnInit.final("ShopServiceDialogs", function(Require)
         if data.operation == "refine" then
             action = "Refine " ..
                          PotionBrewingService.stat_names[data.value]
-        elseif data.value == 0 then
-            action = data.operation == "infusion" and "Remove infusion" or
-                         "Remove catalyst"
+        elseif data.operation == "reroll" then
+            action = "Reroll restoration"
         else
-            action = "Apply " .. quote.option.name
+            action = "Extract and apply " .. quote.option.name
         end
         local dialog = DialogWindow.create(pid,
             action .. " for " .. quote.price .. " |cffffcc00Gold|r?",
@@ -238,37 +240,25 @@ OnInit.final("ShopServiceDialogs", function(Require)
         return dialog:display()
     end
 
-    local function open_infusions(pid, slot)
-        local dialog = DialogWindow.create(pid, "Choose an infusion",
-                                           brewing_option,
-                                           "potion-infusions")
-        local customization = PotionService.getCustomization(
-                                  PotionService.getEquipped(pid, slot))
-        if customization and customization.infusion_id ~= 0 then
-            add_brewing_option(dialog, slot, "infusion", 0,
-                               "Remove Infusion")
+    local function open_affix_transfer(pid, slot, kind)
+        local donor_slot = slot == 1 and 2 or 1
+        local donor = PotionService.getEquipped(pid, donor_slot)
+        if not donor then
+            failure(pid, "NO DONOR")
+            return false
         end
-        for _, infusion in ipairs(PotionService.getInfusions()) do
-            add_brewing_option(dialog, slot, "infusion", infusion.id,
-                               infusion.name)
+        local customization = PotionService.getCustomization(donor)
+        local affix = kind == "prefix" and customization.prefix or
+                          customization.suffix
+        if not affix then
+            failure(pid, "NO DONOR AFFIX")
+            return false
         end
-        return dialog:display()
-    end
-
-    local function open_catalysts(pid, slot)
-        local dialog = DialogWindow.create(pid, "Choose a catalyst",
-                                           brewing_option,
-                                           "potion-catalysts")
-        local customization = PotionService.getCustomization(
-                                  PotionService.getEquipped(pid, slot))
-        if customization and customization.catalyst_id ~= 0 then
-            add_brewing_option(dialog, slot, "catalyst", 0,
-                               "Remove Catalyst")
-        end
-        for _, catalyst in ipairs(PotionService.getCatalysts()) do
-            add_brewing_option(dialog, slot, "catalyst", catalyst.id,
-                               catalyst.name)
-        end
+        local dialog = DialogWindow.create(pid,
+            "Extracting this affix destroys " .. GetItemName(donor.obj) .. ".",
+            brewing_option, "potion-affix-transfer")
+        add_brewing_option(dialog, slot, kind, donor_slot,
+                           "Extract " .. affix.name)
         return dialog:display()
     end
 
@@ -277,10 +267,10 @@ OnInit.final("ShopServiceDialogs", function(Require)
         dialog:destroy()
         if data.operation == "refine" then
             return open_refinement(pid, data.slot)
-        elseif data.operation == "infusion" then
-            return open_infusions(pid, data.slot)
+        elseif data.operation == "reroll" then
+            return confirm_brewing(pid, data)
         end
-        return open_catalysts(pid, data.slot)
+        return open_affix_transfer(pid, data.slot, data.operation)
     end
 
     open_brew_menu = function(pid, slot)
@@ -297,13 +287,22 @@ OnInit.final("ShopServiceDialogs", function(Require)
             end
         end
         if refinable then
-            dialog:addButton("Refine Properties", {
-                slot = slot,
-                operation = "refine"
-            })
+            if PotionService.canRerollRestoration(item) then
+                local quote = PotionBrewingService.quote(pid, slot, "reroll", 0)
+                dialog:addButton("Reroll Restoration (" .. quote.price ..
+                                     " Gold)", {slot = slot, operation = "reroll",
+                                                 value = 0})
+            else
+                dialog:addButton("Refine Properties", {
+                    slot = slot,
+                    operation = "refine"
+                })
+            end
         end
-        dialog:addButton("Infusions", {slot = slot, operation = "infusion"})
-        dialog:addButton("Catalysts", {slot = slot, operation = "catalyst"})
+        dialog:addButton("Transfer Prefix",
+                         {slot = slot, operation = "prefix"})
+        dialog:addButton("Transfer Suffix",
+                         {slot = slot, operation = "suffix"})
         return dialog:display()
     end
 
