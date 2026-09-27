@@ -18,6 +18,17 @@ OnInit.final("PotionService", function(Require)
     local VAMPIRIC_LEECH = 0.05
     local INFUSION_NONE = 0
     local INFUSION_VAMPIRIC = 1
+    local INFUSION_STONE = 2
+    local INFUSION_TEMPEST = 3
+    local CATALYST_NONE = 0
+    local CATALYST_POTENT = 1
+    local CATALYST_LINGERING = 2
+    local CATALYST_ACCELERANT = 3
+    -- Potion definitions currently roll at most five properties. The final two
+    -- six-bit quality slots are therefore stable, already-saved customization
+    -- storage that does not compete with logical identity or item charges.
+    local INFUSION_QUALITY_INDEX = 6
+    local CATALYST_QUALITY_INDEX = 7
     local GREATER_HEALTH_ID = 2
     local GREATER_MANA_ID = 3
     local SUPERIOR_HEALTH_ID = 4
@@ -43,9 +54,17 @@ OnInit.final("PotionService", function(Require)
     local TEMPEST_KEY = "tempest_flask"
     local HUNTERS_KEY = "hunters_flask"
     local cooldowns = {}
+    local infusions = {}
+    local catalysts = {}
 
     PotionService.INFUSION_NONE = INFUSION_NONE
     PotionService.INFUSION_VAMPIRIC = INFUSION_VAMPIRIC
+    PotionService.INFUSION_STONE = INFUSION_STONE
+    PotionService.INFUSION_TEMPEST = INFUSION_TEMPEST
+    PotionService.CATALYST_NONE = CATALYST_NONE
+    PotionService.CATALYST_POTENT = CATALYST_POTENT
+    PotionService.CATALYST_LINGERING = CATALYST_LINGERING
+    PotionService.CATALYST_ACCELERANT = CATALYST_ACCELERANT
     PotionService.DEFAULT_USE_COOLDOWN = DEFAULT_USE_COOLDOWN
     PotionService.GREATER_HEALTH_KEY = GREATER_HEALTH_KEY
     PotionService.GREATER_MANA_KEY = GREATER_MANA_KEY
@@ -61,9 +80,47 @@ OnInit.final("PotionService", function(Require)
         ITEM_CHARGES
     }
 
+    ---@class PotionCustomizationEffect
+    ---@field id integer
+    ---@field key string
+    ---@field name string
+    ---@field description string
+    ---@field icon string
+    ---@field on_use? fun(context: PotionUseContext)
+    ---@field potency_multiplier? number
+    ---@field duration_multiplier? number
+    ---@field cooldown_multiplier? number
+
+    local function register_customization(registry, definition)
+        if type(definition) ~= "table" or type(definition.id) ~= "number" or
+            definition.id <= 0 or definition.id > 63 or
+            registry[definition.id] then return false end
+        registry[definition.id] = definition
+        return true
+    end
+
+    ---@param definition PotionCustomizationEffect
+    ---@return boolean
+    function PotionService.registerInfusion(definition)
+        return register_customization(infusions, definition)
+    end
+
+    ---@param definition PotionCustomizationEffect
+    ---@return boolean
+    function PotionService.registerCatalyst(definition)
+        return register_customization(catalysts, definition)
+    end
+
+    ---@return PotionCustomizationEffect[]
+    function PotionService.getInfusions() return infusions end
+
+    ---@return PotionCustomizationEffect[]
+    function PotionService.getCatalysts() return catalysts end
+
     ---@class PotionBehavior
     ---@field cooldown? number|fun(item: Item): number
     ---@field replaces_restoration? boolean Suppress formula healing and mana.
+    ---@field inherent_infusion? integer
     ---@field on_use? fun(context: PotionUseContext)
 
     ---@class PotionUseContext
@@ -71,6 +128,8 @@ OnInit.final("PotionService", function(Require)
     ---@field item Item
     ---@field hero unit
     ---@field unit UnitTable
+    ---@field potency_multiplier number
+    ---@field duration_multiplier number
 
     ---Defines a logical potion while keeping gameplay behavior out of the
     ---generic runtime-item catalog. Ordinary restoration remains driven by
@@ -262,6 +321,37 @@ OnInit.final("PotionService", function(Require)
         ITEM_RARITY, ITEM_LIMIT, ITEM_NOCRAFT
     }
 
+    local function apply_vampiric_effect(context, leech, duration)
+        local buff = VampiricPotion:add(context.hero, context.hero)
+        buff.leech = leech * context.potency_multiplier
+        buff:duration(duration * context.duration_multiplier)
+        UnitRefreshBuff(context.hero, buff)
+    end
+
+    local function apply_stone_effect(context, reduction, duration)
+        local buff = StonebloodFlaskBuff:add(context.hero, context.hero)
+        local previous = buff.dr or 1.
+        local multiplier = math.max(0.01, 1. - reduction *
+                                        context.potency_multiplier)
+        if previous ~= multiplier then
+            context.unit.dr = context.unit.dr / previous * multiplier
+            buff.dr = multiplier
+        end
+        buff:duration(duration * context.duration_multiplier)
+        UnitRefreshBuff(context.hero, buff)
+    end
+
+    local function apply_tempest_effect(context, rate, duration)
+        local adjusted_rate = rate * context.potency_multiplier
+        local buff = TempestFlaskBuff:add(context.hero, context.hero)
+        buff.rate = adjusted_rate
+        PotionService.accelerateCooldowns(context, adjusted_rate,
+                                          duration *
+                                              context.duration_multiplier)
+        buff:duration(duration * context.duration_multiplier)
+        UnitRefreshBuff(context.hero, buff)
+    end
+
     PotionService.define(STONEBLOOD_KEY, {
         id = STONEBLOOD_ID,
         carrier = HEALTH_FLASK_ID,
@@ -275,9 +365,9 @@ OnInit.final("PotionService", function(Require)
         prepare_data = prepare_chaos_flask(15000, 30, 0, 0)
     }, {
         cooldown = DEFAULT_USE_COOLDOWN,
+        inherent_infusion = INFUSION_STONE,
         on_use = function(context)
-            local buff = StonebloodFlaskBuff:add(context.hero, context.hero)
-            buff:duration(12.)
+            apply_stone_effect(context, 0.15, 12.)
         end
     })
 
@@ -294,10 +384,9 @@ OnInit.final("PotionService", function(Require)
         prepare_data = prepare_chaos_flask(0, 0, 15000, 30)
     }, {
         cooldown = DEFAULT_USE_COOLDOWN,
+        inherent_infusion = INFUSION_TEMPEST,
         on_use = function(context)
-            local buff = TempestFlaskBuff:add(context.hero, context.hero)
-            PotionService.accelerateCooldowns(context, 1., 8.)
-            buff:duration(8.)
+            apply_tempest_effect(context, 1., 8.)
         end
     })
 
@@ -314,11 +403,9 @@ OnInit.final("PotionService", function(Require)
         prepare_data = prepare_chaos_flask(7500, 15, 7500, 15)
     }, {
         cooldown = DEFAULT_USE_COOLDOWN,
+        inherent_infusion = INFUSION_VAMPIRIC,
         on_use = function(context)
-            local buff = VampiricPotion:add(context.hero, context.hero)
-            buff.leech = 0.08
-            buff:duration(12.)
-            UnitRefreshBuff(context.hero, buff)
+            apply_vampiric_effect(context, 0.08, 12.)
         end
     })
 
@@ -336,18 +423,90 @@ OnInit.final("PotionService", function(Require)
     }, {
         cooldown = DEFAULT_USE_COOLDOWN,
         replaces_restoration = true,
+        inherent_infusion = INFUSION_VAMPIRIC,
         on_use = function(context)
-            local buff = VampiricPotion:add(context.hero, context.hero)
-            buff.leech = VAMPIRIC_LEECH
-            buff:duration(VAMPIRIC_DURATION)
-            UnitRefreshBuff(context.hero, buff)
+            apply_vampiric_effect(context, VAMPIRIC_LEECH,
+                                   VAMPIRIC_DURATION)
         end
+    })
+
+    PotionService.registerInfusion({
+        id = INFUSION_VAMPIRIC,
+        key = "vampiric",
+        name = "Vampiric Infusion",
+        icon = BLOOD_FLASK_ICON,
+        description = "Restores |cffffcc005%|r of damage dealt as Health " ..
+            "for |cffffcc0012 seconds|r.",
+        on_use = function(context)
+            apply_vampiric_effect(context, 0.05, 12.)
+        end
+    })
+
+    PotionService.registerInfusion({
+        id = INFUSION_STONE,
+        key = "stone",
+        name = "Stone Infusion",
+        icon = "ReplaceableTextures\\CommandButtons\\BTNStone.blp",
+        description = "Reduces damage taken by |cffffcc0010%|r for " ..
+            "|cffffcc0010 seconds|r.",
+        on_use = function(context)
+            apply_stone_effect(context, 0.10, 10.)
+        end
+    })
+
+    PotionService.registerInfusion({
+        id = INFUSION_TEMPEST,
+        key = "tempest",
+        name = "Tempest Infusion",
+        icon = "ReplaceableTextures\\CommandButtons\\BTNMonsoon.blp",
+        description = "Ability cooldowns recover |cffffcc0050%|r faster " ..
+            "for |cffffcc008 seconds|r.",
+        on_use = function(context)
+            apply_tempest_effect(context, 0.50, 8.)
+        end
+    })
+
+    PotionService.registerCatalyst({
+        id = CATALYST_POTENT,
+        key = "potent",
+        name = "Potent Catalyst",
+        icon = "ReplaceableTextures\\CommandButtons\\BTNStrongDrink.blp",
+        description = "Infusion effects are |cffffcc0025%|r stronger.",
+        potency_multiplier = 1.25
+    })
+
+    PotionService.registerCatalyst({
+        id = CATALYST_LINGERING,
+        key = "lingering",
+        name = "Lingering Catalyst",
+        icon = "ReplaceableTextures\\CommandButtons\\BTNCloudOfFog.blp",
+        description = "Infusion effects last |cffffcc0050%|r longer.",
+        duration_multiplier = 1.50
+    })
+
+    PotionService.registerCatalyst({
+        id = CATALYST_ACCELERANT,
+        key = "accelerant",
+        name = "Accelerant Catalyst",
+        icon = "ReplaceableTextures\\CommandButtons\\BTNBootsOfSpeed.blp",
+        description = "Potion cooldown is |cffffcc0033%|r shorter, but " ..
+            "infusion effects last |cffffcc0025%|r less time.",
+        cooldown_multiplier = 2. / 3.,
+        duration_multiplier = 0.75
     })
 
     local function potion_at(pid, index)
         local profile = Profile[pid]
         return profile and profile.hero and
                    profile.hero.items[POTION_INDEX + index - 1] or nil
+    end
+
+    ---@param pid integer
+    ---@param index integer
+    ---@return Item?
+    function PotionService.getEquipped(pid, index)
+        if index ~= 1 and index ~= 2 then return nil end
+        return potion_at(pid, index)
     end
 
     local function cooldown_table(pid)
@@ -370,8 +529,22 @@ OnInit.final("PotionService", function(Require)
         -- Potion buttons mirror the ordinary inventory-slot presentation.
         -- Item:info() is the detailed inspection view and appends bookkeeping
         -- such as current charges, saveability, sale value, and sockets.
+        PotionService.refreshItem(item)
         return GetItemName(item.obj), BlzGetItemIconPath(item.obj),
                item.tooltip or BlzGetItemDescription(item.obj)
+    end
+
+    local function selected_customization(item, registry, quality_index)
+        local id = item and item.quality and item.quality[quality_index] or 0
+        return registry[id], id
+    end
+
+    local function append_customization(item, definition)
+        if not definition then return end
+        local line = "|n|cff0080c0" .. definition.name .. ":|r " ..
+                         definition.description
+        item.tooltip = (item.tooltip or "") .. line
+        item.alt_tooltip = (item.alt_tooltip or "") .. line
     end
 
     ---Applies the item's dynamic presentation to its backing native handle.
@@ -381,21 +554,122 @@ OnInit.final("PotionService", function(Require)
             return
         end
         item:update(true)
+        local infusion = selected_customization(item, infusions,
+                                                INFUSION_QUALITY_INDEX)
+        local catalyst = selected_customization(item, catalysts,
+                                                CATALYST_QUALITY_INDEX)
+        append_customization(item, infusion)
+        append_customization(item, catalyst)
+        BlzSetItemDescription(item.obj, item.tooltip)
+        BlzSetItemExtendedTooltip(item.obj, item.tooltip)
     end
 
     ---@param item Item
     ---@param infusion integer
     function PotionService.setInfusion(item, infusion)
         if not item or item.type ~= TYPE_POTION_INDEX then return false end
-        local changed
-        if infusion == INFUSION_VAMPIRIC then
-            changed = RuntimeItemDefinitions.apply(item, BLOOD_FLASK_KEY, false)
-        else
-            RuntimeItemDefinitions.clear(item)
-            changed = true
+        if infusion ~= INFUSION_NONE and not infusions[infusion] then
+            return false
         end
+
+        -- Preserve the original Vampire conversion for the basic mana flask.
+        -- Logical flasks keep their base definition and use the saved infusion
+        -- slot, which is what makes brewing composable.
+        if not item.runtime_definition and item.id == MANA_FLASK_ID and
+            infusion == INFUSION_VAMPIRIC then
+            return RuntimeItemDefinitions.apply(item, BLOOD_FLASK_KEY, false)
+        end
+        if RuntimeItemDefinitions.is(item, BLOOD_FLASK_KEY) and
+            infusion == INFUSION_NONE and
+            item.quality[INFUSION_QUALITY_INDEX] == INFUSION_NONE then
+            RuntimeItemDefinitions.clear(item)
+            PotionService.refreshItem(item)
+            if item.pid then NotifyItemChanged(item.pid) end
+            return true
+        end
+
+        local behavior = item.runtime_definition and
+                             item.runtime_definition.metadata and
+                             item.runtime_definition.metadata.potion or nil
+        if behavior and behavior.inherent_infusion == infusion and
+            infusion ~= INFUSION_NONE then return false end
+
+        local changed = item.quality[INFUSION_QUALITY_INDEX] ~= infusion
+        item.quality[INFUSION_QUALITY_INDEX] = infusion
+        PotionService.refreshItem(item)
         if item.pid then NotifyItemChanged(item.pid) end
         return changed
+    end
+
+    ---@param item Item
+    ---@param catalyst integer
+    ---@return boolean
+    function PotionService.setCatalyst(item, catalyst)
+        if not item or item.type ~= TYPE_POTION_INDEX or
+            (catalyst ~= CATALYST_NONE and not catalysts[catalyst]) then
+            return false
+        end
+        local changed = item.quality[CATALYST_QUALITY_INDEX] ~= catalyst
+        item.quality[CATALYST_QUALITY_INDEX] = catalyst
+        PotionService.refreshItem(item)
+        if item.pid then NotifyItemChanged(item.pid) end
+        return changed
+    end
+
+    ---@param item Item
+    ---@return table?
+    function PotionService.getCustomization(item)
+        if not item or item.type ~= TYPE_POTION_INDEX then return nil end
+        local infusion, infusion_id = selected_customization(
+                                            item, infusions,
+                                            INFUSION_QUALITY_INDEX)
+        local catalyst, catalyst_id = selected_customization(
+                                            item, catalysts,
+                                            CATALYST_QUALITY_INDEX)
+        return {
+            infusion_id = infusion and infusion_id or INFUSION_NONE,
+            infusion = infusion,
+            catalyst_id = catalyst and catalyst_id or CATALYST_NONE,
+            catalyst = catalyst
+        }
+    end
+
+    ---@param item Item
+    ---@param infusion integer
+    ---@return boolean
+    ---@return string?
+    function PotionService.canSetInfusion(item, infusion)
+        if not item or item.type ~= TYPE_POTION_INDEX or
+            (infusion ~= INFUSION_NONE and not infusions[infusion]) then
+            return false, "INVALID INFUSION"
+        end
+        local customization = PotionService.getCustomization(item)
+        if customization.infusion_id == infusion then
+            return false, "ALREADY APPLIED"
+        end
+        local behavior = item.runtime_definition and
+                             item.runtime_definition.metadata and
+                             item.runtime_definition.metadata.potion
+        if behavior and behavior.inherent_infusion == infusion and
+            infusion ~= INFUSION_NONE then
+            return false, "INHERENT"
+        end
+        return true
+    end
+
+    ---@param item Item
+    ---@param catalyst integer
+    ---@return boolean
+    ---@return string?
+    function PotionService.canSetCatalyst(item, catalyst)
+        if not item or item.type ~= TYPE_POTION_INDEX or
+            (catalyst ~= CATALYST_NONE and not catalysts[catalyst]) then
+            return false, "INVALID CATALYST"
+        end
+        if PotionService.getCustomization(item).catalyst_id == catalyst then
+            return false, "ALREADY APPLIED"
+        end
+        return true
     end
 
     ---@param pid integer
@@ -426,6 +700,11 @@ OnInit.final("PotionService", function(Require)
         if type(cooldown) ~= "number" then
             cooldown = DEFAULT_USE_COOLDOWN
         end
+
+        local catalyst = selected_customization(item, catalysts,
+                                                CATALYST_QUALITY_INDEX)
+        cooldown = cooldown *
+                       (catalyst and catalyst.cooldown_multiplier or 1.)
 
         return math.max(0., cooldown)
     end
@@ -500,11 +779,13 @@ OnInit.final("PotionService", function(Require)
     ---@param stat integer
     ---@return boolean
     function PotionService.canRefine(item, stat)
-        return refinement_index(item, stat) ~= nil
+        local quality_index = refinement_index(item, stat)
+        return quality_index ~= nil and
+                   quality_index < INFUSION_QUALITY_INDEX
     end
 
-    ---Rerolls one eligible potion property. Currency/material consumption is
-    ---intentionally left to the future brewing transaction that calls this.
+    ---Rerolls one eligible potion property. The brewing transaction owns
+    ---currency checks and calls this only after committing its quoted cost.
     ---@param item Item
     ---@param stat integer
     ---@return boolean success
@@ -512,13 +793,13 @@ OnInit.final("PotionService", function(Require)
     ---@return number? new_value
     function PotionService.refine(item, stat)
         local quality_index = refinement_index(item, stat)
-        if not quality_index or quality_index > QUALITY_SAVED then
+        if not quality_index or quality_index >= INFUSION_QUALITY_INDEX then
             return false
         end
 
         local old_value = item.cached_stats[stat]
         item.quality[quality_index] = GetRandomInt(0, 63)
-        item:update(true)
+        PotionService.refreshItem(item)
 
         if stat == ITEM_CHARGES then
             item.charges = math.min(item.charges,
@@ -555,6 +836,8 @@ OnInit.final("PotionService", function(Require)
 
         local stats = item.cached_stats
         local behavior = potion_behavior(item)
+        local customization = PotionService.getCustomization(item)
+        local catalyst = customization and customization.catalyst or nil
         local replaces_restoration =
             behavior and behavior.replaces_restoration == true
         local heal =
@@ -570,13 +853,25 @@ OnInit.final("PotionService", function(Require)
             HP(hero, hero, heal, name)
         end
         if mana > 0 then MP(hero, mana) end
+
+        local context = {
+            pid = pid,
+            item = item,
+            hero = hero,
+            unit = Unit[hero],
+            potency_multiplier = catalyst and
+                catalyst.potency_multiplier or 1.,
+            duration_multiplier = catalyst and
+                catalyst.duration_multiplier or 1.
+        }
         if behavior and behavior.on_use then
-            behavior.on_use({
-                pid = pid,
-                item = item,
-                hero = hero,
-                unit = Unit[hero]
-            })
+            behavior.on_use(context)
+        end
+        if customization and customization.infusion and
+            customization.infusion.on_use and
+            (not behavior or behavior.inherent_infusion ~=
+                customization.infusion_id) then
+            customization.infusion.on_use(context)
         end
 
         local use_cooldown = PotionService.getUseCooldown(item)
@@ -594,7 +889,9 @@ OnInit.final("PotionService", function(Require)
 
         local second = potion_at(pid, 2)
         if second and second.id == MANA_FLASK_ID and
-            (second.extra[2] or INFUSION_NONE) == INFUSION_NONE then
+            (second.extra[2] or INFUSION_NONE) == INFUSION_NONE and
+            (second.quality[INFUSION_QUALITY_INDEX] or INFUSION_NONE) ==
+                INFUSION_NONE then
             PotionService.setInfusion(second, INFUSION_VAMPIRIC)
         elseif second and second.id == MANA_FLASK_ID and
             RuntimeItemDefinitions.is(second, BLOOD_FLASK_KEY) then

@@ -296,8 +296,16 @@ OnInit.final("ArchitectureTests", function(Require)
     ArchitectureTests.register("runtime potion saves preserve identity and charges",
                                function()
         local cases = {
-            {PotionService.GRAND_MANA_KEY, 2, FourCC('pman')},
-            {PotionService.HUNTERS_KEY, 0, FourCC('phea')}
+            {
+                PotionService.GRAND_MANA_KEY, 2, FourCC('pman'),
+                PotionService.INFUSION_VAMPIRIC,
+                PotionService.CATALYST_ACCELERANT, 2.
+            },
+            {
+                PotionService.HUNTERS_KEY, 0, FourCC('phea'),
+                PotionService.INFUSION_STONE,
+                PotionService.CATALYST_POTENT, 3.
+            }
         }
 
         for index = 1, #cases do
@@ -309,20 +317,45 @@ OnInit.final("ArchitectureTests", function(Require)
             end
 
             local maximum_charges = item.cached_stats[ITEM_CHARGES]
+            local flat_health = item.cached_stats[ITEM_FLAT_HEAL]
+            local percent_health = item.cached_stats[ITEM_PERCENT_HEAL]
+            local flat_mana = item.cached_stats[ITEM_FLAT_MANA]
+            local percent_mana = item.cached_stats[ITEM_PERCENT_MANA]
             item.charges = case[2]
+            if not PotionService.setInfusion(item, case[4]) or
+                not PotionService.setCatalyst(item, case[5]) then
+                item:destroy()
+                return false, "could not customize saved potion " ..
+                           tostring(case[1])
+            end
             local saved_id = item:encode_id()
             local saved_stats = item:encode_stats()
             local saved_extra = item:encode_extra()
             item:destroy()
 
             local restored = Item.decode(saved_id, saved_stats, saved_extra)
+            PotionService.refreshItem(restored)
             local properties = PotionService.getProperties(restored)
+            local customization = PotionService.getCustomization(restored)
             local valid = restored and properties and
                               RuntimeItemDefinitions.is(restored, case[1]) and
                               restored.runtime_definition.world_skin_id ==
                               case[3] and restored.charges == case[2] and
                               properties.charges == case[2] and
-                              properties.maximum_charges == maximum_charges
+                              properties.maximum_charges == maximum_charges and
+                              properties.flat_health == flat_health and
+                              properties.percent_health == percent_health and
+                              properties.flat_mana == flat_mana and
+                              properties.percent_mana == percent_mana and
+                              customization and
+                              customization.infusion_id == case[4] and
+                              customization.catalyst_id == case[5] and
+                              math.abs(properties.cooldown - case[6]) < 0.001 and
+                              restored.tooltip:find(
+                                  customization.infusion.name .. ":", 1,
+                                  true) and restored.tooltip:find(
+                                  customization.catalyst.name .. ":", 1,
+                                  true)
 
             if restored then restored:destroy() end
             if not valid then
@@ -671,6 +704,11 @@ OnInit.final("ArchitectureTests", function(Require)
         end
         if not ShopAction.get('I0JS').cooldown then
             return false, "recharge action has no cooldown presentation"
+        end
+        if type(PotionBrewingService.quote) ~= "function" or
+            type(PotionBrewingService.commit) ~= "function" or
+            ShopAction.get('I00J').label ~= "BREW / REFILL" then
+            return false, "potion brewing service is not registered"
         end
         return true
     end)

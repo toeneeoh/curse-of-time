@@ -13,7 +13,16 @@ OnInit.final("ShopServiceDialogs", function(Require)
             MAXED = "This service is already at its maximum.",
             FULL = "This service is already full.",
             ["NO ITEM"] = "You have no item to recharge!",
-            ["NO POTIONS"] = "You have no potions to refill.",
+            ["NO POTIONS"] = "You have no potions to brew or refill.",
+            ["NO HERO"] = "You have no active hero.",
+            ["NOT REFINABLE"] = "That potion property cannot be refined.",
+            ["ALREADY APPLIED"] = "That customization is already applied.",
+            INHERENT = "That effect is already inherent to this flask.",
+            ["REQUIRES LEVEL 200"] =
+                "Chaos brewing requires a level 200 hero.",
+            ["REQUIRES RANK 4"] =
+                "That infusion requires Rank 4 with its faction.",
+            ["BREW FAILED"] = "The potion could not be customized.",
             ["NO STATS"] = "You have no stats available to refund.",
             COOLDOWN = "This service is currently on cooldown.",
             OWNED = "You already own this service.",
@@ -152,6 +161,185 @@ OnInit.final("ShopServiceDialogs", function(Require)
         return dialog:display()
     end
 
+    local open_brew_menu
+
+    local function brewing_confirm(dialog, _, data)
+        local quote = PotionBrewingService.commit(dialog.pid, data.slot,
+                                                   data.operation, data.value)
+        dialog:destroy()
+        if not quote.available then
+            failure(dialog.pid, quote.reason)
+        end
+        return false
+    end
+
+    local function confirm_brewing(pid, data)
+        local quote = PotionBrewingService.quote(pid, data.slot,
+                                                 data.operation, data.value)
+        if not quote.available then
+            failure(pid, quote.reason)
+            return false
+        end
+
+        local action
+        if data.operation == "refine" then
+            action = "Refine " ..
+                         PotionBrewingService.stat_names[data.value]
+        elseif data.value == 0 then
+            action = data.operation == "infusion" and "Remove infusion" or
+                         "Remove catalyst"
+        else
+            action = "Apply " .. quote.option.name
+        end
+        local dialog = DialogWindow.create(pid,
+            action .. " for " .. quote.price .. " |cffffcc00Gold|r?",
+            brewing_confirm, "potion-brewing-confirm")
+        dialog:addButton("Confirm", data)
+        return dialog:display()
+    end
+
+    local function brewing_option(dialog, _, data)
+        local pid = dialog.pid
+        dialog:destroy()
+        return confirm_brewing(pid, data)
+    end
+
+    local function add_brewing_option(dialog, slot, operation, value, label)
+        local quote = PotionBrewingService.quote(dialog.pid, slot, operation,
+                                                 value)
+        if quote.available then
+            label = label .. " (" .. quote.price .. " Gold)"
+        elseif quote.reason == "ALREADY APPLIED" then
+            label = label .. " (Applied)"
+        elseif quote.reason ~= "currency" then
+            label = label .. " (" .. quote.reason .. ")"
+        else
+            label = label .. " (" .. quote.price .. " Gold - NOT ENOUGH)"
+        end
+        dialog:addButton(label, {
+            slot = slot,
+            operation = operation,
+            value = value
+        }, quote.option and quote.option.icon or nil)
+    end
+
+    local function open_refinement(pid, slot)
+        local item = PotionService.getEquipped(pid, slot)
+        if not item then return false end
+        local dialog = DialogWindow.create(pid, "Refine which property?",
+                                           brewing_option,
+                                           "potion-refinement")
+        for _, stat in ipairs(PotionService.ROLLABLE_STATS) do
+            if PotionService.canRefine(item, stat) then
+                add_brewing_option(dialog, slot, "refine", stat,
+                                   PotionBrewingService.stat_names[stat])
+            end
+        end
+        return dialog:display()
+    end
+
+    local function open_infusions(pid, slot)
+        local dialog = DialogWindow.create(pid, "Choose an infusion",
+                                           brewing_option,
+                                           "potion-infusions")
+        local customization = PotionService.getCustomization(
+                                  PotionService.getEquipped(pid, slot))
+        if customization and customization.infusion_id ~= 0 then
+            add_brewing_option(dialog, slot, "infusion", 0,
+                               "Remove Infusion")
+        end
+        for _, infusion in ipairs(PotionService.getInfusions()) do
+            add_brewing_option(dialog, slot, "infusion", infusion.id,
+                               infusion.name)
+        end
+        return dialog:display()
+    end
+
+    local function open_catalysts(pid, slot)
+        local dialog = DialogWindow.create(pid, "Choose a catalyst",
+                                           brewing_option,
+                                           "potion-catalysts")
+        local customization = PotionService.getCustomization(
+                                  PotionService.getEquipped(pid, slot))
+        if customization and customization.catalyst_id ~= 0 then
+            add_brewing_option(dialog, slot, "catalyst", 0,
+                               "Remove Catalyst")
+        end
+        for _, catalyst in ipairs(PotionService.getCatalysts()) do
+            add_brewing_option(dialog, slot, "catalyst", catalyst.id,
+                               catalyst.name)
+        end
+        return dialog:display()
+    end
+
+    local function brewing_category(dialog, _, data)
+        local pid = dialog.pid
+        dialog:destroy()
+        if data.operation == "refine" then
+            return open_refinement(pid, data.slot)
+        elseif data.operation == "infusion" then
+            return open_infusions(pid, data.slot)
+        end
+        return open_catalysts(pid, data.slot)
+    end
+
+    open_brew_menu = function(pid, slot)
+        local item = PotionService.getEquipped(pid, slot)
+        if not item then return false end
+        local dialog = DialogWindow.create(pid,
+            "Customize " .. GetItemName(item.obj), brewing_category,
+            "potion-brewing")
+        local refinable = false
+        for _, stat in ipairs(PotionService.ROLLABLE_STATS) do
+            if PotionService.canRefine(item, stat) then
+                refinable = true
+                break
+            end
+        end
+        if refinable then
+            dialog:addButton("Refine Properties", {
+                slot = slot,
+                operation = "refine"
+            })
+        end
+        dialog:addButton("Infusions", {slot = slot, operation = "infusion"})
+        dialog:addButton("Catalysts", {slot = slot, operation = "catalyst"})
+        return dialog:display()
+    end
+
+    local function potion_service_choice(dialog, _, data)
+        local pid = dialog.pid
+        dialog:destroy()
+        if data == "refill" then return open_refill(pid) end
+        return open_brew_menu(pid, data)
+    end
+
+    local function open_potion_services(pid)
+        local first = PotionService.getEquipped(pid, 1)
+        local second = PotionService.getEquipped(pid, 2)
+        if not first and not second then
+            failure(pid, "NO POTIONS")
+            return false
+        end
+        local dialog = DialogWindow.create(pid, "Potion Services",
+                                           potion_service_choice,
+                                           "potion-services")
+        local refill = PotionRefillService.quote(pid)
+        if refill.available then
+            dialog:addButton("Refill All (" .. refill.price .. " Gold)",
+                             "refill")
+        end
+        if first then
+            dialog:addButton("Customize " .. GetItemName(first.obj), 1,
+                             BlzGetItemIconPath(first.obj))
+        end
+        if second then
+            dialog:addButton("Customize " .. GetItemName(second.obj), 2,
+                             BlzGetItemIconPath(second.obj))
+        end
+        return dialog:display()
+    end
+
     local function open_converter(pid)
         local quote = CurrencyConverterService.commit(pid)
         if not quote.available then
@@ -222,9 +410,13 @@ OnInit.final("ShopServiceDialogs", function(Require)
         cooldown = function(pid) return RECHARGE_COOLDOWN[pid], 180 end,
     })
     RegisterShopAction('I00J', {
-        label = "AVAILABLE",
-        availability = function(pid) return service_availability(PotionRefillService.quote(pid)) end,
-        open = open_refill,
+        label = "BREW / REFILL",
+        availability = function(pid)
+            return PotionService.getEquipped(pid, 1) ~= nil or
+                       PotionService.getEquipped(pid, 2) ~= nil,
+                   "NO POTIONS"
+        end,
+        open = open_potion_services,
     })
     RegisterShopAction('I084', {
         label = "4 PLATINUM",

@@ -3,6 +3,7 @@
 
 OnInit.final("ShopServices", function(Require)
     Require('Currency')
+    Require('Faction')
     Require('ItemEventRegistry')
     Require('Items')
     Require('PotionService')
@@ -14,6 +15,7 @@ OnInit.final("ShopServices", function(Require)
     RetrainingService = {}
     RechargeService = {}
     PotionRefillService = {}
+    PotionBrewingService = {}
     CurrencyConverterService = {}
     BackpackUpgradeService = {}
 
@@ -160,6 +162,130 @@ OnInit.final("ShopServices", function(Require)
             PotionService.refill(quote.potions[index])
         end
         NotifyItemChanged(pid)
+        return quote
+    end
+
+    PotionBrewingService.stat_names = {
+        [ITEM_FLAT_HEAL] = "Health Restored",
+        [ITEM_PERCENT_HEAL] = "% Max Health Restored",
+        [ITEM_FLAT_MANA] = "Mana Restored",
+        [ITEM_PERCENT_MANA] = "% Max Mana Restored",
+        [ITEM_CHARGES] = "Maximum Charges"
+    }
+
+    local infusion_factions = {
+        [PotionService.INFUSION_STONE] = 1,
+        [PotionService.INFUSION_TEMPEST] = 2,
+        [PotionService.INFUSION_VAMPIRIC] = 3
+    }
+
+    local function brewing_price(item, operation, value)
+        local properties = PotionService.getProperties(item)
+        local base = math.max(1000, properties.level_requirement ^ 2)
+        if operation == "refine" then return math.floor(base * 0.5) end
+        if value == 0 then return math.floor(base * 0.25) end
+        if operation == "catalyst" then return math.floor(base * 0.75) end
+        return math.floor(base)
+    end
+
+    ---Quotes a single potion customization operation. Infusions and catalysts
+    ---are Chaos brewing; stat refinement remains available to rolled
+    ---pre-Chaos flasks.
+    ---@param pid integer
+    ---@param slot integer Potion slot, 1 or 2.
+    ---@param operation string "refine", "infusion", or "catalyst".
+    ---@param value integer Stat index or customization id.
+    ---@return table
+    function PotionBrewingService.quote(pid, slot, operation, value)
+        if not Hero[pid] then return result(false, "NO HERO") end
+        local item = PotionService.getEquipped(pid, slot)
+        if not item then return result(false, "NO POTION") end
+
+        local available, reason
+        local option
+        if operation == "refine" then
+            available = PotionService.canRefine(item, value)
+            reason = available and nil or "NOT REFINABLE"
+        elseif operation == "infusion" then
+            available, reason = PotionService.canSetInfusion(item, value)
+            option = value == 0 and nil or PotionService.getInfusions()[value]
+            if available and value ~= 0 and not option then
+                available, reason = false, "INVALID INFUSION"
+            end
+        elseif operation == "catalyst" then
+            available, reason = PotionService.canSetCatalyst(item, value)
+            option = value == 0 and nil or PotionService.getCatalysts()[value]
+            if available and value ~= 0 and not option then
+                available, reason = false, "INVALID CATALYST"
+            end
+        else
+            return result(false, "INVALID BREW")
+        end
+
+        if available and operation ~= "refine" and
+            GetHeroLevel(Hero[pid]) < 200 then
+            available, reason = false, "REQUIRES LEVEL 200"
+        end
+
+        local faction_id = operation == "infusion" and
+                               infusion_factions[value] or nil
+        if available and faction_id and
+            Faction.getRank(Faction.getReputation(pid, faction_id)) < 4 then
+            available, reason = false, "REQUIRES RANK 4"
+        end
+
+        local quote = result(available, reason)
+        quote.item = item
+        quote.slot = slot
+        quote.operation = operation
+        quote.value = value
+        quote.option = option
+        quote.price = brewing_price(item, operation, value)
+        if available and GetCurrency(pid, GOLD) +
+            GetCurrency(pid, PLATINUM) * 1000000 < quote.price then
+            quote.available = false
+            quote.reason = "currency"
+        end
+        return quote
+    end
+
+    ---@param pid integer
+    ---@param slot integer
+    ---@param operation string
+    ---@param value integer
+    ---@return table
+    function PotionBrewingService.commit(pid, slot, operation, value)
+        local quote = PotionBrewingService.quote(pid, slot, operation, value)
+        if not quote.available then return quote end
+        local previous_gold = GetCurrency(pid, GOLD)
+        local previous_platinum = GetCurrency(pid, PLATINUM)
+        if not ChargePlayer(pid, quote.price, "Potion brewing complete.") then
+            quote.available = false
+            quote.reason = "currency"
+            return quote
+        end
+
+        local changed, old_value, new_value
+        if operation == "refine" then
+            changed, old_value, new_value =
+                PotionService.refine(quote.item, value)
+        elseif operation == "infusion" then
+            changed = PotionService.setInfusion(quote.item, value)
+        else
+            changed = PotionService.setCatalyst(quote.item, value)
+        end
+        if not changed then
+            -- The quote was recomputed immediately before charging, so this is
+            -- only a defensive guard against an invalid subsystem mutation.
+            SetCurrency(pid, GOLD, previous_gold)
+            SetCurrency(pid, PLATINUM, previous_platinum)
+            quote.available = false
+            quote.reason = "BREW FAILED"
+            return quote
+        end
+
+        quote.old_value = old_value
+        quote.new_value = new_value
         return quote
     end
 
