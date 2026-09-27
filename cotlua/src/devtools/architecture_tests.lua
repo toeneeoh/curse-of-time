@@ -203,7 +203,15 @@ OnInit.final("ArchitectureTests", function(Require)
                               properties.level_requirement == case[3] and
                               properties.maximum_charges >= case[4] and
                               properties.maximum_charges <= case[5] and
+                              properties.charges ==
+                              properties.maximum_charges and
                               item.cached_stats[case[6]] > 0
+
+            if valid then
+                item.charges = 0
+                valid = PotionService.refill(item) and
+                            item.charges == properties.maximum_charges
+            end
 
             if item then item:destroy() end
             if not valid then
@@ -234,6 +242,8 @@ OnInit.final("ArchitectureTests", function(Require)
                               expected_skin and
                               properties.level_requirement == 200 and
                               properties.maximum_charges == 6 and
+                              properties.charges ==
+                              properties.maximum_charges and
                               properties.flat_health == case[3] and
                               properties.flat_mana == case[4] and
                               item.tooltip:find(
@@ -242,6 +252,12 @@ OnInit.final("ArchitectureTests", function(Require)
                                   "|cffff0000Faction Rank Requirement: |r4",
                                   1, true) and item.tooltip:find(
                                   "|cff0080c0", 1, true)
+
+            if valid then
+                item.charges = 0
+                valid = PotionService.refill(item) and
+                            item.charges == properties.maximum_charges
+            end
 
             if valid and properties.percent_health > 0 then
                 valid = item.tooltip:find("Max Health Restored", 1, true) ~= nil
