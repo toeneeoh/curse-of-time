@@ -5,6 +5,7 @@ OnInit.final("ShopServices", function(Require)
     Require('Currency')
     Require('ItemEventRegistry')
     Require('Items')
+    Require('PotionService')
     Require('Profile')
     Require('Spells')
     Require('TimerQueue')
@@ -125,11 +126,14 @@ OnInit.final("ShopServices", function(Require)
         for slot = POTION_INDEX, POTION_INDEX + 1 do
             local potion = Profile[pid].hero.items[slot]
             if potion then
-                quote.potions[#quote.potions + 1] = potion
-                quote.price = quote.price + ItemData[potion.id][ITEM_LEVEL_REQUIREMENT] ^ 2
-                    + potion.cached_stats[ITEM_FLAT_HEAL] * 0.5
-                    + potion.cached_stats[ITEM_FLAT_MANA] * 0.5
-                if potion.charges < potion.cached_stats[ITEM_CHARGES] then
+                local properties = PotionService.getProperties(potion)
+                if properties then
+                    quote.potions[#quote.potions + 1] = potion
+                    quote.price = quote.price +
+                                      PotionService.getRefillCost(potion)
+                end
+                if properties and potion.charges <
+                    properties.maximum_charges then
                     needs_refill = true
                 end
             end
@@ -153,8 +157,7 @@ OnInit.final("ShopServices", function(Require)
             return quote
         end
         for index = 1, #quote.potions do
-            local potion = quote.potions[index]
-            potion.charges = potion.cached_stats[ITEM_CHARGES]
+            PotionService.refill(quote.potions[index])
         end
         NotifyItemChanged(pid)
         return quote

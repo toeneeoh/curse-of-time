@@ -21,12 +21,13 @@ OnInit.final("PhoenixRangerSpells", function(Require)
                 if not thistype.enabled[source] then
                     UnitRemoveAbility(source, multi_shot_ability)
                     UnitAddAbility(source, multi_shot_ability)
-                    SetUnitAbilityLevel(source, multi_shot_ability, (GetHeroLevel(source) // 50) + 1)
+                    SetUnitAbilityLevel(source, multi_shot_ability,
+                                        (GetHeroLevel(source) // 50) + 1)
                     BlzUnitHideAbility(source, multi_shot_ability, true)
                     thistype.enabled[source] = true
                     Unit[source].pm = Unit[source].pm * 0.6
                 end
-            -- toggle off
+                -- toggle off
             elseif id == ORDER_ID_UNIMMOLATION then
                 if thistype.enabled[source] then
                     UnitRemoveAbility(source, multi_shot_ability)
@@ -86,35 +87,38 @@ OnInit.final("PhoenixRangerSpells", function(Require)
         local thistype = PHOENIXFLIGHT
 
         thistype.values = {
-            range = function(pid) local ablev = GetUnitAbilityLevel(Hero[pid], thistype.id) return 350. + ablev * 150. end,
-            dmg = function(pid) return GetHeroAgi(Hero[pid], true) * 1.5 end,
-            aoe = 250.,
+            range = function(pid)
+                local ablev = GetUnitAbilityLevel(Hero[pid], thistype.id)
+                return 350. + ablev * 150.
+            end,
+            dmg = function(pid)
+                return GetHeroAgi(Hero[pid], true) * 1.5
+            end,
+            aoe = 250.
         }
 
-        thistype.preCast = function(pid, tpid, caster, target, x, y, targetX, targetY)
+        thistype.preCast = function(pid, tpid, caster, target, x, y, targetX,
+                                    targetY)
             local r = GetRectFromCoords(x, y)
             local r2 = GetRectFromCoords(targetX, targetY)
             local angle = atan(targetY - y, targetX - x)
-            local range = math.min(thistype.values.range(pid) * LBOOST[pid], math.max(17., DistanceCoords(x, y, targetX, targetY)))
+            local range = math.min(thistype.values.range(pid) * LBOOST[pid],
+                                   math.max(17., DistanceCoords(x, y, targetX,
+                                                                targetY)))
 
             targetX = x + range * math.cos(angle)
             targetY = y + range * math.sin(angle)
 
             if not IsTerrainWalkable(targetX, targetY) or r2 ~= r then
                 IssueImmediateOrderById(caster, ORDER_ID_STOP)
-                DisplayTextToPlayer(Player(pid - 1), 0, 0, INVALID_TARGET_MESSAGE)
+                DisplayTextToPlayer(Player(pid - 1), 0, 0,
+                                    INVALID_TARGET_MESSAGE)
             end
         end
 
         local missile_template = {
-            selfInteractions = {
-                CAT_MoveAutoHeight,
-                CAT_Orient2D,
-                distance,
-            },
-            interactions = {
-                unit = CAT_UnitCollisionCheck2D,
-            },
+            selfInteractions = {CAT_MoveAutoHeight, CAT_Orient2D, distance},
+            interactions = {unit = CAT_UnitCollisionCheck2D},
             identifier = "missile",
             speed = 1000,
             visualZ = 200.,
@@ -122,8 +126,12 @@ OnInit.final("PhoenixRangerSpells", function(Require)
             onUnitCollision = CAT_UnitPassThrough2D,
             onUnitCallback = {
                 other = function(self, enemy)
-                    DestroyEffect(AddSpecialEffectTarget("Abilities\\Weapons\\PhoenixMissile\\Phoenix_Missile.mdl", enemy, "chest"))
-                    DamageTarget(self.source, enemy, self.damage * BOOST[self.pid], ATTACK_TYPE_NORMAL, MAGIC, thistype.tag)
+                    DestroyEffect(AddSpecialEffectTarget(
+                                      "Abilities\\Weapons\\PhoenixMissile\\Phoenix_Missile.mdl",
+                                      enemy, "chest"))
+                    DamageTarget(self.source, enemy,
+                                 self.damage * BOOST[self.pid],
+                                 ATTACK_TYPE_NORMAL, MAGIC, thistype.tag)
 
                     local b = BurningDebuff:get(nil, enemy)
                     if b then
@@ -139,19 +147,26 @@ OnInit.final("PhoenixRangerSpells", function(Require)
                 SetUnitYBounded(self.source, self.y)
                 ShowUnit(self.source, true)
                 reselect(self.source)
-            end,
+            end
         }
         missile_template.__index = missile_template
 
         function thistype:onCast()
-            local range = math.min(self.range * LBOOST[self.pid], math.max(17., DistanceCoords(self.x, self.y, self.targetX, self.targetY)))
+            local range = math.min(self.range * LBOOST[self.pid], math.max(17.,
+                                                                           DistanceCoords(
+                                                                               self.x,
+                                                                               self.y,
+                                                                               self.targetX,
+                                                                               self.targetY)))
 
             local missile = setmetatable({}, missile_template)
             missile.x = self.x
             missile.y = self.y
             missile.vx = missile.speed * math.cos(self.angle)
             missile.vy = missile.speed * math.sin(self.angle)
-            missile.visual = AddSpecialEffect("units\\human\\phoenix\\phoenix.mdl", self.x, self.y)
+            missile.visual = AddSpecialEffect(
+                                 "units\\human\\phoenix\\phoenix.mdl", self.x,
+                                 self.y)
             BlzSetSpecialEffectScale(missile.visual, 1.5)
             missile.source = self.caster
             missile.owner = Player(self.pid - 1)
@@ -174,8 +189,15 @@ OnInit.final("PhoenixRangerSpells", function(Require)
     do
         local thistype = FIERYARROWS
         thistype.values = {
-            chance = function(pid) local ablev = GetUnitAbilityLevel(Hero[pid], thistype.id) return 2 * ablev end,
-            dmg = function(pid) local ablev = GetUnitAbilityLevel(Hero[pid], thistype.id) return GetHeroAgi(Hero[pid], true) * ablev + Unit[Hero[pid]].damage * 0.3 end,
+            chance = function(pid)
+                local ablev = GetUnitAbilityLevel(Hero[pid], thistype.id)
+                return 2 * ablev
+            end,
+            dmg = function(pid)
+                local ablev = GetUnitAbilityLevel(Hero[pid], thistype.id)
+                return GetHeroAgi(Hero[pid], true) * ablev +
+                           Unit[Hero[pid]].damage * 0.3
+            end
         }
 
         local function on_hit(source, target)
@@ -183,8 +205,14 @@ OnInit.final("PhoenixRangerSpells", function(Require)
             local ablev = GetUnitAbilityLevel(source, thistype.id)
 
             if math.random() * 100. < ablev * 2 * LBOOST[pid] then
-                DamageTarget(source, target, (((UnitGetBonus(source, BONUS_DAMAGE) + GetHeroAgi(source, true)) * .3 + GetHeroAgi(source, true) * ablev)) * BOOST[pid], ATTACK_TYPE_NORMAL, MAGIC, thistype.tag)
-                DestroyEffect(AddSpecialEffect("Abilities\\Weapons\\PhoenixMissile\\Phoenix_Missile.mdl", GetUnitX(target),GetUnitY(target)))
+                DamageTarget(source, target,
+                             (((UnitGetBonus(source, BONUS_DAMAGE) +
+                                 GetHeroAgi(source, true)) * .3 +
+                                 GetHeroAgi(source, true) * ablev)) * BOOST[pid],
+                             ATTACK_TYPE_NORMAL, MAGIC, thistype.tag)
+                DestroyEffect(AddSpecialEffect(
+                                  "Abilities\\Weapons\\PhoenixMissile\\Phoenix_Missile.mdl",
+                                  GetUnitX(target), GetUnitY(target)))
 
                 local b = BurningDebuff:get(nil, target)
                 if b then
@@ -211,17 +239,15 @@ OnInit.final("PhoenixRangerSpells", function(Require)
         thistype.values = {
             aoe = 900.,
             dmg = function(pid) return Unit[Hero[pid]].damage end,
-            dot = function(pid) local ablev = GetUnitAbilityLevel(Hero[pid], thistype.id) return (0.05 + ablev * 0.05) * (Unit[Hero[pid]].damage) end,
+            dot = function(pid)
+                local ablev = GetUnitAbilityLevel(Hero[pid], thistype.id)
+                return (0.05 + ablev * 0.05) * (Unit[Hero[pid]].damage)
+            end
         }
 
         local missile_template = {
-            selfInteractions = {
-                CAT_MoveArcedHoming,
-                CAT_Orient3D,
-            },
-            interactions = {
-                unit = CAT_UnitCollisionCheck3D,
-            },
+            selfInteractions = {CAT_MoveArcedHoming, CAT_Orient3D},
+            interactions = {unit = CAT_UnitCollisionCheck3D},
             identifier = "missile",
             collisionRadius = 10.,
             friendlyFire = false,
@@ -231,22 +257,26 @@ OnInit.final("PhoenixRangerSpells", function(Require)
             onUnitCollision = CAT_UnitImpact3D,
             onUnitCallback = function(self, enemy)
                 BurningDebuff:add(self.source, enemy):duration(5.)
-                DamageTarget(self.source, enemy, self.damage, ATTACK_TYPE_NORMAL, MAGIC, thistype.tag)
-            end,
+                DamageTarget(self.source, enemy, self.damage,
+                             ATTACK_TYPE_NORMAL, MAGIC, thistype.tag)
+            end
         }
         missile_template.__index = missile_template
 
         function thistype:onCast()
             local ug = CreateGroup()
 
-            MakeGroupInRange(self.pid, ug, self.x, self.y, self.aoe * LBOOST[self.pid], Condition(FilterEnemy))
+            MakeGroupInRange(self.pid, ug, self.x, self.y,
+                             self.aoe * LBOOST[self.pid], Condition(FilterEnemy))
 
             for target in each(ug) do
                 local missile = setmetatable({}, missile_template)
                 missile.x = self.x
                 missile.y = self.y
                 missile.z = GetUnitZ(self.caster)
-                missile.visual = AddSpecialEffect("Abilities\\Weapons\\SearingArrow\\SearingArrowMissile.mdl", self.x, self.y)
+                missile.visual = AddSpecialEffect(
+                                     "Abilities\\Weapons\\SearingArrow\\SearingArrowMissile.mdl",
+                                     self.x, self.y)
                 BlzSetSpecialEffectScale(missile.visual, 1.15)
                 missile.source = self.caster
                 missile.target = target
@@ -269,27 +299,38 @@ OnInit.final("PhoenixRangerSpells", function(Require)
     do
         local thistype = FLAMINGBOW
         thistype.values = {
-            pierce = function(pid) local ablev = GetUnitAbilityLevel(Hero[pid], thistype.id) return 10. + 1. * ablev end,
+            pierce = function(pid)
+                local ablev = GetUnitAbilityLevel(Hero[pid], thistype.id)
+                return 10. + 1. * ablev
+            end,
             bonus = function(pid)
-                local untouched_damage = BlzGetUnitBaseDamage(Hero[pid], 0) + Unit[Hero[pid]].bonus_damage
+                local untouched_damage =
+                    BlzGetUnitBaseDamage(Hero[pid], 0) +
+                        Unit[Hero[pid]].bonus_damage
                 return 0.5 * untouched_damage
             end,
             total = function(pid)
                 local ablev = GetUnitAbilityLevel(Hero[pid], thistype.id)
-                local untouched_damage = BlzGetUnitBaseDamage(Hero[pid], 0) + Unit[Hero[pid]].bonus_damage
-                return (0.8 + 0.02 * ablev) * untouched_damage end,
-            dur = 15.,
+                local untouched_damage =
+                    BlzGetUnitBaseDamage(Hero[pid], 0) +
+                        Unit[Hero[pid]].bonus_damage
+                return (0.8 + 0.02 * ablev) * untouched_damage
+            end,
+            dur = 15.
         }
 
         function thistype:onCast()
-            FlamingBowBuff:add(self.caster, self.caster):duration(self.dur * LBOOST[self.pid])
+            FlamingBowBuff:add(self.caster, self.caster):duration(self.dur *
+                                                                      LBOOST[self.pid])
         end
 
         function thistype.onLearn(source, ablev, pid)
             if ablev == 1 then
-                Unit[source].armor_pen_percent = Unit[source].armor_pen_percent + thistype.pierce(pid)
+                Unit[source].armor_pen_percent =
+                    Unit[source].armor_pen_percent + thistype.pierce(pid)
             else
-                Unit[source].armor_pen_percent = Unit[source].armor_pen_percent + 1
+                Unit[source].armor_pen_percent =
+                    Unit[source].armor_pen_percent + 1
             end
         end
     end

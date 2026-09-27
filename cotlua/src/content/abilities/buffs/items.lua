@@ -1,5 +1,6 @@
 OnInit.final("BuffsItems", function(Require)
     Require('BuffSystem')
+    Require('CooldownAcceleration')
     Require('UnitTable')
     Require('SpellTools')
 
@@ -171,8 +172,12 @@ OnInit.final("BuffsItems", function(Require)
         thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
 
         local function on_hit(source, target, amount, amount_after_red)
-            HP(source, source, amount_after_red * 0.05, "Vampiric Potion")
-            DestroyEffect(AddSpecialEffectTarget("war3mapImported\\VampiricAuraTarget.mdx", source, "chest"))
+            local buff = thistype:get(nil, source)
+            if buff then
+                HP(source, source, amount_after_red * buff.leech, "Vampiric Potion")
+                DestroyEffect(AddSpecialEffectTarget(
+                    "war3mapImported\\VampiricAuraTarget.mdx", source, "chest"))
+            end
         end
 
         function thistype:onRemove()
@@ -181,9 +186,48 @@ OnInit.final("BuffsItems", function(Require)
         end
 
         function thistype:onApply()
-            self.leech = 0.05
+            self.leech = self.leech or 0.05
             EVENT_ON_HIT_AFTER_REDUCTIONS:register_unit_action(self.target, on_hit)
             self.sfx = Unit[self.target]:addEffect("Abilities\\Spells\\Items\\VampiricPotion\\VampPotionCaster.mdl", "origin")
+        end
+    end
+
+    ---@class StonebloodFlaskBuff : Buff
+    StonebloodFlaskBuff = Buff.new()
+    do
+        local thistype = StonebloodFlaskBuff
+        thistype.NAME            = "Stoneblood"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNStone.blp"
+        thistype.DESC            = "This unit has +^#dr% damage resistance"
+        thistype.DISPEL_TYPE     = BUFF_POSITIVE
+        thistype.STACK_TYPE      = BUFF_STACK_NONE
+
+        function thistype:onRemove()
+            Unit[self.target].dr = Unit[self.target].dr / self.dr
+        end
+
+        function thistype:onApply()
+            self.dr = 0.85
+            Unit[self.target].dr = Unit[self.target].dr * self.dr
+        end
+    end
+
+    ---@class TempestFlaskBuff : Buff
+    TempestFlaskBuff = Buff.new()
+    do
+        local thistype = TempestFlaskBuff
+        thistype.NAME            = "Tempest"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNMonsoon.blp"
+        thistype.DESC            = "Ability cooldowns recover +^$rate% faster"
+        thistype.DISPEL_TYPE     = BUFF_POSITIVE
+        thistype.STACK_TYPE      = BUFF_STACK_NONE
+
+        function thistype:onRemove()
+            CooldownAcceleration.remove(self.target)
+        end
+
+        function thistype:onApply()
+            self.rate = 1.
         end
     end
 

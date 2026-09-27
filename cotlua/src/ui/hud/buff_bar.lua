@@ -169,11 +169,10 @@ OnInit.final("BuffBar", function(Require)
     end
 
     Buff.onChange(function(u, buff, change)
-        if change == "refresh" and buff and buff.index then
-            refresh_buff(buff)
-        else
-            display(Unit[u])
-        end
+        -- Buff:add() publishes before callers assign a duration. A later
+        -- duration refresh therefore has to update the cooldown overlay too,
+        -- not only the icon and tooltip.
+        display(Unit[u])
     end)
 
     local function on_select(pid, u)

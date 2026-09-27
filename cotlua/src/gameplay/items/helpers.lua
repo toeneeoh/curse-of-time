@@ -123,7 +123,7 @@ OnInit.global("ItemHelpers", function(Require)
 
     ---@type fun(itm: Item): boolean
     function ItemIsUpgradeable(itm)
-        return ItemData[itm.id][ITEM_UPGRADE_MAX] > itm.level
+        return (itm.data or ItemData[itm.id])[ITEM_UPGRADE_MAX] > itm.level
     end
 
     ---@type fun(pid: integer, id: string|integer): Item
@@ -142,15 +142,21 @@ OnInit.global("ItemHelpers", function(Require)
         return item
     end
 
-    ---@type fun(itm: item, tooltip: string)
-    function ParseItemTooltip(itm, tooltip)
-        local original = tooltip ~= "" and tooltip or BlzGetItemExtendedTooltip(itm)
-        local item_id = GetItemTypeId(itm)
+    ---Parses the standard bracket-formula format into an item data table.
+    ---Runtime definitions use this same path as object-editor items so their
+    ---stats and generated tooltips cannot drift into a separate format.
+    ---@param name string
+    ---@param path string
+    ---@param tooltip string
+    ---@return table data
+    function ParseItemDefinition(name, path, tooltip)
+        local data = __jarray(0)
+        local original = tooltip or ""
         local gmatch, gsub = string.gmatch, string.gsub
 
-        ItemData[item_id].tooltip = original
-        ItemData[item_id].path = BlzGetItemIconPath(itm)
-        ItemData[item_id].name = GetItemName(itm)
+        data.tooltip = original
+        data.path = path
+        data.name = name
 
         original:gsub("(%b[])", function(contents)
             contents = contents:sub(2, -2)
@@ -165,15 +171,15 @@ OnInit.global("ItemHelpers", function(Require)
             end
 
             if index then
-                ItemData[item_id][index] = tonumber(value)
-                ItemData[item_id][index .. "fixed"] = (suffix == "*") and 1 or 0
+                data[index] = tonumber(value)
+                data[index .. "fixed"] = (suffix == "*") and 1 or 0
 
                 contents = contents:gsub("(#.*)", function(capture)
-                    local data = capture:sub(7, #capture)
-                    ItemData[item_id][index .. "id"] = FourCC(capture:sub(2, 5))
-                    ItemData[item_id][index .. "data"] = data
+                    local arguments = capture:sub(7, #capture)
+                    data[index .. "id"] = FourCC(capture:sub(2, 5))
+                    data[index .. "data"] = arguments
 
-                    for entry in gmatch(data, "(%S+)") do
+                    for entry in gmatch(arguments, "(%S+)") do
                         local args = {}
                         for arg in gmatch(entry, "([^,]+)") do
                             args[#args + 1] = arg
@@ -181,10 +187,10 @@ OnInit.global("ItemHelpers", function(Require)
 
                         if #args == 4 then
                             args[3] = gsub(args[3], "_", " ")
-                            local effects = ItemData[item_id].sfx
+                            local effects = data.sfx
                             if type(effects) ~= "table" then
                                 effects = {}
-                                ItemData[item_id].sfx = effects
+                                data.sfx = effects
                             end
                             effects[#effects + 1] = {
                                 level = args[2],
@@ -202,20 +208,30 @@ OnInit.global("ItemHelpers", function(Require)
                     contents = contents:sub(start)
                     gsub(contents, affix, function(prefix, capture)
                         if prefix == "|" then
-                            ItemData[item_id][index .. "range"] = tonumber(capture)
+                            data[index .. "range"] = tonumber(capture)
                         elseif prefix == "=" then
-                            ItemData[item_id][index .. "fpl"] = tonumber(capture)
+                            data[index .. "fpl"] = tonumber(capture)
                         elseif prefix == ">" then
-                            ItemData[item_id][index .. "fpr"] = tonumber(capture)
+                            data[index .. "fpr"] = tonumber(capture)
                         elseif prefix == "%" then
-                            ItemData[item_id][index .. "percent"] = tonumber(capture)
+                            data[index .. "percent"] = tonumber(capture)
                         elseif prefix == "@" then
-                            ItemData[item_id][index .. "unlock"] = tonumber(capture)
+                            data[index .. "unlock"] = tonumber(capture)
                         end
                     end)
                 end
             end
         end)
+
+        return data
+    end
+
+    ---@type fun(itm: item, tooltip: string)
+    function ParseItemTooltip(itm, tooltip)
+        local original = tooltip ~= "" and tooltip or BlzGetItemExtendedTooltip(itm)
+        local item_id = GetItemTypeId(itm)
+        ItemData[item_id] = ParseItemDefinition(
+            GetItemName(itm), BlzGetItemIconPath(itm), original)
     end
 
     ---Handles `I000:0` item keys and legacy integer rawcodes.

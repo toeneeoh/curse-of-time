@@ -2,13 +2,12 @@
     item.lua
 
     A library that defines a custom item interface
-]]
-
-OnInit.final("Items", function(Require)
+]] OnInit.final("Items", function(Require)
     Require('Users')
     Require('Variables')
     Require('ItemEventRegistry')
     Require('Hotkeys')
+    Require('ItemHelpers')
     Require('Currency')
     Require('Events')
     Require('Prices')
@@ -18,11 +17,12 @@ OnInit.final("Items", function(Require)
     Require('TimerQueue')
     Require('UnitTable')
 
-    CHURCH_DONATION = {} ---@type boolean[] 
+    CHURCH_DONATION = {} ---@type boolean[]
     RECHARGE_COOLDOWN = __jarray(0) ---@type number[]
     IS_ITEM_DROP = __jarray(true) ---@type boolean[]
 
-    local get_widget_life, get_unit_state, set_widget_life, set_unit_state = GetWidgetLife, GetUnitState, SetWidgetLife, SetUnitState
+    local get_widget_life, get_unit_state, set_widget_life, set_unit_state =
+        GetWidgetLife, GetUnitState, SetWidgetLife, SetUnitState
     local floor = math.floor
     local concat = table.concat
     local ItemData = ItemData
@@ -31,6 +31,12 @@ OnInit.final("Items", function(Require)
     local Spells = Spells
     local ITEM_ABILITY, ITEM_ABILITY2 = ITEM_ABILITY, ITEM_ABILITY2
     local TYPE_SOCKETABLE = 12
+    local DISPLAY_STATS = {}
+
+    for index = 1, ITEM_ABILITY2 do DISPLAY_STATS[#DISPLAY_STATS + 1] = index end
+    DISPLAY_STATS[#DISPLAY_STATS + 1] = STATUS_RESISTANCE
+
+    local function item_data(item) return item.data or ItemData[item.id] end
 
     -- per-stat applicators
     -- sig: applier(unit, mult, value, mod, self_item)
@@ -92,6 +98,10 @@ OnInit.final("Items", function(Require)
         unit.cd_flat = unit.cd_flat + mult * value
     end
 
+    STAT_APPLIERS[STATUS_RESISTANCE] = function(unit, mult, value)
+        unit.status_resist_flat = unit.status_resist_flat + mult * value
+    end
+
     -- multiplicative / special ones
     STAT_APPLIERS[ITEM_MAGIC_RESIST] = function(unit, mult, value)
         local factor = 1 - value * 0.01
@@ -111,21 +121,22 @@ OnInit.final("Items", function(Require)
         end
     end
 
-    STAT_APPLIERS[ITEM_BASE_ATTACK_SPEED] = function(unit, mult, value)
-        local factor = 1. + value * 0.01
-        if mult > 0 then
-            unit.bonus_bat = unit.bonus_bat / factor
-        else
-            unit.bonus_bat = unit.bonus_bat * factor
+    STAT_APPLIERS[ITEM_BASE_ATTACK_SPEED] =
+        function(unit, mult, value)
+            local factor = 1. + value * 0.01
+            if mult > 0 then
+                unit.bonus_bat = unit.bonus_bat / factor
+            else
+                unit.bonus_bat = unit.bonus_bat * factor
+            end
         end
-    end
 
     local slot_types = {
-        TYPE_EQUIPPABLE, TYPE_EQUIPPABLE, TYPE_EQUIPPABLE, TYPE_EQUIPPABLE, TYPE_EQUIPPABLE, TYPE_EQUIPPABLE,
-        TYPE_POTION, TYPE_POTION,
-        TYPE_ALL, TYPE_ALL, TYPE_ALL, TYPE_ALL, TYPE_ALL, TYPE_ALL,
-        TYPE_ALL, TYPE_ALL, TYPE_ALL, TYPE_ALL, TYPE_ALL, TYPE_ALL,
-        TYPE_ALL, TYPE_ALL, TYPE_ALL, TYPE_ALL, TYPE_ALL, TYPE_ALL,
+        TYPE_EQUIPPABLE, TYPE_EQUIPPABLE, TYPE_EQUIPPABLE, TYPE_EQUIPPABLE,
+        TYPE_EQUIPPABLE, TYPE_EQUIPPABLE, TYPE_POTION, TYPE_POTION, TYPE_ALL,
+        TYPE_ALL, TYPE_ALL, TYPE_ALL, TYPE_ALL, TYPE_ALL, TYPE_ALL, TYPE_ALL,
+        TYPE_ALL, TYPE_ALL, TYPE_ALL, TYPE_ALL, TYPE_ALL, TYPE_ALL, TYPE_ALL,
+        TYPE_ALL, TYPE_ALL, TYPE_ALL
     }
 
     ---@type fun(itm: Item)
@@ -136,9 +147,7 @@ OnInit.final("Items", function(Require)
         if total == 0 then
             local price = GetItemPrice(itm.id, itm.pid)
 
-            if price then
-                total = price[GOLD] // 2
-            end
+            if price then total = price[GOLD] // 2 end
         end
 
         local gold = math.fmod(total, 1000000)
@@ -217,6 +226,8 @@ OnInit.final("Items", function(Require)
     ---@field cache_stats function
     ---@field sockets Item[]
     ---@field alive boolean
+    ---@field data table Parsed data used by this item instance.
+    ---@field runtime_definition RuntimeLogicalItemDefinition?
     Item = {} ---@type Item|Item[]
     do
         local thistype = Item
@@ -226,13 +237,14 @@ OnInit.final("Items", function(Require)
         ---@param argument integer
         ---@return number
         function thistype:getAbilityArgument(index, argument)
-            return tonumber(ItemData[self.id][index .. "data" .. argument]) or 0
+            return tonumber(item_data(self)[index .. "data" .. argument]) or 0
         end
 
         function thistype.onDeath()
             -- typecast widget to item
             SaveWidgetHandle(hash, 0, 0, GetTriggerWidget())
-            TQ:callDelayed(2., thistype.destroy, Item[LoadItemHandle(hash, 0, 0)])
+            TQ:callDelayed(2., thistype.destroy,
+                           Item[LoadItemHandle(hash, 0, 0)])
             RemoveSavedHandle(hash, 0, 0)
             return false
         end
@@ -240,23 +252,24 @@ OnInit.final("Items", function(Require)
 
         -- object inheritance and method operators
         local mt = {
-                __index = function(tbl, key)
-                    return (rawget(Item, key) or rawget(tbl.proxy, key))
-                end,
-                __newindex = function(tbl, key, value)
-                    if key == "restricted" then
-                        tbl:restrict(value)
-                        rawset(tbl.proxy, key, value)
-                    else
-                        rawset(tbl, key, value)
-                    end
-                end,
-            }
+            __index = function(tbl, key)
+                return (rawget(Item, key) or rawget(tbl.proxy, key))
+            end,
+            __newindex = function(tbl, key, value)
+                if key == "restricted" then
+                    tbl:restrict(value)
+                    rawset(tbl.proxy, key, value)
+                else
+                    rawset(tbl, key, value)
+                end
+            end
+        }
 
         ---@class ItemRuntime
         ---@field native_create function
         ---@field definitions table<integer, RuntimeItemDefinition>
         ---@field define fun(id: string|integer, definition: RuntimeItemDefinition)
+        ---@field applyData fun(item: Item, data: table, initialize_charges: boolean?)
         ---@field create fun(id: string|integer|item, x: number?, y: number?, expire: number?): Item
         ---@field wrap fun(handle: item): Item
         ---@field commit_slot fun(self: Item, slot: integer, suppress_refresh: boolean?): boolean
@@ -268,7 +281,7 @@ OnInit.final("Items", function(Require)
         ---@field flavor? string
         ---@field appendHeader? fun(item: Item, text: string[], alt_text: string[])
 
-        ItemRuntime = { definitions = {} }
+        ItemRuntime = {definitions = {}}
         local NativeCreateItem = CreateItem
         ItemRuntime.native_create = NativeCreateItem
 
@@ -277,6 +290,56 @@ OnInit.final("Items", function(Require)
         function ItemRuntime.define(id, definition)
             local rawcode = type(id) == "string" and FourCC(id) or id
             ItemRuntime.definitions[rawcode] = definition
+        end
+
+        ---Applies parsed data to one managed item. Runtime logical items use
+        ---this without mutating the shared object-editor ItemData entry.
+        ---@param item Item
+        ---@param data table
+        ---@param initialize_charges boolean?
+        function ItemRuntime.applyData(item, data, initialize_charges)
+            item.data = data
+
+            if not rawget(data, "quality_index") then
+                local quality_index = {}
+                local quality_count = 1
+
+                for stat = 1, TOTAL_STATS do
+                    if data[stat .. "range"] ~= 0 then
+                        quality_index[stat] = quality_count
+                        quality_count = quality_count + 1
+                    end
+                end
+
+                data.quality_index = quality_index
+            end
+
+            local rarity = data[ITEM_RARITY]
+            item.rarity = rarity == 0 and 4 or rarity
+            item.limit = data[ITEM_LIMIT]
+            item.type = data[ITEM_TYPE]
+            item.abil = data[ITEM_ABILITY .. "id"]
+            item.nocraft = data[ITEM_NOCRAFT] ~= 0
+
+            local charges = data[ITEM_CHARGES]
+            if initialize_charges and charges > 0 then
+                item.charges = charges
+            end
+
+            if initialize_charges then
+                for index = 1, QUALITY_SAVED do
+                    item.quality[index] = 0
+                end
+
+                local count = 1
+                for stat = 1, TOTAL_STATS do
+                    if data[stat .. "range"] ~= 0 then
+                        item.quality[count] = GetRandomInt(0, 63)
+                        count = count + 1
+                    end
+                    if count > QUALITY_SAVED then break end
+                end
+            end
         end
 
         ---@type fun(id: string|integer|item, x: number?, y: number?, expire: number?): Item
@@ -315,9 +378,7 @@ OnInit.final("Items", function(Require)
                 charges = GetItemCharges(itm),
                 dummies = nil, -- stores item spells
                 sockets = {},
-                proxy = {
-                    restricted = false,
-                },
+                proxy = {restricted = false}
             }, mt)
 
             local tbl = ItemData[self.id]
@@ -325,7 +386,10 @@ OnInit.final("Items", function(Require)
             -- first time setup
             if tbl.tooltip == 0 then
                 -- if an item's description exists, use that for parsing (exception for default shops)
-                ParseItemTooltip(self.obj, ((BlzGetItemDescription(self.obj):len()) > 1 and BlzGetItemDescription(self.obj)) or "")
+                ParseItemTooltip(self.obj,
+                                 ((BlzGetItemDescription(self.obj):len()) > 1 and
+                                     BlzGetItemDescription(self.obj)) or "")
+                tbl = ItemData[self.id]
             end
 
             local definition = ItemRuntime.definitions[item_id]
@@ -333,36 +397,7 @@ OnInit.final("Items", function(Require)
                 definition.prepare(self, tbl)
             end
 
-            if not rawget(tbl, "quality_index") then
-                local quality_index = {}
-                local quality_count = 1
-
-                for stat = 1, ITEM_ABILITY2 do
-                    if tbl[stat .. "range"] ~= 0 then
-                        quality_index[stat] = quality_count
-                        quality_count = quality_count + 1
-                    end
-                end
-
-                tbl.quality_index = quality_index
-            end
-
-            local rarity = tbl[ITEM_RARITY]
-            self.rarity = rarity == 0 and 4 or rarity
-            self.limit = tbl[ITEM_LIMIT]
-            self.type = tbl[ITEM_TYPE]
-
-            -- store first ability id for convenience
-            self.abil = tbl[ITEM_ABILITY .. "id"]
-
-            -- setup charges (for potions)
-            local charges = tbl[ITEM_CHARGES]
-            if charges > 0 then
-                self.charges = charges
-            end
-
-            -- determine if immediately useable in recipes
-            self.nocraft = tbl[ITEM_NOCRAFT] ~= 0
+            ItemRuntime.applyData(self, tbl, true)
 
             -- Any custom item that reaches the managed inventory must retain
             -- its identity regardless of its object-editor item class. The old
@@ -388,19 +423,6 @@ OnInit.final("Items", function(Require)
                 TQ:callDelayed(expire, thistype.expire, self)
             end
 
-            -- randomize rolls
-            local count = 1
-            for i = 1, ITEM_ABILITY2 do
-                if tbl[i .. "range"] ~= 0 then
-                    self.quality[count] = GetRandomInt(0, 63)
-                    count = count + 1
-                end
-
-                if count > QUALITY_SAVED then
-                    break
-                end
-            end
-
             if tbl[ITEM_TIER] ~= 0 then
                 self:update()
             else
@@ -409,10 +431,10 @@ OnInit.final("Items", function(Require)
                 -- native handle every refresh. Tierless utility items never run
                 -- update(), so leaving these fields nil made their slot retain
                 -- whichever tooltip had previously occupied it.
-                local base_tooltip = (definition and definition.flavor)
-                    or tbl.tooltip
-                self.tooltip = (base_tooltip ~= nil and base_tooltip ~= 0)
-                    and base_tooltip or ""
+                local base_tooltip = (definition and definition.flavor) or
+                                         tbl.tooltip
+                self.tooltip = (base_tooltip ~= nil and base_tooltip ~= 0) and
+                                   base_tooltip or ""
                 self.alt_tooltip = self.tooltip
             end
 
@@ -421,7 +443,9 @@ OnInit.final("Items", function(Require)
             if RuntimeMetrics then
                 RuntimeMetrics.items.created = RuntimeMetrics.items.created + 1
                 RuntimeMetrics.items.live = RuntimeMetrics.items.live + 1
-                RuntimeMetrics.items.peak = math.max(RuntimeMetrics.items.peak, RuntimeMetrics.items.live)
+                RuntimeMetrics.items.peak =
+                    math.max(RuntimeMetrics.items.peak,
+                             RuntimeMetrics.items.live)
             end
 
             return self
@@ -442,7 +466,7 @@ OnInit.final("Items", function(Require)
             [FourCC('AIcd')] = 1, -- war drums
             [FourCC('Adt1')] = 1, -- gem of true sight
             [FourCC('A03F')] = 1, -- endurance aura
-            [FourCC('AIta')] = 1, -- crystal ball reveal
+            [FourCC('AIta')] = 1 -- crystal ball reveal
         }
 
         -- Called on equip to stack with an existing item if applicable
@@ -451,7 +475,8 @@ OnInit.final("Items", function(Require)
             for i = 1, MAX_INVENTORY_SLOTS do
                 local match = Profile[pid].hero.items[i]
 
-                if match and match ~= self and match.id == self.id and match.charges < limit and match.level == self.level then
+                if match and match ~= self and match.id == self.id and
+                    match.charges < limit and match.level == self.level then
                     local total = match.charges + self.charges
                     local diff = limit - match.charges
 
@@ -474,48 +499,64 @@ OnInit.final("Items", function(Require)
         ---@type fun(self: Item, flag: boolean)
         function thistype:restrict(flag)
             if flag then
-                BlzSetItemName(self.obj, self:name() .. "\n|cffFFCC00You are too low level to use this item!|r")
+                BlzSetItemName(self.obj, self:name() ..
+                                   "\n|cffFFCC00You are too low level to use this item!|r")
             else
                 BlzSetItemName(self.obj, self:name())
             end
         end
 
-        --Generates a proper name string
+        -- Generates a proper name string
         ---@type fun(self: Item):string
         function thistype:name()
-            local definition = ItemRuntime.definitions[self.id]
+            local definition = not self.runtime_definition and
+                                   ItemRuntime.definitions[self.id] or nil
             if definition and definition.name then
                 return definition.name(self)
             end
 
-            local name = GetObjectName(self.id)
+            local name = item_data(self).name
 
             if self.level > 0 then
-                return concat({RARITY_NAME[(self.level + 3) // self.rarity], " ", name, " +", self.level})
+                return concat({
+                    RARITY_NAME[(self.level + 3) // self.rarity], " ", name,
+                    " +", self.level
+                })
             end
 
             return name
         end
 
         function thistype:info()
-            local details = { self.alt_tooltip or self.tooltip or BlzGetItemDescription(self.obj) }
-            local maxlvl = ItemData[self.id][ITEM_UPGRADE_MAX]
+            local details = {
+                self.alt_tooltip or self.tooltip or
+                    BlzGetItemDescription(self.obj)
+            }
+            local data = item_data(self)
+            local maxlvl = data[ITEM_UPGRADE_MAX]
             local total, gold, plat = GetItemSellPrice(self)
 
             if maxlvl > 0 then
-                details[#details + 1] = "|n|cff999999Maximum Upgrade: +" .. maxlvl .. "|r"
+                details[#details + 1] = "|n|cff999999Maximum Upgrade: +" ..
+                                            maxlvl .. "|r"
             end
 
             if total > 0 then
                 if plat > 0 then
-                    details[#details + 1] = "|n|cffffcc00Sells for:|r " .. plat .. " |cffe3e2e2Platinum|r and " .. gold .. " |cffffcc00Gold|r"
+                    details[#details + 1] =
+                        "|n|cffffcc00Sells for:|r " .. plat ..
+                            " |cffe3e2e2Platinum|r and " .. gold ..
+                            " |cffffcc00Gold|r"
                 else
-                    details[#details + 1] = "|n|cffffcc00Sells for:|r " .. gold .. " |cffffcc00Gold|r"
+                    details[#details + 1] =
+                        "|n|cffffcc00Sells for:|r " .. gold ..
+                            " |cffffcc00Gold|r"
                 end
             end
 
             if self.charges > 0 then
-                details[#details + 1] = "|n|cffffcc00Charges:|r " .. self.charges
+                details[#details + 1] = "|n|cffffcc00Charges:|r " ..
+                                            self.charges
             end
 
             if ItemToIndex(self.id) then
@@ -527,29 +568,31 @@ OnInit.final("Items", function(Require)
             end
 
             for i, socket in ipairs(self.sockets) do
-                details[#details + 1] = "|n|n|cffffcc00Socket " .. i .. ":|r " .. socket:name()
-                details[#details + 1] = "|n" .. (socket.alt_tooltip or socket.tooltip or BlzGetItemDescription(socket.obj))
+                details[#details + 1] =
+                    "|n|n|cffffcc00Socket " .. i .. ":|r " .. socket:name()
+                details[#details + 1] = "|n" ..
+                                            (socket.alt_tooltip or
+                                                socket.tooltip or
+                                                BlzGetItemDescription(socket.obj))
             end
 
             return {
                 name = self:name(),
-                icon = ItemData[self.id].path,
-                description = concat(details),
+                icon = data.path,
+                description = concat(details)
             }
         end
 
         local function apply_item_stats(self, mult, holder)
             holder = holder or self.holder
 
-            if not holder then
-                return
-            end
+            if not holder then return end
 
             local u = Hero[self.pid]
             local unit = Unit[u]
-            local hp   = get_widget_life(u) ---@type number 
-            local mana = get_unit_state(u, UNIT_STATE_MANA) ---@type number 
-            local mod  = ItemProfMod(self.id, self.pid) ---@type number 
+            local hp = get_widget_life(u) ---@type number
+            local mana = get_unit_state(u, UNIT_STATE_MANA) ---@type number
+            local mod = ItemProfMod(self.id, self.pid) ---@type number
             local cs = self.cached_stats
 
             unit.suppress_stat_events = true
@@ -567,7 +610,7 @@ OnInit.final("Items", function(Require)
             set_unit_state(u, UNIT_STATE_MANA, mana)
 
             -- shield
-            if ItemData[self.id][ITEM_TYPE] == 5 then
+            if item_data(self)[ITEM_TYPE] == 5 then
                 unit.shield_count = unit.shield_count + mult
             end
 
@@ -575,24 +618,26 @@ OnInit.final("Items", function(Require)
 
             -- profiency warning
             if GetHeroLevel(u) < 15 and mult > 0 and mod < 1 then
-                DisplayTimedTextToPlayer(self.owner, 0, 0, 10, "You lack the proficiency (-pf) to use this item, therefore it only gives 75% of most stats.\n|cffFF0000You will stop getting this warning at level 15.|r")
+                DisplayTimedTextToPlayer(self.owner, 0, 0, 10,
+                                         "You lack the proficiency (-pf) to use this item, therefore it only gives 75% of most stats.\n|cffFF0000You will stop getting this warning at level 15.|r")
             end
         end
 
         ---@type fun(itm: Item, index: integer, value: integer): string
         local function ParseItemAbilityTooltip(itm, index, value)
-            local data   = ItemData[itm.id][index .. "data"] ---@type string 
-            local id     = ItemData[itm.id][index .. "id"] ---@type integer 
-            local orig   = BlzGetAbilityExtendedTooltip(id, 0) ---@type string 
-            local count  = 1
-            local values = {} ---@type integer[] 
+            local definition_data = item_data(itm)
+            local data = definition_data[index .. "data"] ---@type string
+            local id = definition_data[index .. "id"] ---@type integer
+            local orig = BlzGetAbilityExtendedTooltip(id, 0) ---@type string
+            local count = 1
+            local values = {} ---@type integer[]
 
             values[0] = value
 
             -- parse ability data into array
             for v in data:gmatch("(%-?%d+)") do
                 values[count] = v
-                ItemData[itm.id][index .. "data" .. count] = v
+                definition_data[index .. "data" .. count] = v
                 count = count + 1
             end
 
@@ -606,30 +651,32 @@ OnInit.final("Items", function(Require)
 
         ---@type fun(itm: Item)
         local function add_item_abilities(itm)
-            if not itm.holder then
-                return
-            end
+            if not itm.holder then return end
 
             local prof = ItemProfMod(itm.id, itm.pid) >= 1
 
+            local data = item_data(itm)
             for index = ITEM_ABILITY, ITEM_ABILITY2 do
-                local abilid = ItemData[itm.id][index .. "id"]
+                local abilid = data[index .. "id"]
                 -- don't add ability if backpack is not allowed
-                if GetUnitTypeId(itm.holder) == BACKPACK and not backpack_allowed[abilid] then
-                    abilid = 0
-                end
+                if GetUnitTypeId(itm.holder) == BACKPACK and
+                    not backpack_allowed[abilid] then abilid = 0 end
                 -- ability exists and unlocked and has proficiency
-                if abilid ~= 0 and Spells[abilid] and itm.level >= ItemData[itm.id][index .. "unlock"] and prof then
+                if abilid ~= 0 and Spells[abilid] and itm.level >=
+                    data[index .. "unlock"] and prof then
                     if not itm.abilities then
                         itm.abilities = {}
                     end
 
                     local dummy
-                    local desc = ParseItemAbilityTooltip(itm, index, itm.cached_stats[index])
+                    local desc = ParseItemAbilityTooltip(itm, index,
+                                                         itm.cached_stats[index])
 
                     -- if no item spell dummy, generate it
                     if not itm.abilities[index] then
-                        dummy = MakeDummyCastItem(backpack_allowed[abilid] and Backpack[itm.pid] or Hero[itm.pid])
+                        dummy = MakeDummyCastItem(
+                                    backpack_allowed[abilid] and
+                                        Backpack[itm.pid] or Hero[itm.pid])
                         itm.abilities[index] = {obj = dummy, id = abilid}
                     else
                         dummy = itm.abilities[index].obj
@@ -637,7 +684,8 @@ OnInit.final("Items", function(Require)
 
                     -- append tooltip if useable from backpack
                     if backpack_allowed[abilid] then
-                        desc = desc .. "\n|cffffcc00This ability may be used from your backpack.|r"
+                        desc = desc ..
+                                   "\n|cffffcc00This ability may be used from your backpack.|r"
                     end
 
                     -- dummy may be nil if no spell inventory space remaining
@@ -646,7 +694,7 @@ OnInit.final("Items", function(Require)
                             BlzItemAddAbility(dummy, abilid)
                         end
                         BlzSetItemIconPath(dummy, BlzGetAbilityIcon(abilid))
-                        --BlzSetItemDescription(dummy, desc)
+                        -- BlzSetItemDescription(dummy, desc)
                         BlzSetItemExtendedTooltip(dummy, desc)
                         BlzSetItemName(dummy, GetObjectName(abilid))
 
@@ -657,8 +705,10 @@ OnInit.final("Items", function(Require)
         end
 
         function thistype:lvl(lvl)
-            local definition = ItemRuntime.definitions[self.id]
-            if ItemData[self.id][ITEM_UPGRADE_MAX] > 0 or (definition and definition.custom_level) then
+            local definition = not self.runtime_definition and
+                                   ItemRuntime.definitions[self.id] or nil
+            if item_data(self)[ITEM_UPGRADE_MAX] > 0 or
+                (definition and definition.custom_level) then
                 local parent = self.socketed and self.parent or nil
                 local parent_equipped = parent and parent.equipped
 
@@ -670,9 +720,7 @@ OnInit.final("Items", function(Require)
                 self.level = lvl
                 self:update()
 
-                if parent then
-                    parent:update()
-                end
+                if parent then parent:update() end
 
                 if parent_equipped then
                     apply_item_stats(parent, 1)
@@ -688,9 +736,7 @@ OnInit.final("Items", function(Require)
         function thistype:consumeCharge()
             self.charges = self.charges - 1
 
-            if self.charges <= 0 then
-                self:destroy()
-            end
+            if self.charges <= 0 then self:destroy() end
         end
 
         function Item:cache_stats()
@@ -704,7 +750,7 @@ OnInit.final("Items", function(Require)
                 local value = base
 
                 self.cached_base[stat] = base
-                if ItemData[self.id][stat .. "range"] ~= 0 then
+                if item_data(self)[stat .. "range"] ~= 0 then
                     self.cached_lower[stat] = self:calculateValue(stat, 1)
                     self.cached_upper[stat] = self:calculateValue(stat, 2)
                 else
@@ -723,33 +769,32 @@ OnInit.final("Items", function(Require)
         -- 1 = lower, 2 = upper
         ---@type fun(self: Item, STAT: integer, flag: integer): number
         function Item:calculateValue(STAT, flag)
-            local definition = ItemRuntime.definitions[self.id]
+            local definition = not self.runtime_definition and
+                                   ItemRuntime.definitions[self.id] or nil
             if definition and definition.calculateValue then
                 local value = definition.calculateValue(self, STAT, flag)
-                if value ~= nil then
-                    return value
-                end
+                if value ~= nil then return value end
             end
 
-            local tbl = ItemData[self.id]
-            local unlockat = tbl[STAT .. "unlock"] ---@type number 
+            local tbl = item_data(self)
+            local unlockat = tbl[STAT .. "unlock"] ---@type number
 
-            if self.level < unlockat then
-                return 0
-            end
+            if self.level < unlockat then return 0 end
 
-            local flatPerLevel  = tbl[STAT .. "fpl"] ---@type number 
-            local flatPerRarity = tbl[STAT .. "fpr"] ---@type number 
-            local percent       = tbl[STAT .. "percent"] ---@type number 
-            local fixed         = tbl[STAT .. "fixed"] ---@type number 
-            local lower         = tbl[STAT]  ---@type number 
-            local upper         = tbl[STAT .. "range"]  ---@type number 
-            local hasVariance   = (upper ~= 0) ---@type boolean 
-            local pmult         = (percent ~= 0 and percent * 0.01) or 1 ---@type number
+            local flatPerLevel = tbl[STAT .. "fpl"] ---@type number
+            local flatPerRarity = tbl[STAT .. "fpr"] ---@type number
+            local percent = tbl[STAT .. "percent"] ---@type number
+            local fixed = tbl[STAT .. "fixed"] ---@type number
+            local lower = tbl[STAT] ---@type number
+            local upper = tbl[STAT .. "range"] ---@type number
+            local hasVariance = (upper ~= 0) ---@type boolean
+            local pmult = (percent ~= 0 and percent * 0.01) or 1 ---@type number
 
             -- calculate values after applying affixes
-            lower = lower + ((flatPerLevel * self.level + flatPerRarity * (math.max(self.level - 1, 0) // self.rarity)) * pmult)
-            upper = upper + ((flatPerLevel * self.level + flatPerRarity * (math.max(self.level - 1, 0) // self.rarity)) * pmult)
+            lower = lower + ((flatPerLevel * self.level + flatPerRarity *
+                        (math.max(self.level - 1, 0) // self.rarity)) * pmult)
+            upper = upper + ((flatPerLevel * self.level + flatPerRarity *
+                        (math.max(self.level - 1, 0) // self.rarity)) * pmult)
 
             -- values are not fixed
             if fixed == 0 then
@@ -767,7 +812,8 @@ OnInit.final("Items", function(Require)
                 if hasVariance then
                     local count = tbl.quality_index[STAT] or 1
 
-                    final = lower + (upper - lower) * 0.015625 * (1 + self.quality[count])
+                    final = lower + (upper - lower) * 0.015625 *
+                                (1 + self.quality[count])
                 else
                     final = lower
                 end
@@ -782,7 +828,9 @@ OnInit.final("Items", function(Require)
         end
 
         local function remove_item_ability(self, abil, index)
-            if self and (not self.holder or (not backpack_allowed[abil.id] and self.holder == Backpack[self.pid])) then
+            if self and (not self.holder or
+                (not backpack_allowed[abil.id] and self.holder ==
+                    Backpack[self.pid])) then
                 set_widget_life(abil.obj, 1.)
                 RemoveItem(abil.obj)
                 self.abilities[index] = nil
@@ -798,10 +846,14 @@ OnInit.final("Items", function(Require)
                         -- trigger unequip event
                         Spells[abil.id].onUnequip(self, abil.id, i, holder)
 
-                        local orig_spell_owner = backpack_allowed[abil.id] and Backpack[self.pid] or Hero[self.pid]
+                        local orig_spell_owner =
+                            backpack_allowed[abil.id] and Backpack[self.pid] or
+                                Hero[self.pid]
 
                         -- remove ability after cooldown expires
-                        TQ:callDelayed(BlzGetUnitAbilityCooldownRemaining(orig_spell_owner, abil.id), remove_item_ability, self, abil, i)
+                        TQ:callDelayed(BlzGetUnitAbilityCooldownRemaining(
+                                           orig_spell_owner, abil.id),
+                                       remove_item_ability, self, abil, i)
                     end
                 end
             end
@@ -810,23 +862,22 @@ OnInit.final("Items", function(Require)
         ---@type fun(itm: Item, itm2: Item): boolean
         local function has_conflict(itm, itm2)
             local same_limit = itm.limit == itm2.limit
-            return (same_limit and itm.id == itm2.id) or (same_limit and itm.limit ~= 1)
+            return (same_limit and itm.id == itm2.id) or
+                       (same_limit and itm.limit ~= 1)
         end
 
         ---@param itm Item
         ---@param ignore Item?
         ---@return boolean, string?
         local function is_item_limited(itm, ignore)
-            local candidates = { itm }
+            local candidates = {itm}
             local has_limit = itm.limit > 0
             for _, socket in ipairs(itm.sockets or {}) do
                 candidates[#candidates + 1] = socket
                 has_limit = has_limit or socket.limit > 0
             end
 
-            if not has_limit then
-                return false
-            end
+            if not has_limit then return false end
 
             local items = Profile[itm.pid].hero.items
 
@@ -857,27 +908,16 @@ OnInit.final("Items", function(Require)
         ---@param itm Item
         ---@return boolean
         function thistype:socket(itm)
-            if not itm
-                or itm == self
-                or itm.socketed
-                or itm.type ~= TYPE_SOCKETABLE
-                or self.type == TYPE_SOCKETABLE
-                or itm.pid ~= self.pid
-                or not itm.holder
-                or not itm.index
-                or #self.sockets >= MAX_SOCKETS
-                or is_item_limited(itm)
-            then
-                return false
-            end
+            if not itm or itm == self or itm.socketed or itm.type ~=
+                TYPE_SOCKETABLE or self.type == TYPE_SOCKETABLE or itm.pid ~=
+                self.pid or not itm.holder or not itm.index or #self.sockets >=
+                MAX_SOCKETS or is_item_limited(itm) then return false end
 
             local was_equipped = self.equipped
 
             -- Remove exactly the stats that are currently applied. The new
             -- socket-inclusive cache is applied after the mutation.
-            if was_equipped then
-                apply_item_stats(self, -1)
-            end
+            if was_equipped then apply_item_stats(self, -1) end
 
             -- drop() performs the complete inventory/ability removal. Keep
             -- the backing item handle hidden because it now belongs to self.
@@ -890,9 +930,7 @@ OnInit.final("Items", function(Require)
 
             self:update()
 
-            if was_equipped then
-                apply_item_stats(self, 1)
-            end
+            if was_equipped then apply_item_stats(self, 1) end
 
             return true
         end
@@ -904,15 +942,11 @@ OnInit.final("Items", function(Require)
         function thistype:unsocket(index)
             local socket = self.sockets[index]
 
-            if not socket then
-                return nil
-            end
+            if not socket then return nil end
 
             local was_equipped = self.equipped
 
-            if was_equipped then
-                apply_item_stats(self, -1)
-            end
+            if was_equipped then apply_item_stats(self, -1) end
 
             self.sockets[index] = self.sockets[#self.sockets]
             self.sockets[#self.sockets] = nil
@@ -921,12 +955,11 @@ OnInit.final("Items", function(Require)
 
             self:update()
 
-            if was_equipped then
-                apply_item_stats(self, 1)
-            end
+            if was_equipped then apply_item_stats(self, 1) end
 
             if not socket:equip() then
-                SetItemPosition(socket.obj, GetUnitX(Hero[self.pid]), GetUnitY(Hero[self.pid]))
+                SetItemPosition(socket.obj, GetUnitX(Hero[self.pid]),
+                                GetUnitY(Hero[self.pid]))
                 SetItemVisible(socket.obj, true)
             end
 
@@ -945,29 +978,35 @@ OnInit.final("Items", function(Require)
         ---@return string? err
         function ValidateItemSlot(self, slot, ignore)
             if is_item_bound(self, self.pid) and SAVE_TABLE.KEY_ITEMS[self.id] then
-                return false, "This item is bound to " .. User[self.owner].nameColored .. "."
+                return false, "This item is bound to " ..
+                           User[self.owner].nameColored .. "."
             end
 
-            local type = ItemData[self.id][ITEM_TYPE]
+            local data = item_data(self)
+            local type = data[ITEM_TYPE]
 
             -- restrict by slot type
             if not VerifySlotForType(slot, type) then
                 return false, nil
             end
 
-            local lvlreq = ItemData[self.id][ITEM_LEVEL_REQUIREMENT] ---@type integer 
+            local lvlreq = data[ITEM_LEVEL_REQUIREMENT] ---@type integer
             local lvl = GetHeroLevel(Hero[self.pid])
 
             if slot <= BACKPACK_INDEX - 1 then
                 local limited, err = is_item_limited(self, ignore)
 
                 if lvlreq > lvl then
-                    return false, "This item requires at least level |c00FF5555" .. (lvlreq) .. "|r to equip."
+                    return false,
+                           "This item requires at least level |c00FF5555" ..
+                               (lvlreq) .. "|r to equip."
                 elseif limited then
                     return false, err
                 end
             elseif slot >= BACKPACK_INDEX and lvlreq > lvl + 20 then
-                return false, "This item requires at least level |c00FF5555" .. (lvlreq - 20) .. "|r to pick up."
+                return false,
+                       "This item requires at least level |c00FF5555" ..
+                           (lvlreq - 20) .. "|r to pick up."
             end
 
             return true
@@ -977,7 +1016,7 @@ OnInit.final("Items", function(Require)
             -- set starting slot to backpack if fail limit check
             local slot = (is_item_limited(self) and BACKPACK_INDEX) or 1
             local items = Profile[self.pid].hero.items
-            local type = ItemData[self.id][ITEM_TYPE]
+            local type = item_data(self)[ITEM_TYPE]
 
             for i = slot, MAX_INVENTORY_SLOTS do
                 if not items[i] and VerifySlotForType(i, type) then
@@ -1000,7 +1039,8 @@ OnInit.final("Items", function(Require)
             local orig_holder = self.holder
             local orig_index = self.index
             local was_equipped = self.equipped
-            local new_holder = (slot <= 6 and Hero[self.pid]) or Backpack[self.pid]
+            local new_holder = (slot <= 6 and Hero[self.pid]) or
+                                   Backpack[self.pid]
 
             -- New holder needs to be set before applying stats and abilities.
             self.holder = new_holder
@@ -1039,9 +1079,7 @@ OnInit.final("Items", function(Require)
             SetItemPosition(self.obj, 30000., 30000.)
             SetItemVisible(self.obj, false)
 
-            if not suppress_refresh then
-                NotifyItemChanged(self.pid)
-            end
+            if not suppress_refresh then NotifyItemChanged(self.pid) end
 
             return true
         end
@@ -1064,46 +1102,57 @@ OnInit.final("Items", function(Require)
             end
 
             -- cannot move item to new slot
-            if not valid then
-                return false
-            end
+            if not valid then return false end
 
             -- if item is stackable
             local stack = self.cached_stats[ITEM_STACK]
             if stack > 1 then
                 self:stack(self.pid, stack)
 
-                if not self.alive then
-                    return true
-                end
+                if not self.alive then return true end
             end
 
             return ItemRuntime.commit_slot(self, slot, suppress_refresh)
         end
 
         local parse_item_stat = {
-            [ITEM_ABILITY] = function(self, index, value, lower, upper, valuestr, range)
+            [ITEM_ABILITY] = function(self, index, value, lower, upper,
+                                      valuestr, range)
                 local s = ParseItemAbilityTooltip(self, index, value)
 
                 return (s:len() > 0 and concat({"|n", s})) or ""
             end,
 
-            default = function(self, index, value, lower, upper, valuestr, range, posneg)
-                local suffix = STAT_TAG[index].item_suffix or STAT_TAG[index].suffix or "|r"
+            default = function(self, index, value, lower, upper, valuestr,
+                               range, posneg)
+                local suffix = STAT_TAG[index].item_suffix or
+                                   STAT_TAG[index].suffix or "|r"
 
                 if range ~= 0 then
-                    return concat({"|n + |cffffcc00", lower, "-", upper, suffix, " ", STAT_TAG[index].tag})
+                    return concat({
+                        "|n + |cffffcc00", lower, "-", upper, suffix, " ",
+                        STAT_TAG[index].tag
+                    })
                 else
-                    return concat({"|n ", posneg, valuestr, suffix, " ", STAT_TAG[index].tag})
+                    return concat({
+                        "|n ", posneg, valuestr, suffix, " ",
+                        STAT_TAG[index].tag
+                    })
                 end
             end
         }
 
         parse_item_stat[ITEM_ABILITY2] = parse_item_stat[ITEM_ABILITY]
 
-        function thistype:update()
-            local definition = ItemRuntime.definitions[self.id]
-            local orig = (definition and definition.flavor) or ItemData[self.id].tooltip ---@type string
+        ---Rebuilds calculated stats and native-handle presentation.
+        ---Presentation subscribers must suppress the change broadcast to
+        ---avoid recursively refreshing themselves.
+        ---@param suppress_refresh boolean?
+        function thistype:update(suppress_refresh)
+            local definition = not self.runtime_definition and
+                                   ItemRuntime.definitions[self.id] or nil
+            local data = item_data(self)
+            local orig = (definition and definition.flavor) or data.tooltip ---@type string
             local text = {}
 
             -- first "header" lines: rarity, upg level, tier, type, req level
@@ -1117,21 +1166,28 @@ OnInit.final("Items", function(Require)
                 text[#text + 1] = "|n"
             end
 
-            text[#text + 1] = TIER_NAME[ItemData[self.id][ITEM_TIER]]
+            text[#text + 1] = TIER_NAME[data[ITEM_TIER]]
             text[#text + 1] = " "
-            text[#text + 1] = TYPE_NAME[ItemData[self.id][ITEM_TYPE]]
+            text[#text + 1] = TYPE_NAME[data[ITEM_TYPE]]
 
-            local lvl = ItemData[self.id][ITEM_LEVEL_REQUIREMENT]
+            local lvl = data[ITEM_LEVEL_REQUIREMENT]
             if lvl > 0 then
                 text[#text + 1] = "|n|cffff0000Level Requirement: |r"
                 text[#text + 1] = lvl
             end
 
+            local faction_rank = self.runtime_definition and
+                                     self.runtime_definition
+                                         .faction_rank_requirement or 0
+            if faction_rank > 0 then
+                text[#text + 1] =
+                    "|n|cffff0000Faction Rank Requirement: |r"
+                text[#text + 1] = faction_rank
+            end
+
             text[#text + 1] = "|n"
             local alt_text = {}
-            for i, v in ipairs(text) do
-                alt_text[i] = v
-            end
+            for i, v in ipairs(text) do alt_text[i] = v end
 
             if definition and definition.appendHeader then
                 definition.appendHeader(self, text, alt_text)
@@ -1143,50 +1199,64 @@ OnInit.final("Items", function(Require)
             local cs = self.cached_stats
 
             -- body stats
-            for index = 1, ITEM_ABILITY2 do
+            for _, index in ipairs(DISPLAY_STATS) do
                 local value = cs[index]
 
                 -- write non-zero stats
                 if value ~= 0 then
                     local base_value = self.cached_base[index]
                     local socket_value = value - base_value
-                    local socket_valuestr = tostring(floor(math.abs(socket_value) + 0.5))
+                    local socket_valuestr = tostring(floor(
+                                                         math.abs(socket_value) +
+                                                             0.5))
                     local lower = self.cached_lower[index]
                     local upper = self.cached_upper[index]
                     local valuestr = tostring(floor(math.abs(value) + 0.5))
                     local posneg = "+ |cffffcc00"
 
                     -- handle negative values
-                    if value < 0 then
-                        posneg = "- |cffcc0000"
-                    end
+                    if value < 0 then posneg = "- |cffcc0000" end
 
                     -- alt tooltip
-                    local range = ItemData[self.id][index .. "range"]
+                    local range = data[index .. "range"]
                     if parse_item_stat[index] then
-                        alt_text[#alt_text + 1] = parse_item_stat[index](self, index, value, lower, upper, valuestr, range)
+                        alt_text[#alt_text + 1] =
+                            parse_item_stat[index](self, index, value, lower,
+                                                   upper, valuestr, range)
                     else
-                        alt_text[#alt_text + 1] = parse_item_stat.default(self, index, value, lower, upper, valuestr, range, posneg)
+                        alt_text[#alt_text + 1] =
+                            parse_item_stat.default(self, index, value, lower,
+                                                    upper, valuestr, range,
+                                                    posneg)
 
                         if socket_value ~= 0 then
                             alt_text[#alt_text + 1] = " |cff00ff00("
-                            alt_text[#alt_text + 1] = socket_value > 0 and "+" or "-"
+                            alt_text[#alt_text + 1] =
+                                socket_value > 0 and "+" or "-"
                             alt_text[#alt_text + 1] = socket_valuestr
-                            alt_text[#alt_text + 1] = STAT_TAG[index].item_suffix or STAT_TAG[index].suffix or "|r"
+                            alt_text[#alt_text + 1] = STAT_TAG[index]
+                                                          .item_suffix or
+                                                          STAT_TAG[index].suffix or
+                                                          "|r"
                             alt_text[#alt_text + 1] = "|cff00ff00)|r"
                         end
                     end
 
                     -- normal tooltip
                     if index == ITEM_ABILITY or index == ITEM_ABILITY2 then
-                        text[#text + 1] = parse_item_stat[index](self, index, value, 0, 0)
+                        text[#text + 1] =
+                            parse_item_stat[index](self, index, value, 0, 0)
                     else
-                        local suffix = STAT_TAG[index].item_suffix or STAT_TAG[index].suffix or "|r"
+                        local suffix = STAT_TAG[index].item_suffix or
+                                           STAT_TAG[index].suffix or "|r"
                         text[#text + 1] = "|n "
 
                         if base_value ~= 0 then
-                            text[#text + 1] = base_value > 0 and "+ |cffffcc00" or "- |cffcc0000"
-                            text[#text + 1] = tostring(math.abs(floor(base_value + 0.5)))
+                            text[#text + 1] =
+                                base_value > 0 and "+ |cffffcc00" or
+                                    "- |cffcc0000"
+                            text[#text + 1] =
+                                tostring(math.abs(floor(base_value + 0.5)))
                             text[#text + 1] = suffix
                         end
 
@@ -1195,7 +1265,9 @@ OnInit.final("Items", function(Require)
                                 text[#text + 1] = " "
                             end
 
-                            text[#text + 1] = socket_value > 0 and "|cff00ff00+ " or "|cff00ff00- "
+                            text[#text + 1] =
+                                socket_value > 0 and "|cff00ff00+ " or
+                                    "|cff00ff00- "
                             text[#text + 1] = socket_valuestr
                             text[#text + 1] = suffix
                             text[#text + 1] = "|r"
@@ -1234,26 +1306,26 @@ OnInit.final("Items", function(Require)
             self.tooltip = concat(text)
             self.alt_tooltip = concat(alt_text)
 
-            BlzSetItemIconPath(self.obj, ItemData[self.id].path)
-            BlzSetItemName(self.obj, definition and definition.name and definition.name(self) or ItemData[self.id].name)
-            BlzSetItemTooltip(self.obj, ItemData[self.id].name)
+            BlzSetItemIconPath(self.obj, data.path)
+            BlzSetItemName(self.obj, definition and definition.name and
+                               definition.name(self) or data.name)
+            BlzSetItemTooltip(self.obj, data.name)
             BlzSetItemDescription(self.obj, self.tooltip)
             BlzSetItemExtendedTooltip(self.obj, self.tooltip)
 
             -- update inventory frames
-            if self.pid then
+            if self.pid and not suppress_refresh then
                 NotifyItemChanged(self.pid)
             end
         end
 
         ---@type fun(id: integer, stats: integer, extra: integer): Item|nil
         function thistype.decode(id, stats, extra)
-            if id == 0 then
-                return nil
-            end
+            if id == 0 then return nil end
 
             local itemid = id & 0x1FFF
-            local itm = ItemRuntime.create(CUSTOM_ITEM_OFFSET + itemid, 30000., 30000.)
+            local itm = ItemRuntime.create(CUSTOM_ITEM_OFFSET + itemid, 30000.,
+                                           30000.)
             local mask = 0xFE000
             itm.level = (id & mask) >> 13
 
@@ -1273,7 +1345,24 @@ OnInit.final("Items", function(Require)
             itm.extra[1] = (extra >> 16) & mask
             itm.extra[2] = (extra & mask)
 
+            if RuntimeItemDefinitions then
+                RuntimeItemDefinitions.restore(itm)
+            end
+
             itm:lvl(itm.level)
+
+            -- Potion charges are persistent. The high bit distinguishes the
+            -- new encoding from legacy saves, whose unused extra field was 0
+            -- and should continue loading with a full flask.
+            if itm.type == TYPE_POTION_INDEX then
+                local encoded_charges = itm.extra[1]
+                if (encoded_charges & 0x8000) ~= 0 then
+                    itm.charges = encoded_charges & 0x7FFF
+                else
+                    itm.charges = itm.cached_stats[ITEM_CHARGES]
+                end
+                itm.extra[1] = 0
+            end
 
             return itm
         end
@@ -1293,7 +1382,11 @@ OnInit.final("Items", function(Require)
         -- extra item metadata
         ---@type fun(self: Item): integer
         function thistype:encode_extra()
-            local extra = (self.extra[1] << 16) + self.extra[2]
+            local first = self.extra[1]
+            if self.type == TYPE_POTION_INDEX then
+                first = 0x8000 | math.max(0, math.min(0x7FFF, self.charges))
+            end
+            local extra = (first << 16) + self.extra[2]
 
             return extra
         end
@@ -1303,9 +1396,7 @@ OnInit.final("Items", function(Require)
         function thistype:encode_id()
             local id = ItemToIndex(self.id)
 
-            if id == nil then
-                return 0
-            end
+            if id == nil then return 0 end
 
             id = id + (self.level << 13)
 
@@ -1317,9 +1408,7 @@ OnInit.final("Items", function(Require)
         end
 
         function thistype:drop(x, y, mute)
-            if self.holder == nil or self.index == nil then
-                return
-            end
+            if self.holder == nil or self.index == nil then return end
 
             refresh_item_abilities(self, true, self.holder)
 
@@ -1329,11 +1418,13 @@ OnInit.final("Items", function(Require)
                 apply_item_stats(self, -1)
             end
 
-            SetItemPosition(self.obj, x or GetUnitX(self.holder), y or GetUnitY(self.holder))
+            SetItemPosition(self.obj, x or GetUnitX(self.holder),
+                            y or GetUnitY(self.holder))
             SetItemVisible(self.obj, true)
 
             if not mute then
-                SoundHandler("Sound\\Interface\\HeroDropItem1.flac", true, self.owner, self.holder)
+                SoundHandler("Sound\\Interface\\HeroDropItem1.flac", true,
+                             self.owner, self.holder)
             end
 
             Profile[self.pid].hero.items[self.index] = nil
@@ -1344,9 +1435,7 @@ OnInit.final("Items", function(Require)
         end
 
         function thistype:onDestroy()
-            if not self.alive then
-                return false
-            end
+            if not self.alive then return false end
 
             self.alive = false
 
@@ -1355,9 +1444,7 @@ OnInit.final("Items", function(Require)
                 self.sfx = nil
             end
 
-            if self.pid then
-                NotifyItemChanged(self.pid)
-            end
+            if self.pid then NotifyItemChanged(self.pid) end
 
             -- Release the strong registry reference before invalidating the handle.
             Item[self.obj] = nil
@@ -1369,7 +1456,8 @@ OnInit.final("Items", function(Require)
             self.obj = nil
 
             if RuntimeMetrics then
-                RuntimeMetrics.items.destroyed = RuntimeMetrics.items.destroyed + 1
+                RuntimeMetrics.items.destroyed =
+                    RuntimeMetrics.items.destroyed + 1
                 RuntimeMetrics.items.live = RuntimeMetrics.items.live - 1
             end
 
@@ -1377,9 +1465,7 @@ OnInit.final("Items", function(Require)
         end
 
         function thistype:destroy()
-            if not self.alive then
-                return false
-            end
+            if not self.alive then return false end
 
             self:drop(30000, 30000, true)
             return self:onDestroy()
@@ -1387,9 +1473,7 @@ OnInit.final("Items", function(Require)
 
         ---@type fun(itm: Item)
         function thistype.expire(itm)
-            if not itm.holder and not itm.owner then
-                itm:destroy()
-            end
+            if not itm.holder and not itm.owner then itm:destroy() end
         end
     end
 

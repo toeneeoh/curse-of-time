@@ -514,7 +514,14 @@ OnInit.final("Profile", function(Require)
                     socket_count = socket_count + #(item.sockets or {})
                     local item_index = (item.id or 0) & 0x1FFF
                     if item_index > 0 then
-                        icons[slot] = BlzGetAbilityIcon(CUSTOM_ITEM_OFFSET + item_index)
+                        local carrier_id = CUSTOM_ITEM_OFFSET + item_index
+                        local encoded_extra = type(item.extra) == "number"
+                            and item.extra or 0
+                        local runtime_definition = RuntimeItemDefinitions
+                            and RuntimeItemDefinitions.fromSaved(
+                                carrier_id, encoded_extra)
+                        icons[slot] = runtime_definition and runtime_definition.icon
+                            or BlzGetAbilityIcon(carrier_id)
                     end
                 end
             end

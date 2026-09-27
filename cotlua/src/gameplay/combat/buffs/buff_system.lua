@@ -6,23 +6,23 @@ OnInit.final("BuffSystem", function(Require)
     -------------------------------//
     ----------- BUFF TYPES --------//
     -------------------------------//
-    BUFF_NONE         = 0   ---@type integer 
-    BUFF_POSITIVE     = 1     ---@type integer 
-    BUFF_NEGATIVE     = 2 ---@type integer 
+    BUFF_NONE = 0 ---@type integer
+    BUFF_POSITIVE = 1 ---@type integer
+    BUFF_NEGATIVE = 2 ---@type integer
 
     -------------------------------//
     -------- BUFF STACK TYPES -----//
     -------------------------------//
-    --Applying the same buff only refreshes the duration
-    --If the buff is reapplied but from a different source, the Buff unit source gets replaced.
-    BUFF_STACK_NONE   = 0 ---@type integer 
+    -- Applying the same buff only refreshes the duration
+    -- If the buff is reapplied but from a different source, the Buff unit source gets replaced.
+    BUFF_STACK_NONE = 0 ---@type integer
 
-    --Each buff from different source stacks.
-    --Re-applying the same buff from the same source only refreshes the duration
-    BUFF_STACK_PARTIAL= 1 ---@type integer 
+    -- Each buff from different source stacks.
+    -- Re-applying the same buff from the same source only refreshes the duration
+    BUFF_STACK_PARTIAL = 1 ---@type integer
 
-    --Each buff applied fully stacks.
-    BUFF_STACK_FULL   = 2 ---@type integer 
+    -- Each buff applied fully stacks.
+    BUFF_STACK_FULL = 2 ---@type integer
 
     local buffs = {}
     local change_listeners = {}
@@ -59,15 +59,18 @@ OnInit.final("BuffSystem", function(Require)
     ---@field add function
     ---@field create function
     ---@field duration function
+    ---@field IGNORE_STATUS_RESISTANCE boolean? Preserve the supplied duration for technical effects.
+    ---@field base_duration number? Last duration requested by the caller.
+    ---@field applied_duration number? Duration after status resistance.
     ---@field refresh function
     ---@field remaining function
     Buff = {} ---@type Buff
     do
         local thistype = Buff
 
-        --===============================================================
-        --======================== BUFF CORE ============================
-        --===============================================================    
+        -- ===============================================================
+        -- ======================== BUFF CORE ============================
+        -- ===============================================================
 
         ---@type fun(): Buff
         function Buff.new()
@@ -78,8 +81,8 @@ OnInit.final("BuffSystem", function(Require)
                 DISPEL_TYPE = 0,
                 ICON = "ReplaceableTextures\\CommandButtons\\BTNShoveler.blp",
                 NAME = "Placeholder",
-                DESC = "Placeholder",
-            }, { __index = Buff })
+                DESC = "Placeholder"
+            }, {__index = Buff})
 
             self.parent = self -- self reference
 
@@ -97,9 +100,7 @@ OnInit.final("BuffSystem", function(Require)
         local function shift_unit_buffs(u, index)
             for i = index, #u.buffs do
                 u.buffs[i] = u.buffs[i + 1]
-                if not u.buffs[i] then
-                    break
-                end
+                if not u.buffs[i] then break end
                 u.buffs[i].index = i
             end
         end
@@ -147,15 +148,14 @@ OnInit.final("BuffSystem", function(Require)
         function Buff:get(source, target)
             local tbl = Unit[target].buffs
 
-            if not tbl then
-                return nil
-            end
+            if not tbl then return nil end
 
             -- search target's buffs over global
             for i = 1, #tbl do
                 local b = tbl[i]
 
-                if b.parent == self.parent and target == b.target and (source == nil or source == b.source) then
+                if b.parent == self.parent and target == b.target and
+                    (source == nil or source == b.source) then
                     return b
                 end
             end
@@ -185,23 +185,38 @@ OnInit.final("BuffSystem", function(Require)
             -- remove from buff bar
             UnitRemoveBuff(self.target, self)
 
-            if self.onRemove then
-                self:onRemove()
-            end
+            if self.onRemove then self:onRemove() end
         end
 
-        ---@type fun(self: Buff, dur: number)
-        function Buff:duration(dur)
+        ---Schedules expiration. Negative buffs use the target's status
+        ---resistance unless their definition explicitly opts out.
+        ---@param dur number?
+        ---@param ignore_status_resistance boolean? Treat dur as already final.
+        function Buff:duration(dur, ignore_status_resistance)
             if self.internal_callback then
                 TQ:disableCallback(self.internal_callback)
             end
 
             if dur then
+                self.base_duration = dur
+                if self.DISPEL_TYPE == BUFF_NEGATIVE and
+                    not self.IGNORE_STATUS_RESISTANCE and
+                    not ignore_status_resistance then
+                    local target_data = Unit[self.target]
+                    if target_data then
+                        dur = Unit.calculateStatusDuration(dur,
+                                                           target_data.status_resist)
+                    end
+                end
+                self.applied_duration = dur
                 self.internal_callback = TQ:callDelayed(dur, self.remove, self)
+            else
+                self.base_duration = nil
+                self.applied_duration = nil
             end
 
             -- refresh buff bar
-            UnitRefreshBuff(self.target)
+            UnitRefreshBuff(self.target, self)
         end
 
         ---@type fun(self: Buff): number?
@@ -258,9 +273,7 @@ OnInit.final("BuffSystem", function(Require)
             if apply then
                 buffs[#buffs + 1] = self
 
-                if self.onApply then
-                    self:onApply()
-                end
+                if self.onApply then self:onApply() end
 
                 UnitAddBuff(target, self)
             end
@@ -268,9 +281,9 @@ OnInit.final("BuffSystem", function(Require)
             return self
         end
 
-        --===============================================================
-        --======================= BUFF DISPEL ===========================
-        --===============================================================
+        -- ===============================================================
+        -- ======================= BUFF DISPEL ===========================
+        -- ===============================================================
         ---@param u unit
         ---@param dispelType integer
         function thistype.dispelType(u, dispelType)
@@ -288,7 +301,9 @@ OnInit.final("BuffSystem", function(Require)
         function thistype.dispelBoth(u)
             local i = 1
             while i <= #buffs do
-                if buffs[i].target == u and (buffs[i].DISPEL_TYPE == BUFF_POSITIVE or buffs[i].DISPEL_TYPE == BUFF_NEGATIVE) then
+                if buffs[i].target == u and
+                    (buffs[i].DISPEL_TYPE == BUFF_POSITIVE or
+                        buffs[i].DISPEL_TYPE == BUFF_NEGATIVE) then
                     buffs[i]:remove()
                 else
                     i = i + 1
@@ -301,7 +316,8 @@ OnInit.final("BuffSystem", function(Require)
         function thistype.dispelAll(u, override)
             local i = 1
             while i <= #buffs do
-                if buffs[i].target == u and (not buffs[i].CANNOT_PURGE or override) then
+                if buffs[i].target == u and
+                    (not buffs[i].CANNOT_PURGE or override) then
                     buffs[i]:remove()
                 else
                     i = i + 1
@@ -313,20 +329,17 @@ OnInit.final("BuffSystem", function(Require)
         function thistype:dispel(source, target)
             local tbl = Unit[target]
 
-            if not tbl then
-                return false
-            end
+            if not tbl then return false end
 
             tbl = Unit[target].buffs
 
-            if not tbl then
-                return false
-            end
+            if not tbl then return false end
 
             for i = 1, #tbl do
                 local b = tbl[i]
 
-                if b.parent == self and target == b.target and (source == nil or source == b.source) and not b.CANNOT_PURGE then
+                if b.parent == self and target == b.target and
+                    (source == nil or source == b.source) and not b.CANNOT_PURGE then
                     b:remove()
                     return true
                 end
@@ -347,12 +360,12 @@ OnInit.final("BuffSystem", function(Require)
             end
         end
 
-        --memoize metatables for inheritance
+        -- memoize metatables for inheritance
         local mts = {}
 
         ---@return Buff
         function thistype:create(source, target)
-            mts[self] = mts[self] or { __index = self }
+            mts[self] = mts[self] or {__index = self}
 
             local b = setmetatable({}, mts[self])
 
@@ -372,11 +385,12 @@ OnInit.final("BuffSystem", function(Require)
                 local existing = self:get(nil, target)
 
                 if existing then
-                    if self.STACK_TYPE == BUFF_STACK_PARTIAL and ablev > (existing.ablev or 0) then
+                    if self.STACK_TYPE == BUFF_STACK_PARTIAL and ablev >
+                        (existing.ablev or 0) then
                         existing.ablev = ablev
                         existing.source = source
                         existing.target = target
-                        existing.pid  = GetPlayerId(GetOwningPlayer(source)) + 1
+                        existing.pid = GetPlayerId(GetOwningPlayer(source)) + 1
                         existing.tpid = GetPlayerId(GetOwningPlayer(target)) + 1
 
                         existing:refresh()
@@ -395,8 +409,7 @@ OnInit.final("BuffSystem", function(Require)
             return b
         end
 
-        RegisterPlayerUnitEvent(EVENT_PLAYER_UNIT_DEATH,
-        function()
+        RegisterPlayerUnitEvent(EVENT_PLAYER_UNIT_DEATH, function()
             thistype.dispelAll(GetTriggerUnit())
         end)
     end

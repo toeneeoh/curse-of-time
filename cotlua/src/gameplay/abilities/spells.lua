@@ -7,11 +7,9 @@
         EVENT_PLAYER_UNIT_SPELL_FINISH,
         EVENT_PLAYER_HERO_SKILL,
         EVENT_PLAYER_UNIT_SPELL_CHANNEL)
-    
-    Provides a spell object factory for defining abilities by their ID
-]]
 
-OnInit.final("Spells", function(Require)
+    Provides a spell object factory for defining abilities by their ID
+]] OnInit.final("Spells", function(Require)
     Require("Users")
     Require("UnitEvent")
     Require("UnitTable")
@@ -42,18 +40,18 @@ OnInit.final("Spells", function(Require)
     local gsub = string.gsub
 
     -- set by getTooltip before calling gsub
-    local current_spell      ---@type Spell
-    local current_unit       ---@type unit
-    local current_pid        ---@type integer
-    local current_alt        ---@type boolean
+    local current_spell ---@type Spell
+    local current_unit ---@type unit
+    local current_pid ---@type integer
+    local current_alt ---@type boolean
 
-    SONG_WAR     = FourCC('A024') ---@type integer 
-    SONG_HARMONY = FourCC('A01A') ---@type integer 
-    SONG_PEACE   = FourCC('A09X') ---@type integer 
-    SONG_FATIGUE = FourCC('A00N') ---@type integer 
-    LAST_CAST    = __jarray(0) ---@type integer[] 
+    SONG_WAR = FourCC('A024') ---@type integer
+    SONG_HARMONY = FourCC('A01A') ---@type integer
+    SONG_PEACE = FourCC('A09X') ---@type integer
+    SONG_FATIGUE = FourCC('A00N') ---@type integer
+    LAST_CAST = __jarray(0) ---@type integer[]
 
-    INVALID_TARGET_MESSAGE = "|cffff0000Cannot target there!|r" ---@type string 
+    INVALID_TARGET_MESSAGE = "|cffff0000Cannot target there!|r" ---@type string
 
     ---@class Spell
     ---@field id integer
@@ -99,7 +97,7 @@ OnInit.final("Spells", function(Require)
                 ablev = GetUnitAbilityLevel(u, self.id)
             }
 
-            mts[self] = mts[self] or { __index = self }
+            mts[self] = mts[self] or {__index = self}
 
             setmetatable(spell, mts[self])
 
@@ -117,13 +115,21 @@ OnInit.final("Spells", function(Require)
             return spell
         end
 
-        local mt = { __index = function(tbl, key) local v = rawget(tbl, "values") return Spell[key] or (v and v[key]) end }
+        local mt = {
+            __index = function(tbl, key)
+                local v = rawget(tbl, "values")
+                return Spell[key] or (v and v[key])
+            end
+        }
 
         local function store_tooltip(id)
             UnitAddAbility(DUMMY_UNIT, id)
             local abil = BlzGetUnitAbility(DUMMY_UNIT, id)
             for ablev = 1, BlzGetAbilityIntegerField(abil, ABILITY_IF_LEVELS) do
-                Spell.TOOLTIPS[id][ablev] = BlzGetAbilityStringLevelField(abil, ABILITY_SLF_TOOLTIP_NORMAL_EXTENDED, ablev - 1)
+                Spell.TOOLTIPS[id][ablev] =
+                    BlzGetAbilityStringLevelField(abil,
+                                                  ABILITY_SLF_TOOLTIP_NORMAL_EXTENDED,
+                                                  ablev - 1)
             end
             UnitRemoveAbility(DUMMY_UNIT, id)
         end
@@ -148,7 +154,7 @@ OnInit.final("Spells", function(Require)
 
             -- if multiple ids share a definition, store them
             if ... then
-                self.shared = { self.id }
+                self.shared = {self.id}
                 for i = 1, select('#', ...) do
                     id = FourCC(select(i, ...))
                     Spells[id] = self
@@ -164,18 +170,14 @@ OnInit.final("Spells", function(Require)
             local hero = Hero[pid]
             local selected = PLAYER_SELECTED_UNIT[pid]
 
-            if hero then
-                UpdateSpellTooltips(hero)
-            end
+            if hero then UpdateSpellTooltips(hero) end
             if selected and selected ~= hero then
                 UpdateSpellTooltips(selected)
             end
         end
 
         local function update_selected_tooltips(_, selected)
-            if selected then
-                UpdateSpellTooltips(selected)
-            end
+            if selected then UpdateSpellTooltips(selected) end
         end
 
         local function extended_spell_tooltip(pid, is_down)
@@ -194,37 +196,34 @@ OnInit.final("Spells", function(Require)
             user = user.next
         end
 
-        local function tooltip_replacer(defaultflag, colorflag, prefix, tag, content)
+        local function tooltip_replacer(defaultflag, colorflag, prefix, tag,
+                                        content)
             local self = current_spell
-            local u    = current_unit
+            local u = current_unit
 
             -- if we don't have a unit, just show raw content
-            if not u then
-                return content
-            end
+            if not u then return content end
 
             -- only calculate if alt mode is active for this player
             local alt = current_alt or (defaultflag == "~")
-            if not alt then
-                return content
-            end
+            if not alt then return content end
 
             local color = (colorflag ~= ">")
 
             -- lookup value
             local val = self[tag]
-            if val == nil then
-                return content
-            end
+            if val == nil then return content end
 
             local calc = (type(val) == "table") and val[current_pid] or val
 
             if prefix == "[" then
                 local sb = Unit[u].spellboost
-                return HL(
-                    real_to_string(calc * (1 + sb + MIN_SPELLBOOST_VARIANCE)) .. " - "
-                        .. real_to_string(calc * (1 + sb + MAX_SPELLBOOST_VARIANCE)), color
-                )
+                return HL(real_to_string(calc *
+                                             (1 + sb + MIN_SPELLBOOST_VARIANCE)) ..
+                              " - " ..
+                              real_to_string(
+                                  calc * (1 + sb + MAX_SPELLBOOST_VARIANCE)),
+                          color)
 
             elseif prefix == "{" then
                 local mult = LBOOST[current_pid]
@@ -247,7 +246,7 @@ OnInit.final("Spells", function(Require)
         ---@type fun(self: Spell, u: unit?, ablev: integer?): string
         function thistype:getTooltip(u, ablev)
             local level = ablev or self.ablev or 1
-            local orig  = thistype.TOOLTIPS[self.id][level]
+            local orig = thistype.TOOLTIPS[self.id][level]
 
             -- just return raw tooltip if no dynamic values
             if not self.values or (not string.find(orig, "=", 1, true)) then
@@ -256,9 +255,9 @@ OnInit.final("Spells", function(Require)
 
             -- set context for the replacer
             current_spell = self
-            current_unit  = u
-            current_pid   = self.pid
-            current_alt   = alt_down[self.pid] or false
+            current_unit = u
+            current_pid = self.pid
+            current_alt = alt_down[self.pid] or false
 
             local result = gsub(orig, pattern, tooltip_replacer)
 
@@ -274,8 +273,9 @@ OnInit.final("Spells", function(Require)
             if GetLocalPlayer() == GetOwningPlayer(u) then
                 local ability = BlzGetUnitAbility(u, sid)
                 if ability then
-                    BlzSetAbilityStringLevelField(
-                        ability, ABILITY_SLF_TOOLTIP_NORMAL_EXTENDED, ablev - 1, tooltip)
+                    BlzSetAbilityStringLevelField(ability,
+                                                  ABILITY_SLF_TOOLTIP_NORMAL_EXTENDED,
+                                                  ablev - 1, tooltip)
                 end
                 BlzSetAbilityExtendedTooltip(sid, tooltip, ablev - 1)
                 BlzSetAbilityActivatedExtendedTooltip(sid, tooltip, ablev - 1)
@@ -283,26 +283,27 @@ OnInit.final("Spells", function(Require)
         end
 
         -- Stub methods
-        function thistype.preCast(pid, tpid, caster, target, x, y, targetX, targetY) end
+        function thistype.preCast(pid, tpid, caster, target, x, y, targetX,
+                                  targetY) end
         function thistype.onCast() end
         function thistype.onUnequip(itm, id, index, orig_holder) end
         function thistype.onEquip(itm, id, index) end
-        --function thistype.onLearn(source, ablev, pid) end
-        --function thistype.onSetup(source) end
+        -- function thistype.onLearn(source, ablev, pid) end
+        -- function thistype.onSetup(source) end
     end
 
     local function SpellCast()
-        local caster  = GetTriggerUnit() ---@type unit 
-        local target  = GetSpellTargetUnit() ---@type unit 
-        local sid     = GetSpellAbilityId() ---@type integer 
-        local p       = GetOwningPlayer(caster)
-        local pid     = GetPlayerId(p) + 1 ---@type integer 
-        local tpid    = GetPlayerId(GetOwningPlayer(target)) + 1 ---@type integer 
-        local x       = GetUnitX(caster) ---@type number 
-        local y       = GetUnitY(caster) ---@type number 
-        local targetX = GetSpellTargetX() ---@type number 
-        local targetY = GetSpellTargetY() ---@type number 
-        local spell   = Spells[sid]
+        local caster = GetTriggerUnit() ---@type unit
+        local target = GetSpellTargetUnit() ---@type unit
+        local sid = GetSpellAbilityId() ---@type integer
+        local p = GetOwningPlayer(caster)
+        local pid = GetPlayerId(p) + 1 ---@type integer
+        local tpid = GetPlayerId(GetOwningPlayer(target)) + 1 ---@type integer
+        local x = GetUnitX(caster) ---@type number
+        local y = GetUnitY(caster) ---@type number
+        local targetX = GetSpellTargetX() ---@type number
+        local targetY = GetSpellTargetY() ---@type number
+        local spell = Spells[sid]
 
         if spell then
             spell.preCast(pid, tpid, caster, target, x, y, targetX, targetY)
@@ -322,13 +323,13 @@ OnInit.final("Spells", function(Require)
 
     ---@return boolean
     local function SpellLearn()
-        local source = GetTriggerUnit() ---@type unit 
-        local sid    = GetLearnedSkill() ---@type integer 
-        local pid    = GetPlayerId(GetOwningPlayer(source)) + 1 ---@type integer 
-        local ablev  = GetUnitAbilityLevel(source, sid) ---@type integer 
-        local i      = 0 ---@type integer 
-        local abil   = BlzGetUnitAbilityByIndex(source, i) ---@type ability 
-        local spell  = Spells[sid]
+        local source = GetTriggerUnit() ---@type unit
+        local sid = GetLearnedSkill() ---@type integer
+        local pid = GetPlayerId(GetOwningPlayer(source)) + 1 ---@type integer
+        local ablev = GetUnitAbilityLevel(source, sid) ---@type integer
+        local i = 0 ---@type integer
+        local abil = BlzGetUnitAbilityByIndex(source, i) ---@type ability
+        local spell = Spells[sid]
 
         -- find ability
         while abil and BlzGetAbilityId(abil) ~= sid do
@@ -339,26 +340,24 @@ OnInit.final("Spells", function(Require)
         UpdateSpellTooltips(source)
 
         -- execute onlearn function
-        if spell and spell.onLearn then
-            spell.onLearn(source, ablev, pid)
-        end
+        if spell and spell.onLearn then spell.onLearn(source, ablev, pid) end
 
         return false
     end
 
     local function SpellEffect()
-        local caster = GetTriggerUnit() ---@type unit 
-        local target = GetSpellTargetUnit() ---@type unit 
-        local p      = GetOwningPlayer(caster)
-        local sid    = GetSpellAbilityId() ---@type integer 
-        local pid    = GetPlayerId(p) + 1 ---@type integer 
-        local tpid   = GetPlayerId(GetOwningPlayer(target)) + 1 ---@type integer 
-        local ablev  = GetUnitAbilityLevel(caster, sid) ---@type integer 
-        local x      = GetUnitX(caster) ---@type number 
-        local y      = GetUnitY(caster) ---@type number 
-        local targetX = GetSpellTargetX() ---@type number 
-        local targetY = GetSpellTargetY() ---@type number 
-        local spell   = Spells[sid]
+        local caster = GetTriggerUnit() ---@type unit
+        local target = GetSpellTargetUnit() ---@type unit
+        local p = GetOwningPlayer(caster)
+        local sid = GetSpellAbilityId() ---@type integer
+        local pid = GetPlayerId(p) + 1 ---@type integer
+        local tpid = GetPlayerId(GetOwningPlayer(target)) + 1 ---@type integer
+        local ablev = GetUnitAbilityLevel(caster, sid) ---@type integer
+        local x = GetUnitX(caster) ---@type number
+        local y = GetUnitY(caster) ---@type number
+        local targetX = GetSpellTargetX() ---@type number
+        local targetY = GetSpellTargetY() ---@type number
+        local spell = Spells[sid]
 
         EVENT_ON_CAST:trigger(caster, sid, ablev)
 
@@ -414,16 +413,14 @@ OnInit.final("Spells", function(Require)
             local sid = blzgetabilityid(abil)
             local spell = Spells[sid]
 
-            if spell then
-                spell:setTooltip(u, sid)
-            end
+            if spell then spell:setTooltip(u, sid) end
 
             i = i + 1
             abil = blzgetunitabilitybyindex(u, i)
         end
 
-        --SetPlayerAbilityAvailable(PLAYER_CREEP, FourCC('Agyv'), true)
-        --SetPlayerAbilityAvailable(PLAYER_CREEP, FourCC('Agyv'), false)
+        -- SetPlayerAbilityAvailable(PLAYER_CREEP, FourCC('Agyv'), true)
+        -- SetPlayerAbilityAvailable(PLAYER_CREEP, FourCC('Agyv'), false)
     end
 
     ---Runs first-time setup for registered abilities on a newly indexed unit.
@@ -438,9 +435,7 @@ OnInit.final("Spells", function(Require)
 
             if spell then
                 spell:setTooltip(u, id)
-                if spell.onSetup then
-                    spell.onSetup(u)
-                end
+                if spell.onSetup then spell.onSetup(u) end
             end
 
             index = index + 1

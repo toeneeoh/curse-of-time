@@ -2,20 +2,18 @@
     dev.lua
 
     A library used for debugging and testing.
-]]
-
-OnInit.final("Dev", function(Require)
+]] OnInit.final("Dev", function(Require)
     Require('HeroDefinitions')
     Require('BossSchema')
-    DEV_ENABLED            = true
-    PROFILE_SAVE_VERSION   = 0x40000000
+    DEV_ENABLED = true
+    PROFILE_SAVE_VERSION = 0x40000000
     CHARACTER_SAVE_VERSION = 0x40000000
-    SAVE_SCRAMBLE_VERSION  = 0x40000000
-    MAP_NAME               = "CoT Nevermore BETA"
-    EXTRA_DEBUG            = false
-    BUDDHA_MODE            = {} ---@type boolean[]
-    DEBUG_COUNT            = 0
-    WEATHER_OVERRIDE       = 0
+    SAVE_SCRAMBLE_VERSION = 0x40000000
+    MAP_NAME = "CoT Nevermore BETA"
+    EXTRA_DEBUG = false
+    BUDDHA_MODE = {} ---@type boolean[]
+    DEBUG_COUNT = 0
+    WEATHER_OVERRIDE = 0
 
     local BOOST_OFF = false
 
@@ -26,6 +24,8 @@ OnInit.final("Dev", function(Require)
     Require('Variables')
     Require('Items')
     Require('ItemHelpers')
+    Require('RuntimeItemDefinitions')
+    Require('CooldownAcceleration')
     Require('Perks')
     Require('FactionMining')
     Require('FactionEvents')
@@ -58,6 +58,8 @@ OnInit.final("Dev", function(Require)
         ["str"] = "Set the selected hero's strength to #. usage: -str [#]",
         ["agi"] = "Set the selected hero's agility to #. usage: -agi [#]",
         ["int"] = "Set the selected hero's intelligence to #. usage: -int [#]",
+        ["statusresist"] = "Set the selected unit's Status Resistance percentage. usage: -statusresist [0-75]",
+        ["accel"] = "Accelerate the selected unit's cooldowns. usage: -accel [seconds per second] [duration]",
         ["g"] = "Set the amount of gold you have to #. usage: -g [#]",
         ["day"] = "Set the time of day to morning.",
         ["night"] = "Set the time of day to midnight.",
@@ -94,7 +96,7 @@ OnInit.final("Dev", function(Require)
 [type #] - proficiency (0-all, 1-plate, 2-fullplate, 3-leather, 4-cloth, 5-shield, 6-heavy, 7-sword, 8-dagger, 9-bow, 10-staff)
 [limit #] - multiple item restriction (1 - can only have one, 2+ special error messages)
 [cost #] - upgrade item price
-other keywords: armor, str, agi, int, regen, damage, spellboost, cd (crit damage), cc (crit chance), health, mana, dr, mr, ms, evasion, bat, gold
+other keywords: armor, str, agi, int, regen, damage, spellboost, cd (crit damage), cc (crit chance), health, mana, dr, mr, ms, evasion, bat, gold, statusresist
 
 modifiers:
 * - stat is fixed per level // for stuff like spellboost and damage resist that has linear scaling
@@ -107,23 +109,18 @@ modifiers:
         ["go"] = "Lazy command to pick a hero quickly"
     }
 
-    local function BUDDHA(target, source, amount)
-        amount.value = 0.
-    end
+    local function BUDDHA(target, source, amount) amount.value = 0. end
 
     local function NOCOST(source)
         if not Unit[source].nomanaregen then
-            SetUnitState(source, UNIT_STATE_MANA, GetUnitState(source, UNIT_STATE_MAX_MANA))
+            SetUnitState(source, UNIT_STATE_MANA,
+                         GetUnitState(source, UNIT_STATE_MAX_MANA))
         end
     end
 
-    local function reset_cd(source)
-        UnitResetCooldown(source)
-    end
+    local function reset_cd(source) UnitResetCooldown(source) end
 
-    local function NOCD(source)
-        TimerQueue:callDelayed(0.1, reset_cd, source)
-    end
+    local function NOCD(source) TimerQueue:callDelayed(0.1, reset_cd, source) end
 
     -- Six legal, non-conflicting level-400 pieces for a solo Vampire baseline.
     -- The build favors dagger damage, sustain, and mobility without relying on
@@ -134,43 +131,43 @@ modifiers:
         FourCC('I0BK'), -- Azazoth's Leather Armor
         FourCC('I0OB'), -- Torture Jewel
         FourCC('I04E'), -- Thanatos's Wings
-        FourCC('I0MR'), -- Thanatos's Boots of Rift Walking
+        FourCC('I0MR') -- Thanatos's Boots of Rift Walking
     }
 
     local function grant_vampire_colosseum_loadout(pid)
         local hero = Hero[pid]
 
         if not hero or GetUnitTypeId(hero) ~= HERO_VAMPIRE then
-            DisplayTextToPlayer(Player(pid - 1), 0., 0., "Select Vampire before using -test; no test items were created.")
+            DisplayTextToPlayer(Player(pid - 1), 0., 0.,
+                                "Select Vampire before using -test; no test items were created.")
             return
         end
 
         local equipped = 0
         for _, item_id in ipairs(vampire_colosseum_loadout) do
-            local itm = ItemRuntime.create(item_id, GetUnitX(hero), GetUnitY(hero))
+            local itm = ItemRuntime.create(item_id, GetUnitX(hero),
+                                           GetUnitY(hero))
             local max_level = ItemData[item_id][ITEM_UPGRADE_MAX]
 
-            if max_level > 0 then
-                itm:lvl(max_level)
-            end
+            if max_level > 0 then itm:lvl(max_level) end
 
             PlayerAddItem(pid, itm)
-            if itm.equipped then
-                equipped = equipped + 1
-            end
+            if itm.equipped then equipped = equipped + 1 end
         end
 
-        DisplayTextToPlayer(Player(pid - 1), 0., 0., "Vampire Colosseum loadout equipped: " .. equipped .. "/6 items.")
+        DisplayTextToPlayer(Player(pid - 1), 0., 0.,
+                            "Vampire Colosseum loadout equipped: " .. equipped ..
+                                "/6 items.")
     end
 
     local boost_mt = {
         __index = function(tbl, key)
             return (1. + Unit[Hero[key]].spellboost)
         end,
-        __newindex = function() end,
+        __newindex = function() end
     }
 
-    --lookup table
+    -- lookup table
     dev_cmds = {
         ["nocd"] = function(p, pid, args)
             if EVENT_ON_ORDER:register_unit_action(Hero[pid], NOCD) then
@@ -193,18 +190,37 @@ modifiers:
                 DisplayTextToPlayer(Player(pid - 1), 0, 0, "No cost disabled")
             end
         end,
+        ["statusresist"] = function(p, pid, args)
+            local target = PLAYER_SELECTED_UNIT[pid] or Hero[pid]
+            local data = target and Unit[target] or nil
+            if not data then return end
+
+            data.status_resist_flat = math.max(0., S2R(args[2] or "0"))
+            DisplayTextToPlayer(p, 0., 0., "Status Resistance: " ..
+                                    RealToString(data.status_resist * 100.) ..
+                                    "%")
+        end,
+        ["accel"] = function(p, pid, args)
+            local target = PLAYER_SELECTED_UNIT[pid] or Hero[pid]
+            local rate = math.max(0., S2R(args[2] or "2"))
+            local duration = math.max(0., S2R(args[3] or "6"))
+            if not target or not CooldownAcceleration.apply(target, rate,
+                                                             duration) then
+                return
+            end
+
+            DisplayTextToPlayer(p, 0., 0., "Cooldown Acceleration: +" ..
+                                    RealToString(rate) .. " sec/sec for " ..
+                                    RealToString(duration) .. " seconds")
+        end,
         ["sight"] = function(p, pid, args)
             local r = 400.
 
-            if args[2] then
-                r = S2I(args[2])
-            end
+            if args[2] then r = S2I(args[2]) end
 
             BlzSetUnitRealField(Hero[pid], UNIT_RF_SIGHT_RADIUS, r)
         end,
-        ["dummycount"] = function(p, pid, args)
-            print(DUMMY_COUNT)
-        end,
+        ["dummycount"] = function(p, pid, args) print(DUMMY_COUNT) end,
         ["vision"] = function(p, pid, args)
             FogMaskEnable(false)
             FogEnable(false)
@@ -219,13 +235,12 @@ modifiers:
         ["sc"] = function(p, pid, args)
             SetCurrency(pid, CRYSTAL, S2I(args[2]))
         end,
-        ["sh"] = function(p, pid, args)
-            Honor.setTotal(pid, S2I(args[2]))
-        end,
+        ["sh"] = function(p, pid, args) Honor.setTotal(pid, S2I(args[2])) end,
         ["perks"] = function(p, pid, args)
             local amount = math.max(0, S2I(args[2]))
             Perks.setDevPoints(pid, amount)
-            DisplayTextToPlayer(p, 0., 0., "Temporary Perk Point total: " .. amount)
+            DisplayTextToPlayer(p, 0., 0.,
+                                "Temporary Perk Point total: " .. amount)
         end,
         ["rewardmetrics"] = function(p, pid, args)
             local metrics = RuntimeMetrics.rewards
@@ -234,13 +249,16 @@ modifiers:
                 DisplayTextToPlayer(p, 0., 0., "Reward metrics reset.")
                 return
             end
-            DisplayTextToPlayer(p, 0., 0., "Reward metrics: gold=" .. metrics.gold_events
-                .. " xp=" .. metrics.xp_events
-                .. " quests=" .. metrics.quest_updates
-                .. " hud flushes=" .. metrics.hud_flushes
-                .. " text tags removed=" .. metrics.world_text_tags_removed
-                .. " currency writes saved=" .. metrics.currency_writes_saved
-                .. " XP refreshes saved=" .. metrics.xp_rate_refreshes_saved)
+            DisplayTextToPlayer(p, 0., 0.,
+                                "Reward metrics: gold=" .. metrics.gold_events ..
+                                    " xp=" .. metrics.xp_events .. " quests=" ..
+                                    metrics.quest_updates .. " hud flushes=" ..
+                                    metrics.hud_flushes .. " text tags removed=" ..
+                                    metrics.world_text_tags_removed ..
+                                    " currency writes saved=" ..
+                                    metrics.currency_writes_saved ..
+                                    " XP refreshes saved=" ..
+                                    metrics.xp_rate_refreshes_saved)
         end,
         ["levelmetrics"] = function(p, pid, args)
             local metrics = RuntimeMetrics.leveling
@@ -254,16 +272,22 @@ modifiers:
             local divisor = math.max(1, metrics.events)
             local award_divisor = math.max(1, metrics.leveling_awards)
             DisplayTextToPlayer(p, 0., 0., string.format(
-                "Level metrics: events=%d avg=%.2fms max=%.2fms | XP level awards=%d avg=%.2fms max=%.2fms",
-                metrics.events, metrics.total_time / divisor * 1000., metrics.max_time * 1000.,
-                metrics.leveling_awards, metrics.leveling_award_time / award_divisor * 1000.,
-                metrics.max_leveling_award_time * 1000.))
+                                    "Level metrics: events=%d avg=%.2fms max=%.2fms | XP level awards=%d avg=%.2fms max=%.2fms",
+                                    metrics.events,
+                                    metrics.total_time / divisor * 1000.,
+                                    metrics.max_time * 1000.,
+                                    metrics.leveling_awards,
+                                    metrics.leveling_award_time / award_divisor *
+                                        1000.,
+                                    metrics.max_leveling_award_time * 1000.))
             DisplayTextToPlayer(p, 0., 0., string.format(
-                "Stages avg: hero event %.2fms, backpack %.2fms, items %.2fms, stat sync %.2fms, stat event %.2fms, finish %.2fms",
-                metrics.hero_event_time / divisor * 1000., metrics.backpack_time / divisor * 1000.,
-                metrics.item_time / divisor * 1000., metrics.stat_sync_time / divisor * 1000.,
-                metrics.stat_event_time / divisor * 1000.,
-                metrics.finish_time / divisor * 1000.))
+                                    "Stages avg: hero event %.2fms, backpack %.2fms, items %.2fms, stat sync %.2fms, stat event %.2fms, finish %.2fms",
+                                    metrics.hero_event_time / divisor * 1000.,
+                                    metrics.backpack_time / divisor * 1000.,
+                                    metrics.item_time / divisor * 1000.,
+                                    metrics.stat_sync_time / divisor * 1000.,
+                                    metrics.stat_event_time / divisor * 1000.,
+                                    metrics.finish_time / divisor * 1000.))
         end,
         ["sf"] = function(p, pid, args)
             SetCurrency(pid, FACTION, S2I(args[2]))
@@ -279,18 +303,22 @@ modifiers:
         ["mining"] = function(p, pid, args)
             local kind = args[2] or "common"
             local hero = Hero[pid]
-            if not FactionMining.spawn(kind, GetUnitX(hero) + 250., GetUnitY(hero)) then
-                DisplayTextToPlayer(p, 0., 0., "Unable to spawn deposit. Check its placeholder rawcode.")
+            if not FactionMining.spawn(kind, GetUnitX(hero) + 250.,
+                                       GetUnitY(hero)) then
+                DisplayTextToPlayer(p, 0., 0.,
+                                    "Unable to spawn deposit. Check its placeholder rawcode.")
             end
         end,
         ["factionevent"] = function(p, pid)
             if not FactionEvents.startNow(pid) then
-                DisplayTextToPlayer(p, 0., 0., "Unable to start the faction event.")
+                DisplayTextToPlayer(p, 0., 0.,
+                                    "Unable to start the faction event.")
             end
         end,
         ["lvl"] = function(p, pid, args)
             if GetHeroLevel(PLAYER_SELECTED_UNIT[pid]) > S2I(args[2]) then
-                UnitStripHeroLevel(PLAYER_SELECTED_UNIT[pid], GetHeroLevel(PLAYER_SELECTED_UNIT[pid]) - S2I(args[2]))
+                UnitStripHeroLevel(PLAYER_SELECTED_UNIT[pid], GetHeroLevel(
+                                       PLAYER_SELECTED_UNIT[pid]) - S2I(args[2]))
             else
                 SetHeroLevel(PLAYER_SELECTED_UNIT[pid], S2I(args[2]), false)
             end
@@ -308,26 +336,24 @@ modifiers:
         ["g"] = function(p, pid, args)
             SetCurrency(pid, GOLD, S2I(args[2]))
         end,
-        ["day"] = function(p, pid, args)
-            SetTimeOfDay(5.95)
-        end,
-        ["night"] = function(p, pid, args)
-            SetTimeOfDay(18.01)
-        end,
+        ["day"] = function(p, pid, args) SetTimeOfDay(5.95) end,
+        ["night"] = function(p, pid, args) SetTimeOfDay(18.01) end,
         ["si"] = function(p, pid, args)
             local search = ""
 
-            for i = 2, #args do
-                search = search .. args[i] .. " "
-            end
+            for i = 2, #args do search = search .. args[i] .. " " end
             search = search:gsub("%s+$", "")
 
             find_item(search, pid)
         end,
         ["gi"] = function(p, pid, args)
             if args[2] then
-                local itm = ItemRuntime.create(FourCC(args[2]), GetUnitX(Hero[pid]), GetUnitY(Hero[pid]))
-                local min_lvl = IMaxBJ(0, ItemData[FourCC(args[2])][ITEM_UPGRADE_MAX] - ITEM_MAX_LEVEL_VARIANCE)
+                local itm = ItemRuntime.create(FourCC(args[2]),
+                                               GetUnitX(Hero[pid]),
+                                               GetUnitY(Hero[pid]))
+                local min_lvl = IMaxBJ(0,
+                                       ItemData[FourCC(args[2])][ITEM_UPGRADE_MAX] -
+                                           ITEM_MAX_LEVEL_VARIANCE)
                 itm:lvl(min_lvl)
                 PlayerAddItem(pid, itm)
             end
@@ -336,10 +362,9 @@ modifiers:
             local id = S2I(args[2])
             local type = S2I(args[3])
 
-            if id <= PLAYER_CAP and GetPlayerSlotState(Player(id - 1)) ~= PLAYER_SLOT_STATE_PLAYING and type and type ~= 0 then
-                if not User[id - 1] then
-                    User.create(id - 1)
-                end
+            if id <= PLAYER_CAP and GetPlayerSlotState(Player(id - 1)) ~=
+                PLAYER_SLOT_STATE_PLAYING and type and type ~= 0 then
+                if not User[id - 1] then User.create(id - 1) end
 
                 if not Profile[id] then
                     Profile[id] = Profile.create(id)
@@ -352,7 +377,8 @@ modifiers:
             end
         end,
         ["sharecontrol"] = function(p, pid, args)
-            SetPlayerAlliance(Player(S2I(args[2]) - 1), p, ALLIANCE_SHARED_CONTROL, true)
+            SetPlayerAlliance(Player(S2I(args[2]) - 1), p,
+                              ALLIANCE_SHARED_CONTROL, true)
         end,
         ["enterchaos"] = function(p, pid, args)
             OpenGodsPortal()
@@ -366,7 +392,10 @@ modifiers:
 
             for i = 0, S2I(args[2]) do
                 local r = bj_PI * 2 * i / max
-                CreateUnit(PLAYER_CREEP, FourCC('h02D'), GetUnitX(Hero[pid]) + math.cos(r) * 30 * i / max, GetUnitY(Hero[pid]) + math.sin(r) * 30 * i / max, 270.)
+                CreateUnit(PLAYER_CREEP, FourCC('h02D'),
+                           GetUnitX(Hero[pid]) + math.cos(r) * 30 * i / max,
+                           GetUnitY(Hero[pid]) + math.sin(r) * 30 * i / max,
+                           270.)
             end
         end,
         ["shopkeeper"] = function(p, pid, args)
@@ -393,7 +422,10 @@ modifiers:
         ["noborders"] = function(p, pid, args)
             if GetLocalPlayer() == p then
                 SetCameraField(CAMERA_FIELD_ROTATION, 90., 0)
-                SetCameraBounds(WorldBounds.minX, WorldBounds.minY, WorldBounds.minX, WorldBounds.maxY, WorldBounds.maxX, WorldBounds.maxY, WorldBounds.maxX, WorldBounds.minY)
+                SetCameraBounds(WorldBounds.minX, WorldBounds.minY,
+                                WorldBounds.minX, WorldBounds.maxY,
+                                WorldBounds.maxX, WorldBounds.maxY,
+                                WorldBounds.maxX, WorldBounds.minY)
             end
             SetMinimapTexture(pid, "war3mapImported\\minimap_noborders.dds")
         end,
@@ -403,31 +435,32 @@ modifiers:
             BOSS_RESPAWN_TIME = args[2]
             print("Boss respawn time set to " .. args[2] .. " seconds")
         end,
-        ["pause"] = function(p, pid, args)
-            PauseUnit(Hero[pid], true)
-        end,
-        ["unpause"] = function(p, pid, args)
-            PauseUnit(Hero[pid], false)
-        end,
+        ["pause"] = function(p, pid, args) PauseUnit(Hero[pid], true) end,
+        ["unpause"] = function(p, pid, args) PauseUnit(Hero[pid], false) end,
         ["setfirestorm"] = function(p, pid, args)
             firestormRate = S2I(args[2])
         end,
         ["horde"] = function(p, pid, args)
             for _ = 0, 39 do
-                CreateUnit(PLAYER_CREEP, FourCC('n07R'), GetUnitX(Hero[pid]), GetUnitY(Hero[pid]), GetRandomReal(0, 359))
+                CreateUnit(PLAYER_CREEP, FourCC('n07R'), GetUnitX(Hero[pid]),
+                           GetUnitY(Hero[pid]), GetRandomReal(0, 359))
             end
         end,
         ["kill"] = function(p, pid, args)
-            DamageTarget(Hero[pid], PLAYER_SELECTED_UNIT[pid], BlzGetUnitMaxHP(PLAYER_SELECTED_UNIT[pid]) * 2., ATTACK_TYPE_NORMAL, PURE, "Kill")
+            DamageTarget(Hero[pid], PLAYER_SELECTED_UNIT[pid],
+                         BlzGetUnitMaxHP(PLAYER_SELECTED_UNIT[pid]) * 2.,
+                         ATTACK_TYPE_NORMAL, PURE, "Kill")
         end,
         ["ally"] = function(p, pid, args)
-            CreateUnit(p, FourCC(args[2]), GetUnitX(Hero[pid]), GetUnitY(Hero[pid]) - 300., GetRandomReal(0, 359))
+            CreateUnit(p, FourCC(args[2]), GetUnitX(Hero[pid]),
+                       GetUnitY(Hero[pid]) - 300., GetRandomReal(0, 359))
         end,
         ["setowner"] = function(p, pid, args)
             SetUnitOwner(PLAYER_SELECTED_UNIT[pid], Player(S2I(args[2])), true)
         end,
         ["enemy"] = function(p, pid, args)
-            CreateUnit(PLAYER_CREEP, FourCC(args[2]), GetUnitX(Hero[pid]), GetUnitY(Hero[pid]) - 300., GetRandomReal(0, 359))
+            CreateUnit(PLAYER_CREEP, FourCC(args[2]), GetUnitX(Hero[pid]),
+                       GetUnitY(Hero[pid]) - 300., GetRandomReal(0, 359))
         end,
         ["donation"] = function(p, pid, args)
             print("weather rate: " .. R2S(donation))
@@ -450,18 +483,12 @@ modifiers:
 
             GroupEnumUnitsInRect(ug, WorldBounds.rect, nil)
 
-            for target in each(ug) do
-                KillUnit(target)
-            end
+            for target in each(ug) do KillUnit(target) end
 
             DestroyGroup(ug)
         end,
-        ["print"] = function(p, pid, args)
-            print(StringHash(args[2]))
-        end,
-        ["printc"] = function(p, pid, args)
-            print(FourCC(args[2]))
-        end,
+        ["print"] = function(p, pid, args) print(StringHash(args[2])) end,
+        ["printc"] = function(p, pid, args) print(FourCC(args[2])) end,
         ["test"] = function(p, pid, args)
             SetCurrency(pid, GOLD, 9999999)
             SetCurrency(pid, PLATINUM, 9999)
@@ -499,8 +526,10 @@ modifiers:
             end
         end,
         ["heal"] = function(p, pid, args)
-            SetWidgetLife(PLAYER_SELECTED_UNIT[pid], BlzGetUnitMaxHP(PLAYER_SELECTED_UNIT[pid]))
-            SetUnitState(PLAYER_SELECTED_UNIT[pid], UNIT_STATE_MANA, BlzGetUnitMaxMana(PLAYER_SELECTED_UNIT[pid]))
+            SetWidgetLife(PLAYER_SELECTED_UNIT[pid],
+                          BlzGetUnitMaxHP(PLAYER_SELECTED_UNIT[pid]))
+            SetUnitState(PLAYER_SELECTED_UNIT[pid], UNIT_STATE_MANA,
+                         BlzGetUnitMaxMana(PLAYER_SELECTED_UNIT[pid]))
         end,
         ["ms"] = function(p, pid, args)
             args[2] = args[2] and S2I(args[2]) or GetUnitMoveSpeed(Hero[pid])
@@ -517,9 +546,7 @@ modifiers:
                 UnitAddAbility(PLAYER_SELECTED_UNIT[pid], ABIL_AVUL)
             end
         end,
-        ["colo"] = function(p, pid, args)
-            ColoPlayerCount = S2I(args[2])
-        end,
+        ["colo"] = function(p, pid, args) ColoPlayerCount = S2I(args[2]) end,
         ["hp"] = function(p, pid, args)
             SetWidgetLife(PLAYER_SELECTED_UNIT[pid], S2I(args[2]))
             BlzSetUnitMaxHP(PLAYER_SELECTED_UNIT[pid], S2I(args[2]))
@@ -528,7 +555,8 @@ modifiers:
             BlzSetUnitArmor(PLAYER_SELECTED_UNIT[pid], S2I(args[2]))
         end,
         ["armortype"] = function(p, pid, args)
-            BlzSetUnitIntegerField(PLAYER_SELECTED_UNIT[pid], UNIT_IF_DEFENSE_TYPE, S2I(args[2]))
+            BlzSetUnitIntegerField(PLAYER_SELECTED_UNIT[pid],
+                                   UNIT_IF_DEFENSE_TYPE, S2I(args[2]))
         end,
         ["boost"] = function(p, pid, args)
             if BOOST_OFF then
@@ -586,7 +614,8 @@ modifiers:
             end
         end,
         ["tp"] = function(p, pid, args)
-            SetUnitPosition(PLAYER_SELECTED_UNIT[pid], GetMouseX(pid), GetMouseY(pid))
+            SetUnitPosition(PLAYER_SELECTED_UNIT[pid], GetMouseX(pid),
+                            GetMouseY(pid))
         end,
         ["extradebug"] = function(p, pid, args)
             EXTRA_DEBUG = not EXTRA_DEBUG
@@ -618,19 +647,23 @@ modifiers:
         ["anim"] = function(p, pid, args)
             SetUnitAnimationByIndex(PLAYER_SELECTED_UNIT[pid], S2I(args[2]))
         end,
-        ["shadowstep"] = function(p, pid, args)
-            ShadowStepExpire(true)
-        end,
+        ["shadowstep"] = function(p, pid, args) ShadowStepExpire(true) end,
         ["rotate"] = function(p, pid, args)
             BlzSetUnitFacingEx(PLAYER_SELECTED_UNIT[pid], S2R(args[2]))
         end,
         ["position"] = function(p, pid, args)
-            print(R2S(GetUnitX(PLAYER_SELECTED_UNIT[pid])) .. " " .. R2S(GetUnitY(PLAYER_SELECTED_UNIT[pid])))
+            print(R2S(GetUnitX(PLAYER_SELECTED_UNIT[pid])) .. " " ..
+                      R2S(GetUnitY(PLAYER_SELECTED_UNIT[pid])))
         end,
         ["skills"] = function(p, pid, args)
-            print(BlzGetAbilityStringLevelField(BlzGetUnitAbilityByIndex(Hero[pid], S2I(args[2])), ABILITY_SLF_TOOLTIP_NORMAL, 0))
-            print(BlzGetAbilityStringField(BlzGetUnitAbilityByIndex(Hero[pid], S2I(args[2])), ABILITY_SF_NAME))
-            print(pack(">I4", BlzGetAbilityId(BlzGetUnitAbilityByIndex(Hero[pid], S2I(args[2])))))
+            print(BlzGetAbilityStringLevelField(
+                      BlzGetUnitAbilityByIndex(Hero[pid], S2I(args[2])),
+                      ABILITY_SLF_TOOLTIP_NORMAL, 0))
+            print(BlzGetAbilityStringField(
+                      BlzGetUnitAbilityByIndex(Hero[pid], S2I(args[2])),
+                      ABILITY_SF_NAME))
+            print(pack(">I4", BlzGetAbilityId(
+                           BlzGetUnitAbilityByIndex(Hero[pid], S2I(args[2])))))
         end,
         ["makeitem"] = function(p, pid, args)
             ItemRuntime.create(FourCC('I0OX'), 0, 0)
@@ -638,23 +671,20 @@ modifiers:
         ["itemtest"] = function(p, pid, args)
             ItemRuntime.create(FourCC('I0OX'), 0, 0, 10)
         end,
-        ["FourCC"] = function(p, pid, args)
-            print(FourCC(args[2]))
-        end,
+        ["FourCC"] = function(p, pid, args) print(FourCC(args[2])) end,
         ["itemlevel"] = function(p, pid, args)
             Profile[pid].hero.items[1]:lvl(S2I(args[2]))
         end,
         ["maxlevel"] = function(p, pid, args)
-            Profile[pid].hero.items[1]:lvl(ItemData[Profile[pid].hero.items[1].id][ITEM_UPGRADE_MAX])
+            Profile[pid].hero.items[1]:lvl(
+                ItemData[Profile[pid].hero.items[1].id][ITEM_UPGRADE_MAX])
         end,
         ["itemset"] = function(p, pid, args)
             local items = Profile[pid].hero.items
             items[1]:drop()
             wipe_item_stats(items[1].id)
             local text = ""
-            for i = 2, #args do
-                text = text .. args[i] .. " "
-            end
+            for i = 2, #args do text = text .. args[i] .. " " end
             ParseItemTooltip(items[1].obj, text)
             items[1]:update()
             items[1]:equip()
@@ -694,7 +724,8 @@ modifiers:
             CosmeticTable[User[p].name][S2I(args[2])] = S2I(args[3])
         end,
         ["setaura"] = function(p, pid, args)
-            CosmeticTable[User[p].name][S2I(args[2]) + DONATOR_AURA_OFFSET] = S2I(args[3])
+            CosmeticTable[User[p].name][S2I(args[2]) + DONATOR_AURA_OFFSET] =
+                S2I(args[3])
         end,
         ["id2char"] = function(p, pid, args)
             print(GetObjectName(SAVE_UNIT_TYPE[S2I(args[2])]))
@@ -705,9 +736,7 @@ modifiers:
         ["removespell"] = function(p, pid, args)
             UnitRemoveAbility(PLAYER_SELECTED_UNIT[pid], FourCC(args[2]))
         end,
-        ["restock"] = function(p, pid, args)
-            MoveShopkeeper()
-        end,
+        ["restock"] = function(p, pid, args) MoveShopkeeper() end,
         ["host"] = function(p, pid, args)
             local host = DetectHost()
 
@@ -716,15 +745,17 @@ modifiers:
             end
         end,
         ["keys"] = function(p, pid, args)
-            for index = 8,255 do
+            for index = 8, 255 do
                 local trigger = CreateTrigger()
                 TriggerAddAction(trigger, function()
-                    print("OsKey:",index, "meta",BlzGetTriggerPlayerMetaKey())
+                    print("OsKey:", index, "meta", BlzGetTriggerPlayerMetaKey())
                 end)
                 local key = ConvertOsKeyType(index)
-                for metaKey = 0,15,1 do
-                    BlzTriggerRegisterPlayerKeyEvent(trigger, p, key, metaKey, true)
-                    BlzTriggerRegisterPlayerKeyEvent(trigger, p, key, metaKey, false)
+                for metaKey = 0, 15, 1 do
+                    BlzTriggerRegisterPlayerKeyEvent(trigger, p, key, metaKey,
+                                                     true)
+                    BlzTriggerRegisterPlayerKeyEvent(trigger, p, key, metaKey,
+                                                     false)
                 end
             end
         end,
@@ -752,7 +783,8 @@ modifiers:
 
             local s = os.clock()
             for _ = 1, iterations do
-                ALICE_ForAllObjectsInRangeDo(print_name, 0, 0, 500., "unit", Allied, Player(0))
+                ALICE_ForAllObjectsInRangeDo(print_name, 0, 0, 500., "unit",
+                                             Allied, Player(0))
                 --
             end
             local e = os.clock()
@@ -796,8 +828,8 @@ modifiers:
                     end
                 end
             end
-        end,
-   }
+        end
+    }
 
     ---@param id integer
     wipe_item_stats = function(id)
@@ -818,12 +850,24 @@ modifiers:
     event_setup = function(pid)
         local index = User.AmountPlaying
         MULTIBOARD.MAIN:addRows(1)
-        MULTIBOARD.MAIN:get(index, 1).text = {0.02, 0, 0.09, MULTIBOARD.ICON_SIZE}
-        MULTIBOARD.MAIN:get(index, 2).icon = {0.11, 0, MULTIBOARD.ICON_SIZE, MULTIBOARD.ICON_SIZE}
-        MULTIBOARD.MAIN:get(index, 3).icon = {0.13, 0, MULTIBOARD.ICON_SIZE, MULTIBOARD.ICON_SIZE}
-        MULTIBOARD.MAIN:get(index, 4).text = {0.15, 0, 0.08, MULTIBOARD.ICON_SIZE}
-        MULTIBOARD.MAIN:get(index, 5).text = {0.23, 0, 0.03, MULTIBOARD.ICON_SIZE}
-        MULTIBOARD.MAIN:get(index, 6).text = {0.26, 0, 0.03, MULTIBOARD.ICON_SIZE}
+        MULTIBOARD.MAIN:get(index, 1).text = {
+            0.02, 0, 0.09, MULTIBOARD.ICON_SIZE
+        }
+        MULTIBOARD.MAIN:get(index, 2).icon = {
+            0.11, 0, MULTIBOARD.ICON_SIZE, MULTIBOARD.ICON_SIZE
+        }
+        MULTIBOARD.MAIN:get(index, 3).icon = {
+            0.13, 0, MULTIBOARD.ICON_SIZE, MULTIBOARD.ICON_SIZE
+        }
+        MULTIBOARD.MAIN:get(index, 4).text = {
+            0.15, 0, 0.08, MULTIBOARD.ICON_SIZE
+        }
+        MULTIBOARD.MAIN:get(index, 5).text = {
+            0.23, 0, 0.03, MULTIBOARD.ICON_SIZE
+        }
+        MULTIBOARD.MAIN:get(index, 6).text = {
+            0.26, 0, 0.03, MULTIBOARD.ICON_SIZE
+        }
         MULTIBOARD.MAIN:refresh()
 
         local boss = MULTIBOARD.BOSS
@@ -834,9 +878,11 @@ modifiers:
         boss:get(offset, 3).text = {0.15, 0.002, 0.05, 0.0175}
         boss:showRow(offset, false)
 
-        --alliance setup
-        SetPlayerAllianceStateBJ(Player(PLAYER_TOWN), Player(pid - 1), bj_ALLIANCE_ALLIED)
-        SetPlayerAlliance(Player(pid - 1), Player(PLAYER_NEUTRAL_PASSIVE), ALLIANCE_SHARED_SPELLS, true)
+        -- alliance setup
+        SetPlayerAllianceStateBJ(Player(PLAYER_TOWN), Player(pid - 1),
+                                 bj_ALLIANCE_ALLIED)
+        SetPlayerAlliance(Player(pid - 1), Player(PLAYER_NEUTRAL_PASSIVE),
+                          ALLIANCE_SHARED_SPELLS, true)
 
         local i = 0
         while i ~= bj_MAX_PLAYERS do
@@ -844,8 +890,10 @@ modifiers:
             local i2 = 0
             while i2 ~= bj_MAX_PLAYERS do
                 if i ~= i2 then
-                    SetPlayerAlliance(Player(i), Player(i2), ALLIANCE_SHARED_VISION, true)
-                    SetPlayerAlliance(Player(i), Player(i2), ALLIANCE_SHARED_CONTROL, false)
+                    SetPlayerAlliance(Player(i), Player(i2),
+                                      ALLIANCE_SHARED_VISION, true)
+                    SetPlayerAlliance(Player(i), Player(i2),
+                                      ALLIANCE_SHARED_CONTROL, false)
                 end
                 i2 = i2 + 1
             end
@@ -863,9 +911,8 @@ modifiers:
             local name = GetObjectName(CUSTOM_ITEM_OFFSET + i)
             if name ~= "Default string" and name ~= "" then
                 itm = CreateItem(CUSTOM_ITEM_OFFSET + i, 30000., 30000.)
-                if GetItemType(itm) ~= ITEM_TYPE_POWERUP and GetItemType(itm) ~= ITEM_TYPE_CAMPAIGN then
-                    searchable[i] = true
-                end
+                if GetItemType(itm) ~= ITEM_TYPE_POWERUP and GetItemType(itm) ~=
+                    ITEM_TYPE_CAMPAIGN then searchable[i] = true end
                 SetWidgetLife(itm, 1.)
                 RemoveItem(itm)
             end
@@ -890,8 +937,26 @@ modifiers:
         local pid = self.pid
 
         if index ~= -1 then
-            local itm = ItemRuntime.create(self.data[index], GetUnitX(Hero[pid]), GetUnitY(Hero[pid]))
-            local min_lvl = IMaxBJ(0, ItemData[self.data[index]][ITEM_UPGRADE_MAX] - ITEM_MAX_LEVEL_VARIANCE)
+            local selection = data or self.data[index]
+            local itm
+            local min_lvl = 0
+
+            if type(selection) == "table" and selection.runtime_item then
+                itm = RuntimeItemDefinitions.create(selection.runtime_item,
+                                                    GetUnitX(Hero[pid]),
+                                                    GetUnitY(Hero[pid]))
+                if itm then
+                    min_lvl = IMaxBJ(0, itm.data[ITEM_UPGRADE_MAX] -
+                                         ITEM_MAX_LEVEL_VARIANCE)
+                end
+            else
+                itm = ItemRuntime.create(selection, GetUnitX(Hero[pid]),
+                                         GetUnitY(Hero[pid]))
+                min_lvl = IMaxBJ(0, ItemData[selection][ITEM_UPGRADE_MAX] -
+                                     ITEM_MAX_LEVEL_VARIANCE)
+            end
+
+            if not itm then return false end
             itm:lvl(min_lvl)
             PlayerAddItem(pid, itm)
 
@@ -905,12 +970,23 @@ modifiers:
     ---@param pid integer
     find_item = function(search, pid)
         local itemCode = "" ---@type string
-        local id       = 0 ---@type integer
-        local name     = "" ---@type string
-        local count    = 0 ---@type integer
+        local id = 0 ---@type integer
+        local name = "" ---@type string
+        local count = 0 ---@type integer
         local dw = DialogWindow.create(pid, "Select an item", SearchPage)
 
         preload_items()
+
+        for _, definition in ipairs(RuntimeItemDefinitions.getAll()) do
+            local runtime_item_code = pack(">I4", definition.carrier_id)
+            local searchable_name = lower(
+                                        definition.name .. " " .. definition.key ..
+                                            " " .. runtime_item_code)
+            if find(searchable_name, lower(search)) then
+                dw:addButton(runtime_item_code .. " - " .. definition.name,
+                             {runtime_item = definition.key}, definition.icon)
+            end
+        end
 
         -- I000 to I0SX
         for i = 0, 9000 do
@@ -918,12 +994,11 @@ modifiers:
             itemCode = pack(">I4", id)
             name = GetObjectName(id)
             if searchable[i] and find(lower(name), lower(search)) then
-                dw:addButton(itemCode .. " - " .. name, id, BlzGetAbilityIcon(id))
+                dw:addButton(itemCode .. " - " .. name, id,
+                             BlzGetAbilityIcon(id))
             end
 
-            if dw.count >= DialogWindow.BUTTON_MAX then
-                break
-            end
+            if dw.count >= DialogWindow.BUTTON_MAX then break end
 
             count = count + 1
 
@@ -942,11 +1017,11 @@ modifiers:
     end
 
     local function dev_commands()
-        local p    = GetTriggerPlayer()
-        local pid  = GetPlayerId(p) + 1 ---@type integer
+        local p = GetTriggerPlayer()
+        local pid = GetPlayerId(p) + 1 ---@type integer
         local args = {}
 
-        --propogate args table
+        -- propogate args table
         for arg in GetEventPlayerChatString():gmatch("%S+") do
             args[#args + 1] = arg
         end
@@ -963,16 +1038,12 @@ modifiers:
         enabled = false,
         data = {},
         threshold = 0.0, -- seconds; set >0 to only log "slow" stuff
-        live_output = false,
+        live_output = false
     }
 
     local data = Profiler.data
 
-    function Profiler.clear()
-        for k in pairs(data) do
-            data[k] = nil
-        end
-    end
+    function Profiler.clear() for k in pairs(data) do data[k] = nil end end
 
     function Profiler.start()
         Profiler.enabled = true
@@ -985,9 +1056,7 @@ modifiers:
     end
 
     function Profiler.time(name, fn, ...)
-        if not Profiler.enabled then
-            return fn(...)
-        end
+        if not Profiler.enabled then return fn(...) end
 
         local t0 = clock()
         local results = table.pack(fn(...))
@@ -995,18 +1064,16 @@ modifiers:
 
         local entry = data[name]
         if not entry then
-            entry = { total = 0.0, count = 0, max = 0.0 }
+            entry = {total = 0.0, count = 0, max = 0.0}
             data[name] = entry
         end
         entry.total = entry.total + dt
         entry.count = entry.count + 1
-        if dt > entry.max then
-            entry.max = dt
-        end
+        if dt > entry.max then entry.max = dt end
 
         if Profiler.live_output and dt >= (Profiler.threshold or 0.0) then
-            DisplayTimedTextToPlayer(Player(0), 0, 0, 5,
-                string.format("[prof] %s: %.4f s", name, dt))
+            DisplayTimedTextToPlayer(Player(0), 0, 0, 5, string.format(
+                                         "[prof] %s: %.4f s", name, dt))
         end
 
         return table.unpack(results, 1, results.n)
@@ -1018,24 +1085,24 @@ modifiers:
         -- flatten into array to sort
         local arr = {}
         for name, e in pairs(data) do
-            arr[#arr+1] = {
+            arr[#arr + 1] = {
                 name = name,
                 total = e.total,
                 count = e.count,
                 max = e.max,
-                average = e.total / math.max(1, e.count),
+                average = e.total / math.max(1, e.count)
             }
         end
 
-        table.sort(arr, function(a, b)
-            return a.total > b.total
-        end)
+        table.sort(arr, function(a, b) return a.total > b.total end)
 
         for i = 1, math.min(top_n, #arr) do
             local e = arr[i]
             DisplayTimedTextToPlayer(Player(0), 0, 0, 10,
-                string.format("[prof] #%d %s total=%.4f max=%.4f avg=%.6f count=%d",
-                    i, e.name, e.total, e.max, e.average, e.count))
+                                     string.format(
+                                         "[prof] #%d %s total=%.4f max=%.4f avg=%.6f count=%d",
+                                         i, e.name, e.total, e.max, e.average,
+                                         e.count))
         end
     end
 

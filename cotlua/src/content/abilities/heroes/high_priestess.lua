@@ -14,8 +14,12 @@ OnInit.final("HighPriestessSpells", function(Require)
 
         thistype.values = {
             aoe = 850.,
-            heal = function(pid) return 0.15 * GetHeroInt(Hero[pid], true) end,
-            mana = function(pid) return 0.02 * BlzGetUnitMaxMana(Hero[pid]) end,
+            heal = function(pid)
+                return 0.15 * GetHeroInt(Hero[pid], true)
+            end,
+            mana = function(pid)
+                return 0.02 * BlzGetUnitMaxMana(Hero[pid])
+            end
         }
 
         ---@type fun(pt: PlayerTimer): boolean
@@ -27,7 +31,8 @@ OnInit.final("HighPriestessSpells", function(Require)
 
             pt.dur = pt.dur + 1
 
-            MakeGroupInRange(pt.pid, pt.ug, pt.x, pt.y, pt.aoe, Condition(FilterAllyHero))
+            MakeGroupInRange(pt.pid, pt.ug, pt.x, pt.y, pt.aoe,
+                             Condition(FilterAllyHero))
 
             for target in each(pt.ug) do
                 if percent > GetUnitLifePercent(target) then
@@ -36,18 +41,20 @@ OnInit.final("HighPriestessSpells", function(Require)
                 end
             end
 
-            if pt.dur > 10. then
-                mana = mana * 2.
-            end
+            if pt.dur > 10. then mana = mana * 2. end
 
-            if GetUnitCurrentOrder(Hero[pt.pid]) == OrderId("clusterrockets") and UnitAlive(Hero[pt.pid]) then
+            if GetUnitCurrentOrder(Hero[pt.pid]) == OrderId("clusterrockets") and
+                UnitAlive(Hero[pt.pid]) then
                 if ModuloReal(pt.dur, 2.) == 0 then
                     MP(Hero[pt.pid], mana)
                 end
                 if ftarget then
-                    heal = (heal + BlzGetUnitMaxHP(ftarget) * 0.01) * BOOST[pt.pid]
+                    heal = (heal + BlzGetUnitMaxHP(ftarget) * 0.01) *
+                               BOOST[pt.pid]
                     HP(Hero[pt.pid], ftarget, heal, thistype.tag)
-                    DestroyEffect(AddSpecialEffectTarget("Abilities\\Spells\\Undead\\VampiricAura\\VampiricAuraTarget.mdl", ftarget, "origin"))
+                    DestroyEffect(AddSpecialEffectTarget(
+                                      "Abilities\\Spells\\Undead\\VampiricAura\\VampiricAuraTarget.mdl",
+                                      ftarget, "origin"))
                 end
 
                 return true
@@ -75,24 +82,36 @@ OnInit.final("HighPriestessSpells", function(Require)
         local thistype = DIVINELIGHT
 
         thistype.values = {
-            heal = function(pid) local ablev = GetUnitAbilityLevel(Hero[pid], thistype.id) return (0.25 + 0.25 * ablev) * GetHeroInt(Hero[pid], true) end,
+            heal = function(pid)
+                local ablev = GetUnitAbilityLevel(Hero[pid], thistype.id)
+                return (0.25 + 0.25 * ablev) * GetHeroInt(Hero[pid], true)
+            end
         }
 
         function thistype:onCast()
-            BlzStartUnitAbilityCooldown(self.caster, RESURRECTION.id, math.max(0.01, BlzGetUnitAbilityCooldownRemaining(self.caster, RESURRECTION.id) - 2.))
+            BlzStartUnitAbilityCooldown(self.caster, RESURRECTION.id,
+                                        math.max(0.01,
+                                                 BlzGetUnitAbilityCooldownRemaining(
+                                                     self.caster,
+                                                     RESURRECTION.id) - 2.))
 
-            --because backpack is a valid target
+            -- because backpack is a valid target
             if GetUnitTypeId(self.target) == BACKPACK then
                 self.target = Hero[self.tpid]
             end
 
-            HP(self.caster, self.target, (self.heal + BlzGetUnitMaxHP(self.target) * 0.05) * BOOST[self.pid], thistype.tag)
+            HP(self.caster, self.target, (self.heal +
+                   BlzGetUnitMaxHP(self.target) * 0.05) * BOOST[self.pid],
+               thistype.tag)
             DivineLightBuff:add(self.caster, self.target):duration(3.)
         end
 
         local manacost = function(u, key)
             if key == "int" or key == "bonus_mana" or key == "bonus_int" then
-                BlzSetUnitAbilityManaCost(u, thistype.id, GetUnitAbilityLevel(u, thistype.id) - 1, R2I(BlzGetUnitMaxMana(u) * 0.05))
+                BlzSetUnitAbilityManaCost(u, thistype.id,
+                                          GetUnitAbilityLevel(u, thistype.id) -
+                                              1,
+                                          R2I(BlzGetUnitMaxMana(u) * 0.05))
             end
         end
 
@@ -114,7 +133,10 @@ OnInit.final("HighPriestessSpells", function(Require)
             ms = 20.,
             regen = 100.,
             aoe = 400.,
-            dur = function(pid) local ablev = GetUnitAbilityLevel(Hero[pid], thistype.id) return 11. + ablev end,
+            dur = function(pid)
+                local ablev = GetUnitAbilityLevel(Hero[pid], thistype.id)
+                return 11. + ablev
+            end
         }
 
         ---@type fun(pt: PlayerTimer): boolean
@@ -122,15 +144,15 @@ OnInit.final("HighPriestessSpells", function(Require)
             pt.dur = pt.dur - 1
 
             if pt.dur > 0. then
-                MakeGroupInRange(pt.pid, pt.ug, pt.x, pt.y, pt.aoe, Condition(FilterEnemy))
+                MakeGroupInRange(pt.pid, pt.ug, pt.x, pt.y, pt.aoe,
+                                 Condition(FilterEnemy))
 
                 for target in each(pt.ug) do
-                    SanctifiedGroundDebuff:add(Hero[pt.pid], target):duration(1.)
+                    SanctifiedGroundDebuff:add(Hero[pt.pid], target)
+                        :duration(1.)
                 end
 
-                if pt.dur == 2 then
-                    FadeSFX(pt.sfx, true)
-                end
+                if pt.dur == 2 then FadeSFX(pt.sfx, true) end
 
                 return true
             end
@@ -139,7 +161,11 @@ OnInit.final("HighPriestessSpells", function(Require)
         end
 
         function thistype:onCast()
-            BlzStartUnitAbilityCooldown(self.caster, RESURRECTION.id, math.max(0.01, BlzGetUnitAbilityCooldownRemaining(self.caster, RESURRECTION.id) - 2.))
+            BlzStartUnitAbilityCooldown(self.caster, RESURRECTION.id,
+                                        math.max(0.01,
+                                                 BlzGetUnitAbilityCooldownRemaining(
+                                                     self.caster,
+                                                     RESURRECTION.id) - 2.))
 
             local pt = TimerList[self.pid]:add()
             pt.x = self.targetX
@@ -148,7 +174,9 @@ OnInit.final("HighPriestessSpells", function(Require)
             pt.dur = self.dur * 2. * LBOOST[self.pid]
             pt.ug = CreateGroup()
 
-            pt.sfx = AddSpecialEffect("war3mapImported\\Heaven's Gate Channel.mdl", pt.x, pt.y)
+            pt.sfx = AddSpecialEffect(
+                         "war3mapImported\\Heaven's Gate Channel.mdl", pt.x,
+                         pt.y)
             BlzSetSpecialEffectScale(pt.sfx, LBOOST[self.pid])
             BlzPlaySpecialEffect(pt.sfx, ANIM_TYPE_BIRTH)
             BlzSetSpecialEffectZ(pt.sfx, GetLocZ(pt.x, pt.y))
@@ -158,7 +186,9 @@ OnInit.final("HighPriestessSpells", function(Require)
 
         local manacost = function(u, key)
             if key == "int" or key == "bonus_mana" or key == "bonus_int" then
-                BlzSetUnitAbilityManaCost(u, thistype.id, GetUnitAbilityLevel(u, thistype.id) - 1, R2I(BlzGetUnitMaxMana(u) * 0.1))
+                BlzSetUnitAbilityManaCost(u, thistype.id,
+                                          GetUnitAbilityLevel(u, thistype.id) -
+                                              1, R2I(BlzGetUnitMaxMana(u) * 0.1))
             end
         end
 
@@ -177,27 +207,40 @@ OnInit.final("HighPriestessSpells", function(Require)
 
         thistype.values = {
             aoe = 600.,
-            heal = function(pid) local ablev = GetUnitAbilityLevel(Hero[pid], thistype.id) return 0.5 * ablev * GetHeroInt(Hero[pid], true) end,
-            dmg = function(pid) local ablev = GetUnitAbilityLevel(Hero[pid], thistype.id) return 2. * ablev * GetHeroInt(Hero[pid], true) end,
+            heal = function(pid)
+                local ablev = GetUnitAbilityLevel(Hero[pid], thistype.id)
+                return 0.5 * ablev * GetHeroInt(Hero[pid], true)
+            end,
+            dmg = function(pid)
+                local ablev = GetUnitAbilityLevel(Hero[pid], thistype.id)
+                return 2. * ablev * GetHeroInt(Hero[pid], true)
+            end
         }
 
         local function on_hit(source, target)
             local pid = GetPlayerId(GetOwningPlayer(source)) + 1
 
-            DamageTarget(source, target, thistype.dmg(pid) * BOOST[pid], ATTACK_TYPE_NORMAL, MAGIC, thistype.tag)
+            DamageTarget(source, target, thistype.dmg(pid) * BOOST[pid],
+                         ATTACK_TYPE_NORMAL, MAGIC, thistype.tag)
         end
         function thistype:onCast()
             local ug = CreateGroup()
 
-            BlzStartUnitAbilityCooldown(self.caster, RESURRECTION.id, math.max(0.01, BlzGetUnitAbilityCooldownRemaining(self.caster, RESURRECTION.id) - 2.))
+            BlzStartUnitAbilityCooldown(self.caster, RESURRECTION.id,
+                                        math.max(0.01,
+                                                 BlzGetUnitAbilityCooldownRemaining(
+                                                     self.caster,
+                                                     RESURRECTION.id) - 2.))
 
-            MakeGroupInRange(self.pid, ug, self.x, self.y, self.aoe * LBOOST[self.pid], Condition(isalive))
+            MakeGroupInRange(self.pid, ug, self.x, self.y,
+                             self.aoe * LBOOST[self.pid], Condition(isalive))
 
             for target in each(ug) do
                 local dummy = Dummy.create(self.x, self.y, FourCC('A09Q'), 1)
                 if IsUnitAlly(target, Player(self.pid - 1)) then
                     dummy:attack(target)
-                    HP(self.caster, target, self.heal * BOOST[self.pid], thistype.tag)
+                    HP(self.caster, target, self.heal * BOOST[self.pid],
+                       thistype.tag)
                 else
                     dummy:attack(target, self.caster, on_hit)
                 end
@@ -206,7 +249,9 @@ OnInit.final("HighPriestessSpells", function(Require)
 
         local manacost = function(u, key)
             if key == "int" or key == "bonus_mana" or key == "bonus_int" then
-                BlzSetUnitAbilityManaCost(u, thistype.id, GetUnitAbilityLevel(u, thistype.id) - 1, R2I(BlzGetUnitMaxMana(u) * 0.1))
+                BlzSetUnitAbilityManaCost(u, thistype.id,
+                                          GetUnitAbilityLevel(u, thistype.id) -
+                                              1, R2I(BlzGetUnitMaxMana(u) * 0.1))
             end
         end
 
@@ -223,27 +268,41 @@ OnInit.final("HighPriestessSpells", function(Require)
         local thistype = PROTECTION
 
         thistype.values = {
-            shield = function(pid) return 3. * GetHeroInt(Hero[pid], true) end,
-            aoe = 650.,
+            shield = function(pid)
+                return 3. * GetHeroInt(Hero[pid], true)
+            end,
+            aoe = 650.
         }
 
         function thistype:onCast()
             local ug = CreateGroup()
 
-            DestroyEffect(AddSpecialEffectTarget("war3mapImported\\RighteousGuard.mdx", self.caster, "chest"))
-            BlzStartUnitAbilityCooldown(self.caster, RESURRECTION.id, math.max(0.01, BlzGetUnitAbilityCooldownRemaining(self.caster, RESURRECTION.id) - 2.))
+            DestroyEffect(AddSpecialEffectTarget(
+                              "war3mapImported\\RighteousGuard.mdx",
+                              self.caster, "chest"))
+            BlzStartUnitAbilityCooldown(self.caster, RESURRECTION.id,
+                                        math.max(0.01,
+                                                 BlzGetUnitAbilityCooldownRemaining(
+                                                     self.caster,
+                                                     RESURRECTION.id) - 2.))
 
-            MakeGroupInRange(self.pid, ug, self.x, self.y, self.aoe * LBOOST[self.pid], Condition(FilterAllyHero))
+            MakeGroupInRange(self.pid, ug, self.x, self.y,
+                             self.aoe * LBOOST[self.pid],
+                             Condition(FilterAllyHero))
 
             for target in each(ug) do
-                ProtectionBuff:add(self.caster, target):duration(20 + 10 * self.ablev)
-                Shield.add(target, self.shield * BOOST[self.pid], 20 + 10 * self.ablev):color(4)
+                ProtectionBuff:add(self.caster, target):duration(20 + 10 *
+                                                                     self.ablev)
+                Shield.add(target, self.shield * BOOST[self.pid],
+                           20 + 10 * self.ablev):color(4)
             end
         end
 
         local manacost = function(u, key)
             if key == "int" or key == "bonus_mana" or key == "bonus_int" then
-                BlzSetUnitAbilityManaCost(u, thistype.id, GetUnitAbilityLevel(u, thistype.id) - 1, R2I(BlzGetUnitMaxMana(u) * 0.5))
+                BlzSetUnitAbilityManaCost(u, thistype.id,
+                                          GetUnitAbilityLevel(u, thistype.id) -
+                                              1, R2I(BlzGetUnitMaxMana(u) * 0.5))
             end
         end
 
@@ -261,26 +320,35 @@ OnInit.final("HighPriestessSpells", function(Require)
         thistype.spell = FourCC('A045')
 
         thistype.values = {
-            restore = function(pid) return 40. + 20.* GetUnitAbilityLevel(Hero[pid], thistype.id) end,
+            restore = function(pid)
+                return 40. + 20. * GetUnitAbilityLevel(Hero[pid], thistype.id)
+            end
         }
 
-        function thistype.preCast(pid, tpid, caster, target, x, y, targetX, targetY)
+        function thistype.preCast(pid, tpid, caster, target, x, y, targetX,
+                                  targetY)
             if target ~= HeroGrave[tpid] then
                 IssueImmediateOrderById(caster, ORDER_ID_STOP)
-                DisplayTextToPlayer(Player(pid - 1), 0, 0, "You must target a tombstone!")
+                DisplayTextToPlayer(Player(pid - 1), 0, 0,
+                                    "You must target a tombstone!")
             elseif GetUnitAbilityLevel(HeroGrave[tpid], thistype.spell) > 0 then
                 IssueImmediateOrderById(caster, ORDER_ID_STOP)
-                DisplayTextToPlayer(Player(pid - 1), 0, 0, "This player is already being revived!")
+                DisplayTextToPlayer(Player(pid - 1), 0, 0,
+                                    "This player is already being revived!")
             end
         end
 
         function thistype:onCast()
             HideEffect(REVIVE_INDICATOR[self.tpid])
 
-            DestroyEffect(AddSpecialEffect("Abilities\\Spells\\Human\\Resurrect\\ResurrectTarget.mdl", self.targetX, self.targetY))
+            DestroyEffect(AddSpecialEffect(
+                              "Abilities\\Spells\\Human\\Resurrect\\ResurrectTarget.mdl",
+                              self.targetX, self.targetY))
             ResurrectionRevival[self.tpid] = self.pid
             UnitAddAbility(HeroGrave[self.tpid], thistype.spell)
-            REVIVE_INDICATOR[self.tpid] = AddSpecialEffect("UI\\Feedback\\Target\\Target.mdx", self.targetX, self.targetY)
+            REVIVE_INDICATOR[self.tpid] = AddSpecialEffect(
+                                              "UI\\Feedback\\Target\\Target.mdx",
+                                              self.targetX, self.targetY)
 
             local size = 0.
 
@@ -290,8 +358,11 @@ OnInit.final("HighPriestessSpells", function(Require)
 
             BlzSetSpecialEffectTimeScale(REVIVE_INDICATOR[self.tpid], 0.)
             BlzSetSpecialEffectScale(REVIVE_INDICATOR[self.tpid], size)
-            BlzSetSpecialEffectZ(REVIVE_INDICATOR[self.tpid], BlzGetLocalSpecialEffectZ(REVIVE_INDICATOR[self.tpid]) - 100)
-            TimerQueue:callDelayed(12.8, DestroyEffect, REVIVE_INDICATOR[self.tpid])
+            BlzSetSpecialEffectZ(REVIVE_INDICATOR[self.tpid],
+                                 BlzGetLocalSpecialEffectZ(
+                                     REVIVE_INDICATOR[self.tpid]) - 100)
+            TimerQueue:callDelayed(12.8, DestroyEffect,
+                                   REVIVE_INDICATOR[self.tpid])
         end
 
         local function on_death(killed)
@@ -299,14 +370,19 @@ OnInit.final("HighPriestessSpells", function(Require)
             -- self resurrection
             if BlzGetUnitAbilityCooldownRemaining(killed, thistype.id) <= 0 then
                 UnitAddAbility(HeroGrave[pid], thistype.spell)
-                BlzStartUnitAbilityCooldown(killed, thistype.id, 450. - 50. * GetUnitAbilityLevel(killed, thistype.id))
+                BlzStartUnitAbilityCooldown(killed, thistype.id, 450. - 50. *
+                                                GetUnitAbilityLevel(killed,
+                                                                    thistype.id))
                 ResurrectionRevival[pid] = pid
             end
         end
 
         local manacost = function(u, key)
             if key == "int" or key == "bonus_mana" or key == "bonus_int" then
-                BlzSetUnitAbilityManaCost(u, thistype.id, GetUnitAbilityLevel(u, thistype.id) - 1, R2I(GetUnitState(u, UNIT_STATE_MANA)))
+                BlzSetUnitAbilityManaCost(u, thistype.id,
+                                          GetUnitAbilityLevel(u, thistype.id) -
+                                              1,
+                                          R2I(GetUnitState(u, UNIT_STATE_MANA)))
             end
         end
 

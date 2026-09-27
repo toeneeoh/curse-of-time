@@ -2,9 +2,7 @@
     stat_view.lua
 
     This module defines the stat window for detailed information on heroes / units
-]]
-
-OnInit.final("StatView", function(Require)
+]] OnInit.final("StatView", function(Require)
     Require('StatValues')
     Require('Honor')
     Require('HonorMilestones')
@@ -37,121 +35,218 @@ OnInit.final("StatView", function(Require)
         armor_percent = ITEM_ARMOR,
         bonus_hp = ITEM_HEALTH,
         cc = ITEM_CRIT_CHANCE,
-        cd_= ITEM_CRIT_DAMAGE,
+        cd_ = ITEM_CRIT_DAMAGE,
         cc_percent = ITEM_CRIT_CHANCE_MULT,
         cd_percent = ITEM_CRIT_DAMAGE_MULT,
         ms = ITEM_MOVESPEED,
         ms_percent = ITEM_MOVESPEED,
         overmovespeed = ITEM_MOVESPEED,
-        regen_= ITEM_REGENERATION,
+        regen_ = ITEM_REGENERATION,
         regen_percent = ITEM_REGENERATION,
         regen_max = ITEM_REGENERATION,
-        mana_regen_= ITEM_MANA_REGENERATION,
+        mana_regen_ = ITEM_MANA_REGENERATION,
         mana_regen_percent = ITEM_MANA_REGENERATION,
         mana_regen_max = ITEM_MANA_REGENERATION,
         nomanaregen = ITEM_MANA_REGENERATION,
         gold_rate = ITEM_GOLD_GAIN,
         xp_rate = XP_RATE,
+        status_resist_flat = STATUS_RESISTANCE,
+        cooldown_acceleration = COOLDOWN_ACCELERATION
     }
 
-    local function owner_pid(u)
-        return GetPlayerId(GetOwningPlayer(u)) + 1
-    end
+    local function owner_pid(u) return GetPlayerId(GetOwningPlayer(u)) + 1 end
 
-    local function faction_for(u)
-        return Faction.getFaction(owner_pid(u))
-    end
+    local function faction_for(u) return Faction.getFaction(owner_pid(u)) end
 
     local function faction_reputation(u)
         local faction = faction_for(u)
         return faction and Faction.getReputation(owner_pid(u), faction.id) or 0
     end
 
-    local difficulty_names = { "Easy", "Medium", "Hard" }
+    local difficulty_names = {"Easy", "Medium", "Hard"}
 
     local tab_tags = {
-        ST,
+        ST, {
+            {
+                tag = "|cffffcc00Gold|r",
+                priority = 1,
+                getter = function(u)
+                    return GetCurrency(owner_pid(u), GOLD)
+                end
+            }, {
+                tag = "|cffccccccPlatinum|r",
+                priority = 1,
+                getter = function(u)
+                    return GetCurrency(owner_pid(u), PLATINUM)
+                end
+            }, {
+                tag = "|cff6969ffCrystal|r",
+                priority = 1,
+                getter = function(u)
+                    return GetCurrency(owner_pid(u), CRYSTAL)
+                end
+            }, {
+                tag = "|cffffcc00Spendable Honor|r",
+                priority = 1,
+                getter = function(u)
+                    return GetCurrency(owner_pid(u), HONOR)
+                end
+            }, {
+                tag = "|cffffcc00Lifetime Honor|r",
+                priority = 1,
+                getter = function(u)
+                    return Honor.getTotal(owner_pid(u))
+                end
+            }, {
+                tag = "|cffffcc00Allocated Honor|r",
+                priority = 1,
+                getter = function(u)
+                    return Honor.getAllocated(owner_pid(u))
+                end
+            }, {
+                tag = "|cff80ff80Unspent Faction Points|r",
+                priority = 1,
+                getter = function(u)
+                    return Faction.getPoints(owner_pid(u))
+                end
+            }, {
+                tag = "|cffffff00Gold Find|r",
+                priority = 1,
+                getter = function(u)
+                    local rate = Unit[u].gold_rate
+                    if math.abs(rate) < 0.0005 then rate = 0 end
+                    return rate .. "%"
+                end
+            }, {
+                tag = "|cffccccccCurrency Converter|r",
+                priority = 1,
+                getter = function(u)
+                    local pid = owner_pid(u)
+                    if not HasCurrencyConverter(pid) then
+                        return "Not Owned"
+                    end
+                    return IsCurrencyConverterEnabled(pid) and "Enabled" or
+                               "Disabled"
+                end
+            }
+        }, {
+            {
+                tag = "|cffffcc00Available Perk Points|r",
+                priority = 1,
+                getter = function(u)
+                    local pid = GetPlayerId(GetOwningPlayer(u)) + 1
+                    return Perks.getAvailable(pid)
+                end
+            }, {
+                tag = "|cffffcc00Allocated Perk Points|r",
+                priority = 1,
+                getter = function(u)
+                    local pid = GetPlayerId(GetOwningPlayer(u)) + 1
+                    return Perks.getSpent(pid)
+                end
+            }, {
+                tag = "|cffffcc00Total Perk Points|r",
+                priority = 1,
+                getter = function(u)
+                    local pid = GetPlayerId(GetOwningPlayer(u)) + 1
+                    return Perks.getTotal(pid)
+                end
+            }, {
+                tag = "|cffffcc00Free Reset|r",
+                priority = 1,
+                getter = function(u)
+                    local pid = GetPlayerId(GetOwningPlayer(u)) + 1
+                    return Perks.hasReset(pid) and "Available" or "Unavailable"
+                end
+            }
+        }, {}, -- lifetime Honor milestones use their own paginated renderer
         {
-            { tag = "|cffffcc00Gold|r", priority = 1, getter = function(u) return GetCurrency(owner_pid(u), GOLD) end},
-            { tag = "|cffccccccPlatinum|r", priority = 1, getter = function(u) return GetCurrency(owner_pid(u), PLATINUM) end},
-            { tag = "|cff6969ffCrystal|r", priority = 1, getter = function(u) return GetCurrency(owner_pid(u), CRYSTAL) end},
-            { tag = "|cffffcc00Spendable Honor|r", priority = 1, getter = function(u) return GetCurrency(owner_pid(u), HONOR) end},
-            { tag = "|cffffcc00Lifetime Honor|r", priority = 1, getter = function(u) return Honor.getTotal(owner_pid(u)) end},
-            { tag = "|cffffcc00Allocated Honor|r", priority = 1, getter = function(u) return Honor.getAllocated(owner_pid(u)) end},
-            { tag = "|cff80ff80Unspent Faction Points|r", priority = 1, getter = function(u) return Faction.getPoints(owner_pid(u)) end},
-            { tag = "|cffffff00Gold Find|r", priority = 1, getter = function(u)
-                local rate = Unit[u].gold_rate
-                if math.abs(rate) < 0.0005 then rate = 0 end
-                return rate .. "%"
-            end},
-            { tag = "|cffccccccCurrency Converter|r", priority = 1, getter = function(u)
-                local pid = owner_pid(u)
-                if not HasCurrencyConverter(pid) then return "Not Owned" end
-                return IsCurrencyConverterEnabled(pid) and "Enabled" or "Disabled"
-            end},
-        },
-        {
-            { tag = "|cffffcc00Available Perk Points|r", priority = 1, getter = function(u) local pid = GetPlayerId(GetOwningPlayer(u)) + 1 return Perks.getAvailable(pid) end},
-            { tag = "|cffffcc00Allocated Perk Points|r", priority = 1, getter = function(u) local pid = GetPlayerId(GetOwningPlayer(u)) + 1 return Perks.getSpent(pid) end},
-            { tag = "|cffffcc00Total Perk Points|r", priority = 1, getter = function(u) local pid = GetPlayerId(GetOwningPlayer(u)) + 1 return Perks.getTotal(pid) end},
-            { tag = "|cffffcc00Free Reset|r", priority = 1, getter = function(u) local pid = GetPlayerId(GetOwningPlayer(u)) + 1 return Perks.hasReset(pid) and "Available" or "Unavailable" end},
-        },
-        {}, -- lifetime Honor milestones use their own paginated renderer
-        {
-            { tag = "|cffffcc00Faction|r", priority = 1, getter = function(u)
-                local faction = faction_for(u)
-                return faction and faction.name or "None"
-            end},
-            { tag = "|cffffcc00Rank|r", priority = 1, getter = function(u)
-                local faction = faction_for(u)
-                return faction and (Faction.getRank(faction_reputation(u))
-                    .. " / " .. Faction.getMaxRank()) or "-"
-            end},
-            { tag = "|cffffcc00Lifetime Faction Points|r", priority = 1, getter = function(u)
-                local faction = faction_for(u)
-                if not faction then return "-" end
-                local reputation = faction_reputation(u)
-                local threshold = Faction.getNextRankThreshold(reputation)
-                return threshold and (reputation .. " / " .. threshold)
-                    or (reputation .. " (MAX)")
-            end},
-            { tag = "|cff80ff80Unspent Faction Points|r", priority = 1, getter = function(u)
-                return faction_for(u) and Faction.getPoints(owner_pid(u)) or "-"
-            end},
-            { tag = "|cffffcc00Active Quest|r", priority = 1, getter = function(u)
-                local quest = Quest.getActive(owner_pid(u))
-                return quest and quest.name or "None"
-            end},
-            { tag = "|cffffcc00Difficulty|r", priority = 1, getter = function(u)
-                local quest = Quest.getActive(owner_pid(u))
-                return quest and (difficulty_names[quest.diff] or "Unknown") or "-"
-            end},
-            { tag = "|cffffcc00Progress|r", priority = 1, getter = function(u)
-                local quest, progress = Quest.getActive(owner_pid(u))
-                return quest and (Quest.formatProgress(progress) .. " / " .. quest.goal) or "-"
-            end},
-            { tag = "|cffffcc00Quest Reward|r", priority = 1, getter = function(u)
-                local quest = Quest.getActive(owner_pid(u))
-                return quest and (quest.faction_points .. " Faction Points") or "-"
-            end},
-        },
+            {
+                tag = "|cffffcc00Faction|r",
+                priority = 1,
+                getter = function(u)
+                    local faction = faction_for(u)
+                    return faction and faction.name or "None"
+                end
+            }, {
+                tag = "|cffffcc00Rank|r",
+                priority = 1,
+                getter = function(u)
+                    local faction = faction_for(u)
+                    return faction and
+                               (Faction.getRank(faction_reputation(u)) .. " / " ..
+                                   Faction.getMaxRank()) or "-"
+                end
+            }, {
+                tag = "|cffffcc00Lifetime Faction Points|r",
+                priority = 1,
+                getter = function(u)
+                    local faction = faction_for(u)
+                    if not faction then return "-" end
+                    local reputation = faction_reputation(u)
+                    local threshold = Faction.getNextRankThreshold(reputation)
+                    return threshold and (reputation .. " / " .. threshold) or
+                               (reputation .. " (MAX)")
+                end
+            }, {
+                tag = "|cff80ff80Unspent Faction Points|r",
+                priority = 1,
+                getter = function(u)
+                    return faction_for(u) and Faction.getPoints(owner_pid(u)) or
+                               "-"
+                end
+            }, {
+                tag = "|cffffcc00Active Quest|r",
+                priority = 1,
+                getter = function(u)
+                    local quest = Quest.getActive(owner_pid(u))
+                    return quest and quest.name or "None"
+                end
+            }, {
+                tag = "|cffffcc00Difficulty|r",
+                priority = 1,
+                getter = function(u)
+                    local quest = Quest.getActive(owner_pid(u))
+                    return
+                        quest and (difficulty_names[quest.diff] or "Unknown") or
+                            "-"
+                end
+            }, {
+                tag = "|cffffcc00Progress|r",
+                priority = 1,
+                getter = function(u)
+                    local quest, progress = Quest.getActive(owner_pid(u))
+                    return quest and
+                               (Quest.formatProgress(progress) .. " / " ..
+                                   quest.goal) or "-"
+                end
+            }, {
+                tag = "|cffffcc00Quest Reward|r",
+                priority = 1,
+                getter = function(u)
+                    local quest = Quest.getActive(owner_pid(u))
+                    return
+                        quest and (quest.faction_points .. " Faction Points") or
+                            "-"
+                end
+            }
+        }
     }
 
     local perk_bonuses = {
-        { "Primary Attribute", "primary_percent", 100., "%" },
-        { "Total Damage", "damage_percent", 100., "%" },
-        { "Critical Chance", "crit_chance", 1., "%" },
-        { "Critical Damage", "crit_damage", 1., "%" },
-        { "Spellboost", "spellboost", 100., "%" },
-        { "Armor", "armor_percent", 100., "%" },
-        { "Health Regeneration", "regen_percent", 100., "%" },
-        { "Damage Reduction", "damage_reduction", 100., "%" },
-        { "Movespeed", "movespeed", 1., "" },
-        { "Gold Find", "gold_rate", 1., "%" },
-        { "Shared Experience", "shared_xp", 100., "%" },
-        { "New Character Levels", "inheritance", 5., "" },
-        { "New Character Gold", "inheritance", 25000., "" },
-        { "Kill Quest Auto Turn-In", "huntsman", 1., "" },
+        {"Primary Attribute", "primary_percent", 100., "%"},
+        {"Total Damage", "damage_percent", 100., "%"},
+        {"Critical Chance", "crit_chance", 1., "%"},
+        {"Critical Damage", "crit_damage", 1., "%"},
+        {"Spellboost", "spellboost", 100., "%"},
+        {"Armor", "armor_percent", 100., "%"},
+        {"Health Regeneration", "regen_percent", 100., "%"},
+        {"Damage Reduction", "damage_reduction", 100., "%"},
+        {"Movespeed", "movespeed", 1., ""}, {"Gold Find", "gold_rate", 1., "%"},
+        {"Shared Experience", "shared_xp", 100., "%"},
+        {"New Character Levels", "inheritance", 5., ""},
+        {"New Character Gold", "inheritance", 25000., ""},
+        {"Kill Quest Auto Turn-In", "huntsman", 1., ""}
     }
     for _, definition in ipairs(perk_bonuses) do
         local bonus = definition
@@ -166,7 +261,7 @@ OnInit.final("StatView", function(Require)
                 end
                 local result = math.floor(value * bonus[3] + .5)
                 return (result > 0 and "+" or "") .. result .. bonus[4]
-            end,
+            end
         }
     end
 
@@ -180,8 +275,12 @@ OnInit.final("StatView", function(Require)
         return order
     end
 
-    --#region frame setup
-    local frame = BlzCreateFrame("ListBoxWar3", BlzGetFrameByName("ConsoleUIBackdrop", 0), 0, 0)
+    -- #region frame setup
+    local frame = BlzCreateFrame("ListBoxWar3",
+                                 BlzGetFrameByName("ConsoleUIBackdrop", 0), 0, 0)
+    -- Feature windows must cover persistent HUD controls such as potion
+    -- buttons, while remaining below the perk tree and modal dialogs.
+    BlzFrameSetLevel(frame, 20)
 
     local MAX_ROWS = 32
     local CURRENCY_TAB = 2
@@ -196,27 +295,35 @@ OnInit.final("StatView", function(Require)
         local val_f = BlzCreateFrameByType("TEXT", "", parent, "", 0)
         local separator = BlzCreateFrameByType("BACKDROP", "", parent, "", 0)
 
-        BlzFrameSetPoint(tag_f, FRAMEPOINT_TOPLEFT, parent, FRAMEPOINT_TOPLEFT, 0.015, y)
+        BlzFrameSetPoint(tag_f, FRAMEPOINT_TOPLEFT, parent, FRAMEPOINT_TOPLEFT,
+                         0.015, y)
         BlzFrameSetTextAlignment(tag_f, TEXT_JUSTIFY_CENTER, TEXT_JUSTIFY_LEFT)
         BlzFrameSetEnable(tag_f, false)
 
-        BlzFrameSetPoint(val_f, FRAMEPOINT_TOPLEFT, parent, FRAMEPOINT_TOPLEFT, 0.113, y)
+        BlzFrameSetPoint(val_f, FRAMEPOINT_TOPLEFT, parent, FRAMEPOINT_TOPLEFT,
+                         0.113, y)
         BlzFrameSetTextAlignment(val_f, TEXT_JUSTIFY_CENTER, TEXT_JUSTIFY_LEFT)
         BlzFrameSetEnable(val_f, false)
         BlzFrameSetSize(separator, 0.27, 0.001)
-        BlzFrameSetTexture(separator, "replaceabletextures\\teamcolor\\teamcolor08", 0, true)
+        BlzFrameSetTexture(separator,
+                           "replaceabletextures\\teamcolor\\teamcolor08", 0,
+                           true)
         BlzFrameSetEnable(separator, false)
         BlzFrameSetVisible(separator, false)
 
         -- breakdown icon (slot-based)
-        local icon = BlzCreateFrameByType("BACKDROP", "", breakdown_parent, "", 0)
-        local icon_frame = BlzCreateFrameByType("FRAME", "", breakdown_parent, "", 0)
+        local icon = BlzCreateFrameByType("BACKDROP", "", breakdown_parent, "",
+                                          0)
+        local icon_frame = BlzCreateFrameByType("FRAME", "", breakdown_parent,
+                                                "", 0)
         BlzFrameSetTexture(icon, "war3mapImported\\question.blp", 0, true)
         BlzFrameSetScale(icon, 0.6)
         BlzFrameSetSize(icon, 0.016, 0.016)
         BlzFrameSetAllPoints(icon_frame, icon)
 
-        local tip = FrameAddSimpleTooltip(icon_frame, "", "", true, FRAMEPOINT_BOTTOMLEFT, FRAMEPOINT_TOPRIGHT, 0., 0.008, 0.01)
+        local tip = FrameAddSimpleTooltip(icon_frame, "", "", true,
+                                          FRAMEPOINT_BOTTOMLEFT,
+                                          FRAMEPOINT_TOPRIGHT, 0., 0.008, 0.01)
 
         BlzFrameSetVisible(icon, false) -- hidden by default
 
@@ -230,7 +337,7 @@ OnInit.final("StatView", function(Require)
             last_icon_x = nil,
             last_tag = nil,
             last_val = nil,
-            last_tip = nil,
+            last_tip = nil
         }
     end
 
@@ -239,7 +346,7 @@ OnInit.final("StatView", function(Require)
         BlzCreateFrameByType("FRAME", "", frame, "", 0),
         BlzCreateFrameByType("FRAME", "", frame, "", 0),
         BlzCreateFrameByType("FRAME", "", frame, "", 0),
-        BlzCreateFrameByType("FRAME", "", frame, "", 0),
+        BlzCreateFrameByType("FRAME", "", frame, "", 0)
     }
     for i = 1, #breakdown_frames do
         BlzFrameSetTexture(breakdown_frames[i], "trans32.blp", 0, true)
@@ -249,43 +356,71 @@ OnInit.final("StatView", function(Require)
 
     local function init_tab(page)
         local entries = tab_tags[page]
-        tab_ui[page] = { entries = entries, order = build_tab_order(entries), rows = {} }
+        tab_ui[page] = {
+            entries = entries,
+            order = build_tab_order(entries),
+            rows = {}
+        }
 
         for line = 1, MAX_ROWS do
-            local y = -0.04 + (-line + 1) * 0.01
+            local y = -0.075 + (-line + 1) * 0.01
             if page == HONOR_TAB and line >= 4 then
-                y = -0.08 - (line - 4) * 0.032
+                y = -0.115 - (line - 4) * 0.032
             end
             local slot = make_slot(frame, breakdown_frames[page], y)
             tab_ui[page].rows[line] = slot
             BlzFrameSetVisible(slot.tag, false)
             BlzFrameSetVisible(slot.val, false)
 
+            if page == 1 then
+                BlzFrameClearAllPoints(slot.val)
+                BlzFrameSetPoint(slot.val, FRAMEPOINT_TOPLEFT, frame,
+                                 FRAMEPOINT_TOPLEFT, 0.13, y)
+            end
+
             if page == PERKS_TAB then
                 BlzFrameClearAllPoints(slot.val)
                 BlzFrameSetPoint(slot.val, FRAMEPOINT_TOPLEFT, frame,
-                    FRAMEPOINT_TOPLEFT, 0.205, y)
+                                 FRAMEPOINT_TOPLEFT, 0.205, y)
+            end
+
+            if page == CURRENCY_TAB then
+                BlzFrameClearAllPoints(slot.val)
+                BlzFrameSetPoint(slot.val, FRAMEPOINT_TOPLEFT, frame,
+                                 FRAMEPOINT_TOPLEFT, 0.17, y)
+            end
+
+            if page == FACTION_TAB then
+                BlzFrameClearAllPoints(slot.val)
+                BlzFrameSetPoint(slot.val, FRAMEPOINT_TOPLEFT, frame,
+                                 FRAMEPOINT_TOPLEFT, 0.155, y)
             end
 
             if page == HONOR_TAB and line >= 4 then
                 BlzFrameClearAllPoints(slot.icon)
-                BlzFrameSetPoint(slot.icon, FRAMEPOINT_TOPLEFT, frame, FRAMEPOINT_TOPLEFT, 0.016, y + 0.006)
+                BlzFrameSetPoint(slot.icon, FRAMEPOINT_TOPLEFT, frame,
+                                 FRAMEPOINT_TOPLEFT, 0.016, y + 0.006)
                 BlzFrameSetScale(slot.icon, 1.)
                 BlzFrameSetSize(slot.icon, 0.024, 0.024)
                 BlzFrameClearAllPoints(slot.tag)
-                BlzFrameSetPoint(slot.tag, FRAMEPOINT_TOPLEFT, frame, FRAMEPOINT_TOPLEFT, 0.048, y)
+                BlzFrameSetPoint(slot.tag, FRAMEPOINT_TOPLEFT, frame,
+                                 FRAMEPOINT_TOPLEFT, 0.048, y)
                 BlzFrameClearAllPoints(slot.val)
-                BlzFrameSetPoint(slot.val, FRAMEPOINT_TOPLEFT, frame, FRAMEPOINT_TOPLEFT, 0.15, y)
-                BlzFrameSetPoint(slot.separator, FRAMEPOINT_TOPLEFT, frame, FRAMEPOINT_TOPLEFT, 0.015, y - 0.024)
+                BlzFrameSetPoint(slot.val, FRAMEPOINT_TOPLEFT, frame,
+                                 FRAMEPOINT_TOPLEFT, 0.15, y)
+                BlzFrameSetPoint(slot.separator, FRAMEPOINT_TOPLEFT, frame,
+                                 FRAMEPOINT_TOPLEFT, 0.015, y - 0.024)
             end
         end
     end
 
-    for page = 1, #tab_tags do
-        init_tab(page)
-    end
+    for page = 1, #tab_tags do init_tab(page) end
 
-    local tab_frame = BlzCreateFrame("ListBoxWar3", frame, 0, 0)
+    local tab_frame = BlzCreateFrameByType("FRAME", "", frame, "", 0)
+    local tab_separator_top = BlzCreateFrameByType("BACKDROP", "", tab_frame,
+                                                   "", 0)
+    local tab_separator_bottom = BlzCreateFrameByType("BACKDROP", "", tab_frame,
+                                                      "", 0)
     local title = BlzCreateFrame("TitleText", frame, 0, 0)
     local viewing = {}
 
@@ -295,27 +430,41 @@ OnInit.final("StatView", function(Require)
     end
 
     BlzFrameSetAbsPoint(frame, FRAMEPOINT_TOPLEFT, -0.05, 0.55)
-    BlzFrameSetSize(frame, 0.3, 0.33)
+    -- The tab strip is part of the window and sits directly below the unit
+    -- name. The added height preserves the previous amount of row space.
+    BlzFrameSetSize(frame, 0.3, 0.38)
     BlzFrameSetEnable(frame, false)
 
     BlzFrameSetPoint(title, FRAMEPOINT_TOP, frame, FRAMEPOINT_TOP, 0., -0.013)
     BlzFrameSetEnable(title, false)
 
-    BlzFrameSetPoint(tab_frame, FRAMEPOINT_TOPLEFT, frame, FRAMEPOINT_BOTTOMLEFT, 0., 0.005)
+    BlzFrameSetPoint(tab_frame, FRAMEPOINT_TOPLEFT, frame, FRAMEPOINT_TOPLEFT,
+                     0., -0.03)
     BlzFrameSetSize(tab_frame, 0.3, 0.05)
     BlzFrameSetEnable(tab_frame, false)
 
+    BlzFrameSetPoint(tab_separator_top, FRAMEPOINT_TOP, tab_frame,
+                     FRAMEPOINT_TOP, 0., -0.009)
+    BlzFrameSetPoint(tab_separator_bottom, FRAMEPOINT_BOTTOM, tab_frame,
+                     FRAMEPOINT_BOTTOM, 0., 0.009)
+    BlzFrameSetSize(tab_separator_top, 0.28, 0.001)
+    BlzFrameSetSize(tab_separator_bottom, 0.28, 0.001)
+    BlzFrameSetTexture(tab_separator_top,
+                       "replaceabletextures\\teamcolor\\teamcolor08", 0, true)
+    BlzFrameSetTexture(tab_separator_bottom,
+                       "replaceabletextures\\teamcolor\\teamcolor08", 0, true)
+    BlzFrameSetEnable(tab_separator_top, false)
+    BlzFrameSetEnable(tab_separator_bottom, false)
+
     -- hide by default
     BlzFrameSetVisible(frame, false)
-    --#endregion frame setup
+    -- #endregion frame setup
 
     local is_open = {}
 
     local on_refresh = function(target, stat)
         local pid = GetPlayerId(GetLocalPlayer()) + 1
-        if viewing[pid].unit ~= target then
-            return
-        end
+        if viewing[pid].unit ~= target then return end
 
         -- try to map event key -> STAT_TAG index
         local stat_idx = STAT_LOOKUP[stat]
@@ -339,7 +488,8 @@ OnInit.final("StatView", function(Require)
 
         -- no longer viewing stat window
         if viewing[pid].unit then
-            EVENT_STAT_CHANGE:unregister_unit_action(viewing[pid].unit, on_refresh)
+            EVENT_STAT_CHANGE:unregister_unit_action(viewing[pid].unit,
+                                                     on_refresh)
             viewing[pid].unit = nil
         end
     end
@@ -360,19 +510,25 @@ OnInit.final("StatView", function(Require)
     end
 
     -- escape button
-    local esc_button = SimpleButton.create(frame, "ReplaceableTextures\\CommandButtons\\BTNCancel.blp", 0.015, 0.015, FRAMEPOINT_TOPRIGHT, FRAMEPOINT_TOPRIGHT, -0.02, -0.02, onClose, "Close 'B'", FRAMEPOINT_BOTTOM, FRAMEPOINT_TOP, 0., 0.01)
+    local esc_button = SimpleButton.create(frame,
+                                           "ReplaceableTextures\\CommandButtons\\BTNCancel.blp",
+                                           0.015, 0.015, FRAMEPOINT_TOPRIGHT,
+                                           FRAMEPOINT_TOPRIGHT, -0.02, -0.02,
+                                           onClose, "Close 'B'",
+                                           FRAMEPOINT_BOTTOM, FRAMEPOINT_TOP,
+                                           0., 0.01)
     RegisterHotkeyTooltip(esc_button, 6)
 
     local manage_perks = BlzCreateFrameByType("GLUETEXTBUTTON", "", frame,
-        "ScriptDialogButton", 0)
+                                              "ScriptDialogButton", 0)
     BlzFrameSetPoint(manage_perks, FRAMEPOINT_BOTTOM, frame, FRAMEPOINT_BOTTOM,
-        0., 0.018)
+                     0., 0.018)
     BlzFrameSetSize(manage_perks, 0.11, 0.026)
     BlzFrameSetText(manage_perks, "View Perks")
     BlzFrameSetVisible(manage_perks, false)
     local manage_perks_trigger = CreateTrigger()
     BlzTriggerRegisterFrameEvent(manage_perks_trigger, manage_perks,
-        FRAMEEVENT_CONTROL_CLICK)
+                                 FRAMEEVENT_CONTROL_CLICK)
     TriggerAddCondition(manage_perks_trigger, Condition(function()
         local pid = GetPlayerId(GetTriggerPlayer()) + 1
         BlzFrameSetEnable(manage_perks, false)
@@ -384,9 +540,9 @@ OnInit.final("StatView", function(Require)
     end))
 
     local function ViewPlayersClick()
-        local pid   = GetPlayerId(GetTriggerPlayer()) + 1 ---@type integer 
-        local dw    = DialogWindow[pid] ---@type DialogWindow 
-        local index = dw:getClickedIndex(GetClickedButton()) ---@type integer 
+        local pid = GetPlayerId(GetTriggerPlayer()) + 1 ---@type integer
+        local dw = DialogWindow[pid] ---@type DialogWindow
+        local index = dw:getClickedIndex(GetClickedButton()) ---@type integer
 
         if index ~= -1 then
             viewing[pid].unit = Hero[dw.data[index]]
@@ -400,8 +556,8 @@ OnInit.final("StatView", function(Require)
 
     local function ViewPlayers()
         local pid = GetPlayerId(GetTriggerPlayer()) + 1
-        local dw  = DialogWindow.create(pid, "", ViewPlayersClick) ---@type DialogWindow 
-        local U   = User.first ---@type User 
+        local dw = DialogWindow.create(pid, "", ViewPlayersClick) ---@type DialogWindow
+        local U = User.first ---@type User
 
         while U do
             if viewing[pid].unit ~= Hero[U.id] then
@@ -417,14 +573,47 @@ OnInit.final("StatView", function(Require)
     end
 
     -- choose player button
-    SimpleButton.create(esc_button.frame, "ReplaceableTextures\\CommandButtons\\BTNCycleRight.blp", 0.015, 0.015, FRAMEPOINT_TOPRIGHT, FRAMEPOINT_TOPLEFT, 0, 0, ViewPlayers, "Select Player", FRAMEPOINT_BOTTOM, FRAMEPOINT_TOP, 0., 0.01)
+    SimpleButton.create(esc_button.frame,
+                        "ReplaceableTextures\\CommandButtons\\BTNCycleRight.blp",
+                        0.015, 0.015, FRAMEPOINT_TOPRIGHT, FRAMEPOINT_TOPLEFT,
+                        0, 0, ViewPlayers, "Select Player", FRAMEPOINT_BOTTOM,
+                        FRAMEPOINT_TOP, 0., 0.01)
 
     local tabs = {
-        SimpleButton.create(tab_frame, "ReplaceableTextures\\CommandButtons\\BTNHeroPanelStatsButton.dds", 0.026, 0.026, FRAMEPOINT_TOPLEFT, FRAMEPOINT_TOPLEFT, 0.0125, -0.0125, nil, "View Stats", FRAMEPOINT_BOTTOM, FRAMEPOINT_TOP, 0., 0.01),
-        SimpleButton.create(tab_frame, "ReplaceableTextures\\CommandButtons\\BTNHeroPanelCurrencyButton.dds", 0.026, 0.026, FRAMEPOINT_TOPLEFT, FRAMEPOINT_TOPLEFT, 0.042, -0.0125, nil, "View Currency", FRAMEPOINT_BOTTOM, FRAMEPOINT_TOP, 0., 0.01),
-        SimpleButton.create(tab_frame, "ReplaceableTextures\\CommandButtons\\BTNHeroPanelPerkButton.dds", 0.026, 0.026, FRAMEPOINT_TOPLEFT, FRAMEPOINT_TOPLEFT, 0.0715, -0.0125, nil, "View Perks", FRAMEPOINT_BOTTOM, FRAMEPOINT_TOP, 0., 0.01),
-        SimpleButton.create(tab_frame, "ReplaceableTextures\\CommandButtons\\BTNMedalionOfCourage.blp", 0.026, 0.026, FRAMEPOINT_TOPLEFT, FRAMEPOINT_TOPLEFT, 0.101, -0.0125, nil, "View Honor Milestones", FRAMEPOINT_BOTTOM, FRAMEPOINT_TOP, 0., 0.01),
-        SimpleButton.create(tab_frame, "ReplaceableTextures\\CommandButtons\\BTNHumanCaptureFlag.blp", 0.026, 0.026, FRAMEPOINT_TOPLEFT, FRAMEPOINT_TOPLEFT, 0.1305, -0.0125, nil, "View Faction", FRAMEPOINT_BOTTOM, FRAMEPOINT_TOP, 0., 0.01),
+        SimpleButton.create(tab_frame,
+                            "ReplaceableTextures\\CommandButtons\\BTNHeroPanelStatsButton.dds",
+                            0.026, 0.026, FRAMEPOINT_TOPLEFT,
+                            FRAMEPOINT_TOPLEFT, 0.0125, -0.0125, nil,
+                            "View Stats", FRAMEPOINT_BOTTOM, FRAMEPOINT_TOP, 0.,
+                            0.01), SimpleButton.create(tab_frame,
+                                                       "ReplaceableTextures\\CommandButtons\\BTNHeroPanelCurrencyButton.dds",
+                                                       0.026, 0.026,
+                                                       FRAMEPOINT_TOPLEFT,
+                                                       FRAMEPOINT_TOPLEFT,
+                                                       0.042, -0.0125, nil,
+                                                       "View Currency",
+                                                       FRAMEPOINT_BOTTOM,
+                                                       FRAMEPOINT_TOP, 0., 0.01),
+        SimpleButton.create(tab_frame,
+                            "ReplaceableTextures\\CommandButtons\\BTNHeroPanelPerkButton.dds",
+                            0.026, 0.026, FRAMEPOINT_TOPLEFT,
+                            FRAMEPOINT_TOPLEFT, 0.0715, -0.0125, nil,
+                            "View Perks", FRAMEPOINT_BOTTOM, FRAMEPOINT_TOP, 0.,
+                            0.01), SimpleButton.create(tab_frame,
+                                                       "ReplaceableTextures\\CommandButtons\\BTNHeroPanelHonorButton.dds",
+                                                       0.026, 0.026,
+                                                       FRAMEPOINT_TOPLEFT,
+                                                       FRAMEPOINT_TOPLEFT,
+                                                       0.101, -0.0125, nil,
+                                                       "View Honor Milestones",
+                                                       FRAMEPOINT_BOTTOM,
+                                                       FRAMEPOINT_TOP, 0., 0.01),
+        SimpleButton.create(tab_frame,
+                            "ReplaceableTextures\\CommandButtons\\BTNHeroPanelFactionButton.dds",
+                            0.026, 0.026, FRAMEPOINT_TOPLEFT,
+                            FRAMEPOINT_TOPLEFT, 0.1305, -0.0125, nil,
+                            "View Faction", FRAMEPOINT_BOTTOM, FRAMEPOINT_TOP,
+                            0., 0.01)
     }
     for index = 2, #tabs do tabs[index]:enable(false) end
 
@@ -446,9 +635,7 @@ OnInit.final("StatView", function(Require)
             BlzFrameSetEnable(trigger_frame, false)
             BlzFrameSetEnable(trigger_frame, true)
 
-            for i = 1, #tabs do
-                tabs[i]:enable(false)
-            end
+            for i = 1, #tabs do tabs[i]:enable(false) end
 
             tabs[viewing[pid].page]:enable(true)
         end
@@ -464,29 +651,44 @@ OnInit.final("StatView", function(Require)
     tabs[5]:onClick(switch_tab)
 
     local milestone_controls = BlzCreateFrameByType("FRAME", "", frame, "", 0)
-    local milestone_page_text = BlzCreateFrameByType("TEXT", "", milestone_controls, "", 0)
-    BlzFrameSetPoint(milestone_controls, FRAMEPOINT_BOTTOM, frame, FRAMEPOINT_BOTTOM, 0., 0.013)
+    local milestone_page_text = BlzCreateFrameByType("TEXT", "",
+                                                     milestone_controls, "", 0)
+    BlzFrameSetPoint(milestone_controls, FRAMEPOINT_BOTTOM, frame,
+                     FRAMEPOINT_BOTTOM, 0., 0.013)
     BlzFrameSetSize(milestone_controls, 0.11, 0.02)
-    BlzFrameSetPoint(milestone_page_text, FRAMEPOINT_CENTER, milestone_controls, FRAMEPOINT_CENTER, 0., 0.)
-    BlzFrameSetTextAlignment(milestone_page_text, TEXT_JUSTIFY_CENTER, TEXT_JUSTIFY_CENTER)
+    BlzFrameSetPoint(milestone_page_text, FRAMEPOINT_CENTER, milestone_controls,
+                     FRAMEPOINT_CENTER, 0., 0.)
+    BlzFrameSetTextAlignment(milestone_page_text, TEXT_JUSTIFY_CENTER,
+                             TEXT_JUSTIFY_CENTER)
     BlzFrameSetEnable(milestone_page_text, false)
 
     local function change_milestone_page(direction)
         local pid = GetPlayerId(GetTriggerPlayer()) + 1
-        local max_pages = math.max(1, math.ceil(#Honor.getMilestones() / MILESTONES_PER_PAGE))
+        local max_pages = math.max(1, math.ceil(
+                                       #Honor.getMilestones() /
+                                           MILESTONES_PER_PAGE))
         viewing[pid].milestone_page = math.max(1, math.min(max_pages,
-            viewing[pid].milestone_page + direction))
+                                                           viewing[pid]
+                                                               .milestone_page +
+                                                               direction))
         STAT_WINDOW.refresh(pid)
     end
 
     local previous_milestones = SimpleButton.create(milestone_controls,
-        "ReplaceableTextures\\CommandButtons\\BTNCycleLeft.blp", 0.016, 0.016,
-        FRAMEPOINT_LEFT, FRAMEPOINT_LEFT, 0., 0., function() change_milestone_page(-1) end,
-        "Previous Milestones", FRAMEPOINT_BOTTOM, FRAMEPOINT_TOP, 0., 0.01)
+                                                    "ReplaceableTextures\\CommandButtons\\BTNCycleLeft.blp",
+                                                    0.016, 0.016,
+                                                    FRAMEPOINT_LEFT,
+                                                    FRAMEPOINT_LEFT, 0., 0.,
+                                                    function()
+        change_milestone_page(-1)
+    end, "Previous Milestones", FRAMEPOINT_BOTTOM, FRAMEPOINT_TOP, 0., 0.01)
     local next_milestones = SimpleButton.create(milestone_controls,
-        "ReplaceableTextures\\CommandButtons\\BTNCycleRight.blp", 0.016, 0.016,
-        FRAMEPOINT_RIGHT, FRAMEPOINT_RIGHT, 0., 0., function() change_milestone_page(1) end,
-        "Next Milestones", FRAMEPOINT_BOTTOM, FRAMEPOINT_TOP, 0., 0.01)
+                                                "ReplaceableTextures\\CommandButtons\\BTNCycleRight.blp",
+                                                0.016, 0.016, FRAMEPOINT_RIGHT,
+                                                FRAMEPOINT_RIGHT, 0., 0.,
+                                                function()
+        change_milestone_page(1)
+    end, "Next Milestones", FRAMEPOINT_BOTTOM, FRAMEPOINT_TOP, 0., 0.01)
     BlzFrameSetVisible(milestone_controls, false)
 
     local function set_if_changed(slot, field, f, s)
@@ -522,12 +724,15 @@ OnInit.final("StatView", function(Require)
         local rows = tab_ui[HONOR_TAB].rows
         local total = Honor.getTotal(target_pid)
         local milestone_list = Honor.getMilestones()
-        local max_pages = math.max(1, math.ceil(#milestone_list / MILESTONES_PER_PAGE))
-        local page = math.max(1, math.min(max_pages, viewing[pid].milestone_page))
+        local max_pages = math.max(1, math.ceil(
+                                       #milestone_list / MILESTONES_PER_PAGE))
+        local page = math.max(1,
+                              math.min(max_pages, viewing[pid].milestone_page))
         viewing[pid].milestone_page = page
 
         BlzFrameSetVisible(milestone_controls, true)
-        BlzFrameSetText(milestone_page_text, "Milestones " .. page .. "/" .. max_pages)
+        BlzFrameSetText(milestone_page_text,
+                        "Milestones " .. page .. "/" .. max_pages)
         previous_milestones:enable(page > 1)
         next_milestones:enable(page < max_pages)
 
@@ -535,7 +740,7 @@ OnInit.final("StatView", function(Require)
         local next_milestone = Honor.getNextMilestone(target_pid)
         if next_milestone then
             render_honor_row(rows[2], "|cffffcc00Next Milestone|r",
-                total .. "/" .. next_milestone.honor)
+                             total .. "/" .. next_milestone.honor)
         else
             render_honor_row(rows[2], "|cffffcc00Next Milestone|r", "Complete")
         end
@@ -548,24 +753,26 @@ OnInit.final("StatView", function(Require)
             local unlocked = Honor.isMilestoneUnlocked(target_pid, milestone)
             local color = unlocked and "|cff00ff00" or "|cff777777"
             local status = unlocked and "Unlocked" or "Locked"
-            render_honor_row(rows[row], "|cffffcc00" .. milestone.honor .. " Honor|r",
-                color .. milestone.name .. "|r",
-                color .. status .. "|r\n" .. milestone.description,
-                milestone.icon or "ReplaceableTextures\\CommandButtons\\BTNChestOfGold.blp")
+            render_honor_row(rows[row],
+                             "|cffffcc00" .. milestone.honor .. " Honor|r",
+                             color .. milestone.name .. "|r",
+                             color .. status .. "|r\n" .. milestone.description,
+                             milestone.icon or
+                                 "ReplaceableTextures\\CommandButtons\\BTNChestOfGold.blp")
             row = row + 1
         end
     end
 
     -- Shared row rendering
     local function render_stat_row(u, page, row, idx)
-        local T       = tab_ui[page]
+        local T = tab_ui[page]
         local entries = T.entries
-        local rows    = T.rows
-        local v       = entries[idx]
-        local slot    = rows[row]
+        local rows = T.rows
+        local v = entries[idx]
+        local slot = rows[row]
 
         local tag_s = v.alternate or v.tag or ""
-        local num   = v.getter and v.getter(u) or ""
+        local num = v.getter and v.getter(u) or ""
         local num_s = tostring(num)
         local val_s = num_s .. (v.suffix or "")
 
@@ -586,7 +793,8 @@ OnInit.final("StatView", function(Require)
             if slot.last_icon_x ~= x then
                 slot.last_icon_x = x
                 BlzFrameClearAllPoints(slot.icon)
-                BlzFrameSetPoint(slot.icon, FRAMEPOINT_TOPLEFT, slot.val, FRAMEPOINT_TOPLEFT, x, 0.0)
+                BlzFrameSetPoint(slot.icon, FRAMEPOINT_TOPLEFT, slot.val,
+                                 FRAMEPOINT_TOPLEFT, x, 0.0)
             end
 
             BlzFrameSetVisible(slot.icon, true)
@@ -595,7 +803,7 @@ OnInit.final("StatView", function(Require)
             if slot.has_breakdown then
                 slot.has_breakdown = false
                 BlzFrameSetVisible(slot.icon, false)
-                slot.last_tip    = nil
+                slot.last_tip = nil
                 slot.last_icon_x = nil
             end
         end
@@ -614,8 +822,8 @@ OnInit.final("StatView", function(Require)
                         BlzFrameSetVisible(slot.icon, false)
                         BlzFrameSetVisible(slot.separator, false)
                         slot.has_breakdown = false
-                        slot.last_tip      = nil
-                        slot.last_icon_x   = nil
+                        slot.last_tip = nil
+                        slot.last_icon_x = nil
                     end
                 end
             end
@@ -630,25 +838,23 @@ OnInit.final("StatView", function(Require)
         end
 
         local u = viewing[pid].unit
-        if not u then
-            return
-        end
+        if not u then return end
 
         local page = viewing[pid].page
-        local T    = tab_ui[page]
-        if not T then
-            return
-        end
+        local T = tab_ui[page]
+        if not T then return end
 
         -- hard clear all rows for all pages
         clear_all_rows()
 
         -- update title
         local tpid = GetPlayerId(GetOwningPlayer(u)) + 1
-        local name = (u == Hero[tpid] and User[tpid - 1].nameColored) or GetUnitName(u)
+        local name = (u == Hero[tpid] and User[tpid - 1].nameColored) or
+                         GetUnitName(u)
         BlzFrameSetText(title, name)
         BlzFrameSetVisible(manage_perks, page == PERKS_TAB)
-        BlzFrameSetText(manage_perks, tpid == pid and "Manage Perks" or "View Perk Tree")
+        BlzFrameSetText(manage_perks,
+                        tpid == pid and "Manage Perks" or "View Perk Tree")
 
         -- hero vs non-hero gating
         local ishero = (u == Hero[tpid] and 3) or 2
@@ -668,9 +874,7 @@ OnInit.final("StatView", function(Require)
         T.row_index = T.row_index or {}
         local row_index = T.row_index
         -- clear previous mapping
-        for k in pairs(row_index) do
-            row_index[k] = nil
-        end
+        for k in pairs(row_index) do row_index[k] = nil end
 
         local line = 0
         local order = T.order
@@ -683,18 +887,14 @@ OnInit.final("StatView", function(Require)
                     local idx = list[li]
 
                     line = line + 1
-                    if line > MAX_ROWS then
-                        break
-                    end
+                    if line > MAX_ROWS then break end
 
                     row_index[idx] = line
                     render_stat_row(u, page, line, idx)
                 end
             end
 
-            if line > MAX_ROWS then
-                break
-            end
+            if line > MAX_ROWS then break end
         end
     end
 
@@ -713,15 +913,11 @@ OnInit.final("StatView", function(Require)
         end
 
         local u = viewing[pid].unit
-        if not u then
-            return
-        end
+        if not u then return end
 
         local page = viewing[pid].page
-        local T    = tab_ui[page]
-        if not T then
-            return
-        end
+        local T = tab_ui[page]
+        if not T then return end
 
         -- only do targeted updates on stats tab for now
         if page ~= 1 then
@@ -730,7 +926,7 @@ OnInit.final("StatView", function(Require)
         end
 
         local row_index = T.row_index
-        local row       = row_index and row_index[stat_idx]
+        local row = row_index and row_index[stat_idx]
 
         -- if we don't know where this stat is (e.g. first time, unit changed, etc.) fallback
         if not row or row < 1 or row > MAX_ROWS then
@@ -740,7 +936,8 @@ OnInit.final("StatView", function(Require)
 
         -- keep title and breakdown frame up-to-date (cheap)
         local tpid = GetPlayerId(GetOwningPlayer(u)) + 1
-        local name = (u == Hero[tpid] and User[tpid - 1].nameColored) or GetUnitName(u)
+        local name = (u == Hero[tpid] and User[tpid - 1].nameColored) or
+                         GetUnitName(u)
         BlzFrameSetText(title, name)
         for i = 1, #breakdown_frames do
             BlzFrameSetVisible(breakdown_frames[i], i == page)
@@ -756,7 +953,8 @@ OnInit.final("StatView", function(Require)
         if viewing[pid].unit == u then
             close(pid)
         elseif u and not BlzGetUnitBooleanField(u, UNIT_BF_IS_A_BUILDING) then
-            EVENT_STAT_CHANGE:unregister_unit_action(viewing[pid].unit, on_refresh)
+            EVENT_STAT_CHANGE:unregister_unit_action(viewing[pid].unit,
+                                                     on_refresh)
             viewing[pid].unit = u
             viewing[pid].page = (tpid <= PLAYER_CAP and viewing[pid].page) or 1 -- set page to stats for non-player units
             EVENT_STAT_CHANGE:register_unit_action(u, on_refresh)
@@ -764,9 +962,7 @@ OnInit.final("StatView", function(Require)
             is_open[pid] = true
             if GetLocalPlayer() == Player(pid - 1) then
                 BlzFrameSetVisible(frame, true)
-                for i = 1, #tabs do
-                    tabs[i]:enable(false)
-                end
+                for i = 1, #tabs do tabs[i]:enable(false) end
                 tabs[viewing[pid].page]:enable(true)
             end
 
@@ -774,9 +970,7 @@ OnInit.final("StatView", function(Require)
         end
     end
 
-    local function on_cleanup(pid)
-        close(pid)
-    end
+    local function on_cleanup(pid) close(pid) end
 
     local U = User.first
     while U do
@@ -784,13 +978,12 @@ OnInit.final("StatView", function(Require)
         U = U.next
     end
 
-
     Honor.registerChangedAction(function(changed_pid)
         local pid = GetPlayerId(GetLocalPlayer()) + 1
         local selected = viewing[pid].unit
-        if selected and (viewing[pid].page == HONOR_TAB
-                or viewing[pid].page == CURRENCY_TAB)
-            and GetPlayerId(GetOwningPlayer(selected)) + 1 == changed_pid then
+        if selected and
+            (viewing[pid].page == HONOR_TAB or viewing[pid].page == CURRENCY_TAB) and
+            GetPlayerId(GetOwningPlayer(selected)) + 1 == changed_pid then
             STAT_WINDOW.refresh(pid)
         end
     end)
@@ -798,26 +991,27 @@ OnInit.final("StatView", function(Require)
     RegisterCurrencyChangedAction(function(changed_pid)
         local pid = GetPlayerId(GetLocalPlayer()) + 1
         local selected = viewing[pid].unit
-        if selected and viewing[pid].page == CURRENCY_TAB
-            and GetPlayerId(GetOwningPlayer(selected)) + 1 == changed_pid then
+        if selected and viewing[pid].page == CURRENCY_TAB and
+            GetPlayerId(GetOwningPlayer(selected)) + 1 == changed_pid then
             STAT_WINDOW.refresh(pid)
         end
     end)
 
-    RegisterCurrencyConverterChangedAction(function(changed_pid)
-        local pid = GetPlayerId(GetLocalPlayer()) + 1
-        local selected = viewing[pid].unit
-        if selected and viewing[pid].page == CURRENCY_TAB
-            and GetPlayerId(GetOwningPlayer(selected)) + 1 == changed_pid then
-            STAT_WINDOW.refresh(pid)
-        end
-    end)
+    RegisterCurrencyConverterChangedAction(
+        function(changed_pid)
+            local pid = GetPlayerId(GetLocalPlayer()) + 1
+            local selected = viewing[pid].unit
+            if selected and viewing[pid].page == CURRENCY_TAB and
+                GetPlayerId(GetOwningPlayer(selected)) + 1 == changed_pid then
+                STAT_WINDOW.refresh(pid)
+            end
+        end)
 
     Perks.registerChangedAction(function(changed_pid)
         local pid = GetPlayerId(GetLocalPlayer()) + 1
         local selected = viewing[pid].unit
-        if selected and viewing[pid].page == PERKS_TAB
-            and GetPlayerId(GetOwningPlayer(selected)) + 1 == changed_pid then
+        if selected and viewing[pid].page == PERKS_TAB and
+            GetPlayerId(GetOwningPlayer(selected)) + 1 == changed_pid then
             STAT_WINDOW.refresh(pid)
         end
     end)

@@ -7,64 +7,35 @@
 OnInit.final("Potion", function(Require)
     Require('Hotkeys')
     Require('ItemEventRegistry')
-    Require('ResourceChanges')
+    Require('PotionService')
 
     local potion_button = {} ---@type Button[]
     local icon_size = 0.032
 
-    local backdrop = BlzCreateFrameByType("BACKDROP", "", BlzGetOriginFrame(ORIGIN_FRAME_GAME_UI, 0), "", 0)
+    -- Keep persistent potion controls in the ordinary HUD layer. Feature
+    -- windows such as Stat View are siblings under ConsoleUIBackdrop and use
+    -- higher explicit levels, so they reliably cover the potion subtree.
+    local backdrop = BlzCreateFrameByType("BACKDROP", "",
+        BlzGetFrameByName("ConsoleUIBackdrop", 0), "", 0)
+    BlzFrameSetLevel(backdrop, 5)
     BlzFrameSetSize(backdrop, 0.001, 0.001)
     BlzFrameSetTexture(backdrop, "trans32.blp", 0, true)
     BlzFrameSetAbsPoint(backdrop, FRAMEPOINT_BOTTOM, 0.133, 0.194)
     BlzFrameSetEnable(backdrop, false)
+    BlzFrameSetVisible(backdrop, false)
 
     local use_potion_factory
+    local index = 1
+    use_potion_factory = function()
+        local capture_index = index
+        index = index + 1
 
-    do
-        ---@type fun(pot: Item)
-        local potion_effect = function(pot)
-            local fheal = pot.cached_stats[ITEM_FLAT_HEAL]
-            local fmana = pot.cached_stats[ITEM_FLAT_MANA]
-            local pheal = pot.cached_stats[ITEM_PERCENT_HEAL]
-            local pmana = pot.cached_stats[ITEM_PERCENT_MANA]
-
-            local heal = fheal + (0.01 * pheal * Unit[Hero[pot.pid]].hp)
-            local mana = fmana + (0.01 * pmana * Unit[Hero[pot.pid]].mana)
-
-            if heal > 0 then
-                HP(Hero[pot.pid], Hero[pot.pid], heal, GetObjectName(pot.id))
+        return function(pid, is_down)
+            if not is_down then return end
+            local result = PotionService.use(pid, capture_index)
+            if result.success and GetLocalPlayer() == Player(pid - 1) then
+                potion_button[capture_index]:cooldown(result.cooldown, pid)
             end
-
-            if mana > 0 then
-                MP(Hero[pot.pid], mana)
-            end
-        end
-
-        local index = 1
-        use_potion_factory = function()
-            local capture_index = index
-
-            local f = function(pid, is_down)
-                local pot = Profile[pid].hero.items[POTION_INDEX + capture_index - 1]
-                local button = potion_button[capture_index]
-
-                if is_down and pot and button.charges > 0 then
-                    if button.cooldown_time[pid] <= 0 then
-                        pot.charges = pot.charges - 1
-                        if GetLocalPlayer() == Player(pid - 1) then
-                            button:charge(pot.charges)
-                        end
-
-                        button:cooldown(1., pid)
-                        potion_effect(pot)
-                        INVENTORY.refresh(pid)
-                    end
-                end
-            end
-
-            index = index + 1
-
-            return f
         end
     end
 
@@ -102,32 +73,46 @@ OnInit.final("Potion", function(Require)
 
     local function on_cleanup(pid)
         if GetLocalPlayer() == Player(pid - 1) then
+            BlzFrameSetVisible(backdrop, false)
             potion_button[1]:visible(false)
             potion_button[2]:visible(false)
         end
     end
 
     local function on_setup(pid)
+        local has_potion = false
         for i = POTION_INDEX, POTION_INDEX + 1 do
             local pot = Profile[pid].hero.items[i]
             local index = i - POTION_INDEX + 1
             local button = potion_button[index]
 
-            if pot then
+            if pot and pot.alive and pot.type == TYPE_POTION_INDEX then
+                has_potion = true
+                PotionService.refreshItem(pot)
+                local name, icon, description = PotionService.describe(pot)
                 if GetLocalPlayer() == Player(pid - 1) then
                     button:visible(true)
                     button:charge(pot.charges)
-                    button.tooltip:name(GetObjectName(pot.id) .. " '" .. GetHotkeyForFunc(pid, pot_func[index]) .. "'")
-                    button:icon(BlzGetAbilityIcon(pot.id))
-                    button.tooltip:icon(BlzGetAbilityIcon(pot.id))
-                    button.tooltip:text(BlzGetItemExtendedTooltip(pot.obj))
+                    button.tooltip:name(name .. " '" .. GetHotkeyForFunc(pid, pot_func[index]) .. "'")
+                    button:icon(icon)
+                    button.tooltip:icon(icon)
+                    button.tooltip:text(description)
                     button:enabled(pot.charges >= 1 and true or false)
+                    local remaining = PotionService.getCooldown(pid, index)
+                    if remaining > 0. and button.cooldown_time[pid] <= 0. then
+                        button:cooldown(remaining, pid,
+                                        PotionService.getUseCooldown(pot))
+                    end
                 end
             else
                 if GetLocalPlayer() == Player(pid - 1) then
                     button:visible(false)
                 end
             end
+        end
+
+        if GetLocalPlayer() == Player(pid - 1) then
+            BlzFrameSetVisible(backdrop, has_potion)
         end
     end
 

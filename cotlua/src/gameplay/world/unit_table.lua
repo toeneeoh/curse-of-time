@@ -3,9 +3,7 @@
 
     A library that defines a Unit interface that indexes newly
     created units.
-]]
-
-OnInit.final("UnitTable", function(Require)
+]] OnInit.final("UnitTable", function(Require)
     Require('HeroDefinitions')
     Require('TimerQueue')
     Require('WorldBounds')
@@ -14,7 +12,7 @@ OnInit.final("UnitTable", function(Require)
     local TQ = TimerQueue
     local MOVESPEED_CAP = 600
     local index_listeners = {}
-    local indexed_units = setmetatable({}, { __mode = 'k' })
+    local indexed_units = setmetatable({}, {__mode = 'k'})
     local mtype, floor, rawset, rawget = math.type, math.floor, rawset, rawget
     local EVENT_STAT_CHANGE = EVENT_STAT_CHANGE
     local INT_REGEN_FACTOR = 0.05
@@ -99,6 +97,9 @@ OnInit.final("UnitTable", function(Require)
     ---@field gold_rate number
     ---@field shield_count number
     ---@field xp_rate number
+    ---@field status_resist_flat number Status resistance in percentage points.
+    ---@field status_resist number Clamped status resistance multiplier.
+    ---@field cooldown_acceleration number Additional cooldown seconds recovered per second.
     ---@field overworld_base_hp number
     ---@field overworld_base_bonus_hp number
     ---@field overworld_base_dm number
@@ -107,9 +108,20 @@ OnInit.final("UnitTable", function(Require)
     ---@field overworld_rare boolean?
     ---@field overworld_rare_health_multiplier number?
     ---@field overworld_rare_damage_multiplier number?
-    Unit = {}  ---@type Unit | Unit[]
+    Unit = {} ---@type Unit | Unit[]
     do
         local thistype = Unit
+
+        thistype.MAX_STATUS_RESISTANCE = 0.75
+
+        ---@param duration number
+        ---@param resistance number
+        ---@return number
+        function thistype.calculateStatusDuration(duration, resistance)
+            resistance = math.max(0., math.min(thistype.MAX_STATUS_RESISTANCE,
+                                               resistance or 0.))
+            return math.max(0., duration) * (1. - resistance)
+        end
 
         ---Registers a subsystem callback for newly indexed units.
         ---Units indexed before registration are replayed on the next timer tick,
@@ -155,8 +167,11 @@ OnInit.final("UnitTable", function(Require)
 
         local function recalc_damage(tbl)
             -- recalc DAMAGE (uses bonus_damage + damage_percent)
-            local damage = (BlzGetUnitBaseDamage(tbl.unit, 0) + tbl.proxy.bonus_damage) * tbl.proxy.damage_percent
-            UnitSetBonus(tbl.unit, BONUS_DAMAGE, damage - BlzGetUnitBaseDamage(tbl.unit, 0))
+            local damage = (BlzGetUnitBaseDamage(tbl.unit, 0) +
+                               tbl.proxy.bonus_damage) *
+                               tbl.proxy.damage_percent
+            UnitSetBonus(tbl.unit, BONUS_DAMAGE,
+                         damage - BlzGetUnitBaseDamage(tbl.unit, 0))
             rawset(tbl.proxy, "damage", damage)
         end
 
@@ -174,17 +189,20 @@ OnInit.final("UnitTable", function(Require)
             rawset(proxy, "agi", agi)
             rawset(proxy, "int", int)
 
-            local hp = R2I(self.base_hp + proxy.bonus_hp + 25 * (str + proxy.bonus_str))
+            local hp = R2I(self.base_hp + proxy.bonus_hp + 25 *
+                               (str + proxy.bonus_str))
             BlzSetUnitMaxHP(self.unit, hp)
             rawset(proxy, "hp", hp)
 
-            local mana = self.base_mana + proxy.bonus_mana + 20 * (int + proxy.bonus_int)
+            local mana = self.base_mana + proxy.bonus_mana + 20 *
+                             (int + proxy.bonus_int)
             BlzSetUnitMaxMana(self.unit, mana)
             rawset(proxy, "mana", mana)
 
-            local mregen = (proxy.nomanaregen and 0)
-                or (proxy.mana_regen_flat + (int + proxy.bonus_int) * INT_REGEN_FACTOR
-                    + proxy.mana_regen_max * mana * 0.01) * proxy.mana_regen_percent
+            local mregen = (proxy.nomanaregen and 0) or
+                               (proxy.mana_regen_flat + (int + proxy.bonus_int) *
+                                   INT_REGEN_FACTOR + proxy.mana_regen_max *
+                                   mana * 0.01) * proxy.mana_regen_percent
             UnitSetBonus(self.unit, BONUS_MANA_REGEN, mregen)
             rawset(proxy, "mana_regen", mregen)
 
@@ -198,7 +216,8 @@ OnInit.final("UnitTable", function(Require)
                 UnitSetBonus(tbl.unit, BONUS_HERO_BASE_STR, val)
 
                 -- recalc HP
-                local hp = R2I(tbl.base_hp + tbl.proxy.bonus_hp + 25 * (val + tbl.proxy.bonus_str))
+                local hp = R2I(tbl.base_hp + tbl.proxy.bonus_hp + 25 *
+                                   (val + tbl.proxy.bonus_str))
                 BlzSetUnitMaxHP(tbl.unit, hp)
                 rawset(tbl.proxy, "hp", hp)
 
@@ -208,7 +227,8 @@ OnInit.final("UnitTable", function(Require)
                 UnitSetBonus(tbl.unit, BONUS_HERO_STR, val)
 
                 -- same HP & DAMAGE logic as above
-                local hp = R2I(tbl.base_hp + tbl.proxy.bonus_hp + 25 * (tbl.proxy.str + val))
+                local hp = R2I(tbl.base_hp + tbl.proxy.bonus_hp + 25 *
+                                   (tbl.proxy.str + val))
                 BlzSetUnitMaxHP(tbl.unit, hp)
                 rawset(tbl.proxy, "hp", hp)
 
@@ -230,12 +250,18 @@ OnInit.final("UnitTable", function(Require)
                 UnitSetBonus(tbl.unit, BONUS_HERO_BASE_INT, val)
 
                 -- recalc MANA
-                local mana = tbl.base_mana + tbl.proxy.bonus_mana + 20 * (val + tbl.proxy.bonus_int)
+                local mana = tbl.base_mana + tbl.proxy.bonus_mana + 20 *
+                                 (val + tbl.proxy.bonus_int)
                 BlzSetUnitMaxMana(tbl.unit, mana)
                 rawset(tbl.proxy, "mana", mana)
 
                 -- recalc MANA_REGEN
-                local mregen = (tbl.proxy.nomanaregen and 0) or (tbl.proxy.mana_regen_flat + (val + tbl.proxy.bonus_int) * INT_REGEN_FACTOR + tbl.proxy.mana_regen_max * mana * 0.01) * tbl.proxy.mana_regen_percent
+                local mregen = (tbl.proxy.nomanaregen and 0) or
+                                   (tbl.proxy.mana_regen_flat +
+                                       (val + tbl.proxy.bonus_int) *
+                                       INT_REGEN_FACTOR +
+                                       tbl.proxy.mana_regen_max * mana * 0.01) *
+                                   tbl.proxy.mana_regen_percent
                 UnitSetBonus(tbl.unit, BONUS_MANA_REGEN, mregen)
                 rawset(tbl.proxy, "mana_regen", mregen)
 
@@ -245,18 +271,24 @@ OnInit.final("UnitTable", function(Require)
                 UnitSetBonus(tbl.unit, BONUS_HERO_INT, val)
 
                 -- same MANA & MANA_REGEN logic
-                local mana = tbl.base_mana + tbl.proxy.bonus_mana + 20 * (tbl.proxy.int + val)
+                local mana = tbl.base_mana + tbl.proxy.bonus_mana + 20 *
+                                 (tbl.proxy.int + val)
                 BlzSetUnitMaxMana(tbl.unit, mana)
                 rawset(tbl.proxy, "mana", mana)
 
-                local mregen = (tbl.proxy.nomanaregen and 0) or (tbl.proxy.mana_regen_flat + (tbl.proxy.int + val) * INT_REGEN_FACTOR + tbl.proxy.mana_regen_max * mana * 0.01) * tbl.proxy.mana_regen_percent
+                local mregen = (tbl.proxy.nomanaregen and 0) or
+                                   (tbl.proxy.mana_regen_flat +
+                                       (tbl.proxy.int + val) * INT_REGEN_FACTOR +
+                                       tbl.proxy.mana_regen_max * mana * 0.01) *
+                                   tbl.proxy.mana_regen_percent
                 UnitSetBonus(tbl.unit, BONUS_MANA_REGEN, mregen)
                 rawset(tbl.proxy, "mana_regen", mregen)
 
                 recalc_damage(tbl)
             end,
             bonus_mana = function(tbl, val)
-                local mana = tbl.base_mana + val + 20 * (tbl.proxy.int + tbl.proxy.bonus_int)
+                local mana = tbl.base_mana + val + 20 *
+                                 (tbl.proxy.int + tbl.proxy.bonus_int)
                 BlzSetUnitMaxMana(tbl.unit, mana)
                 rawset(tbl.proxy, "mana", mana)
             end,
@@ -271,32 +303,29 @@ OnInit.final("UnitTable", function(Require)
                 rawset(tbl.proxy, "bat", bat)
             end,
             bonus_damage = function(tbl, val)
-                local new_dmg = (BlzGetUnitBaseDamage(tbl.unit, 0) + val) * tbl.proxy.damage_percent
-                UnitSetBonus(tbl.unit, BONUS_DAMAGE, new_dmg - BlzGetUnitBaseDamage(tbl.unit, 0))
+                local new_dmg = (BlzGetUnitBaseDamage(tbl.unit, 0) + val) *
+                                    tbl.proxy.damage_percent
+                UnitSetBonus(tbl.unit, BONUS_DAMAGE,
+                             new_dmg - BlzGetUnitBaseDamage(tbl.unit, 0))
                 rawset(tbl.proxy, "damage", new_dmg)
             end,
             damage_percent = function(tbl, val)
-                local new_dmg = (BlzGetUnitBaseDamage(tbl.unit, 0) + tbl.proxy.bonus_damage) * val
-                UnitSetBonus(tbl.unit, BONUS_DAMAGE, new_dmg - BlzGetUnitBaseDamage(tbl.unit, 0))
+                local new_dmg = (BlzGetUnitBaseDamage(tbl.unit, 0) +
+                                    tbl.proxy.bonus_damage) * val
+                UnitSetBonus(tbl.unit, BONUS_DAMAGE,
+                             new_dmg - BlzGetUnitBaseDamage(tbl.unit, 0))
                 rawset(tbl.proxy, "damage", new_dmg)
             end,
-            bonus_armor = function(tbl, val)
-                recalc_armor(tbl)
-            end,
-            armor_percent = function(tbl, val)
-                recalc_armor(tbl)
-            end,
+            bonus_armor = function(tbl, val) recalc_armor(tbl) end,
+            armor_percent = function(tbl, val) recalc_armor(tbl) end,
             bonus_hp = function(tbl, val)
-                local hp = R2I(tbl.base_hp + val + 25 * (tbl.proxy.str + tbl.proxy.bonus_str))
+                local hp = R2I(tbl.base_hp + val + 25 *
+                                   (tbl.proxy.str + tbl.proxy.bonus_str))
                 BlzSetUnitMaxHP(tbl.unit, hp)
                 rawset(tbl.proxy, "hp", hp)
             end,
-            x = function(tbl, val)
-                SetUnitXBounded(tbl.unit, val)
-            end,
-            y = function(tbl, val)
-                SetUnitYBounded(tbl.unit, val)
-            end,
+            x = function(tbl, val) SetUnitXBounded(tbl.unit, val) end,
+            y = function(tbl, val) SetUnitYBounded(tbl.unit, val) end,
             cc_flat = function(tbl, val)
                 rawset(tbl.proxy, "cc", val * tbl.proxy.cc_percent)
             end,
@@ -309,56 +338,93 @@ OnInit.final("UnitTable", function(Require)
             cd_percent = function(tbl, val)
                 rawset(tbl.proxy, "cd", tbl.proxy.cd_flat * val)
             end,
+            status_resist_flat = function(tbl, val)
+                rawset(tbl.proxy, "status_resist", math.min(
+                           thistype.MAX_STATUS_RESISTANCE,
+                           math.max(0., val * 0.01)))
+            end,
             ms_flat = function(tbl, val)
-                tbl.proxy.movespeed = tbl.proxy.overmovespeed or math.min(MOVESPEED_CAP, math.ceil(val * tbl.proxy.ms_percent))
+                tbl.proxy.movespeed = tbl.proxy.overmovespeed or
+                                          math.min(MOVESPEED_CAP, math.ceil(
+                                                       val *
+                                                           tbl.proxy.ms_percent))
                 UnitSetBonus(tbl.unit, BONUS_MOVE_SPEED, tbl.proxy.movespeed)
             end,
             ms_percent = function(tbl, val)
-                tbl.proxy.movespeed = tbl.proxy.overmovespeed or math.min(MOVESPEED_CAP, math.ceil(tbl.proxy.ms_flat * val))
+                tbl.proxy.movespeed = tbl.proxy.overmovespeed or
+                                          math.min(MOVESPEED_CAP, math.ceil(
+                                                       tbl.proxy.ms_flat * val))
                 UnitSetBonus(tbl.unit, BONUS_MOVE_SPEED, tbl.proxy.movespeed)
             end,
             overmovespeed = function(tbl, val)
-                tbl.proxy.movespeed = val or math.min(MOVESPEED_CAP, math.ceil(tbl.proxy.ms_flat * tbl.proxy.ms_percent))
+                tbl.proxy.movespeed = val or
+                                          math.min(MOVESPEED_CAP, math.ceil(
+                                                       tbl.proxy.ms_flat *
+                                                           tbl.proxy.ms_percent))
                 UnitSetBonus(tbl.unit, BONUS_MOVE_SPEED, tbl.proxy.movespeed)
             end,
             regen_flat = function(tbl, val)
-                local new_regen = (tbl.proxy.noregen and 0) or (val + tbl.proxy.regen_max * tbl.proxy.hp * 0.01) * tbl.proxy.regen_percent
+                local new_regen = (tbl.proxy.noregen and 0) or
+                                      (val + tbl.proxy.regen_max * tbl.proxy.hp *
+                                          0.01) * tbl.proxy.regen_percent
                 UnitSetBonus(tbl.unit, BONUS_LIFE_REGEN, new_regen)
                 rawset(tbl.proxy, "regen", new_regen)
             end,
             regen_percent = function(tbl, val)
-                local new_regen = (tbl.proxy.noregen and 0) or (tbl.proxy.regen_flat + tbl.proxy.regen_max * tbl.proxy.hp * 0.01) * val
+                local new_regen = (tbl.proxy.noregen and 0) or
+                                      (tbl.proxy.regen_flat +
+                                          tbl.proxy.regen_max * tbl.proxy.hp *
+                                          0.01) * val
                 UnitSetBonus(tbl.unit, BONUS_LIFE_REGEN, new_regen)
                 rawset(tbl.proxy, "regen", new_regen)
             end,
             regen_max = function(tbl, val)
-                local new_regen = (tbl.proxy.noregen and 0) or (tbl.proxy.regen_flat + val * tbl.proxy.hp * 0.01) * tbl.proxy.regen_percent
+                local new_regen = (tbl.proxy.noregen and 0) or
+                                      (tbl.proxy.regen_flat + val * tbl.proxy.hp *
+                                          0.01) * tbl.proxy.regen_percent
                 UnitSetBonus(tbl.unit, BONUS_LIFE_REGEN, new_regen)
                 rawset(tbl.proxy, "regen", new_regen)
             end,
             mana_regen_flat = function(tbl, val)
-                local m = (tbl.proxy.nomanaregen and 0) or (val + (tbl.proxy.int + tbl.proxy.bonus_int) * INT_REGEN_FACTOR + (tbl.proxy.mana_regen_max * tbl.proxy.mana * 0.01)) * tbl.proxy.mana_regen_percent
+                local m = (tbl.proxy.nomanaregen and 0) or
+                              (val + (tbl.proxy.int + tbl.proxy.bonus_int) *
+                                  INT_REGEN_FACTOR +
+                                  (tbl.proxy.mana_regen_max * tbl.proxy.mana *
+                                      0.01)) * tbl.proxy.mana_regen_percent
                 UnitSetBonus(tbl.unit, BONUS_MANA_REGEN, m)
                 rawset(tbl.proxy, "mana_regen", m)
             end,
             mana_regen_percent = function(tbl, val)
-                local m = (tbl.proxy.nomanaregen and 0) or (tbl.proxy.mana_regen_flat + (tbl.proxy.int + tbl.proxy.bonus_int) * INT_REGEN_FACTOR + (tbl.proxy.mana_regen_max * tbl.proxy.mana * 0.01)) * val
+                local m = (tbl.proxy.nomanaregen and 0) or
+                              (tbl.proxy.mana_regen_flat +
+                                  (tbl.proxy.int + tbl.proxy.bonus_int) *
+                                  INT_REGEN_FACTOR +
+                                  (tbl.proxy.mana_regen_max * tbl.proxy.mana *
+                                      0.01)) * val
                 UnitSetBonus(tbl.unit, BONUS_MANA_REGEN, m)
                 rawset(tbl.proxy, "mana_regen", m)
             end,
             mana_regen_max = function(tbl, val)
-                local m = (tbl.proxy.nomanaregen and 0) or (tbl.proxy.mana_regen_flat + (tbl.proxy.int + tbl.proxy.bonus_int) * INT_REGEN_FACTOR + (val * tbl.proxy.mana * 0.01)) * tbl.proxy.mana_regen_percent
+                local m = (tbl.proxy.nomanaregen and 0) or
+                              (tbl.proxy.mana_regen_flat +
+                                  (tbl.proxy.int + tbl.proxy.bonus_int) *
+                                  INT_REGEN_FACTOR +
+                                  (val * tbl.proxy.mana * 0.01)) *
+                              tbl.proxy.mana_regen_percent
                 UnitSetBonus(tbl.unit, BONUS_MANA_REGEN, m)
                 rawset(tbl.proxy, "mana_regen", m)
             end,
             nomanaregen = function(tbl, val)
-                UnitSetBonus(tbl.unit, BONUS_MANA_REGEN, val and 0 or tbl.mana_regen)
+                UnitSetBonus(tbl.unit, BONUS_MANA_REGEN,
+                             val and 0 or tbl.mana_regen)
             end,
             attack = function(tbl, val)
                 rawset(tbl, "can_attack", val)
 
                 if not IS_AUTO_ATTACK_OFF[tbl.pid] then
-                    BlzSetUnitWeaponBooleanField(tbl.unit, UNIT_WEAPON_BF_ATTACKS_ENABLED, 0, val)
+                    BlzSetUnitWeaponBooleanField(tbl.unit,
+                                                 UNIT_WEAPON_BF_ATTACKS_ENABLED,
+                                                 0, val)
                 end
             end,
             hidehp = function(tbl, val)
@@ -367,37 +433,44 @@ OnInit.final("UnitTable", function(Require)
                 end
             end,
             range = function(tbl, val)
-                local current_range = BlzGetUnitWeaponRealField(tbl.unit, UNIT_WEAPON_RF_ATTACK_RANGE, 0) -- index is correct, returned range is correct.
-                local current_range_second = BlzGetUnitWeaponRealField(tbl.unit, UNIT_WEAPON_RF_ATTACK_RANGE, 1) -- yes, we should get the 2nd attack range and count it too
-                BlzSetUnitWeaponRealField(tbl.unit, UNIT_WEAPON_RF_ATTACK_RANGE, 1, val - current_range + current_range_second)
+                local current_range = BlzGetUnitWeaponRealField(tbl.unit,
+                                                                UNIT_WEAPON_RF_ATTACK_RANGE,
+                                                                0) -- index is correct, returned range is correct.
+                local current_range_second =
+                    BlzGetUnitWeaponRealField(tbl.unit,
+                                              UNIT_WEAPON_RF_ATTACK_RANGE, 1) -- yes, we should get the 2nd attack range and count it too
+                BlzSetUnitWeaponRealField(tbl.unit, UNIT_WEAPON_RF_ATTACK_RANGE,
+                                          1, val - current_range +
+                                              current_range_second)
                 rawset(tbl.proxy, "range", val)
-                BlzSetUnitRealField(tbl.unit, UNIT_RF_ACQUISITION_RANGE, val + 50)
-            end,
+                BlzSetUnitRealField(tbl.unit, UNIT_RF_ACQUISITION_RANGE,
+                                    val + 50)
+            end
         }
 
         local mt = {
-                __index = function(tbl, key)
-                    return (rawget(thistype, key) or tbl.proxy[key])
-                end,
-                __newindex = function(tbl, key, val)
-                    local prev = tbl.proxy[key]
-                    if set_operators[key] then
-                        if mtype(val) == "float" then
-                            -- round to 3 decimals
-                            val = floor(val * 1000 + 0.5) / 1000.
-                        end
-                        rawset(tbl.proxy, key, val)
-                        set_operators[key](tbl, val)
-                    else
-                        rawset(tbl.proxy, key, val)
+            __index = function(tbl, key)
+                return (rawget(thistype, key) or tbl.proxy[key])
+            end,
+            __newindex = function(tbl, key, val)
+                local prev = tbl.proxy[key]
+                if set_operators[key] then
+                    if mtype(val) == "float" then
+                        -- round to 3 decimals
+                        val = floor(val * 1000 + 0.5) / 1000.
                     end
+                    rawset(tbl.proxy, key, val)
+                    set_operators[key](tbl, val)
+                else
+                    rawset(tbl.proxy, key, val)
+                end
 
-                    -- trigger stat change event
-                    if prev ~= val and not tbl.suppress_stat_events then
-                        EVENT_STAT_CHANGE:trigger(tbl.unit, key)
-                    end
-                end,
-            }
+                -- trigger stat change event
+                if prev ~= val and not tbl.suppress_stat_events then
+                    EVENT_STAT_CHANGE:trigger(tbl.unit, key)
+                end
+            end
+        }
 
         -- default unit data
         local base_proxy = {
@@ -430,6 +503,9 @@ OnInit.final("UnitTable", function(Require)
             gold_rate = 0.,
             shield_count = 0,
             xp_rate = 0,
+            status_resist_flat = 0.,
+            status_resist = 0.,
+            cooldown_acceleration = 0.
         }
         base_proxy.__index = base_proxy
 
@@ -453,10 +529,13 @@ OnInit.final("UnitTable", function(Require)
                 damage = BlzGetUnitBaseDamage(u, 0),
                 bonus_damage = UnitGetBonus(u, BONUS_DAMAGE),
                 hp = self.base_hp,
-                regen_flat = BlzGetUnitRealField(u, UNIT_RF_HIT_POINTS_REGENERATION_RATE),
-                regen = BlzGetUnitRealField(u, UNIT_RF_HIT_POINTS_REGENERATION_RATE),
+                regen_flat = BlzGetUnitRealField(u,
+                                                 UNIT_RF_HIT_POINTS_REGENERATION_RATE),
+                regen = BlzGetUnitRealField(u,
+                                            UNIT_RF_HIT_POINTS_REGENERATION_RATE),
                 mana = self.base_mana,
-                mana_regen_flat = BlzGetUnitRealField(u, UNIT_RF_MANA_REGENERATION),
+                mana_regen_flat = BlzGetUnitRealField(u,
+                                                      UNIT_RF_MANA_REGENERATION),
                 mana_regen_max = 0.,
                 mana_regen = BlzGetUnitRealField(u, UNIT_RF_MANA_REGENERATION),
                 str = GetHeroStr(u, false),
@@ -475,7 +554,7 @@ OnInit.final("UnitTable", function(Require)
                 bat = BlzGetUnitAttackCooldown(u, 0),
                 base_bat = BlzGetUnitAttackCooldown(u, 0),
                 x = GetUnitX(u),
-                y = GetUnitY(u),
+                y = GetUnitY(u)
             }, base_proxy)
 
             self.original_x = self.proxy.x
@@ -536,15 +615,13 @@ OnInit.final("UnitTable", function(Require)
 
             scale = function(tbl, val)
                 BlzSetSpecialEffectScale(tbl.effect, val)
-            end,
+            end
         }
 
         local mt2 = {
             __index = function(tbl, key)
                 local val = rawget(tbl, key)
-                if val ~= nil then
-                    return val
-                end
+                if val ~= nil then return val end
                 return tbl.proxy[key]
             end,
             __newindex = function(tbl, key, val)
@@ -552,9 +629,7 @@ OnInit.final("UnitTable", function(Require)
                 if op then
                     rawset(tbl.proxy, key, val)
 
-                    if tbl.effect then
-                        op(tbl, val)
-                    end
+                    if tbl.effect then op(tbl, val) end
                 else
                     rawset(tbl, key, val)
                 end
@@ -567,7 +642,10 @@ OnInit.final("UnitTable", function(Require)
             local data = {
                 model = model,
                 attach = attachPoint,
-                effect = AddSpecialEffectTarget(model, self.unit, self.morphed and attachPointAlternate or attachPoint),
+                effect = AddSpecialEffectTarget(model, self.unit,
+                                                self.morphed and
+                                                    attachPointAlternate or
+                                                    attachPoint),
                 attach_alternate = attachPointAlternate,
                 morphed = false,
                 proxy = {}
@@ -581,9 +659,7 @@ OnInit.final("UnitTable", function(Require)
         end
 
         function Unit:destroyEffects()
-            if not self.effects then
-                return
-            end
+            if not self.effects then return end
 
             for _, sfx in ipairs(self.effects) do
                 if sfx.effect then
@@ -594,21 +670,19 @@ OnInit.final("UnitTable", function(Require)
         end
 
         function Unit:applyEffects()
-            if not self.effects then
-                return
-            end
+            if not self.effects then return end
 
             for _, sfx in ipairs(self.effects) do
                 if not sfx.effect then
-                    local effect = self.morphed and sfx.attach_alternate or sfx.attach
-                    sfx.effect = AddSpecialEffectTarget(sfx.model, self.unit, effect)
+                    local effect = self.morphed and sfx.attach_alternate or
+                                       sfx.attach
+                    sfx.effect = AddSpecialEffectTarget(sfx.model, self.unit,
+                                                        effect)
 
                     -- reapply attributes
                     for key, val in pairs(sfx.proxy) do
                         local op = effect_operators[key]
-                        if op then
-                            op(sfx, val)
-                        end
+                        if op then op(sfx, val) end
                     end
                 end
             end
@@ -617,9 +691,7 @@ OnInit.final("UnitTable", function(Require)
         function Unit:removeEffect(entry)
             local effects = self.effects
 
-            if not effects or not entry then
-                return
-            end
+            if not effects or not entry then return end
 
             if entry.effect then
                 DestroyEffect(entry.effect)
@@ -645,35 +717,31 @@ OnInit.final("UnitTable", function(Require)
         end
 
         function thistype:destroy()
-            if self.destroyed then
-                return
-            end
+            if self.destroyed then return end
             self.destroyed = true
 
-            if self.taunted then
-                DestroyGroup(self.taunted)
-            end
+            if self.taunted then DestroyGroup(self.taunted) end
 
             if self.aggro_timer then
                 TQ:disableCallback(self.aggro_timer)
             end
 
-            if self.effects then
-                self:destroyEffects()
-            end
+            if self.effects then self:destroyEffects() end
         end
     end
 
     local function on_cleanup(source, _, id)
         -- if unit is removed
-        if id == ORDER_ID_UNDEFEND and GetUnitAbilityLevel(source, DETECT_LEAVE_ABILITY) == 0 then
+        if id == ORDER_ID_UNDEFEND and
+            GetUnitAbilityLevel(source, DETECT_LEAVE_ABILITY) == 0 then
             Unit[source]:destroy()
         end
     end
 
     ---@type fun(u: unit)
     local function index_unit(u)
-        if u and not IsDummy(u) and GetUnitAbilityLevel(u, DETECT_LEAVE_ABILITY) == 0 then
+        if u and not IsDummy(u) and GetUnitAbilityLevel(u, DETECT_LEAVE_ABILITY) ==
+            0 then
             indexed_units[u] = true
 
             for index = 1, #index_listeners do
