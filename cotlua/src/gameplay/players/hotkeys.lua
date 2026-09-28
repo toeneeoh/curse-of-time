@@ -256,6 +256,29 @@ OnInit.final("Hotkeys", function(Require)
     local meta_ctrl = 0x2
     local meta_alt = 0x4
 
+    -- Windows can consume Alt's key-up event when Alt+Tab changes focus. Any
+    -- actions that treat Alt as a held modifier would then remain active until
+    -- Alt is pressed again. Release both forms under which the Alt binding can
+    -- be registered when Alt+Tab starts, or when a later key event proves that
+    -- Alt is no longer held.
+    local function release_alt_bindings(pid)
+        local bindings = key_bindings[pid]
+        if not bindings then return end
+
+        local called = {}
+        for _, key_string in ipairs({'ALT', 'ALT+ALT'}) do
+            local bound_functions = bindings[key_string]
+            if bound_functions then
+                for _, key_function in ipairs(bound_functions) do
+                    if not called[key_function] then
+                        called[key_function] = true
+                        key_function(pid, false)
+                    end
+                end
+            end
+        end
+    end
+
     --- Packs a key‑string (e.g. "CTRL+A", "F1", "/", "ALT+ALT") into an integer.
     --- @param key_string string
     --- @return integer packed
@@ -305,6 +328,14 @@ OnInit.final("Hotkeys", function(Require)
         local to_char = string.char(key)
         local key_string = key_mapper[key] or meta_keys[key] or to_char
         local invalid_char = not key_mapper[key] and (key < 0x30 or key > 0x77)
+
+        local is_alt_key = key == 0x12 or key == 0xA4 or key == 0xA5
+        local alt_is_held = 0 ~= meta & meta_alt
+        if (key == 0x09 and alt_is_held and is_down)
+            or (not is_alt_key and not alt_is_held)
+        then
+            release_alt_bindings(pid)
+        end
 
         if 0 ~= meta & meta_shift then
             key_string = "SHIFT+" .. key_string
