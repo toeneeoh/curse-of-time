@@ -7,6 +7,7 @@
 OnInit.final("Hotkeys", function(Require)
     Require('Users')
     Require('Variables')
+    Require('Mouse')
 
     local hotkey_functions
     local changing_keybinds = {}
@@ -255,13 +256,18 @@ OnInit.final("Hotkeys", function(Require)
     local meta_shift = 0x1
     local meta_ctrl = 0x2
     local meta_alt = 0x4
+    local ALT_RELEASE_TIMEOUT = 10.
+    local alt_recovery_generation = __jarray(0)
 
     -- Windows can consume Alt's key-up event when Alt+Tab changes focus. Any
     -- actions that treat Alt as a held modifier would then remain active until
     -- Alt is pressed again. Release both forms under which the Alt binding can
-    -- be registered when Alt+Tab starts, or when a later key event proves that
-    -- Alt is no longer held.
+    -- be registered when Alt+Tab starts, or when later input proves that Alt is
+    -- no longer held. Mouse input and a timeout below cover the case where
+    -- Windows intercepts Alt+Tab before Warcraft receives either key event.
     local function release_alt_bindings(pid)
+        alt_recovery_generation[pid] = alt_recovery_generation[pid] + 1
+
         local bindings = key_bindings[pid]
         if not bindings then return end
 
@@ -276,6 +282,12 @@ OnInit.final("Hotkeys", function(Require)
                     end
                 end
             end
+        end
+    end
+
+    local function expire_alt_bindings(pid, generation)
+        if alt_recovery_generation[pid] == generation then
+            release_alt_bindings(pid)
         end
     end
 
@@ -331,6 +343,13 @@ OnInit.final("Hotkeys", function(Require)
 
         local is_alt_key = key == 0x12 or key == 0xA4 or key == 0xA5
         local alt_is_held = 0 ~= meta & meta_alt
+        if is_alt_key then
+            alt_recovery_generation[pid] = alt_recovery_generation[pid] + 1
+            if is_down then
+                TimerQueue:callDelayed(ALT_RELEASE_TIMEOUT,
+                    expire_alt_bindings, pid, alt_recovery_generation[pid])
+            end
+        end
         if (key == 0x09 and alt_is_held and is_down)
             or (not is_alt_key and not alt_is_held)
         then
@@ -502,6 +521,8 @@ OnInit.final("Hotkeys", function(Require)
         register_key_binding(U.id, 'F2', update_ui, true)
         register_key_binding(U.id, 'F3', update_ui, true)
         register_key_binding(U.id, 'F4', update_ui, true)
+        EVENT_ON_M1_DOWN:register_action(U.id, release_alt_bindings)
+        EVENT_ON_M2_DOWN:register_action(U.id, release_alt_bindings)
 
         for k = 0x00, 0xFF do
             local key = ConvertOsKeyType(k)

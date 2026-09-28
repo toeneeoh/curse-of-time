@@ -542,7 +542,7 @@ OnInit.final("PotionService", function(Require)
         carrier = HEALTH_FLASK_ID,
         name = "Stoneblood Flask",
         icon = GREEN_FLASK_ICON,
-        tooltip = "|cff808080Heavy mineral sediment settles beneath its crimson contents.|r",
+        tooltip = "|cff808080Heavy mineral sediment settles beneath its green contents.|r",
         display_rarity = 3,
         faction_rank_requirement = 4,
         inherit_stats = chaos_inherited_stats,
