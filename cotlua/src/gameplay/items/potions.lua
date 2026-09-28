@@ -8,6 +8,7 @@ OnInit.final("PotionService", function(Require)
     Require('Profile')
     Require('ResourceChanges')
     Require('RuntimeItemDefinitions')
+    Require('Shield')
     Require('TimerQueue')
 
     PotionService = {}
@@ -21,10 +22,18 @@ OnInit.final("PotionService", function(Require)
     local INFUSION_VAMPIRIC = 1
     local INFUSION_STONE = 2
     local INFUSION_TEMPEST = 3
+    local INFUSION_AEGIS = 4
+    local INFUSION_FURY = 5
+    local INFUSION_ARCANE = 6
+    local INFUSION_SWIFTNESS = 7
+    local INFUSION_PURITY = 8
     local CATALYST_NONE = 0
     local CATALYST_POTENT = 1
     local CATALYST_LINGERING = 2
     local CATALYST_ACCELERANT = 3
+    local CATALYST_BOUNTIFUL = 4
+    local CATALYST_CONSERVING = 5
+    local CATALYST_ECHOING = 6
     local RESTORATION_REROLL_STATE = 1
     local PREFIX_REROLL_STATE = 2
     local SUFFIX_REROLL_STATE = 3
@@ -44,6 +53,7 @@ OnInit.final("PotionService", function(Require)
     local TEMPEST_ID = 9
     local HUNTERS_ID = 10
     local LEGENDARY_CHAOS_ID = 11
+    local FIRST_DONOR_ID = 12
     local BLOOD_FLASK_ICON =
         "ReplaceableTextures\\CommandButtons\\BTNPotionOfVampirism.blp"
     local HEALTH_FLASK_ID = FourCC('I02F')
@@ -63,6 +73,7 @@ OnInit.final("PotionService", function(Require)
     local cooldowns = {}
     local infusions = {}
     local catalysts = {}
+    local chaos_donor_keys = {}
     local restoration_stats = {
         ITEM_FLAT_HEAL, ITEM_PERCENT_HEAL, ITEM_FLAT_MANA, ITEM_PERCENT_MANA
     }
@@ -85,7 +96,11 @@ OnInit.final("PotionService", function(Require)
             return nil
         end
         local reduction = count >= 2 and 60 or 30
-        local multiplier = (100 - reduction) * 0.01
+        local catalyst_id = item.quality[CATALYST_QUALITY_INDEX] or 0
+        local catalyst = catalysts[catalyst_id]
+        local multiplier = (100 - reduction) * 0.01 *
+                               (catalyst and
+                                   catalyst.restoration_multiplier or 1.)
         local original = {}
         for _, stat in ipairs(restoration_stats) do
             original[stat] = item.cached_stats[stat]
@@ -105,7 +120,9 @@ OnInit.final("PotionService", function(Require)
         item.potion_unmodified_stats = original
         local adjustments = {}
         for _, stat in ipairs(restoration_stats) do
-            if original[stat] ~= 0 then adjustments[stat] = reduction end
+            if original[stat] ~= 0 then
+                adjustments[stat] = math.floor((1. - multiplier) * 100. + 0.5)
+            end
         end
         return adjustments
     end
@@ -114,10 +131,18 @@ OnInit.final("PotionService", function(Require)
     PotionService.INFUSION_VAMPIRIC = INFUSION_VAMPIRIC
     PotionService.INFUSION_STONE = INFUSION_STONE
     PotionService.INFUSION_TEMPEST = INFUSION_TEMPEST
+    PotionService.INFUSION_AEGIS = INFUSION_AEGIS
+    PotionService.INFUSION_FURY = INFUSION_FURY
+    PotionService.INFUSION_ARCANE = INFUSION_ARCANE
+    PotionService.INFUSION_SWIFTNESS = INFUSION_SWIFTNESS
+    PotionService.INFUSION_PURITY = INFUSION_PURITY
     PotionService.CATALYST_NONE = CATALYST_NONE
     PotionService.CATALYST_POTENT = CATALYST_POTENT
     PotionService.CATALYST_LINGERING = CATALYST_LINGERING
     PotionService.CATALYST_ACCELERANT = CATALYST_ACCELERANT
+    PotionService.CATALYST_BOUNTIFUL = CATALYST_BOUNTIFUL
+    PotionService.CATALYST_CONSERVING = CATALYST_CONSERVING
+    PotionService.CATALYST_ECHOING = CATALYST_ECHOING
     -- Compatibility names for callers written against the first prototype.
     -- Player-facing brewing now treats these as prefix and suffix pools.
     PotionService.PREFIX_NONE = INFUSION_NONE
@@ -152,6 +177,8 @@ OnInit.final("PotionService", function(Require)
     ---@field potency_multiplier? number
     ---@field duration_multiplier? number
     ---@field cooldown_multiplier? number
+    ---@field restoration_multiplier? number
+    ---@field preserve_charge_chance? number
 
     local function register_customization(registry, definition)
         if type(definition) ~= "table" or type(definition.id) ~= "number" or
@@ -188,6 +215,7 @@ OnInit.final("PotionService", function(Require)
     ---@field replaces_restoration? boolean Suppress formula healing and mana.
     ---@field inherent_infusion? integer
     ---@field initial_prefix? integer
+    ---@field initial_suffix? integer
     ---@field affix_capacity? integer
     ---@field suffix_roll_chance? number
     ---@field on_use? fun(context: PotionUseContext)
@@ -199,6 +227,8 @@ OnInit.final("PotionService", function(Require)
     ---@field unit UnitTable
     ---@field potency_multiplier number
     ---@field duration_multiplier number
+    ---@field heal number
+    ---@field mana number
 
     ---Defines a logical potion while keeping gameplay behavior out of the
     ---generic runtime-item catalog. Ordinary restoration remains driven by
@@ -222,6 +252,9 @@ OnInit.final("PotionService", function(Require)
             local potion = spec.metadata.potion
             if potion.initial_prefix then
                 item.quality[INFUSION_QUALITY_INDEX] = potion.initial_prefix
+            end
+            if potion.initial_suffix then
+                item.quality[CATALYST_QUALITY_INDEX] = potion.initial_suffix
             end
             if item.data[ITEM_LEVEL_REQUIREMENT] >= 200 then
                 item.persistent_state[RESTORATION_REROLL_STATE] = 0
@@ -249,7 +282,7 @@ OnInit.final("PotionService", function(Require)
             GetRandomReal(0., 1.) <= behavior.suffix_roll_chance then
             item.quality[CATALYST_QUALITY_INDEX] = GetRandomInt(
                                                        CATALYST_POTENT,
-                                                       CATALYST_ACCELERANT)
+                                                       #catalysts)
         end
         PotionService.refreshItem(item)
         return item
@@ -453,6 +486,28 @@ OnInit.final("PotionService", function(Require)
         UnitRefreshBuff(context.hero, buff)
     end
 
+    local function apply_scaled_buff(context, buff_type, field, amount,
+                                     duration)
+        local buff = buff_type:add(context.hero, context.hero)
+        local previous = buff[field] or 0.
+        local value = amount * context.potency_multiplier
+        local unit = context.unit
+
+        if field == "damage" then
+            unit.dm = unit.dm / (1. + previous) * (1. + value)
+        elseif field == "spellboost" then
+            unit.spellboost = unit.spellboost - previous + value
+        elseif field == "movespeed" then
+            unit.ms_percent = unit.ms_percent - previous + value
+        elseif field == "status_resist" then
+            unit.status_resist_flat = unit.status_resist_flat - previous + value
+        end
+
+        buff[field] = value
+        buff:duration(duration * context.duration_multiplier)
+        UnitRefreshBuff(context.hero, buff)
+    end
+
     PotionService.define(STONEBLOOD_KEY, {
         id = STONEBLOOD_ID,
         carrier = HEALTH_FLASK_ID,
@@ -549,6 +604,72 @@ OnInit.final("PotionService", function(Require)
     })
 
     PotionService.registerInfusion({
+        id = INFUSION_AEGIS,
+        key = "aegis",
+        name = "Aegis Infusion",
+        icon = "ReplaceableTextures\\CommandButtons\\BTNDivineShield.blp",
+        description = "Grants a shield equal to |cffffcc0020%|r of maximum " ..
+            "Health for |cffffcc0010 seconds|r.",
+        on_use = function(context)
+            Shield.add(context.hero, context.unit.hp * 0.20 *
+                           context.potency_multiplier,
+                       10. * context.duration_multiplier)
+        end
+    })
+
+    PotionService.registerInfusion({
+        id = INFUSION_FURY,
+        key = "fury",
+        name = "Fury Infusion",
+        icon = "ReplaceableTextures\\CommandButtons\\BTNBloodLust.blp",
+        description = "Increases total damage by |cffffcc0025%|r for " ..
+            "|cffffcc0010 seconds|r.",
+        on_use = function(context)
+            apply_scaled_buff(context, FuryFlaskBuff, "damage", 0.25, 10.)
+        end
+    })
+
+    PotionService.registerInfusion({
+        id = INFUSION_ARCANE,
+        key = "arcane",
+        name = "Arcane Infusion",
+        icon = "ReplaceableTextures\\CommandButtons\\BTNBrilliance.blp",
+        description = "Increases Spell Power by |cffffcc0025%|r for " ..
+            "|cffffcc0010 seconds|r.",
+        on_use = function(context)
+            apply_scaled_buff(context, ArcaneFlaskBuff, "spellboost", 0.25,
+                              10.)
+        end
+    })
+
+    PotionService.registerInfusion({
+        id = INFUSION_SWIFTNESS,
+        key = "swiftness",
+        name = "Swiftness Infusion",
+        icon = "ReplaceableTextures\\CommandButtons\\BTNBootsOfSpeed.blp",
+        description = "Increases movement speed by |cffffcc0025%|r for " ..
+            "|cffffcc0010 seconds|r.",
+        on_use = function(context)
+            apply_scaled_buff(context, SwiftnessFlaskBuff, "movespeed", 0.25,
+                              10.)
+        end
+    })
+
+    PotionService.registerInfusion({
+        id = INFUSION_PURITY,
+        key = "purity",
+        name = "Purity Infusion",
+        icon = "ReplaceableTextures\\CommandButtons\\BTNDispelMagic.blp",
+        description = "Removes negative effects and grants |cffffcc0040%|r " ..
+            "Status Resistance for |cffffcc008 seconds|r.",
+        on_use = function(context)
+            Buff.dispelType(context.hero, BUFF_NEGATIVE)
+            apply_scaled_buff(context, PurityFlaskBuff, "status_resist", 40.,
+                              8.)
+        end
+    })
+
+    PotionService.registerInfusion({
         id = INFUSION_STONE,
         key = "stone",
         name = "Stone Infusion",
@@ -580,6 +701,118 @@ OnInit.final("PotionService", function(Require)
         description = "Infusion effects are |cffffcc0025%|r stronger.",
         potency_multiplier = 1.25
     })
+
+    PotionService.registerCatalyst({
+        id = CATALYST_BOUNTIFUL,
+        key = "bountiful",
+        name = "Bountiful Catalyst",
+        icon = "ReplaceableTextures\\CommandButtons\\BTNRejuvenation.blp",
+        description = "Restores |cffffcc0025%|r more Health and Mana.",
+        restoration_multiplier = 1.25
+    })
+
+    PotionService.registerCatalyst({
+        id = CATALYST_CONSERVING,
+        key = "conserving",
+        name = "Conserving Catalyst",
+        icon = "ReplaceableTextures\\CommandButtons\\BTNEngineeringUpgrade.blp",
+        description = "Has a |cffffcc0025%|r chance not to consume a charge.",
+        preserve_charge_chance = 0.25
+    })
+
+    PotionService.registerCatalyst({
+        id = CATALYST_ECHOING,
+        key = "echoing",
+        name = "Echoing Catalyst",
+        icon = "ReplaceableTextures\\CommandButtons\\BTNEcho.blp",
+        description = "Repeats |cffffcc0040%|r of the flask's restoration " ..
+            "after |cffffcc004 seconds|r.",
+        on_use = function(context)
+            if context.heal <= 0. and context.mana <= 0. then return end
+            TQ:callDelayed(4., function(hero, heal, mana)
+                if not UnitAlive(hero) then return end
+                if heal > 0. then HP(hero, hero, heal * 0.40, "Echoing Flask") end
+                if mana > 0. then MP(hero, mana * 0.40) end
+            end, context.hero, context.heal, context.mana)
+        end
+    })
+
+    local function define_affix_donor(id, key, name, icon, prefix, suffix)
+        PotionService.define(key, {
+            id = id,
+            carrier = prefix and HEALTH_FLASK_ID or MANA_FLASK_ID,
+            name = name,
+            icon = icon,
+            tooltip = "A Chaos flask whose affix can be transferred by the Potion Master.",
+            display_rarity = 3,
+            inherit_stats = chaos_inherited_stats,
+            prepare_data = prepare_chaos_flask(6000, 12, 6000, 12)
+        }, {
+            cooldown = DEFAULT_USE_COOLDOWN,
+            initial_prefix = prefix,
+            initial_suffix = suffix,
+            affix_capacity = 1
+        })
+        chaos_donor_keys[#chaos_donor_keys + 1] = key
+    end
+
+    define_affix_donor(FIRST_DONOR_ID, "aegis_donor_flask",
+                       "Aegis Infusion Flask",
+                       "ReplaceableTextures\\CommandButtons\\BTNDivineShield.blp",
+                       INFUSION_AEGIS)
+    define_affix_donor(FIRST_DONOR_ID + 1, "fury_donor_flask",
+                       "Fury Infusion Flask",
+                       "ReplaceableTextures\\CommandButtons\\BTNBloodLust.blp",
+                       INFUSION_FURY)
+    define_affix_donor(FIRST_DONOR_ID + 2, "arcane_donor_flask",
+                       "Arcane Infusion Flask",
+                       "ReplaceableTextures\\CommandButtons\\BTNBrilliance.blp",
+                       INFUSION_ARCANE)
+    define_affix_donor(FIRST_DONOR_ID + 3, "swiftness_donor_flask",
+                       "Swiftness Infusion Flask",
+                       "ReplaceableTextures\\CommandButtons\\BTNBootsOfSpeed.blp",
+                       INFUSION_SWIFTNESS)
+    define_affix_donor(FIRST_DONOR_ID + 4, "purity_donor_flask",
+                       "Purity Infusion Flask",
+                       "ReplaceableTextures\\CommandButtons\\BTNDispelMagic.blp",
+                       INFUSION_PURITY)
+    define_affix_donor(FIRST_DONOR_ID + 5, "bountiful_donor_flask",
+                       "Bountiful Catalyst Flask",
+                       "ReplaceableTextures\\CommandButtons\\BTNRejuvenation.blp",
+                       nil, CATALYST_BOUNTIFUL)
+    define_affix_donor(FIRST_DONOR_ID + 6, "conserving_donor_flask",
+                       "Conserving Catalyst Flask",
+                       "ReplaceableTextures\\CommandButtons\\BTNEngineeringUpgrade.blp",
+                       nil, CATALYST_CONSERVING)
+    define_affix_donor(FIRST_DONOR_ID + 7, "echoing_donor_flask",
+                       "Echoing Catalyst Flask",
+                       "ReplaceableTextures\\CommandButtons\\BTNEcho.blp",
+                       nil, CATALYST_ECHOING)
+    define_affix_donor(FIRST_DONOR_ID + 8, "potent_donor_flask",
+                       "Potent Catalyst Flask",
+                       "ReplaceableTextures\\CommandButtons\\BTNStrongDrink.blp",
+                       nil, CATALYST_POTENT)
+    define_affix_donor(FIRST_DONOR_ID + 9, "lingering_donor_flask",
+                       "Lingering Catalyst Flask",
+                       "ReplaceableTextures\\CommandButtons\\BTNCloudOfFog.blp",
+                       nil, CATALYST_LINGERING)
+    define_affix_donor(FIRST_DONOR_ID + 10, "accelerant_donor_flask",
+                       "Accelerant Catalyst Flask",
+                       "ReplaceableTextures\\CommandButtons\\BTNBootsOfSpeed.blp",
+                       nil, CATALYST_ACCELERANT)
+
+    ---Creates a non-faction affix donor from the Chaos drop pool.
+    function PotionService.createChaosDonor(x, y, expire)
+        if #chaos_donor_keys == 0 then return nil end
+        local key = chaos_donor_keys[GetRandomInt(1, #chaos_donor_keys)]
+        return PotionService.create(key, x, y, expire)
+    end
+
+    function PotionService.getChaosDonorKeys()
+        local result = {}
+        for index, key in ipairs(chaos_donor_keys) do result[index] = key end
+        return result
+    end
 
     PotionService.registerCatalyst({
         id = CATALYST_LINGERING,
@@ -698,9 +931,11 @@ OnInit.final("PotionService", function(Require)
 
     local function restoration_multiplier(item)
         local count = affix_count(item)
-        if count >= 2 then return 0.40 end
-        if count == 1 then return 0.70 end
-        return 1.
+        local multiplier = count >= 2 and 0.40 or count == 1 and 0.70 or 1.
+        local catalyst = selected_customization(item, catalysts,
+                                                CATALYST_QUALITY_INDEX)
+        return multiplier *
+                   (catalyst and catalyst.restoration_multiplier or 1.)
     end
 
     ---Applies the item's dynamic presentation to its backing native handle.
@@ -1256,7 +1491,10 @@ OnInit.final("PotionService", function(Require)
             replaces_restoration and 0. or stats[ITEM_FLAT_MANA] + 0.01 *
                 stats[ITEM_PERCENT_MANA] * Unit[hero].mana
 
-        item.charges = item.charges - 1
+        local preserve_charge = catalyst and catalyst.preserve_charge_chance and
+                                    GetRandomReal(0., 1.) <
+                                        catalyst.preserve_charge_chance
+        if not preserve_charge then item.charges = item.charges - 1 end
         if heal > 0 then
             local name = PotionService.describe(item)
             HP(hero, hero, heal, name)
@@ -1271,7 +1509,9 @@ OnInit.final("PotionService", function(Require)
             potency_multiplier = catalyst and
                 catalyst.potency_multiplier or 1.,
             duration_multiplier = catalyst and
-                catalyst.duration_multiplier or 1.
+                catalyst.duration_multiplier or 1.,
+            heal = heal,
+            mana = mana
         }
         if behavior and behavior.on_use then
             behavior.on_use(context)
@@ -1282,6 +1522,7 @@ OnInit.final("PotionService", function(Require)
                 customization.infusion_id) then
             customization.infusion.on_use(context)
         end
+        if catalyst and catalyst.on_use then catalyst.on_use(context) end
 
         local use_cooldown = PotionService.getUseCooldown(item)
         local player_cooldowns = cooldown_table(pid)

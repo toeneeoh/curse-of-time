@@ -231,6 +231,77 @@ OnInit.final("BuffsItems", function(Require)
         end
     end
 
+    ---@class FuryFlaskBuff : Buff
+    FuryFlaskBuff = Buff.new()
+    do
+        local thistype = FuryFlaskBuff
+        thistype.NAME = "Fury Infusion"
+        thistype.ICON = "ReplaceableTextures\\CommandButtons\\BTNBloodLust.blp"
+        thistype.DESC = "This unit has +^$damage% total damage"
+        thistype.DISPEL_TYPE = BUFF_POSITIVE
+        thistype.STACK_TYPE = BUFF_STACK_NONE
+
+        function thistype:onRemove()
+            Unit[self.target].dm = Unit[self.target].dm / (1. + self.damage)
+        end
+
+        function thistype:onApply() self.damage = 0. end
+    end
+
+    ---@class ArcaneFlaskBuff : Buff
+    ArcaneFlaskBuff = Buff.new()
+    do
+        local thistype = ArcaneFlaskBuff
+        thistype.NAME = "Arcane Infusion"
+        thistype.ICON = "ReplaceableTextures\\CommandButtons\\BTNBrilliance.blp"
+        thistype.DESC = "This unit has +^$spellboost% Spell Power"
+        thistype.DISPEL_TYPE = BUFF_POSITIVE
+        thistype.STACK_TYPE = BUFF_STACK_NONE
+
+        function thistype:onRemove()
+            Unit[self.target].spellboost = Unit[self.target].spellboost -
+                                               self.spellboost
+        end
+
+        function thistype:onApply() self.spellboost = 0. end
+    end
+
+    ---@class SwiftnessFlaskBuff : Buff
+    SwiftnessFlaskBuff = Buff.new()
+    do
+        local thistype = SwiftnessFlaskBuff
+        thistype.NAME = "Swiftness Infusion"
+        thistype.ICON = "ReplaceableTextures\\CommandButtons\\BTNBootsOfSpeed.blp"
+        thistype.DESC = "This unit has +^$movespeed% movement speed"
+        thistype.DISPEL_TYPE = BUFF_POSITIVE
+        thistype.STACK_TYPE = BUFF_STACK_NONE
+
+        function thistype:onRemove()
+            Unit[self.target].ms_percent = Unit[self.target].ms_percent -
+                                               self.movespeed
+        end
+
+        function thistype:onApply() self.movespeed = 0. end
+    end
+
+    ---@class PurityFlaskBuff : Buff
+    PurityFlaskBuff = Buff.new()
+    do
+        local thistype = PurityFlaskBuff
+        thistype.NAME = "Purity Infusion"
+        thistype.ICON = "ReplaceableTextures\\CommandButtons\\BTNDispelMagic.blp"
+        thistype.DESC = "This unit has +$status_resist% Status Resistance"
+        thistype.DISPEL_TYPE = BUFF_POSITIVE
+        thistype.STACK_TYPE = BUFF_STACK_NONE
+
+        function thistype:onRemove()
+            Unit[self.target].status_resist_flat =
+                Unit[self.target].status_resist_flat - self.status_resist
+        end
+
+        function thistype:onApply() self.status_resist = 0. end
+    end
+
     ---@class IntenseFocusBuff : Buff
     IntenseFocusBuff = Buff.new()
     do

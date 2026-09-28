@@ -200,8 +200,8 @@ OnInit.final("ArchitectureTests", function(Require)
             local expected_skin = case[2] == FourCC('I00E') and
                                       FourCC('pman') or FourCC('phea')
             local valid = item and item.id == case[2] and properties and
-                              customization and customization.capacity == 1 and
-                              customization.prefix ~= nil and
+                              customization and customization.capacity == 0 and
+                              customization.prefix == nil and
                               customization.suffix == nil and
                               item.runtime_definition.world_skin_id ==
                               expected_skin and
@@ -303,6 +303,55 @@ OnInit.final("ArchitectureTests", function(Require)
         return true
     end)
 
+    ArchitectureTests.register("Chaos affix donor flasks are saveable",
+                               function()
+        local keys = PotionService.getChaosDonorKeys()
+        if #keys ~= 11 then
+            return false, "Chaos donor pool has " .. #keys .. " entries"
+        end
+
+        for _, key in ipairs(keys) do
+            local item = PotionService.create(key, 30000., 30000.)
+            local customization = PotionService.getCustomization(item)
+            local properties = PotionService.getProperties(item)
+            local occupied = customization and
+                                 ((customization.prefix and 1 or 0) +
+                                     (customization.suffix and 1 or 0)) or 0
+            if not item or not customization or not properties or
+                customization.capacity ~= 1 or occupied ~= 1 or
+                properties.level_requirement ~= 200 or
+                properties.maximum_charges ~= 6 then
+                if item then item:destroy() end
+                return false, "invalid Chaos donor " .. tostring(key)
+            end
+
+            local saved_id = item:encode_id()
+            local saved_stats = item:encode_stats()
+            local saved_extra = item:encode_extra()
+            local saved_state = item:encode_state()
+            local expected_prefix = customization.prefix_id
+            local expected_suffix = customization.suffix_id
+            item:destroy()
+
+            local restored = Item.decode(saved_id, saved_stats, saved_extra,
+                                         saved_state)
+            local restored_customization =
+                PotionService.getCustomization(restored)
+            local valid = restored and restored_customization and
+                              restored.runtime_definition.key == key and
+                              restored_customization.prefix_id ==
+                              expected_prefix and
+                              restored_customization.suffix_id ==
+                              expected_suffix
+            if restored then restored:destroy() end
+            if not valid then
+                return false, "Chaos donor did not round trip " ..
+                           tostring(key)
+            end
+        end
+        return true
+    end)
+
     ArchitectureTests.register("runtime potion saves preserve identity and charges",
                                function()
         local cases = {
@@ -370,8 +419,35 @@ OnInit.final("ArchitectureTests", function(Require)
 
             if restored then restored:destroy() end
             if not valid then
+                local actual = properties and string.format(
+                    "identity=%s skin=%s charges=%s/%s restoration=%s/%s/%s/%s expected=%s/%s/%s/%s affixes=%s/%s cooldown=%s tooltip=%s/%s",
+                    tostring(restored and RuntimeItemDefinitions.is(restored,
+                        case[1])), tostring(restored and
+                        restored.runtime_definition.world_skin_id == case[3]),
+                    tostring(restored and restored.charges),
+                    tostring(properties.maximum_charges),
+                    tostring(properties.flat_health),
+                    tostring(properties.percent_health),
+                    tostring(properties.flat_mana),
+                    tostring(properties.percent_mana),
+                    tostring(expected.flat_health),
+                    tostring(expected.percent_health),
+                    tostring(expected.flat_mana),
+                    tostring(expected.percent_mana),
+                    tostring(customization and customization.infusion_id),
+                    tostring(customization and customization.catalyst_id),
+                    tostring(properties.cooldown),
+                    tostring(restored and customization and
+                        customization.infusion and
+                        restored.tooltip:find(
+                            customization.infusion.name .. ":", 1, true) ~= nil),
+                    tostring(restored and customization and
+                        (not customization.catalyst or
+                            restored.tooltip:find(
+                                customization.catalyst.name .. ":", 1,
+                                true) ~= nil))) or "no properties"
                 return false, "saved potion did not round trip " ..
-                           tostring(case[1])
+                           tostring(case[1]) .. ": " .. actual
             end
         end
 
@@ -407,6 +483,7 @@ OnInit.final("ArchitectureTests", function(Require)
                           PotionService.getRerollCount(first) == 1 and
                           PotionService.getRerollCount(second) == 1 and
                           math.abs(second_price / initial_price - 1.35) < 0.002
+        local failure_stage = valid and nil or "first reroll"
 
         -- Advance the persistent counter, save that state, and ensure the
         -- following candidate is also identical after a load. This catches
@@ -422,14 +499,22 @@ OnInit.final("ArchitectureTests", function(Require)
         local next_restored_ok = PotionService.rerollRestoration(restored)
         local next_a = PotionService.getProperties(first)
         local next_b = PotionService.getProperties(restored)
-        valid = valid and next_first_ok and next_restored_ok and next_a and
-                    next_b and
-                    next_a.base_flat_health == next_b.base_flat_health and
-                    next_a.base_percent_health == next_b.base_percent_health and
-                    next_a.base_flat_mana == next_b.base_flat_mana and
-                    next_a.base_percent_mana == next_b.base_percent_mana and
-                    PotionService.getRerollCount(first) == 2 and
-                    PotionService.getRerollCount(restored) == 2
+        local continuation_valid = next_first_ok and next_restored_ok and
+                                       next_a and next_b and
+                                       next_a.base_flat_health ==
+                                           next_b.base_flat_health and
+                                       next_a.base_percent_health ==
+                                           next_b.base_percent_health and
+                                       next_a.base_flat_mana ==
+                                           next_b.base_flat_mana and
+                                       next_a.base_percent_mana ==
+                                           next_b.base_percent_mana and
+                                       PotionService.getRerollCount(first) == 2 and
+                                       PotionService.getRerollCount(restored) == 2
+        if not continuation_valid and not failure_stage then
+            failure_stage = "save continuation"
+        end
+        valid = valid and continuation_valid
 
         -- Run well past the old three-bit limit and require both identical
         -- copies to retain their full count and advance to a visible result.
@@ -449,22 +534,31 @@ OnInit.final("ArchitectureTests", function(Require)
                                             advanced_a.base_flat_mana or
                                             previous.base_percent_mana ~=
                                             advanced_a.base_percent_mana)
-            valid = valid and first_advanced and restored_advanced and
-                        advanced_a and advanced_b and visibly_changed and
-                        advanced_a.base_flat_health ==
-                            advanced_b.base_flat_health and
-                        advanced_a.base_percent_health ==
-                            advanced_b.base_percent_health and
-                        advanced_a.base_flat_mana ==
-                            advanced_b.base_flat_mana and
-                        advanced_a.base_percent_mana ==
-                            advanced_b.base_percent_mana and
-                        PotionService.getRerollCount(first) == roll
+            local roll_valid = first_advanced and restored_advanced and
+                                   advanced_a and advanced_b and
+                                   visibly_changed and
+                                   advanced_a.base_flat_health ==
+                                       advanced_b.base_flat_health and
+                                   advanced_a.base_percent_health ==
+                                       advanced_b.base_percent_health and
+                                   advanced_a.base_flat_mana ==
+                                       advanced_b.base_flat_mana and
+                                   advanced_a.base_percent_mana ==
+                                       advanced_b.base_percent_mana and
+                                   PotionService.getRerollCount(first) == roll
+            if not roll_valid and not failure_stage then
+                failure_stage = "reroll " .. roll
+            end
+            valid = valid and roll_valid
         end
 
         local twelfth_price = PotionBrewingService.getPrice(first, "reroll")
-        valid = valid and math.abs(twelfth_price / initial_price -
-                                      1.35 ^ 12) < 0.002
+        local price_valid = math.abs(twelfth_price / initial_price -
+                                         1.35 ^ 12) < 0.002
+        if not price_valid and not failure_stage then
+            failure_stage = "twelfth price"
+        end
+        valid = valid and price_valid
 
         local capped_id = first:encode_id()
         local capped_stats = first:encode_stats()
@@ -477,13 +571,20 @@ OnInit.final("ArchitectureTests", function(Require)
             PotionService.rerollRestoration(capped_restore)
         local capped_a = PotionService.getProperties(first)
         local capped_b = PotionService.getProperties(capped_restore)
-        valid = valid and capped_first_ok and capped_restore_ok and capped_a and
-                    capped_b and
-                    capped_a.base_flat_health == capped_b.base_flat_health and
-                    capped_a.base_percent_health ==
-                        capped_b.base_percent_health and
-                    capped_a.base_flat_mana == capped_b.base_flat_mana and
-                    capped_a.base_percent_mana == capped_b.base_percent_mana
+        local continued_valid = capped_first_ok and capped_restore_ok and
+                                    capped_a and capped_b and
+                                    capped_a.base_flat_health ==
+                                        capped_b.base_flat_health and
+                                    capped_a.base_percent_health ==
+                                        capped_b.base_percent_health and
+                                    capped_a.base_flat_mana ==
+                                        capped_b.base_flat_mana and
+                                    capped_a.base_percent_mana ==
+                                        capped_b.base_percent_mana
+        if not continued_valid and not failure_stage then
+            failure_stage = "post-twelve save continuation"
+        end
+        valid = valid and continued_valid
 
         for _, stat in ipairs({ITEM_FLAT_HEAL, ITEM_PERCENT_HEAL,
                                ITEM_FLAT_MANA, ITEM_PERCENT_MANA}) do
@@ -508,7 +609,13 @@ OnInit.final("ArchitectureTests", function(Require)
         if second then second:destroy() end
         if restored then restored:destroy() end
         if capped_restore then capped_restore:destroy() end
-        if not valid then return false, "identical saves produced different rerolls" end
+        if not valid then
+            return false, "identical saves produced different rerolls at " ..
+                       tostring(failure_stage) .. " (counts " ..
+                       PotionService.getRerollCount(first) .. "/" ..
+                       PotionService.getRerollCount(restored) .. ", prices " ..
+                       initial_price .. "/" .. twelfth_price .. ")"
+        end
         return true
     end)
 
@@ -874,15 +981,21 @@ OnInit.final("ArchitectureTests", function(Require)
         "equipment maximum changes use the more punitive resource value",
         function()
             local calculate = ItemRuntime.minimumResourceAfterMaxChange
-            if calculate(100000, 1000000, 10000000, 1) ~= 100000 then
-                return false, "equipping maximum health granted current health"
+            local equipped = calculate(100000, 1000000, 10000000, 1)
+            if equipped ~= 100000 then
+                return false, "equipping maximum health granted current health: " ..
+                           tostring(equipped)
             end
-            if calculate(5000000, 10000000, 1000000, 1) ~= 500000 then
+            local unequipped = calculate(5000000, 10000000, 1000000, 1)
+            if unequipped ~= 500000 then
                 return false,
-                       "unequipping maximum health did not preserve the lower percentage"
+                       "unequipping maximum health did not preserve the lower percentage: " ..
+                           tostring(unequipped)
             end
-            if calculate(0, 1000, 10000, 0) ~= 0 then
-                return false, "equipping maximum mana granted current mana"
+            local mana = calculate(0, 1000, 10000, 0)
+            if mana ~= 0 then
+                return false, "equipping maximum mana granted current mana: " ..
+                           tostring(mana)
             end
             return true
         end)

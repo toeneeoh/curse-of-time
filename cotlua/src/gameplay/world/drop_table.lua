@@ -13,6 +13,8 @@
     local COLOSSEUM_ELITE_TICKET_CHANCE = 0.01
     local PRECHAOS_FLASK_CHANCE = 0.002
     local PRECHAOS_ELITE_FLASK_CHANCE = 0.02
+    local CHAOS_DONOR_CHANCE = 0.0005
+    local CHAOS_ELITE_DONOR_CHANCE = 0.005
 
     ---@class DropTable
     ---@field pickItem function
@@ -98,6 +100,14 @@
             return PotionService.create(key, x, y, 600.) ~= nil
         end
 
+        local function roll_chaos_donor(level, x, y, elite)
+            if level < 200 then return false end
+            local chance = elite and CHAOS_ELITE_DONOR_CHANCE or
+                               CHAOS_DONOR_CHANCE
+            if math.random() >= chance then return false end
+            return PotionService.createChaosDonor(x, y, 600.) ~= nil
+        end
+
         ---@type fun(id: integer, ...)
         local function setup_rates(id, ...)
             local t = table.pack(...)
@@ -134,6 +144,7 @@
                                       COLOSSEUM_TICKET_CHANCE
             thistype:rollColosseumTicket(x, y, ticket_chance)
             roll_prechaos_flask(lvl, x, y, IsUnitType(killed, UNIT_TYPE_HERO))
+            roll_chaos_donor(lvl, x, y, IsUnitType(killed, UNIT_TYPE_HERO))
         end
 
         local id = 69 -- destructables

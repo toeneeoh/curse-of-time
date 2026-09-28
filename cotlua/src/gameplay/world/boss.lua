@@ -12,6 +12,7 @@ OnInit.final("Boss", function(Require)
     Require('TimerQueue')
     Require('Users')
     Require('DropTable')
+    Require('PotionService')
 
     local TQ = TimerQueue
     local dead_gods = 0
@@ -443,6 +444,20 @@ OnInit.final("Boss", function(Require)
             end
 
             DropTable:rollColosseumTicket(x, y, 0.05)
+
+            -- Chaos bosses are the dependable source of transferable generic
+            -- affixes and the rare source of the two-slot legendary base.
+            if CHAOS_MODE then
+                for _ = 1, self.difficulty do
+                    if GetRandomReal(0., 1.) < 0.10 then
+                        PotionService.createChaosDonor(x, y, 600.)
+                    end
+                    if GetRandomReal(0., 1.) < 0.01 then
+                        PotionService.create(PotionService.LEGENDARY_CHAOS_KEY,
+                                             x, y, 600.)
+                    end
+                end
+            end
 
             local count = self.crystal * self.difficulty ---@type integer 
 

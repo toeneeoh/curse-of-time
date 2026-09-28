@@ -25,6 +25,7 @@
     Require('Items')
     Require('ItemHelpers')
     Require('RuntimeItemDefinitions')
+    Require('PotionService')
     Require('CooldownAcceleration')
     Require('Perks')
     Require('FactionMining')
@@ -54,6 +55,7 @@
         ["factionrep"] = "Set the active faction's lifetime Faction Points to #. usage: -factionrep [#]",
         ["mining"] = "Spawn a common, rich, or rare deposit beside your hero. usage: -mining [common|rich|rare]",
         ["factionevent"] = "Immediately start the next hourly faction event.",
+        ["potion"] = "Spawn potion test drops. usage: -potion [all|legendary|donor|aegis|fury|arcane|swiftness|purity|potent|lingering|accelerant|bountiful|conserving|echoing]",
         ["lvl"] = "Set the selected hero's level to #. usage: -lvl [1-500]",
         ["str"] = "Set the selected hero's strength to #. usage: -str [#]",
         ["agi"] = "Set the selected hero's agility to #. usage: -agi [#]",
@@ -313,6 +315,37 @@ modifiers:
             if not FactionEvents.startNow(pid) then
                 DisplayTextToPlayer(p, 0., 0.,
                                     "Unable to start the faction event.")
+            end
+        end,
+        ["potion"] = function(p, pid, args)
+            local choice = lower(args[2] or "all")
+            local hero = Hero[pid]
+            local x, y = GetUnitX(hero), GetUnitY(hero)
+            local keys = PotionService.getChaosDonorKeys()
+
+            local function spawn(key, offset)
+                return PotionService.create(key, x + 150. + 90. * offset,
+                                            y, 600.)
+            end
+
+            if choice == "legendary" then
+                spawn(PotionService.LEGENDARY_CHAOS_KEY, 0)
+            elseif choice == "donor" then
+                PotionService.createChaosDonor(x + 150., y, 600.)
+            elseif choice == "all" then
+                spawn(PotionService.LEGENDARY_CHAOS_KEY, 0)
+                for index, key in ipairs(keys) do spawn(key, index) end
+            else
+                local found
+                for _, key in ipairs(keys) do
+                    if key:find(choice, 1, true) then
+                        found = spawn(key, 0)
+                        break
+                    end
+                end
+                if not found then
+                    DisplayTextToPlayer(p, 0., 0., help_table.potion)
+                end
             end
         end,
         ["lvl"] = function(p, pid, args)
