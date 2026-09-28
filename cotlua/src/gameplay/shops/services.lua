@@ -124,8 +124,8 @@ OnInit.final("ShopServices", function(Require)
         quote.price = 0
         quote.potions = {}
         local found_potion = false
-        for slot = POTION_INDEX, MAX_INVENTORY_SLOTS do
-            local potion = Profile[pid].hero.items[slot]
+        for slot = 1, MAX_INVENTORY_SLOTS do
+            local potion = PotionService.getStored(pid, slot)
             if potion then
                 local properties = PotionService.getProperties(potion)
                 if properties then

@@ -273,6 +273,7 @@
         ---@field create fun(id: string|integer|item, x: number?, y: number?, expire: number?): Item
         ---@field wrap fun(handle: item): Item
         ---@field commit_slot fun(self: Item, slot: integer, suppress_refresh: boolean?): boolean
+        ---@field getRarityIndex fun(item: Item): integer
         ---@field minimumResourceAfterMaxChange fun(current: number, old_maximum: number, new_maximum: number, minimum?: number): number
         ---@class RuntimeItemDefinition
         ---@field custom_level? boolean
@@ -285,6 +286,28 @@
         ItemRuntime = {definitions = {}}
         local NativeCreateItem = CreateItem
         ItemRuntime.native_create = NativeCreateItem
+
+        ---Returns the rarity used by item presentation. Logical items may opt
+        ---into the ordinary rarity header and inventory border without
+        ---pretending to have an upgrade level or changing their world skin.
+        ---@param item Item
+        ---@return integer
+        function ItemRuntime.getRarityIndex(item)
+            local logical_rarity = item.runtime_definition and
+                                       item.runtime_definition.display_rarity
+            if type(logical_rarity) == "number" then
+                return math.max(0, math.min(MAX_ITEM_RARITY_INDEX,
+                                             math.floor(logical_rarity)))
+            end
+
+            local definition = not item.runtime_definition and
+                                   ItemRuntime.definitions[item.id] or nil
+            if item.level > 0 and not (definition and definition.custom_level) then
+                return math.min(MAX_ITEM_RARITY_INDEX,
+                                (item.level + 3) // item.rarity)
+            end
+            return 0
+        end
 
         ---Chooses the more punitive outcome between preserving an absolute
         ---resource value and preserving its percentage when its maximum
@@ -1193,13 +1216,16 @@
             local text = {}
 
             -- first "header" lines: rarity, upg level, tier, type, req level
+            local rarity_index = ItemRuntime.getRarityIndex(self)
             if self.level > 0 and not (definition and definition.custom_level) then
-                local rarity_index = (self.level + 3) // self.rarity
                 BlzSetItemSkin(self.obj, ITEM_MODEL[rarity_index])
 
                 text[#text + 1] = RARITY_NAME[rarity_index]
                 text[#text + 1] = " +"
                 text[#text + 1] = self.level
+                text[#text + 1] = "|n"
+            elseif rarity_index > 0 then
+                text[#text + 1] = RARITY_NAME[rarity_index]
                 text[#text + 1] = "|n"
             end
 

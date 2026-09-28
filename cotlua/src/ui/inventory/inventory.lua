@@ -118,14 +118,7 @@ OnInit.final("Inventory", function(Require)
         ---@param itm Item
         ---@return string
         local function get_rarity_border(itm)
-            local definition = ItemRuntime.definitions[itm.id]
-            local rarity_index = 0
-
-            if itm.level > 0 and not (definition and definition.custom_level) then
-                rarity_index = math.min(MAX_ITEM_RARITY_INDEX,
-                    (itm.level + 3) // itm.rarity)
-            end
-
+            local rarity_index = ItemRuntime.getRarityIndex(itm)
             return SPRITE_RARITY[rarity_index] or SPRITE_RARITY[0]
         end
 

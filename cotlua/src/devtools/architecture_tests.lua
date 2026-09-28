@@ -398,8 +398,31 @@ OnInit.final("ArchitectureTests", function(Require)
                           a.base_percent_mana == b.base_percent_mana and
                           PotionService.getRerollCount(first) == 1 and
                           PotionService.getRerollCount(second) == 1
+
+        -- Advance the persistent counter, save that state, and ensure the
+        -- following candidate is also identical after a load. This catches
+        -- seed-only implementations whose first roll is stable but whose
+        -- sequence position is not actually persisted.
+        local advanced_id = first:encode_id()
+        local advanced_stats = first:encode_stats()
+        local advanced_extra = first:encode_extra()
+        local restored = Item.decode(advanced_id, advanced_stats,
+                                     advanced_extra)
+        local next_first_ok = PotionService.rerollRestoration(first)
+        local next_restored_ok = PotionService.rerollRestoration(restored)
+        local next_a = PotionService.getProperties(first)
+        local next_b = PotionService.getProperties(restored)
+        valid = valid and next_first_ok and next_restored_ok and next_a and
+                    next_b and
+                    next_a.base_flat_health == next_b.base_flat_health and
+                    next_a.base_percent_health == next_b.base_percent_health and
+                    next_a.base_flat_mana == next_b.base_flat_mana and
+                    next_a.base_percent_mana == next_b.base_percent_mana and
+                    PotionService.getRerollCount(first) == 2 and
+                    PotionService.getRerollCount(restored) == 2
         if first then first:destroy() end
         if second then second:destroy() end
+        if restored then restored:destroy() end
         if not valid then return false, "identical saves produced different rerolls" end
         return true
     end)

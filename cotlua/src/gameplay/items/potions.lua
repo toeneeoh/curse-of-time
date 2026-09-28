@@ -278,6 +278,7 @@ OnInit.final("PotionService", function(Require)
         {
             level = 50,
             item_tier = 2,
+            display_rarity = 1,
             health_key = GREATER_HEALTH_KEY,
             mana_key = GREATER_MANA_KEY,
             flat_min = 750,
@@ -289,6 +290,7 @@ OnInit.final("PotionService", function(Require)
         }, {
             level = 110,
             item_tier = 2,
+            display_rarity = 2,
             health_key = SUPERIOR_HEALTH_KEY,
             mana_key = SUPERIOR_MANA_KEY,
             flat_min = 3000,
@@ -300,6 +302,7 @@ OnInit.final("PotionService", function(Require)
         }, {
             level = 170,
             item_tier = 2,
+            display_rarity = 3,
             health_key = GRAND_HEALTH_KEY,
             mana_key = GRAND_MANA_KEY,
             flat_min = 8000,
@@ -360,6 +363,7 @@ OnInit.final("PotionService", function(Require)
             name = name,
             icon = BlzGetAbilityIcon(carrier),
             tooltip = "A refillable flask found throughout the pre-chaos world.",
+            display_rarity = tier.display_rarity,
             inherit_stats = inherited_potion_stats,
             prepare_data = prepare_prechaos_flask(tier, flat_stat, percent_stat)
         })
@@ -444,7 +448,8 @@ OnInit.final("PotionService", function(Require)
         carrier = HEALTH_FLASK_ID,
         name = "Stoneblood Flask",
         icon = "ReplaceableTextures\\CommandButtons\\BTNStone.blp",
-        tooltip = "A Cave Voyagers flask carrying one transferable prefix.",
+        tooltip = "A Cave Voyagers faction flask.",
+        display_rarity = 3,
         faction_rank_requirement = 4,
         inherit_stats = chaos_inherited_stats,
         prepare_data = prepare_chaos_flask(15000, 30, 0, 0)
@@ -459,7 +464,8 @@ OnInit.final("PotionService", function(Require)
         carrier = MANA_FLASK_ID,
         name = "Tempest Flask",
         icon = "ReplaceableTextures\\CommandButtons\\BTNMonsoon.blp",
-        tooltip = "A Stormwatch flask carrying one transferable prefix.",
+        tooltip = "A Stormwatch faction flask.",
+        display_rarity = 3,
         faction_rank_requirement = 4,
         inherit_stats = chaos_inherited_stats,
         prepare_data = prepare_chaos_flask(0, 0, 15000, 30)
@@ -474,7 +480,8 @@ OnInit.final("PotionService", function(Require)
         carrier = HEALTH_FLASK_ID,
         name = "Hunter's Flask",
         icon = BLOOD_FLASK_ICON,
-        tooltip = "An Ashen Vanguard flask carrying one transferable prefix.",
+        tooltip = "An Ashen Vanguard faction flask.",
+        display_rarity = 3,
         faction_rank_requirement = 4,
         inherit_stats = chaos_inherited_stats,
         prepare_data = prepare_chaos_flask(7500, 15, 7500, 15)
@@ -489,8 +496,8 @@ OnInit.final("PotionService", function(Require)
         carrier = HEALTH_FLASK_ID,
         name = "Legendary Chaos Flask",
         icon = "ReplaceableTextures\\CommandButtons\\BTNStrongDrink.blp",
-        tooltip = "A rare Chaos flask base with room for both a prefix and " ..
-            "suffix.",
+        tooltip = "A rare flask base recovered from Chaos.",
+        display_rarity = 4,
         inherit_stats = chaos_inherited_stats,
         prepare_data = prepare_chaos_flask(12000, 25, 12000, 25)
     }, {
@@ -598,8 +605,7 @@ OnInit.final("PotionService", function(Require)
         return potion_at(pid, index)
     end
 
-    ---Returns a potion from its absolute saved inventory slot. This includes
-    ---the two potion slots and every backpack slot.
+    ---Returns a potion from any absolute saved inventory slot.
     function PotionService.getStored(pid, slot)
         local profile = Profile[pid]
         local item = profile and profile.hero and profile.hero.items[slot]
@@ -610,7 +616,7 @@ OnInit.final("PotionService", function(Require)
     ---Returns all flasks available to the Potion Master in inventory order.
     function PotionService.getStoredAll(pid)
         local result = {}
-        for slot = POTION_INDEX, MAX_INVENTORY_SLOTS do
+        for slot = 1, MAX_INVENTORY_SLOTS do
             local item = PotionService.getStored(pid, slot)
             if item then result[#result + 1] = {slot = slot, item = item} end
         end
@@ -661,6 +667,25 @@ OnInit.final("PotionService", function(Require)
         return behavior and behavior.affix_capacity or 0
     end
 
+    local function append_affix_slots(item, prefix, suffix)
+        local capacity = affix_capacity(item)
+        if capacity <= 0 then return end
+
+        local used = (prefix and 1 or 0) + (suffix and 1 or 0)
+        local available = capacity - used
+        local function status(definition)
+            if definition then
+                return "|cff0080c0" .. definition.name .. "|r"
+            end
+            if available > 0 then return "|cff40bf5fOpen|r" end
+            return "|cff606060Locked|r"
+        end
+        local line = "|n|cff808080Prefix:|r " .. status(prefix) ..
+                         "   |cff808080Suffix:|r " .. status(suffix)
+        item.tooltip = (item.tooltip or "") .. line
+        item.alt_tooltip = (item.alt_tooltip or "") .. line
+    end
+
     local function restoration_multiplier(item)
         local count = affix_count(item)
         if count >= 2 then return 0.40 end
@@ -679,6 +704,7 @@ OnInit.final("PotionService", function(Require)
                                                 INFUSION_QUALITY_INDEX)
         local catalyst = selected_customization(item, catalysts,
                                                 CATALYST_QUALITY_INDEX)
+        append_affix_slots(item, infusion, catalyst)
         append_customization(item, infusion)
         append_customization(item, catalyst)
         BlzSetItemDescription(item.obj, item.tooltip)
@@ -998,6 +1024,23 @@ OnInit.final("PotionService", function(Require)
         RuntimeItemDefinitions.setMetadata(item, metadata)
     end
 
+    ---Builds a deterministic permutation using item-local state. This follows
+    ---the save code's pseudoRandomPermutation approach without reseeding the
+    ---global Lua RNG, which would affect unrelated gameplay randomness.
+    local function restoration_permutation(seed, attempt)
+        local values = {}
+        for index = 1, 64 do values[index] = index - 1 end
+
+        local state = ((seed & 0x3F) << 3) | (attempt & 0x07)
+        state = (state ~ 0x45D9F3B) & 0x7FFFFFFF
+        for index = 64, 2, -1 do
+            state = (state * 1103515245 + 12345) & 0x7FFFFFFF
+            local swap = (state % index) + 1
+            values[index], values[swap] = values[swap], values[index]
+        end
+        return values
+    end
+
     ---@param item Item
     ---@return boolean
     function PotionService.rerollRestoration(item)
@@ -1010,13 +1053,14 @@ OnInit.final("PotionService", function(Require)
         end
 
         local changed = false
-        local roll = seed + attempt * 67
+        local permutation = restoration_permutation(seed, attempt)
+        local result_index = 1
         for _, stat in ipairs({ITEM_FLAT_HEAL, ITEM_PERCENT_HEAL,
                                ITEM_FLAT_MANA, ITEM_PERCENT_MANA}) do
             local quality_index = refinement_index(item, stat)
             if quality_index then
-                roll = (roll * 37 + stat * 17 + 11) % 64
-                item.quality[quality_index] = roll
+                item.quality[quality_index] = permutation[result_index]
+                result_index = result_index + 1
                 changed = true
             end
         end

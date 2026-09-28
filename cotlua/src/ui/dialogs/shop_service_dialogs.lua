@@ -242,6 +242,7 @@ OnInit.final("ShopServiceDialogs", function(Require)
     end
 
     local function stored_slot_name(slot)
+        if slot < POTION_INDEX then return "Inventory " .. slot end
         if slot == POTION_INDEX then return "Potion Slot 1" end
         if slot == POTION_INDEX + 1 then return "Potion Slot 2" end
         return "Backpack " .. (slot - BACKPACK_INDEX + 1)
@@ -377,7 +378,7 @@ OnInit.final("ShopServiceDialogs", function(Require)
         ShopAddOffer(shop_id, {
             key = "potion_master_refill",
             name = "Refill Flasks",
-            tooltip = "Refill every flask in your potion slots and backpack.",
+            tooltip = "Refill every flask in your inventory and backpack.",
             icon = "ReplaceableTextures\\CommandButtons\\BTNPotionGreenSmall.blp",
             categories = category,
             availability = function(pid)
@@ -404,7 +405,7 @@ OnInit.final("ShopServiceDialogs", function(Require)
         ShopAddOffer(shop_id, {
             key = "potion_master_prefix",
             name = "Transfer Prefix",
-            tooltip = "Transfer a prefix from another flask in your potion slots or backpack. The donor flask is destroyed.",
+            tooltip = "Transfer a prefix from another flask in your inventory or backpack. The donor flask is destroyed.",
             icon = "ReplaceableTextures\\CommandButtons\\BTNPotionOfVampirism.blp",
             categories = category,
             availability = function(pid)
@@ -415,7 +416,7 @@ OnInit.final("ShopServiceDialogs", function(Require)
         ShopAddOffer(shop_id, {
             key = "potion_master_suffix",
             name = "Transfer Suffix",
-            tooltip = "Transfer a suffix from another flask in your potion slots or backpack. The donor flask is destroyed.",
+            tooltip = "Transfer a suffix from another flask in your inventory or backpack. The donor flask is destroyed.",
             icon = "ReplaceableTextures\\CommandButtons\\BTNCloudOfFog.blp",
             categories = category,
             availability = function(pid)

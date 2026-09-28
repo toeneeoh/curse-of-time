@@ -12,6 +12,7 @@ OnInit.final("RuntimeItemDefinitions", function(Require)
     ---@field tooltip string Standard item bracket-formula tooltip.
     ---@field item_type? integer Inventory/proficiency type index.
     ---@field faction_rank_requirement? integer Faction rank shown alongside the level requirement.
+    ---@field display_rarity? integer Rarity presentation without an upgrade level.
     ---@field metadata? table Gameplay data owned by the defining subsystem.
     ---@field inherit_stats? integer[] Formula stats copied from the carrier.
     ---@field prepare_data? fun(data: table, carrier_data: table)
