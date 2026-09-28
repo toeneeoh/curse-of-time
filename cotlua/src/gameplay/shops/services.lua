@@ -179,8 +179,8 @@ OnInit.final("ShopServices", function(Require)
         if operation == "reroll" or operation == "prefix" or
             operation == "suffix" then
             -- Repeated work on one base rapidly becomes uneconomical. The
-            -- exponent is capped only to keep integer arithmetic safe; the
-            -- saved attempt counter continues increasing.
+            -- compact saved counter caps at seven, which is already costly
+            -- enough to encourage replacing the flask base.
             local attempts = PotionService.getRerollCount(item, operation)
             local multiplier = operation == "reroll" and 0.5 or
                                    operation == "suffix" and 0.75 or 1.

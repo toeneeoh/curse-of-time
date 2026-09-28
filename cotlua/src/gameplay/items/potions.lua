@@ -1011,8 +1011,8 @@ OnInit.final("PotionService", function(Require)
     end
 
     ---Chaos restoration is rerolled as one deterministic property group. The
-    ---next result is derived only from the flask seed and committed attempt,
-    ---so reloading a save cannot produce a different candidate.
+    ---next result is derived from the flask's saved seed, counter, and current
+    ---qualities, so reloading a save cannot produce a different candidate.
     ---@param item Item
     ---@return boolean
     function PotionService.canRerollRestoration(item)
@@ -1050,18 +1050,47 @@ OnInit.final("PotionService", function(Require)
     ---Builds a deterministic permutation using item-local state. This follows
     ---the save code's pseudoRandomPermutation approach without reseeding the
     ---global Lua RNG, which would affect unrelated gameplay randomness.
-    local function restoration_permutation(seed, attempt)
+    local function restoration_permutation(seed)
         local values = {}
         for index = 1, 64 do values[index] = index - 1 end
 
-        local state = ((seed & 0x3F) << 3) | (attempt & 0x07)
-        state = (state ~ 0x45D9F3B) & 0x7FFFFFFF
+        local state = (seed ~ 0x45D9F3B) & 0x7FFFFFFF
         for index = 64, 2, -1 do
             state = (state * 1103515245 + 12345) & 0x7FFFFFFF
             local swap = (state % index) + 1
             values[index], values[swap] = values[swap], values[index]
         end
         return values
+    end
+
+    ---Produces independent property rolls from the fixed seed, saved attempt,
+    ---and currently saved restoration qualities. Including the current rolls
+    ---makes the sequence continue evolving after the compact cost counter
+    ---reaches seven, while remaining reproducible after save/load.
+    local function next_restoration_rolls(seed, attempt, current)
+        local state = ((seed & 0x3F) << 3) | (attempt & 0x07)
+        for index = 1, #current do
+            state = (state ~ ((current[index] + 1) *
+                        (0x1F123BB + index * 0x9E37))) & 0x7FFFFFFF
+            state = (state * 1103515245 + 12345) & 0x7FFFFFFF
+        end
+
+        local rolls = {}
+        local first_permutation
+        local unchanged = true
+        for index = 1, #current do
+            local permutation = restoration_permutation(
+                                    state ~ (index * 0x45D9F3B))
+            if index == 1 then first_permutation = permutation end
+            rolls[index] = permutation[1]
+            if rolls[index] ~= current[index] then unchanged = false end
+        end
+
+        -- A genuinely random sequence can repeat once, but charging for an
+        -- entirely unchanged reroll feels broken. Advance the first property
+        -- to the next entry of its permutation in that exceptionally rare case.
+        if unchanged and first_permutation then rolls[1] = first_permutation[2] end
+        return rolls
     end
 
     ---Returns the player-facing values and quality classification for the
@@ -1119,19 +1148,22 @@ OnInit.final("PotionService", function(Require)
             item.quality[5] = seed
         end
 
-        local changed = false
-        local permutation = restoration_permutation(seed, attempt)
-        local result_index = 1
+        local quality_indices = {}
+        local current = {}
         for _, stat in ipairs({ITEM_FLAT_HEAL, ITEM_PERCENT_HEAL,
                                ITEM_FLAT_MANA, ITEM_PERCENT_MANA}) do
             local quality_index = refinement_index(item, stat)
             if quality_index then
-                item.quality[quality_index] = permutation[result_index]
-                result_index = result_index + 1
-                changed = true
+                quality_indices[#quality_indices + 1] = quality_index
+                current[#current + 1] = item.quality[quality_index]
             end
         end
-        if not changed then return false end
+        if #quality_indices == 0 then return false end
+
+        local rolls = next_restoration_rolls(seed, attempt, current)
+        for index = 1, #quality_indices do
+            item.quality[quality_indices[index]] = rolls[index]
+        end
         increment_reroll_count(item, "restoration")
         PotionService.refreshItem(item)
         if item.pid then NotifyItemChanged(item.pid) end

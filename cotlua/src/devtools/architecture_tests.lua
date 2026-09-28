@@ -421,6 +421,57 @@ OnInit.final("ArchitectureTests", function(Require)
                     PotionService.getRerollCount(first) == 2 and
                     PotionService.getRerollCount(restored) == 2
 
+        -- The price counter intentionally caps at seven, but that must not
+        -- freeze the deterministic result sequence. Run well past the cap and
+        -- require both identical copies to advance to a visibly new result.
+        for roll = 3, 12 do
+            local previous = PotionService.getProperties(first)
+            local first_advanced = PotionService.rerollRestoration(first)
+            local restored_advanced =
+                PotionService.rerollRestoration(restored)
+            local advanced_a = PotionService.getProperties(first)
+            local advanced_b = PotionService.getProperties(restored)
+            local visibly_changed = previous and advanced_a and
+                                        (previous.base_flat_health ~=
+                                            advanced_a.base_flat_health or
+                                            previous.base_percent_health ~=
+                                            advanced_a.base_percent_health or
+                                            previous.base_flat_mana ~=
+                                            advanced_a.base_flat_mana or
+                                            previous.base_percent_mana ~=
+                                            advanced_a.base_percent_mana)
+            valid = valid and first_advanced and restored_advanced and
+                        advanced_a and advanced_b and visibly_changed and
+                        advanced_a.base_flat_health ==
+                            advanced_b.base_flat_health and
+                        advanced_a.base_percent_health ==
+                            advanced_b.base_percent_health and
+                        advanced_a.base_flat_mana ==
+                            advanced_b.base_flat_mana and
+                        advanced_a.base_percent_mana ==
+                            advanced_b.base_percent_mana and
+                        PotionService.getRerollCount(first) == math.min(7,
+                                                                        roll)
+        end
+
+        local capped_id = first:encode_id()
+        local capped_stats = first:encode_stats()
+        local capped_extra = first:encode_extra()
+        local capped_restore = Item.decode(capped_id, capped_stats,
+                                           capped_extra)
+        local capped_first_ok = PotionService.rerollRestoration(first)
+        local capped_restore_ok =
+            PotionService.rerollRestoration(capped_restore)
+        local capped_a = PotionService.getProperties(first)
+        local capped_b = PotionService.getProperties(capped_restore)
+        valid = valid and capped_first_ok and capped_restore_ok and capped_a and
+                    capped_b and
+                    capped_a.base_flat_health == capped_b.base_flat_health and
+                    capped_a.base_percent_health ==
+                        capped_b.base_percent_health and
+                    capped_a.base_flat_mana == capped_b.base_flat_mana and
+                    capped_a.base_percent_mana == capped_b.base_percent_mana
+
         for _, stat in ipairs({ITEM_FLAT_HEAL, ITEM_PERCENT_HEAL,
                                ITEM_FLAT_MANA, ITEM_PERCENT_MANA}) do
             local quality_index = first.data.quality_index[stat]
@@ -443,6 +494,7 @@ OnInit.final("ArchitectureTests", function(Require)
         if first then first:destroy() end
         if second then second:destroy() end
         if restored then restored:destroy() end
+        if capped_restore then capped_restore:destroy() end
         if not valid then return false, "identical saves produced different rerolls" end
         return true
     end)
