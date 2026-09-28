@@ -160,11 +160,22 @@ OnInit.global("CodeGen", function()
         local VALID = false
         str = decompress(unscrambleString(str))
 
-        for i = 1, 3 do
-            if decode(str:sub(1, i)) == StringChecksum(str:sub(i + 1)) then
-                VALID = true
-                str = str:sub(i + 1)
-                break
+        -- New codes explicitly prefix the checksum with its encoded length.
+        -- Retain the old scan as a migration path for existing profile files.
+        local checksum_len = CHAR:find(str:sub(1, 1), 1, true)
+        if checksum_len then
+            local body = str:sub(checksum_len + 2)
+            VALID = decode(str:sub(2, checksum_len + 1)) ==
+                        StringChecksum(body)
+            if VALID then str = body end
+        else
+            for i = 1, #CHAR do
+                if decode(str:sub(1, i)) ==
+                    StringChecksum(str:sub(i + 1)) then
+                    VALID = true
+                    str = str:sub(i + 1)
+                    break
+                end
             end
         end
 
@@ -217,7 +228,12 @@ OnInit.global("CodeGen", function()
 
         -- appends total checksum to beginning of string
         local cs = StringChecksum(out)
-        out = encode(cs) .. out
+        local encoded_checksum = encode(cs)
+        if encoded_checksum:len() > #CHAR then
+            error("Save payload checksum exceeds the supported code length")
+        end
+        out = CHAR:sub(encoded_checksum:len(), encoded_checksum:len()) ..
+                  encoded_checksum .. out
 
         if DEV_ENABLED then
             print("Checksum: " .. cs .. " Encoded: " .. encode(cs))

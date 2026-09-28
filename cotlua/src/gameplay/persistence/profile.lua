@@ -1148,8 +1148,11 @@ OnInit.final("Profile", function(Require)
                 sockets = {},
             }
 
-            local state_count = math.min(math.max(0,
-                read_value(data, index + 2)), MAX_ITEM_STATE_VALUES)
+            local state_count = read_value(data, index + 2)
+            if state_count < 0 or state_count > MAX_ITEM_STATE_VALUES then
+                return nil, index,
+                       "Invalid item state count: " .. tostring(state_count)
+            end
             index = index + 3
             for state_index = 1, state_count do
                 saved.state[state_index] = math.max(0,
@@ -1158,8 +1161,11 @@ OnInit.final("Profile", function(Require)
                 index = index + 1
             end
 
-            local socket_count = math.min(math.max(0, read_value(data, index)),
-                                          MAX_SOCKETS)
+            local socket_count = read_value(data, index)
+            if socket_count < 0 or socket_count > MAX_SOCKETS then
+                return nil, index,
+                       "Invalid item socket count: " .. tostring(socket_count)
+            end
             index = index + 1
 
             for i = 1, socket_count do
@@ -1169,8 +1175,13 @@ OnInit.final("Profile", function(Require)
                 index = index + 3
 
                 local socket_state = {}
-                local socket_state_count = math.min(math.max(0,
-                    read_value(data, index)), MAX_ITEM_STATE_VALUES)
+                local socket_state_count = read_value(data, index)
+                if socket_state_count < 0 or socket_state_count >
+                    MAX_ITEM_STATE_VALUES then
+                    return nil, index,
+                           "Invalid socket state count: " ..
+                               tostring(socket_state_count)
+                end
                 index = index + 1
                 for state_index = 1, socket_state_count do
                     socket_state[state_index] = math.max(0,
@@ -1378,7 +1389,10 @@ OnInit.final("Profile", function(Require)
             self.unit_id = SAVE_UNIT_TYPE[self.id]
 
             for slot = 1, MAX_INVENTORY_SLOTS do
-                self.saved_items[slot], index = deserialize_item(data, index)
+                local err
+                self.saved_items[slot], index, err =
+                    deserialize_item(data, index)
+                if err then return false, err end
             end
 
             self.summon_essence = read_value(data, index)

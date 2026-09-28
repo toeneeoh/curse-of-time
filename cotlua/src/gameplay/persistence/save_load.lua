@@ -73,17 +73,28 @@ OnInit.final("SaveLoad", function(Require)
 
     local threads = {} -- use coroutines to "concurrently" load player profile and character codes
     local received_slots = {}
+    local profile_chunks = {}
+    local character_chunks = {}
+    local received_profiles = {}
 
     ---@return boolean
     local function sync_profile()
         local pid = GetPlayerId(GetTriggerPlayer()) + 1
-        local code = BlzGetTriggerSyncData()
+        if received_profiles[pid] then return false end
+        local index, total, chunk =
+            SaveWire.decodeProfile(BlzGetTriggerSyncData())
+        if not index then return false end
+        profile_chunks[pid] = profile_chunks[pid] or {}
+        local code, valid_stream = SaveWire.accept(profile_chunks[pid], 1,
+                                                    index, total, chunk)
+        if not valid_stream or not code then return false end
         local valid = code:len() > 1
 
         if valid then
             valid = Profile.load(code, pid)
         end
 
+        received_profiles[pid] = true
         coroutine.resume(threads[pid], valid)
 
         return false
@@ -93,11 +104,16 @@ OnInit.final("SaveLoad", function(Require)
     local function sync_character()
         local pid = GetPlayerId(GetTriggerPlayer()) + 1
         local payload = BlzGetTriggerSyncData()
-        local slot, code = SaveWire.decodeCharacter(payload)
+        local slot, index, total, chunk = SaveWire.decodeCharacter(payload)
 
         if not slot then
             return false
         end
+
+        character_chunks[pid] = character_chunks[pid] or {}
+        local code, valid_stream = SaveWire.accept(character_chunks[pid], slot,
+                                                    index, total, chunk)
+        if not valid_stream or not code then return false end
 
         received_slots[pid] = received_slots[pid] or {}
         if received_slots[pid][slot] then
@@ -145,7 +161,11 @@ OnInit.final("SaveLoad", function(Require)
                     local path = GetProfilePath(user.id)
 
                     if GetLocalPlayer() == user.player then
-                        BlzSendSyncData(SYNC_PROFILE, GetLine(0, FileIO.Load(path)))
+                        local messages = SaveWire.encodeProfile(
+                                             GetLine(0, FileIO.Load(path)))
+                        for index = 1, #(messages or {}) do
+                            BlzSendSyncData(SYNC_PROFILE, messages[index])
+                        end
                     end
 
                     -- wait for profile to create
@@ -156,7 +176,12 @@ OnInit.final("SaveLoad", function(Require)
                         for i = 1, MAX_SLOTS do
                             path = GetCharacterPath(user.id, i)
                             if GetLocalPlayer() == user.player then
-                                BlzSendSyncData(SYNC_CHARACTER, SaveWire.encodeCharacter(i, GetLine(1, FileIO.Load(path))))
+                                local messages = SaveWire.encodeCharacter(i,
+                                    GetLine(1, FileIO.Load(path)))
+                                for index = 1, #(messages or {}) do
+                                    BlzSendSyncData(SYNC_CHARACTER,
+                                                    messages[index])
+                                end
                             end
                         end
                     end

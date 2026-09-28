@@ -602,23 +602,48 @@ OnInit.final("ArchitectureTests", function(Require)
 
     ArchitectureTests.register("save wire preserves sparse physical slots",
                                function()
+        local long_code = string.rep("0123456789", 73)
         for slot = 1, MAX_SLOTS do
-            local payload = slot == 17 and "" or "character-code"
-            local decoded_slot, decoded_payload =
-                SaveWire.decodeCharacter(
-                    SaveWire.encodeCharacter(slot, payload))
-            if decoded_slot ~= slot then
-                return false, "save wire changed physical slot " .. slot
+            local payload = slot == 17 and "" or long_code
+            local messages = SaveWire.encodeCharacter(slot, payload)
+            local assembly = {}
+            local decoded_payload
+            -- Deliberately assemble in reverse order to ensure receipt order
+            -- is not part of the wire contract.
+            for message_index = #messages, 1, -1 do
+                local decoded_slot, index, total, chunk =
+                    SaveWire.decodeCharacter(messages[message_index])
+                if decoded_slot ~= slot then
+                    return false, "save wire changed physical slot " .. slot
+                end
+                local valid
+                decoded_payload, valid = SaveWire.accept(assembly, slot,
+                                                          index, total, chunk)
+                if not valid then
+                    return false, "save wire rejected valid chunks"
+                end
             end
             if decoded_payload ~= payload then
                 return false, "save wire changed slot payload " .. slot
             end
         end
 
-        if SaveWire.decodeCharacter("0:bad") ~= nil then
+        local profile = SaveWire.encodeProfile(long_code)
+        local profile_assembly = {}
+        local decoded_profile
+        for index = 1, #profile do
+            local part, total, chunk = SaveWire.decodeProfile(profile[index])
+            decoded_profile = SaveWire.accept(profile_assembly, 1, part, total,
+                                               chunk)
+        end
+        if decoded_profile ~= long_code then
+            return false, "profile chunks did not round-trip"
+        end
+
+        if SaveWire.decodeCharacter("0:1:1:bad") ~= nil then
             return false, "slot zero was accepted"
         end
-        if SaveWire.decodeCharacter((MAX_SLOTS + 1) .. ":bad") ~= nil then
+        if SaveWire.decodeCharacter((MAX_SLOTS + 1) .. ":1:1:bad") ~= nil then
             return false, "out-of-range slot was accepted"
         end
         if SaveWire.decodeCharacter("malformed") ~= nil then
@@ -634,6 +659,39 @@ OnInit.final("ArchitectureTests", function(Require)
         if ok then return false, "unknown character version was accepted" end
         return true
     end)
+
+    ArchitectureTests.register("oversized item state is rejected", function()
+        local source = HeroData.create()
+        source.id = 1
+        local values = source:values()
+        -- Header and the sixteen scalar fields precede inventory slot one.
+        local first_item = 19
+        values[first_item] = 1
+        values[first_item + 1] = 0
+        values[first_item + 2] = 0
+        values[first_item + 3] = 17
+        local decoded = HeroData.create()
+        local ok = decoded:propagate(values)
+        if ok then return false, "oversized item state was accepted" end
+        return true
+    end)
+
+    ArchitectureTests.register(
+        "save codec supports long explicitly framed checksums", function()
+            local source = {}
+            for index = 1, 2500 do source[index] = 0x7FFFFFFF end
+            local code = Compile(1, source)
+            local decoded, err = Decompile(code, Player(0))
+            if err or not decoded or #decoded ~= #source then
+                return false, "long save payload did not decode"
+            end
+            for index = 1, #source do
+                if decoded[index] ~= source[index] then
+                    return false, "long save payload changed value " .. index
+                end
+            end
+            return true
+        end)
 
     ArchitectureTests.register(
         "character save extensions are backward compatible", function()
