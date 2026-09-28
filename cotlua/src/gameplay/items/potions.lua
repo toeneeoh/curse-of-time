@@ -14,6 +14,7 @@ OnInit.final("PotionService", function(Require)
 
     local TQ = TimerQueue
     local DEFAULT_USE_COOLDOWN = 3.
+    local EQUIP_COOLDOWN = 10.
     local VAMPIRIC_DURATION = 12.
     local VAMPIRIC_LEECH = 0.05
     local INFUSION_NONE = 0
@@ -121,6 +122,7 @@ OnInit.final("PotionService", function(Require)
     PotionService.PREFIX_TEMPEST = INFUSION_TEMPEST
     PotionService.SUFFIX_NONE = CATALYST_NONE
     PotionService.DEFAULT_USE_COOLDOWN = DEFAULT_USE_COOLDOWN
+    PotionService.EQUIP_COOLDOWN = EQUIP_COOLDOWN
     PotionService.GREATER_HEALTH_KEY = GREATER_HEALTH_KEY
     PotionService.GREATER_MANA_KEY = GREATER_MANA_KEY
     PotionService.SUPERIOR_HEALTH_KEY = SUPERIOR_HEALTH_KEY
@@ -851,6 +853,27 @@ OnInit.final("PotionService", function(Require)
         return callback and math.max(0., TQ:getRemaining(callback) or 0.) or 0.
     end
 
+    ---Applies the anti-chug cooldown when a different flask enters a potion
+    ---slot. An existing longer cooldown is never shortened.
+    ---@param pid integer
+    ---@param index integer Potion button index, 1 or 2.
+    ---@param duration number?
+    ---@return number remaining
+    function PotionService.applyEquipCooldown(pid, index, duration)
+        if index ~= 1 and index ~= 2 then return 0. end
+        duration = math.max(0., duration or EQUIP_COOLDOWN)
+        local current = PotionService.getCooldown(pid, index)
+        if current >= duration then return current end
+
+        local player_cooldowns = cooldown_table(pid)
+        if player_cooldowns[index] then
+            TQ:disableCallback(player_cooldowns[index])
+        end
+        player_cooldowns[index] = TQ:callDelayed(duration, clear_cooldown,
+                                                 pid, index)
+        return duration
+    end
+
     local function potion_behavior(item)
         local definition = item.runtime_definition
         local metadata = definition and definition.metadata or nil
@@ -1039,6 +1062,50 @@ OnInit.final("PotionService", function(Require)
             values[index], values[swap] = values[swap], values[index]
         end
         return values
+    end
+
+    ---Returns the player-facing values and quality classification for the
+    ---current restoration roll. Near-perfect requires every rolled property
+    ---to be within the top four of the 64 possible quality values.
+    ---@param item Item
+    ---@return table?
+    function PotionService.getRestorationRollResult(item)
+        if not item or item.type ~= TYPE_POTION_INDEX then return nil end
+        local properties = PotionService.getProperties(item)
+        if not properties then return nil end
+
+        local presentation = {
+            [ITEM_FLAT_HEAL] = {properties.flat_health, " Health"},
+            [ITEM_PERCENT_HEAL] = {
+                properties.percent_health, "% Max Health"
+            },
+            [ITEM_FLAT_MANA] = {properties.flat_mana, " Mana"},
+            [ITEM_PERCENT_MANA] = {
+                properties.percent_mana, "% Max Mana"
+            }
+        }
+        local parts = {}
+        local minimum_quality = 63
+        local count = 0
+        for _, stat in ipairs(restoration_stats) do
+            local quality_index = refinement_index(item, stat)
+            if quality_index then
+                local quality = item.quality[quality_index]
+                local shown = presentation[stat]
+                minimum_quality = math.min(minimum_quality, quality)
+                count = count + 1
+                parts[#parts + 1] = tostring(shown[1]) .. shown[2]
+            end
+        end
+        if count == 0 then return nil end
+
+        return {
+            text = table.concat(parts, ", "),
+            perfect = minimum_quality == 63,
+            near_perfect = minimum_quality >= 60,
+            minimum_quality = minimum_quality,
+            property_count = count
+        }
     end
 
     ---@param item Item

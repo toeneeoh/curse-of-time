@@ -267,6 +267,10 @@ OnInit.final("ShopServices", function(Require)
                 PotionService.refine(quote.item, value)
         elseif operation == "reroll" then
             changed = PotionService.rerollRestoration(quote.item)
+            if changed then
+                quote.reroll_result =
+                    PotionService.getRestorationRollResult(quote.item)
+            end
         else
             changed = PotionService.transferAffix(quote.item, quote.donor,
                                                    operation)

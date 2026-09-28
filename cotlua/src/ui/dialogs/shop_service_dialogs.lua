@@ -7,6 +7,7 @@ OnInit.final("ShopServiceDialogs", function(Require)
     Require('ShopRegistry')
     Require('ShopServices')
     Require('TomeService')
+    Require('Users')
 
     PotionMasterServices = {}
 
@@ -173,6 +174,25 @@ OnInit.final("ShopServiceDialogs", function(Require)
         dialog:destroy()
         if not quote.available then
             failure(dialog.pid, quote.reason)
+        elseif quote.reroll_result then
+            local result = quote.reroll_result
+            local item_name = GetItemName(quote.item.obj)
+            local result_text = "|cffffcc00Reroll Result - " .. item_name ..
+                                    ":|r " .. result.text
+            if result.perfect then
+                DisplayTimedTextToForce(FORCE_PLAYING, 20.,
+                    User[dialog.pid - 1].nameColored ..
+                        " rolled |cffffcc00PERFECT|r restoration on " ..
+                        item_name .. "! " .. result.text)
+            elseif result.near_perfect then
+                DisplayTimedTextToForce(FORCE_PLAYING, 20.,
+                    User[dialog.pid - 1].nameColored ..
+                        " rolled |cff40bf5fnear-perfect|r restoration on " ..
+                        item_name .. "! " .. result.text)
+            else
+                DisplayTimedTextToPlayer(Player(dialog.pid - 1), 0, 0, 15.,
+                                         result_text)
+            end
         end
         return false
     end

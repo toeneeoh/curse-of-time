@@ -1130,6 +1130,18 @@
             items[slot] = self
             self.index = slot
 
+            -- Potion cooldowns belong to their two use buttons. Whenever a
+            -- different flask enters either slot, impose a longer shared
+            -- readiness delay so backpack stockpiles cannot bypass normal
+            -- consumption pacing by continuously swapping fresh flasks in.
+            local potion_service = rawget(_G, "PotionService")
+            if self.type == TYPE_POTION_INDEX and orig_index ~= slot and
+                slot >= POTION_INDEX and slot <= POTION_INDEX + 1 and
+                potion_service then
+                potion_service.applyEquipCooldown(self.pid,
+                                                  slot - POTION_INDEX + 1)
+            end
+
             -- A move within the same holder changes only the slot. Re-running
             -- onEquip in that case can duplicate periodic item effects.
             if orig_holder ~= new_holder then

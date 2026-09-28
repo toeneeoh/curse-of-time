@@ -420,6 +420,26 @@ OnInit.final("ArchitectureTests", function(Require)
                     next_a.base_percent_mana == next_b.base_percent_mana and
                     PotionService.getRerollCount(first) == 2 and
                     PotionService.getRerollCount(restored) == 2
+
+        for _, stat in ipairs({ITEM_FLAT_HEAL, ITEM_PERCENT_HEAL,
+                               ITEM_FLAT_MANA, ITEM_PERCENT_MANA}) do
+            local quality_index = first.data.quality_index[stat]
+            if quality_index then first.quality[quality_index] = 63 end
+        end
+        PotionService.refreshItem(first)
+        local perfect = PotionService.getRestorationRollResult(first)
+        valid = valid and perfect and perfect.perfect and
+                    perfect.near_perfect and perfect.text ~= ""
+
+        for _, stat in ipairs({ITEM_FLAT_HEAL, ITEM_PERCENT_HEAL,
+                               ITEM_FLAT_MANA, ITEM_PERCENT_MANA}) do
+            local quality_index = first.data.quality_index[stat]
+            if quality_index then first.quality[quality_index] = 60 end
+        end
+        PotionService.refreshItem(first)
+        local near_perfect = PotionService.getRestorationRollResult(first)
+        valid = valid and near_perfect and not near_perfect.perfect and
+                    near_perfect.near_perfect
         if first then first:destroy() end
         if second then second:destroy() end
         if restored then restored:destroy() end

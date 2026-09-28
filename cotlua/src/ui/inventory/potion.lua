@@ -99,9 +99,13 @@ OnInit.final("Potion", function(Require)
                     button.tooltip:text(description)
                     button:enabled(pot.charges >= 1 and true or false)
                     local remaining = PotionService.getCooldown(pid, index)
-                    if remaining > 0. and button.cooldown_time[pid] <= 0. then
+                    if remaining > 0. and
+                        (button.cooldown_time[pid] <= 0. or
+                            remaining > button.cooldown_time[pid] + 0.1) then
                         button:cooldown(remaining, pid,
-                                        PotionService.getUseCooldown(pot))
+                                        math.max(remaining,
+                                                 PotionService.getUseCooldown(
+                                                     pot)))
                     end
                 end
             else
