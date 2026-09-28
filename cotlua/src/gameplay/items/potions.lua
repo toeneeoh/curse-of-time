@@ -56,6 +56,28 @@ OnInit.final("PotionService", function(Require)
     local FIRST_DONOR_ID = 12
     local BLOOD_FLASK_ICON =
         "ReplaceableTextures\\CommandButtons\\BTNPotionOfVampirism.blp"
+    local GREATER_HEALTH_ICON =
+        "ReplaceableTextures\\CommandButtons\\BTNPotionGreen.blp"
+    local GREATER_MANA_ICON =
+        "ReplaceableTextures\\CommandButtons\\BTNPotionBlue.blp"
+    local GRAND_HEALTH_ICON =
+        "ReplaceableTextures\\CommandButtons\\BTNReplenishHealth.blp"
+    local GRAND_MANA_ICON =
+        "ReplaceableTextures\\CommandButtons\\BTNReplenishMana.blp"
+    local TEMPEST_ICON =
+        "ReplaceableTextures\\CommandButtons\\BTNManaPotion.blp"
+    local POWER_FLASK_ICON =
+        "ReplaceableTextures\\CommandButtons\\BTNredEApotionGS.blp"
+    local BLUE_FLASK_ICON =
+        "ReplaceableTextures\\CommandButtons\\BTNblueEApotionGS.blp"
+    local GREEN_FLASK_ICON =
+        "ReplaceableTextures\\CommandButtons\\BTNgreenEApotionGS.blp"
+    local PURPLE_FLASK_ICON =
+        "ReplaceableTextures\\CommandButtons\\BTNpurpleEApotionGS.blp"
+    local YELLOW_FLASK_ICON =
+        "ReplaceableTextures\\CommandButtons\\BTNyellowEApotionGS.blp"
+    local EMPTY_FLASK_ICON =
+        "ReplaceableTextures\\CommandButtons\\BTNnoEApotionGS.blp"
     local HEALTH_FLASK_ID = FourCC('I02F')
     local MANA_FLASK_ID = FourCC('I00E')
     local BASE_FLASK_CHARGES = 3
@@ -398,13 +420,13 @@ OnInit.final("PotionService", function(Require)
         end
     end
 
-    local function define_prechaos_flask(key, id, carrier, name, tier,
+    local function define_prechaos_flask(key, id, carrier, name, icon, tier,
                                          flat_stat, percent_stat)
         PotionService.define(key, {
             id = id,
             carrier = carrier,
             name = name,
-            icon = BlzGetAbilityIcon(carrier),
+            icon = icon,
             tooltip = "A refillable flask found throughout the pre-chaos world.",
             display_rarity = tier.display_rarity,
             inherit_stats = inherited_potion_stats,
@@ -414,21 +436,27 @@ OnInit.final("PotionService", function(Require)
 
     define_prechaos_flask(GREATER_HEALTH_KEY, GREATER_HEALTH_ID,
                           HEALTH_FLASK_ID, "Greater Health Flask",
+                          GREATER_HEALTH_ICON,
                           prechaos_tiers[1], ITEM_FLAT_HEAL, ITEM_PERCENT_HEAL)
     define_prechaos_flask(GREATER_MANA_KEY, GREATER_MANA_ID, MANA_FLASK_ID,
-                          "Greater Mana Flask", prechaos_tiers[1],
+                          "Greater Mana Flask", GREATER_MANA_ICON,
+                          prechaos_tiers[1],
                           ITEM_FLAT_MANA, ITEM_PERCENT_MANA)
     define_prechaos_flask(SUPERIOR_HEALTH_KEY, SUPERIOR_HEALTH_ID,
                           HEALTH_FLASK_ID, "Superior Health Flask",
+                          GREEN_FLASK_ICON,
                           prechaos_tiers[2], ITEM_FLAT_HEAL, ITEM_PERCENT_HEAL)
     define_prechaos_flask(SUPERIOR_MANA_KEY, SUPERIOR_MANA_ID, MANA_FLASK_ID,
-                          "Superior Mana Flask", prechaos_tiers[2],
+                          "Superior Mana Flask", BLUE_FLASK_ICON,
+                          prechaos_tiers[2],
                           ITEM_FLAT_MANA, ITEM_PERCENT_MANA)
-    define_prechaos_flask(GRAND_HEALTH_KEY, GRAND_HEALTH_ID, HEALTH_FLASK_ID,
-                          "Grand Health Flask", prechaos_tiers[3],
+    define_prechaos_flask(GRAND_HEALTH_KEY, GRAND_HEALTH_ID,
+                          HEALTH_FLASK_ID, "Grand Health Flask",
+                          GRAND_HEALTH_ICON, prechaos_tiers[3],
                           ITEM_FLAT_HEAL, ITEM_PERCENT_HEAL)
     define_prechaos_flask(GRAND_MANA_KEY, GRAND_MANA_ID, MANA_FLASK_ID,
-                          "Grand Mana Flask", prechaos_tiers[3], ITEM_FLAT_MANA,
+                          "Grand Mana Flask", GRAND_MANA_ICON,
+                          prechaos_tiers[3], ITEM_FLAT_MANA,
                           ITEM_PERCENT_MANA)
 
     local function prepare_chaos_flask(flat_health, percent_health, flat_mana,
@@ -512,7 +540,7 @@ OnInit.final("PotionService", function(Require)
         id = STONEBLOOD_ID,
         carrier = HEALTH_FLASK_ID,
         name = "Stoneblood Flask",
-        icon = "ReplaceableTextures\\CommandButtons\\BTNStone.blp",
+        icon = GREEN_FLASK_ICON,
         tooltip = "A Cave Voyagers faction flask.",
         display_rarity = 3,
         faction_rank_requirement = 4,
@@ -528,7 +556,7 @@ OnInit.final("PotionService", function(Require)
         id = TEMPEST_ID,
         carrier = MANA_FLASK_ID,
         name = "Tempest Flask",
-        icon = "ReplaceableTextures\\CommandButtons\\BTNMonsoon.blp",
+        icon = TEMPEST_ICON,
         tooltip = "A Stormwatch faction flask.",
         display_rarity = 3,
         faction_rank_requirement = 4,
@@ -560,7 +588,7 @@ OnInit.final("PotionService", function(Require)
         id = LEGENDARY_CHAOS_ID,
         carrier = HEALTH_FLASK_ID,
         name = "Legendary Chaos Flask",
-        icon = "ReplaceableTextures\\CommandButtons\\BTNStrongDrink.blp",
+        icon = POWER_FLASK_ICON,
         tooltip = "A rare flask base recovered from Chaos.",
         display_rarity = 4,
         inherit_stats = chaos_inherited_stats,
@@ -607,7 +635,7 @@ OnInit.final("PotionService", function(Require)
         id = INFUSION_AEGIS,
         key = "aegis",
         name = "Aegis Infusion",
-        icon = "ReplaceableTextures\\CommandButtons\\BTNDivineShield.blp",
+        icon = YELLOW_FLASK_ICON,
         description = "Grants a shield equal to |cffffcc0020%|r of maximum " ..
             "Health for |cffffcc0010 seconds|r.",
         on_use = function(context)
@@ -621,7 +649,7 @@ OnInit.final("PotionService", function(Require)
         id = INFUSION_FURY,
         key = "fury",
         name = "Fury Infusion",
-        icon = "ReplaceableTextures\\CommandButtons\\BTNBloodLust.blp",
+        icon = POWER_FLASK_ICON,
         description = "Increases total damage by |cffffcc0025%|r for " ..
             "|cffffcc0010 seconds|r.",
         on_use = function(context)
@@ -633,7 +661,7 @@ OnInit.final("PotionService", function(Require)
         id = INFUSION_ARCANE,
         key = "arcane",
         name = "Arcane Infusion",
-        icon = "ReplaceableTextures\\CommandButtons\\BTNBrilliance.blp",
+        icon = PURPLE_FLASK_ICON,
         description = "Increases Spell Power by |cffffcc0025%|r for " ..
             "|cffffcc0010 seconds|r.",
         on_use = function(context)
@@ -646,7 +674,7 @@ OnInit.final("PotionService", function(Require)
         id = INFUSION_SWIFTNESS,
         key = "swiftness",
         name = "Swiftness Infusion",
-        icon = "ReplaceableTextures\\CommandButtons\\BTNBootsOfSpeed.blp",
+        icon = GREEN_FLASK_ICON,
         description = "Increases movement speed by |cffffcc0025%|r for " ..
             "|cffffcc0010 seconds|r.",
         on_use = function(context)
@@ -659,7 +687,7 @@ OnInit.final("PotionService", function(Require)
         id = INFUSION_PURITY,
         key = "purity",
         name = "Purity Infusion",
-        icon = "ReplaceableTextures\\CommandButtons\\BTNDispelMagic.blp",
+        icon = "ReplaceableTextures\\CommandButtons\\BTNInvulnerable.blp",
         description = "Removes negative effects and grants |cffffcc0040%|r " ..
             "Status Resistance for |cffffcc008 seconds|r.",
         on_use = function(context)
@@ -673,7 +701,7 @@ OnInit.final("PotionService", function(Require)
         id = INFUSION_STONE,
         key = "stone",
         name = "Stone Infusion",
-        icon = "ReplaceableTextures\\CommandButtons\\BTNStone.blp",
+        icon = GREEN_FLASK_ICON,
         description = "Reduces damage taken by |cffffcc0015%|r for " ..
             "|cffffcc0012 seconds|r.",
         on_use = function(context)
@@ -685,7 +713,7 @@ OnInit.final("PotionService", function(Require)
         id = INFUSION_TEMPEST,
         key = "tempest",
         name = "Tempest Infusion",
-        icon = "ReplaceableTextures\\CommandButtons\\BTNMonsoon.blp",
+        icon = TEMPEST_ICON,
         description = "Ability cooldowns recover |cffffcc00100%|r faster " ..
             "for |cffffcc008 seconds|r.",
         on_use = function(context)
@@ -697,7 +725,7 @@ OnInit.final("PotionService", function(Require)
         id = CATALYST_POTENT,
         key = "potent",
         name = "Potent Catalyst",
-        icon = "ReplaceableTextures\\CommandButtons\\BTNStrongDrink.blp",
+        icon = "ReplaceableTextures\\CommandButtons\\BTNINV_Potion_16.blp",
         description = "Infusion effects are |cffffcc0025%|r stronger.",
         potency_multiplier = 1.25
     })
@@ -706,7 +734,7 @@ OnInit.final("PotionService", function(Require)
         id = CATALYST_BOUNTIFUL,
         key = "bountiful",
         name = "Bountiful Catalyst",
-        icon = "ReplaceableTextures\\CommandButtons\\BTNRejuvenation.blp",
+        icon = "ReplaceableTextures\\CommandButtons\\BTNReplenishHealthMana.blp",
         description = "Restores |cffffcc0025%|r more Health and Mana.",
         restoration_multiplier = 1.25
     })
@@ -715,7 +743,7 @@ OnInit.final("PotionService", function(Require)
         id = CATALYST_CONSERVING,
         key = "conserving",
         name = "Conserving Catalyst",
-        icon = "ReplaceableTextures\\CommandButtons\\BTNEngineeringUpgrade.blp",
+        icon = EMPTY_FLASK_ICON,
         description = "Has a |cffffcc0025%|r chance not to consume a charge.",
         preserve_charge_chance = 0.25
     })
@@ -724,7 +752,7 @@ OnInit.final("PotionService", function(Require)
         id = CATALYST_ECHOING,
         key = "echoing",
         name = "Echoing Catalyst",
-        icon = "ReplaceableTextures\\CommandButtons\\BTNEcho.blp",
+        icon = BLUE_FLASK_ICON,
         description = "Repeats |cffffcc0040%|r of the flask's restoration " ..
             "after |cffffcc004 seconds|r.",
         on_use = function(context)
@@ -758,47 +786,47 @@ OnInit.final("PotionService", function(Require)
 
     define_affix_donor(FIRST_DONOR_ID, "aegis_donor_flask",
                        "Aegis Infusion Flask",
-                       "ReplaceableTextures\\CommandButtons\\BTNDivineShield.blp",
+                       YELLOW_FLASK_ICON,
                        INFUSION_AEGIS)
     define_affix_donor(FIRST_DONOR_ID + 1, "fury_donor_flask",
                        "Fury Infusion Flask",
-                       "ReplaceableTextures\\CommandButtons\\BTNBloodLust.blp",
+                       POWER_FLASK_ICON,
                        INFUSION_FURY)
     define_affix_donor(FIRST_DONOR_ID + 2, "arcane_donor_flask",
                        "Arcane Infusion Flask",
-                       "ReplaceableTextures\\CommandButtons\\BTNBrilliance.blp",
+                       PURPLE_FLASK_ICON,
                        INFUSION_ARCANE)
     define_affix_donor(FIRST_DONOR_ID + 3, "swiftness_donor_flask",
                        "Swiftness Infusion Flask",
-                       "ReplaceableTextures\\CommandButtons\\BTNBootsOfSpeed.blp",
+                       GREEN_FLASK_ICON,
                        INFUSION_SWIFTNESS)
     define_affix_donor(FIRST_DONOR_ID + 4, "purity_donor_flask",
                        "Purity Infusion Flask",
-                       "ReplaceableTextures\\CommandButtons\\BTNDispelMagic.blp",
+                       "ReplaceableTextures\\CommandButtons\\BTNInvulnerable.blp",
                        INFUSION_PURITY)
     define_affix_donor(FIRST_DONOR_ID + 5, "bountiful_donor_flask",
                        "Bountiful Catalyst Flask",
-                       "ReplaceableTextures\\CommandButtons\\BTNRejuvenation.blp",
+                       "ReplaceableTextures\\CommandButtons\\BTNReplenishHealthMana.blp",
                        nil, CATALYST_BOUNTIFUL)
     define_affix_donor(FIRST_DONOR_ID + 6, "conserving_donor_flask",
                        "Conserving Catalyst Flask",
-                       "ReplaceableTextures\\CommandButtons\\BTNEngineeringUpgrade.blp",
+                       EMPTY_FLASK_ICON,
                        nil, CATALYST_CONSERVING)
     define_affix_donor(FIRST_DONOR_ID + 7, "echoing_donor_flask",
                        "Echoing Catalyst Flask",
-                       "ReplaceableTextures\\CommandButtons\\BTNEcho.blp",
+                       BLUE_FLASK_ICON,
                        nil, CATALYST_ECHOING)
     define_affix_donor(FIRST_DONOR_ID + 8, "potent_donor_flask",
                        "Potent Catalyst Flask",
-                       "ReplaceableTextures\\CommandButtons\\BTNStrongDrink.blp",
+                       "ReplaceableTextures\\CommandButtons\\BTNINV_Potion_16.blp",
                        nil, CATALYST_POTENT)
     define_affix_donor(FIRST_DONOR_ID + 9, "lingering_donor_flask",
                        "Lingering Catalyst Flask",
-                       "ReplaceableTextures\\CommandButtons\\BTNCloudOfFog.blp",
+                       PURPLE_FLASK_ICON,
                        nil, CATALYST_LINGERING)
     define_affix_donor(FIRST_DONOR_ID + 10, "accelerant_donor_flask",
                        "Accelerant Catalyst Flask",
-                       "ReplaceableTextures\\CommandButtons\\BTNBootsOfSpeed.blp",
+                       YELLOW_FLASK_ICON,
                        nil, CATALYST_ACCELERANT)
 
     ---Creates a non-faction affix donor from the Chaos drop pool.
@@ -818,7 +846,7 @@ OnInit.final("PotionService", function(Require)
         id = CATALYST_LINGERING,
         key = "lingering",
         name = "Lingering Catalyst",
-        icon = "ReplaceableTextures\\CommandButtons\\BTNCloudOfFog.blp",
+        icon = PURPLE_FLASK_ICON,
         description = "Infusion effects last |cffffcc0050%|r longer.",
         duration_multiplier = 1.50
     })
@@ -827,7 +855,7 @@ OnInit.final("PotionService", function(Require)
         id = CATALYST_ACCELERANT,
         key = "accelerant",
         name = "Accelerant Catalyst",
-        icon = "ReplaceableTextures\\CommandButtons\\BTNBootsOfSpeed.blp",
+        icon = YELLOW_FLASK_ICON,
         description = "Potion cooldown is |cffffcc0033%|r shorter, but " ..
             "infusion effects last |cffffcc0025%|r less time.",
         cooldown_multiplier = 2. / 3.,
