@@ -16,8 +16,9 @@
         scalar hero data
         inventory slots
             item id/stats/extra
+            extensible item-state count and values
             socket count
-            socket id/stats/extra
+            socket id/stats/extra/state
 
 ]]
 
@@ -49,6 +50,8 @@ OnInit.final("Profile", function(Require)
     local MAX_FACTION         = 100000
     local MAX_UPGRADE_LEVEL   = 10
     local MAX_STATS           = 255000
+    local MAX_ITEM_STATE_VALUES = 16
+    local MAX_ITEM_STATE_VALUE = 0x7FFFFFFF
     local CHARACTER_SAVE_MAGIC = 271828
 
     ---A newly created hero should never remain paused after character setup.
@@ -1019,6 +1022,25 @@ OnInit.final("Profile", function(Require)
             return data[index] or 0
         end
 
+        local function normalized_item_state(itm)
+            local state = itm and itm.encode_state and itm:encode_state() or
+                              (itm and itm.persistent_state) or {}
+            local result = {}
+            for index = 1, math.min(#state, MAX_ITEM_STATE_VALUES) do
+                result[index] = math.max(0, math.min(MAX_ITEM_STATE_VALUE,
+                    math.floor(tonumber(state[index]) or 0)))
+            end
+            return result
+        end
+
+        local function serialize_item_state(result, itm)
+            local state = normalized_item_state(itm)
+            result[#result + 1] = #state
+            for index = 1, #state do
+                result[#result + 1] = state[index]
+            end
+        end
+
         local function serialize_item(result, itm)
             if not itm then
                 result[#result + 1] = 0
@@ -1034,6 +1056,7 @@ OnInit.final("Profile", function(Require)
             result[#result + 1] = id
             result[#result + 1] = itm:encode_stats() or 0
             result[#result + 1] = itm:encode_extra() or 0
+            serialize_item_state(result, itm)
 
             local sockets = itm.sockets or {}
             local count = math.min(#sockets, MAX_SOCKETS)
@@ -1046,6 +1069,7 @@ OnInit.final("Profile", function(Require)
                 result[#result + 1] = socket_id or 0
                 result[#result + 1] = socket and (socket:encode_stats() or 0) or 0
                 result[#result + 1] = socket and (socket:encode_extra() or 0) or 0
+                serialize_item_state(result, socket)
             end
         end
 
@@ -1063,6 +1087,7 @@ OnInit.final("Profile", function(Require)
                 id = id,
                 stats = itm:encode_stats() or 0,
                 extra = itm:encode_extra() or 0,
+                state = normalized_item_state(itm),
                 sockets = {},
             }
 
@@ -1075,6 +1100,7 @@ OnInit.final("Profile", function(Require)
                         id = socket_id,
                         stats = socket:encode_stats() or 0,
                         extra = socket:encode_extra() or 0,
+                        state = normalized_item_state(socket),
                     }
                 end
             end
@@ -1118,11 +1144,23 @@ OnInit.final("Profile", function(Require)
                 id = id,
                 stats = read_value(data, index),
                 extra = read_value(data, index + 1),
+                state = {},
                 sockets = {},
             }
 
-            local socket_count = math.min(math.max(0, read_value(data, index + 2)), MAX_SOCKETS)
+            local state_count = math.min(math.max(0,
+                read_value(data, index + 2)), MAX_ITEM_STATE_VALUES)
             index = index + 3
+            for state_index = 1, state_count do
+                saved.state[state_index] = math.max(0,
+                    math.min(MAX_ITEM_STATE_VALUE,
+                             read_value(data, index)))
+                index = index + 1
+            end
+
+            local socket_count = math.min(math.max(0, read_value(data, index)),
+                                          MAX_SOCKETS)
+            index = index + 1
 
             for i = 1, socket_count do
                 local socket_id = read_value(data, index)
@@ -1130,10 +1168,22 @@ OnInit.final("Profile", function(Require)
                 local socket_extra = read_value(data, index + 2)
                 index = index + 3
 
+                local socket_state = {}
+                local socket_state_count = math.min(math.max(0,
+                    read_value(data, index)), MAX_ITEM_STATE_VALUES)
+                index = index + 1
+                for state_index = 1, socket_state_count do
+                    socket_state[state_index] = math.max(0,
+                        math.min(MAX_ITEM_STATE_VALUE,
+                                 read_value(data, index)))
+                    index = index + 1
+                end
+
                 saved.sockets[i] = {
                     id = socket_id,
                     stats = socket_stats,
                     extra = socket_extra,
+                    state = socket_state,
                 }
             end
 
@@ -1145,7 +1195,8 @@ OnInit.final("Profile", function(Require)
                 return nil
             end
 
-            local itm = Item.decode(saved.id or 0, saved.stats or 0, saved.extra or 0)
+            local itm = Item.decode(saved.id or 0, saved.stats or 0,
+                                    saved.extra or 0, saved.state)
             if not itm then
                 return nil
             end
@@ -1157,7 +1208,10 @@ OnInit.final("Profile", function(Require)
                 local socket = nil
 
                 if saved_socket and saved_socket.id ~= 0 then
-                    socket = Item.decode(saved_socket.id or 0, saved_socket.stats or 0, saved_socket.extra or 0)
+                    socket = Item.decode(saved_socket.id or 0,
+                                         saved_socket.stats or 0,
+                                         saved_socket.extra or 0,
+                                         saved_socket.state)
                 end
 
                 if socket then
@@ -1293,6 +1347,7 @@ OnInit.final("Profile", function(Require)
                         id = ids[slot],
                         stats = stats[slot],
                         extra = 0,
+                        state = {},
                         sockets = {},
                     }
                 end
@@ -1311,9 +1366,7 @@ OnInit.final("Profile", function(Require)
             local version = read_value(data, 2)
             local index = 3
 
-            if version == 1 then
-                -- future migration point if version changes
-            elseif version ~= CHARACTER_SAVE_VERSION then
+            if version ~= CHARACTER_SAVE_VERSION then
                 return false, "Unsupported character save version: " .. tostring(version)
             end
 

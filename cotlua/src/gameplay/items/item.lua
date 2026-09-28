@@ -190,6 +190,7 @@
     ---@field y number
     ---@field quality integer[]
     ---@field extra integer[]
+    ---@field persistent_state integer[] Extensible values serialized separately from packed item fields.
     ---@field rarity integer
     ---@field limit integer
     ---@field eval conditionfunc
@@ -419,6 +420,7 @@
                 y = GetItemY(itm),
                 quality = __jarray(0),
                 extra = __jarray(0),
+                persistent_state = {},
                 owner = nil,
                 holder = nil,
                 equipped = false,
@@ -1410,8 +1412,8 @@
             end
         end
 
-        ---@type fun(id: integer, stats: integer, extra: integer): Item|nil
-        function thistype.decode(id, stats, extra)
+        ---@type fun(id: integer, stats: integer, extra: integer, persistent_state: integer[]?): Item|nil
+        function thistype.decode(id, stats, extra, persistent_state)
             if id == 0 then return nil end
 
             local itemid = id & 0x1FFF
@@ -1435,6 +1437,12 @@
             mask = 0xFFFF
             itm.extra[1] = (extra >> 16) & mask
             itm.extra[2] = (extra & mask)
+            -- Decoded items own their state. In particular, two items restored
+            -- from the same snapshot must not advance one another's counters.
+            itm.persistent_state = {}
+            for index = 1, #(persistent_state or {}) do
+                itm.persistent_state[index] = persistent_state[index]
+            end
 
             if RuntimeItemDefinitions then
                 RuntimeItemDefinitions.restore(itm)
@@ -1456,6 +1464,13 @@
             end
 
             return itm
+        end
+
+        ---Returns subsystem-owned item state that is stored as ordinary save
+        ---values rather than competing for bits in id/stats/extra.
+        ---@return integer[]
+        function thistype:encode_state()
+            return self.persistent_state or {}
         end
 
         -- save 5 more quality integers, 6 bits for each

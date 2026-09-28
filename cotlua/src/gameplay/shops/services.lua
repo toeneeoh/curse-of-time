@@ -174,19 +174,28 @@ OnInit.final("ShopServices", function(Require)
 
     local function brewing_price(item, operation, value)
         local properties = PotionService.getProperties(item)
-        local base = math.max(1000, properties.level_requirement ^ 2)
+        local tier = math.max(0, item.data[ITEM_TIER] or 0)
+        local base = math.max(1000, properties.level_requirement ^ 2 +
+                                  tier ^ 2 * 250)
         if operation == "refine" then return math.floor(base * 0.5) end
         if operation == "reroll" or operation == "prefix" or
             operation == "suffix" then
-            -- Repeated work on one base rapidly becomes uneconomical. The
-            -- compact saved counter caps at seven, which is already costly
-            -- enough to encourage replacing the flask base.
+            -- Repeated work on one base becomes steadily less economical.
+            -- Counts are stored as full item-state values rather than a small
+            -- packed bit field, so the curve does not stop after seven rolls.
             local attempts = PotionService.getRerollCount(item, operation)
             local multiplier = operation == "reroll" and 0.5 or
                                    operation == "suffix" and 0.75 or 1.
-            return math.floor(base * multiplier * (1.85 ^ attempts))
+            return math.min(1000000000000000,
+                            math.floor(base * multiplier * (1.35 ^ attempts)))
         end
         return math.floor(base)
+    end
+
+    ---Returns the current quoted price without requiring player inventory or
+    ---currency state. This also gives regression checks one source of truth.
+    function PotionBrewingService.getPrice(item, operation, value)
+        return brewing_price(item, operation, value)
     end
 
     ---Quotes a single potion customization operation. Infusions and catalysts

@@ -53,6 +53,7 @@ OnInit.final("ArchitectureTests", function(Require)
     Require('StruggleRewards')
     Require('Perks')
     Require('PotionService')
+    Require('ShopServices')
 
     ArchitectureTests = {tests = {}}
 
@@ -337,9 +338,11 @@ OnInit.final("ArchitectureTests", function(Require)
             local saved_id = item:encode_id()
             local saved_stats = item:encode_stats()
             local saved_extra = item:encode_extra()
+            local saved_state = item:encode_state()
             item:destroy()
 
-            local restored = Item.decode(saved_id, saved_stats, saved_extra)
+            local restored = Item.decode(saved_id, saved_stats, saved_extra,
+                                         saved_state)
             PotionService.refreshItem(restored)
             local properties = PotionService.getProperties(restored)
             local customization = PotionService.getCustomization(restored)
@@ -383,12 +386,17 @@ OnInit.final("ArchitectureTests", function(Require)
         local saved_id = source:encode_id()
         local saved_stats = source:encode_stats()
         local saved_extra = source:encode_extra()
+        local saved_state = source:encode_state()
         source:destroy()
 
-        local first = Item.decode(saved_id, saved_stats, saved_extra)
-        local second = Item.decode(saved_id, saved_stats, saved_extra)
+        local first = Item.decode(saved_id, saved_stats, saved_extra,
+                                  saved_state)
+        local second = Item.decode(saved_id, saved_stats, saved_extra,
+                                   saved_state)
+        local initial_price = PotionBrewingService.getPrice(first, "reroll")
         local first_ok = PotionService.rerollRestoration(first)
         local second_ok = PotionService.rerollRestoration(second)
+        local second_price = PotionBrewingService.getPrice(first, "reroll")
         local a = PotionService.getProperties(first)
         local b = PotionService.getProperties(second)
         local valid = first_ok and second_ok and a and b and
@@ -397,7 +405,8 @@ OnInit.final("ArchitectureTests", function(Require)
                           a.base_flat_mana == b.base_flat_mana and
                           a.base_percent_mana == b.base_percent_mana and
                           PotionService.getRerollCount(first) == 1 and
-                          PotionService.getRerollCount(second) == 1
+                          PotionService.getRerollCount(second) == 1 and
+                          math.abs(second_price / initial_price - 1.35) < 0.002
 
         -- Advance the persistent counter, save that state, and ensure the
         -- following candidate is also identical after a load. This catches
@@ -406,8 +415,9 @@ OnInit.final("ArchitectureTests", function(Require)
         local advanced_id = first:encode_id()
         local advanced_stats = first:encode_stats()
         local advanced_extra = first:encode_extra()
+        local advanced_state = first:encode_state()
         local restored = Item.decode(advanced_id, advanced_stats,
-                                     advanced_extra)
+                                     advanced_extra, advanced_state)
         local next_first_ok = PotionService.rerollRestoration(first)
         local next_restored_ok = PotionService.rerollRestoration(restored)
         local next_a = PotionService.getProperties(first)
@@ -421,9 +431,8 @@ OnInit.final("ArchitectureTests", function(Require)
                     PotionService.getRerollCount(first) == 2 and
                     PotionService.getRerollCount(restored) == 2
 
-        -- The price counter intentionally caps at seven, but that must not
-        -- freeze the deterministic result sequence. Run well past the cap and
-        -- require both identical copies to advance to a visibly new result.
+        -- Run well past the old three-bit limit and require both identical
+        -- copies to retain their full count and advance to a visible result.
         for roll = 3, 12 do
             local previous = PotionService.getProperties(first)
             local first_advanced = PotionService.rerollRestoration(first)
@@ -450,15 +459,19 @@ OnInit.final("ArchitectureTests", function(Require)
                             advanced_b.base_flat_mana and
                         advanced_a.base_percent_mana ==
                             advanced_b.base_percent_mana and
-                        PotionService.getRerollCount(first) == math.min(7,
-                                                                        roll)
+                        PotionService.getRerollCount(first) == roll
         end
+
+        local twelfth_price = PotionBrewingService.getPrice(first, "reroll")
+        valid = valid and math.abs(twelfth_price / initial_price -
+                                      1.35 ^ 12) < 0.002
 
         local capped_id = first:encode_id()
         local capped_stats = first:encode_stats()
         local capped_extra = first:encode_extra()
+        local capped_state = first:encode_state()
         local capped_restore = Item.decode(capped_id, capped_stats,
-                                           capped_extra)
+                                           capped_extra, capped_state)
         local capped_first_ok = PotionService.rerollRestoration(first)
         local capped_restore_ok =
             PotionService.rerollRestoration(capped_restore)
@@ -701,11 +714,12 @@ OnInit.final("ArchitectureTests", function(Require)
 
     ArchitectureTests.register(
         "character inventory DTO preserves sparse slots and sockets", function()
-            local function saved_item(id, stats, extra, sockets)
+            local function saved_item(id, stats, extra, sockets, state)
                 return {
                     encode_id = function() return id end,
                     encode_stats = function() return stats end,
                     encode_extra = function() return extra end,
+                    encode_state = function() return state or {} end,
                     sockets = sockets or {}
                 }
             end
@@ -713,9 +727,11 @@ OnInit.final("ArchitectureTests", function(Require)
             local source = HeroData.create()
             source.id = 1
             source.items[1] = saved_item(101, 102, 103, {
-                saved_item(111, 112, 113), saved_item(121, 122, 123)
-            })
-            source.items[MAX_INVENTORY_SLOTS] = saved_item(201, 202, 203)
+                saved_item(111, 112, 113, nil, {11, 12}),
+                saved_item(121, 122, 123, nil, {21})
+            }, {7, 8, 9})
+            source.items[MAX_INVENTORY_SLOTS] =
+                saved_item(201, 202, 203, nil, {31, 32, 33, 34})
 
             local decoded = HeroData.create()
             if not decoded:propagate(source:values()) then
@@ -727,15 +743,18 @@ OnInit.final("ArchitectureTests", function(Require)
             if not first or first.id ~= 101 or first.stats ~= 102 or first.extra ~=
                 103 or #first.sockets ~= 2 or first.sockets[1].id ~= 111 or
                 first.sockets[1].stats ~= 112 or first.sockets[1].extra ~= 113 or
+                first.state[1] ~= 7 or first.state[3] ~= 9 or
+                first.sockets[1].state[2] ~= 12 or
                 first.sockets[2].id ~= 121 or first.sockets[2].stats ~= 122 or
-                first.sockets[2].extra ~= 123 then
+                first.sockets[2].extra ~= 123 or
+                first.sockets[2].state[1] ~= 21 then
                 return false, "socketed inventory item did not round-trip"
             end
             if decoded.saved_items[2] ~= nil then
                 return false, "empty inventory slot became occupied"
             end
             if not last or last.id ~= 201 or last.stats ~= 202 or last.extra ~=
-                203 then
+                203 or last.state[4] ~= 34 then
                 return false, "last inventory slot did not round-trip"
             end
 

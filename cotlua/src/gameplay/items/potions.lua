@@ -25,6 +25,10 @@ OnInit.final("PotionService", function(Require)
     local CATALYST_POTENT = 1
     local CATALYST_LINGERING = 2
     local CATALYST_ACCELERANT = 3
+    local RESTORATION_REROLL_STATE = 1
+    local PREFIX_REROLL_STATE = 2
+    local SUFFIX_REROLL_STATE = 3
+    local REROLL_SEED_STATE = 4
     -- Potion definitions currently roll at most five properties. The final two
     -- six-bit quality slots are therefore stable, already-saved customization
     -- storage that does not compete with logical identity or item charges.
@@ -220,7 +224,11 @@ OnInit.final("PotionService", function(Require)
                 item.quality[INFUSION_QUALITY_INDEX] = potion.initial_prefix
             end
             if item.data[ITEM_LEVEL_REQUIREMENT] >= 200 then
-                item.quality[5] = GetRandomInt(1, 63)
+                item.persistent_state[RESTORATION_REROLL_STATE] = 0
+                item.persistent_state[PREFIX_REROLL_STATE] = 0
+                item.persistent_state[SUFFIX_REROLL_STATE] = 0
+                item.persistent_state[REROLL_SEED_STATE] =
+                    GetRandomInt(1, 0x7FFFFFFF)
             end
         end
         return RuntimeItemDefinitions.define(key, spec)
@@ -1027,24 +1035,25 @@ OnInit.final("PotionService", function(Require)
     end
 
     function PotionService.getRerollCount(item, kind)
-        local metadata = RuntimeItemDefinitions.getMetadata(item)
-        if kind == "prefix" then return (metadata >> 3) & 0x03 end
-        if kind == "suffix" then return (metadata >> 5) & 0x03 end
-        return metadata & 0x07
+        if not item or not item.persistent_state then return 0 end
+        local index = RESTORATION_REROLL_STATE
+        if kind == "prefix" then
+            index = PREFIX_REROLL_STATE
+        elseif kind == "suffix" then
+            index = SUFFIX_REROLL_STATE
+        end
+        return math.max(0, math.floor(item.persistent_state[index] or 0))
     end
 
     local function increment_reroll_count(item, kind)
-        local metadata = RuntimeItemDefinitions.getMetadata(item)
-        local shift, mask = 0, 0x07
+        local index = RESTORATION_REROLL_STATE
         if kind == "prefix" then
-            shift, mask = 3, 0x03
+            index = PREFIX_REROLL_STATE
         elseif kind == "suffix" then
-            shift, mask = 5, 0x03
+            index = SUFFIX_REROLL_STATE
         end
-        local count = (metadata >> shift) & mask
-        count = math.min(mask, count + 1)
-        metadata = (metadata & ~(mask << shift)) | (count << shift)
-        RuntimeItemDefinitions.setMetadata(item, metadata)
+        item.persistent_state[index] = math.min(0x7FFFFFFF,
+            PotionService.getRerollCount(item, kind) + 1)
     end
 
     ---Builds a deterministic permutation using item-local state. This follows
@@ -1065,10 +1074,9 @@ OnInit.final("PotionService", function(Require)
 
     ---Produces independent property rolls from the fixed seed, saved attempt,
     ---and currently saved restoration qualities. Including the current rolls
-    ---makes the sequence continue evolving after the compact cost counter
-    ---reaches seven, while remaining reproducible after save/load.
+    ---keeps each result evolving while remaining reproducible after save/load.
     local function next_restoration_rolls(seed, attempt, current)
-        local state = ((seed & 0x3F) << 3) | (attempt & 0x07)
+        local state = (seed ~ ((attempt + 1) * 0x45D9F3B)) & 0x7FFFFFFF
         for index = 1, #current do
             state = (state ~ ((current[index] + 1) *
                         (0x1F123BB + index * 0x9E37))) & 0x7FFFFFFF
@@ -1142,10 +1150,11 @@ OnInit.final("PotionService", function(Require)
     function PotionService.rerollRestoration(item)
         if not PotionService.canRerollRestoration(item) then return false end
         local attempt = PotionService.getRerollCount(item)
-        local seed = item.quality[5]
+        local seed = item.persistent_state[REROLL_SEED_STATE] or 0
         if seed == 0 then
-            seed = ((item.runtime_definition.id * 29) % 63) + 1
-            item.quality[5] = seed
+            seed = ((item.runtime_definition.id * 0x45D9F3B) ~ 0x119DE1F3) &
+                       0x7FFFFFFF
+            item.persistent_state[REROLL_SEED_STATE] = seed
         end
 
         local quality_indices = {}
