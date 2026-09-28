@@ -333,8 +333,20 @@ modifiers:
             elseif choice == "donor" then
                 PotionService.createChaosDonor(x + 150., y, 600.)
             elseif choice == "all" then
-                spawn(PotionService.LEGENDARY_CHAOS_KEY, 0)
-                for index, key in ipairs(keys) do spawn(key, index) end
+                local catalog = {
+                    PotionService.GREATER_HEALTH_KEY,
+                    PotionService.GREATER_MANA_KEY,
+                    PotionService.SUPERIOR_HEALTH_KEY,
+                    PotionService.SUPERIOR_MANA_KEY,
+                    PotionService.GRAND_HEALTH_KEY,
+                    PotionService.GRAND_MANA_KEY,
+                    PotionService.STONEBLOOD_KEY,
+                    PotionService.TEMPEST_KEY,
+                    PotionService.HUNTERS_KEY,
+                    PotionService.LEGENDARY_CHAOS_KEY
+                }
+                for _, key in ipairs(keys) do catalog[#catalog + 1] = key end
+                for index, key in ipairs(catalog) do spawn(key, index - 1) end
             else
                 local found
                 for _, key in ipairs(keys) do
