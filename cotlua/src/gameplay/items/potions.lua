@@ -60,10 +60,6 @@ OnInit.final("PotionService", function(Require)
         "ReplaceableTextures\\CommandButtons\\BTNPotionGreen.blp"
     local GREATER_MANA_ICON =
         "ReplaceableTextures\\CommandButtons\\BTNPotionBlue.blp"
-    local GRAND_HEALTH_ICON =
-        "ReplaceableTextures\\CommandButtons\\BTNReplenishHealth.blp"
-    local GRAND_MANA_ICON =
-        "ReplaceableTextures\\CommandButtons\\BTNReplenishMana.blp"
     local TEMPEST_ICON =
         "ReplaceableTextures\\CommandButtons\\BTNManaPotion.blp"
     local POWER_FLASK_ICON =
@@ -195,6 +191,8 @@ OnInit.final("PotionService", function(Require)
     ---@field name string
     ---@field description string
     ---@field icon string
+    ---@field affix_name string Name fragment used by customized flasks.
+    ---@field flavor string Gray in-world flavor text used by donor flasks.
     ---@field on_use? fun(context: PotionUseContext)
     ---@field potency_multiplier? number
     ---@field duration_multiplier? number
@@ -351,7 +349,8 @@ OnInit.final("PotionService", function(Require)
             percent_min = 8,
             percent_max = 12,
             charge_min = 0,
-            charge_max = 1
+            charge_max = 1,
+            flavor = "A dependable flask whose contents remain fresh through the longest journey."
         }, {
             level = 110,
             item_tier = 2,
@@ -363,7 +362,8 @@ OnInit.final("PotionService", function(Require)
             percent_min = 14,
             percent_max = 18,
             charge_min = 1,
-            charge_max = 2
+            charge_max = 2,
+            flavor = "Its carefully sealed mixture gives off a steady, comforting warmth."
         }, {
             level = 170,
             item_tier = 2,
@@ -375,7 +375,8 @@ OnInit.final("PotionService", function(Require)
             percent_min = 20,
             percent_max = 25,
             charge_min = 2,
-            charge_max = 3
+            charge_max = 3,
+            flavor = "Concentrated restorative essence glimmers beneath the glass."
         }
     }
 
@@ -427,7 +428,7 @@ OnInit.final("PotionService", function(Require)
             carrier = carrier,
             name = name,
             icon = icon,
-            tooltip = "A refillable flask found throughout the pre-chaos world.",
+            tooltip = "|cff808080" .. tier.flavor .. "|r",
             display_rarity = tier.display_rarity,
             inherit_stats = inherited_potion_stats,
             prepare_data = prepare_prechaos_flask(tier, flat_stat, percent_stat)
@@ -444,18 +445,18 @@ OnInit.final("PotionService", function(Require)
                           ITEM_FLAT_MANA, ITEM_PERCENT_MANA)
     define_prechaos_flask(SUPERIOR_HEALTH_KEY, SUPERIOR_HEALTH_ID,
                           HEALTH_FLASK_ID, "Superior Health Flask",
-                          GREEN_FLASK_ICON,
+                          GREATER_HEALTH_ICON,
                           prechaos_tiers[2], ITEM_FLAT_HEAL, ITEM_PERCENT_HEAL)
     define_prechaos_flask(SUPERIOR_MANA_KEY, SUPERIOR_MANA_ID, MANA_FLASK_ID,
-                          "Superior Mana Flask", BLUE_FLASK_ICON,
+                          "Superior Mana Flask", GREATER_MANA_ICON,
                           prechaos_tiers[2],
                           ITEM_FLAT_MANA, ITEM_PERCENT_MANA)
     define_prechaos_flask(GRAND_HEALTH_KEY, GRAND_HEALTH_ID,
                           HEALTH_FLASK_ID, "Grand Health Flask",
-                          GRAND_HEALTH_ICON, prechaos_tiers[3],
+                          GREATER_HEALTH_ICON, prechaos_tiers[3],
                           ITEM_FLAT_HEAL, ITEM_PERCENT_HEAL)
     define_prechaos_flask(GRAND_MANA_KEY, GRAND_MANA_ID, MANA_FLASK_ID,
-                          "Grand Mana Flask", GRAND_MANA_ICON,
+                          "Grand Mana Flask", GREATER_MANA_ICON,
                           prechaos_tiers[3], ITEM_FLAT_MANA,
                           ITEM_PERCENT_MANA)
 
@@ -541,7 +542,7 @@ OnInit.final("PotionService", function(Require)
         carrier = HEALTH_FLASK_ID,
         name = "Stoneblood Flask",
         icon = GREEN_FLASK_ICON,
-        tooltip = "A Cave Voyagers faction flask.",
+        tooltip = "|cff808080Heavy mineral sediment settles beneath its crimson contents.|r",
         display_rarity = 3,
         faction_rank_requirement = 4,
         inherit_stats = chaos_inherited_stats,
@@ -557,7 +558,7 @@ OnInit.final("PotionService", function(Require)
         carrier = MANA_FLASK_ID,
         name = "Tempest Flask",
         icon = TEMPEST_ICON,
-        tooltip = "A Stormwatch faction flask.",
+        tooltip = "|cff808080A captive current circles endlessly within the glass.|r",
         display_rarity = 3,
         faction_rank_requirement = 4,
         inherit_stats = chaos_inherited_stats,
@@ -571,9 +572,9 @@ OnInit.final("PotionService", function(Require)
     PotionService.define(HUNTERS_KEY, {
         id = HUNTERS_ID,
         carrier = HEALTH_FLASK_ID,
-        name = "Hunter's Flask",
+        name = "Vampiric Flask",
         icon = BLOOD_FLASK_ICON,
-        tooltip = "An Ashen Vanguard faction flask.",
+        tooltip = "|cff808080Warm to the touch, with a pulse that is almost familiar.|r",
         display_rarity = 3,
         faction_rank_requirement = 4,
         inherit_stats = chaos_inherited_stats,
@@ -587,9 +588,9 @@ OnInit.final("PotionService", function(Require)
     PotionService.define(LEGENDARY_CHAOS_KEY, {
         id = LEGENDARY_CHAOS_ID,
         carrier = HEALTH_FLASK_ID,
-        name = "Legendary Chaos Flask",
-        icon = POWER_FLASK_ICON,
-        tooltip = "A rare flask base recovered from Chaos.",
+        name = "Legendary Flask",
+        icon = "ReplaceableTextures\\CommandButtons\\BTNINV_Potion_16.blp",
+        tooltip = "|cff808080Two currents spiral through the glass without ever mingling.|r",
         display_rarity = 4,
         inherit_stats = chaos_inherited_stats,
         prepare_data = prepare_chaos_flask(12000, 25, 12000, 25)
@@ -601,7 +602,7 @@ OnInit.final("PotionService", function(Require)
     PotionService.define(BLOOD_FLASK_KEY, {
         id = INFUSION_VAMPIRIC,
         carrier = MANA_FLASK_ID,
-        name = "Blood Flask",
+        name = "Vampiric Flask",
         icon = BLOOD_FLASK_ICON,
         tooltip = "|cff0080c0Vampirism:|r Restores |cffffcc005%|r of " ..
             "damage dealt as Health for |cffffcc0012 seconds|r.",
@@ -623,6 +624,8 @@ OnInit.final("PotionService", function(Require)
         id = INFUSION_VAMPIRIC,
         key = "vampiric",
         name = "Vampiric Infusion",
+        affix_name = "Vampiric",
+        flavor = "The mixture beats against the glass with a borrowed pulse.",
         icon = BLOOD_FLASK_ICON,
         description = "Restores |cffffcc008%|r of damage dealt as Health " ..
             "for |cffffcc0012 seconds|r.",
@@ -635,6 +638,8 @@ OnInit.final("PotionService", function(Require)
         id = INFUSION_AEGIS,
         key = "aegis",
         name = "Aegis Infusion",
+        affix_name = "Aegis",
+        flavor = "Its glass remains immaculate, untouched by chip or scratch.",
         icon = YELLOW_FLASK_ICON,
         description = "Grants a shield equal to |cffffcc0020%|r of maximum " ..
             "Health for |cffffcc0010 seconds|r.",
@@ -649,6 +654,8 @@ OnInit.final("PotionService", function(Require)
         id = INFUSION_FURY,
         key = "fury",
         name = "Fury Infusion",
+        affix_name = "Fury",
+        flavor = "The crimson mixture seethes even while perfectly still.",
         icon = POWER_FLASK_ICON,
         description = "Increases total damage by |cffffcc0025%|r for " ..
             "|cffffcc0010 seconds|r.",
@@ -661,6 +668,8 @@ OnInit.final("PotionService", function(Require)
         id = INFUSION_ARCANE,
         key = "arcane",
         name = "Arcane Infusion",
+        affix_name = "Arcane",
+        flavor = "Violet sparks gather impatiently around the stopper.",
         icon = PURPLE_FLASK_ICON,
         description = "Increases Spell Power by |cffffcc0025%|r for " ..
             "|cffffcc0010 seconds|r.",
@@ -674,7 +683,9 @@ OnInit.final("PotionService", function(Require)
         id = INFUSION_SWIFTNESS,
         key = "swiftness",
         name = "Swiftness Infusion",
-        icon = GREEN_FLASK_ICON,
+        affix_name = "Swiftness",
+        flavor = "Its bright contents refuse to settle for even a moment.",
+        icon = BLUE_FLASK_ICON,
         description = "Increases movement speed by |cffffcc0025%|r for " ..
             "|cffffcc0010 seconds|r.",
         on_use = function(context)
@@ -687,7 +698,9 @@ OnInit.final("PotionService", function(Require)
         id = INFUSION_PURITY,
         key = "purity",
         name = "Purity Infusion",
-        icon = "ReplaceableTextures\\CommandButtons\\BTNInvulnerable.blp",
+        affix_name = "Purity",
+        flavor = "A clear light gathers beneath the darkened seal.",
+        icon = EMPTY_FLASK_ICON,
         description = "Removes negative effects and grants |cffffcc0040%|r " ..
             "Status Resistance for |cffffcc008 seconds|r.",
         on_use = function(context)
@@ -701,6 +714,8 @@ OnInit.final("PotionService", function(Require)
         id = INFUSION_STONE,
         key = "stone",
         name = "Stone Infusion",
+        affix_name = "Stoneblood",
+        flavor = "Mineral sediment swirls through the heavy mixture.",
         icon = GREEN_FLASK_ICON,
         description = "Reduces damage taken by |cffffcc0015%|r for " ..
             "|cffffcc0012 seconds|r.",
@@ -713,6 +728,8 @@ OnInit.final("PotionService", function(Require)
         id = INFUSION_TEMPEST,
         key = "tempest",
         name = "Tempest Infusion",
+        affix_name = "Tempest",
+        flavor = "A captive current circles endlessly within the glass.",
         icon = TEMPEST_ICON,
         description = "Ability cooldowns recover |cffffcc00100%|r faster " ..
             "for |cffffcc008 seconds|r.",
@@ -725,15 +742,43 @@ OnInit.final("PotionService", function(Require)
         id = CATALYST_POTENT,
         key = "potent",
         name = "Potent Catalyst",
+        affix_name = "Potency",
+        flavor = "A single drop leaves the surrounding air trembling.",
         icon = "ReplaceableTextures\\CommandButtons\\BTNINV_Potion_16.blp",
         description = "Infusion effects are |cffffcc0025%|r stronger.",
         potency_multiplier = 1.25
     })
 
     PotionService.registerCatalyst({
+        id = CATALYST_LINGERING,
+        key = "lingering",
+        name = "Lingering Catalyst",
+        affix_name = "Lingering",
+        flavor = "Its fragrance hangs in the air long after the stopper is replaced.",
+        icon = "ReplaceableTextures\\CommandButtons\\BTNInvulnerable.blp",
+        description = "Infusion effects last |cffffcc0050%|r longer.",
+        duration_multiplier = 1.50
+    })
+
+    PotionService.registerCatalyst({
+        id = CATALYST_ACCELERANT,
+        key = "accelerant",
+        name = "Accelerant Catalyst",
+        affix_name = "Acceleration",
+        flavor = "The volatile mixture flashes at the slightest motion.",
+        icon = "ReplaceableTextures\\CommandButtons\\BTNBootsOfSpeed.blp",
+        description = "Potion cooldown is |cffffcc0033%|r shorter, but " ..
+            "infusion effects last |cffffcc0025%|r less time.",
+        cooldown_multiplier = 2. / 3.,
+        duration_multiplier = 0.75
+    })
+
+    PotionService.registerCatalyst({
         id = CATALYST_BOUNTIFUL,
         key = "bountiful",
         name = "Bountiful Catalyst",
+        affix_name = "Bounty",
+        flavor = "The flask feels impossibly full whenever it is lifted.",
         icon = "ReplaceableTextures\\CommandButtons\\BTNReplenishHealthMana.blp",
         description = "Restores |cffffcc0025%|r more Health and Mana.",
         restoration_multiplier = 1.25
@@ -743,7 +788,9 @@ OnInit.final("PotionService", function(Require)
         id = CATALYST_CONSERVING,
         key = "conserving",
         name = "Conserving Catalyst",
-        icon = EMPTY_FLASK_ICON,
+        affix_name = "Conservation",
+        flavor = "Not a single drop clings to the glass after pouring.",
+        icon = "ReplaceableTextures\\CommandButtons\\BTNRestoration.blp",
         description = "Has a |cffffcc0025%|r chance not to consume a charge.",
         preserve_charge_chance = 0.25
     })
@@ -752,7 +799,9 @@ OnInit.final("PotionService", function(Require)
         id = CATALYST_ECHOING,
         key = "echoing",
         name = "Echoing Catalyst",
-        icon = BLUE_FLASK_ICON,
+        affix_name = "Echoes",
+        flavor = "A second ripple always follows the first.",
+        icon = TEMPEST_ICON,
         description = "Repeats |cffffcc0040%|r of the flask's restoration " ..
             "after |cffffcc004 seconds|r.",
         on_use = function(context)
@@ -765,13 +814,15 @@ OnInit.final("PotionService", function(Require)
         end
     })
 
-    local function define_affix_donor(id, key, name, icon, prefix, suffix)
+    local function define_affix_donor(id, key, icon, prefix, suffix)
+        local effect = prefix and infusions[prefix] or catalysts[suffix]
         PotionService.define(key, {
             id = id,
             carrier = prefix and HEALTH_FLASK_ID or MANA_FLASK_ID,
-            name = name,
+            name = prefix and effect.affix_name .. " Flask" or
+                "Flask of " .. effect.affix_name,
             icon = icon,
-            tooltip = "A Chaos flask whose affix can be transferred by the Potion Master.",
+            tooltip = "|cff808080" .. effect.flavor .. "|r",
             display_rarity = 3,
             inherit_stats = chaos_inherited_stats,
             prepare_data = prepare_chaos_flask(6000, 12, 6000, 12)
@@ -784,49 +835,37 @@ OnInit.final("PotionService", function(Require)
         chaos_donor_keys[#chaos_donor_keys + 1] = key
     end
 
-    define_affix_donor(FIRST_DONOR_ID, "aegis_donor_flask",
-                       "Aegis Infusion Flask",
-                       YELLOW_FLASK_ICON,
+    define_affix_donor(FIRST_DONOR_ID, "aegis_donor_flask", YELLOW_FLASK_ICON,
                        INFUSION_AEGIS)
     define_affix_donor(FIRST_DONOR_ID + 1, "fury_donor_flask",
-                       "Fury Infusion Flask",
                        POWER_FLASK_ICON,
                        INFUSION_FURY)
     define_affix_donor(FIRST_DONOR_ID + 2, "arcane_donor_flask",
-                       "Arcane Infusion Flask",
                        PURPLE_FLASK_ICON,
                        INFUSION_ARCANE)
     define_affix_donor(FIRST_DONOR_ID + 3, "swiftness_donor_flask",
-                       "Swiftness Infusion Flask",
-                       GREEN_FLASK_ICON,
+                       BLUE_FLASK_ICON,
                        INFUSION_SWIFTNESS)
     define_affix_donor(FIRST_DONOR_ID + 4, "purity_donor_flask",
-                       "Purity Infusion Flask",
-                       "ReplaceableTextures\\CommandButtons\\BTNInvulnerable.blp",
+                       EMPTY_FLASK_ICON,
                        INFUSION_PURITY)
     define_affix_donor(FIRST_DONOR_ID + 5, "bountiful_donor_flask",
-                       "Bountiful Catalyst Flask",
                        "ReplaceableTextures\\CommandButtons\\BTNReplenishHealthMana.blp",
                        nil, CATALYST_BOUNTIFUL)
     define_affix_donor(FIRST_DONOR_ID + 6, "conserving_donor_flask",
-                       "Conserving Catalyst Flask",
-                       EMPTY_FLASK_ICON,
+                       "ReplaceableTextures\\CommandButtons\\BTNRestoration.blp",
                        nil, CATALYST_CONSERVING)
     define_affix_donor(FIRST_DONOR_ID + 7, "echoing_donor_flask",
-                       "Echoing Catalyst Flask",
-                       BLUE_FLASK_ICON,
+                       TEMPEST_ICON,
                        nil, CATALYST_ECHOING)
     define_affix_donor(FIRST_DONOR_ID + 8, "potent_donor_flask",
-                       "Potent Catalyst Flask",
                        "ReplaceableTextures\\CommandButtons\\BTNINV_Potion_16.blp",
                        nil, CATALYST_POTENT)
     define_affix_donor(FIRST_DONOR_ID + 9, "lingering_donor_flask",
-                       "Lingering Catalyst Flask",
-                       PURPLE_FLASK_ICON,
+                       "ReplaceableTextures\\CommandButtons\\BTNInvulnerable.blp",
                        nil, CATALYST_LINGERING)
     define_affix_donor(FIRST_DONOR_ID + 10, "accelerant_donor_flask",
-                       "Accelerant Catalyst Flask",
-                       YELLOW_FLASK_ICON,
+                       "ReplaceableTextures\\CommandButtons\\BTNBootsOfSpeed.blp",
                        nil, CATALYST_ACCELERANT)
 
     ---Creates a non-faction affix donor from the Chaos drop pool.
@@ -841,26 +880,6 @@ OnInit.final("PotionService", function(Require)
         for index, key in ipairs(chaos_donor_keys) do result[index] = key end
         return result
     end
-
-    PotionService.registerCatalyst({
-        id = CATALYST_LINGERING,
-        key = "lingering",
-        name = "Lingering Catalyst",
-        icon = PURPLE_FLASK_ICON,
-        description = "Infusion effects last |cffffcc0050%|r longer.",
-        duration_multiplier = 1.50
-    })
-
-    PotionService.registerCatalyst({
-        id = CATALYST_ACCELERANT,
-        key = "accelerant",
-        name = "Accelerant Catalyst",
-        icon = YELLOW_FLASK_ICON,
-        description = "Potion cooldown is |cffffcc0033%|r shorter, but " ..
-            "infusion effects last |cffffcc0025%|r less time.",
-        cooldown_multiplier = 2. / 3.,
-        duration_multiplier = 0.75
-    })
 
     local function potion_at(pid, index)
         local profile = Profile[pid]
@@ -946,7 +965,7 @@ OnInit.final("PotionService", function(Require)
         local available = capacity - used
         local function status(definition)
             if definition then
-                return "|cff0080c0" .. definition.name .. "|r"
+                return "|cff0080c0" .. definition.affix_name .. "|r"
             end
             if available > 0 then return "|cff40bf5fOpen|r" end
             return "|cff606060Locked|r"
@@ -955,6 +974,18 @@ OnInit.final("PotionService", function(Require)
                          "   |cff808080Suffix:|r " .. status(suffix)
         item.tooltip = (item.tooltip or "") .. line
         item.alt_tooltip = (item.alt_tooltip or "") .. line
+    end
+
+    local function customized_name(item, prefix, suffix)
+        if prefix and suffix then
+            return prefix.affix_name .. " Flask of " .. suffix.affix_name
+        elseif prefix then
+            return prefix.affix_name .. " Flask"
+        elseif suffix then
+            return "Flask of " .. suffix.affix_name
+        end
+        return item.runtime_definition and item.runtime_definition.data.name or
+                   GetItemName(item.obj)
     end
 
     local function restoration_multiplier(item)
@@ -977,9 +1008,24 @@ OnInit.final("PotionService", function(Require)
                                                 INFUSION_QUALITY_INDEX)
         local catalyst = selected_customization(item, catalysts,
                                                 CATALYST_QUALITY_INDEX)
+        local behavior = item.runtime_definition and
+                             item.runtime_definition.metadata and
+                             item.runtime_definition.metadata.potion
+        local name_prefix = infusion
+        if not name_prefix and behavior and behavior.inherent_infusion then
+            name_prefix = infusions[behavior.inherent_infusion]
+        end
         append_affix_slots(item, infusion, catalyst)
         append_customization(item, infusion)
         append_customization(item, catalyst)
+        local name = customized_name(item, name_prefix, catalyst)
+        local icon = name_prefix and name_prefix.icon or catalyst and
+                         catalyst.icon or
+                         (item.runtime_definition and
+                             item.runtime_definition.data.path or item.data.path)
+        BlzSetItemName(item.obj, name)
+        BlzSetItemTooltip(item.obj, name)
+        BlzSetItemIconPath(item.obj, icon)
         BlzSetItemDescription(item.obj, item.tooltip)
         BlzSetItemExtendedTooltip(item.obj, item.tooltip)
     end

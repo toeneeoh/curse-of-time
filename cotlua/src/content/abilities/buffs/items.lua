@@ -271,7 +271,7 @@ OnInit.final("BuffsItems", function(Require)
     do
         local thistype = SwiftnessFlaskBuff
         thistype.NAME = "Swiftness Infusion"
-        thistype.ICON = "ReplaceableTextures\\CommandButtons\\BTNgreenEApotionGS.blp"
+        thistype.ICON = "ReplaceableTextures\\CommandButtons\\BTNblueEApotionGS.blp"
         thistype.DESC = "This unit has +^$movespeed% movement speed"
         thistype.DISPEL_TYPE = BUFF_POSITIVE
         thistype.STACK_TYPE = BUFF_STACK_NONE
@@ -289,7 +289,7 @@ OnInit.final("BuffsItems", function(Require)
     do
         local thistype = PurityFlaskBuff
         thistype.NAME = "Purity Infusion"
-        thistype.ICON = "ReplaceableTextures\\CommandButtons\\BTNInvulnerable.blp"
+        thistype.ICON = "ReplaceableTextures\\CommandButtons\\BTNnoEApotionGS.blp"
         thistype.DESC = "This unit has +$status_resist% Status Resistance"
         thistype.DISPEL_TYPE = BUFF_POSITIVE
         thistype.STACK_TYPE = BUFF_STACK_NONE

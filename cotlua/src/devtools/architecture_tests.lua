@@ -199,12 +199,16 @@ OnInit.final("ArchitectureTests", function(Require)
             local customization = PotionService.getCustomization(item)
             local expected_skin = case[2] == FourCC('I00E') and
                                       FourCC('pman') or FourCC('phea')
+            local expected_icon = case[2] == FourCC('I00E') and
+                                      "ReplaceableTextures\\CommandButtons\\BTNPotionBlue.blp" or
+                                      "ReplaceableTextures\\CommandButtons\\BTNPotionGreen.blp"
             local valid = item and item.id == case[2] and properties and
                               customization and customization.capacity == 0 and
                               customization.prefix == nil and
                               customization.suffix == nil and
                               item.runtime_definition.world_skin_id ==
                               expected_skin and
+                              BlzGetItemIconPath(item.obj) == expected_icon and
                               properties.level_requirement == case[3] and
                               properties.maximum_charges >= case[4] and
                               properties.maximum_charges <= case[5] and
@@ -316,11 +320,21 @@ OnInit.final("ArchitectureTests", function(Require)
             local properties = PotionService.getProperties(item)
             local occupied = customization and
                                  ((customization.prefix and 1 or 0) +
-                                     (customization.suffix and 1 or 0)) or 0
+                                 (customization.suffix and 1 or 0)) or 0
+            local expected_name = customization and customization.prefix and
+                                      customization.prefix.affix_name ..
+                                          " Flask" or
+                                      customization and customization.suffix and
+                                          "Flask of " ..
+                                              customization.suffix.affix_name
             if not item or not customization or not properties or
                 customization.capacity ~= 1 or occupied ~= 1 or
                 properties.level_requirement ~= 200 or
-                properties.maximum_charges ~= 6 then
+                properties.maximum_charges ~= 6 or
+                GetItemName(item.obj) ~= expected_name or
+                GetItemName(item.obj):find("Infusion", 1, true) or
+                GetItemName(item.obj):find("Catalyst", 1, true) or
+                not item.tooltip:find("|cff808080", 1, true) then
                 if item then item:destroy() end
                 return false, "invalid Chaos donor " .. tostring(key)
             end
@@ -357,12 +371,13 @@ OnInit.final("ArchitectureTests", function(Require)
         local cases = {
             {
                 PotionService.STONEBLOOD_KEY, 0, FourCC('phea'),
-                PotionService.INFUSION_TEMPEST, 0, 3.
+                PotionService.INFUSION_TEMPEST, 0, 3., "Tempest Flask"
             },
             {
                 PotionService.LEGENDARY_CHAOS_KEY, 2, FourCC('phea'),
                 PotionService.INFUSION_STONE,
-                PotionService.CATALYST_ACCELERANT, 2.
+                PotionService.CATALYST_ACCELERANT, 2.,
+                "Stoneblood Flask of Acceleration"
             }
         }
 
@@ -408,6 +423,7 @@ OnInit.final("ArchitectureTests", function(Require)
                               customization and
                               customization.infusion_id == case[4] and
                               customization.catalyst_id == case[5] and
+                              GetItemName(restored.obj) == case[7] and
                               math.abs(properties.cooldown - case[6]) < 0.001 and
                               restored.tooltip:find(
                                   customization.infusion.name .. ":", 1,
