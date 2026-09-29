@@ -17,6 +17,10 @@ OnInit.final("Inventory", function(Require)
     local INVENTORY_HEIGHT  = 0.232
     local INVENTORY_GAPY    = 0.0312
     local INVENTORY_GAPX    = 0.0333
+    -- inventory_row.tga is six equally sized cells (672 / 6). Using the
+    -- rounded potion-column width here accumulated visible horizontal drift
+    -- by the sixth ordinary inventory slot.
+    local INVENTORY_COLUMN_PITCH = INVENTORY_WIDTH / 6.
     local INVENTORY_TEXTURE = "inventory_row.tga"
     local POTION_TEXTURE    = "war3mapImported\\PotionBackdrop2.dds"
     local INVENTORY_MIN_X   = 0.612
@@ -58,35 +62,35 @@ OnInit.final("Inventory", function(Require)
     -- fields: {x, y, kind}
     local inventory_slots = {
         {0.0000, 0.1248, "main"},
-        {0.0333, 0.1248, "main"},
-        {0.0666, 0.1248, "main"},
-        {0.0999, 0.1248, "main", FRAMEPOINT_TOPRIGHT},
-        {0.1332, 0.1248, "main", FRAMEPOINT_TOPRIGHT},
-        {0.1665, 0.1248, "main", FRAMEPOINT_TOPRIGHT},
+        {INVENTORY_COLUMN_PITCH, 0.1248, "main"},
+        {INVENTORY_COLUMN_PITCH * 2, 0.1248, "main"},
+        {INVENTORY_COLUMN_PITCH * 3, 0.1248, "main", FRAMEPOINT_TOPRIGHT},
+        {INVENTORY_COLUMN_PITCH * 4, 0.1248, "main", FRAMEPOINT_TOPRIGHT},
+        {INVENTORY_COLUMN_PITCH * 5, 0.1248, "main", FRAMEPOINT_TOPRIGHT},
 
         {0.2048, 0.1248, "potion1", FRAMEPOINT_TOPRIGHT},
         {0.2048, 0.0936, "potion2", FRAMEPOINT_TOPRIGHT},
 
         {0.0000, 0.0624, "unequip1"},
-        {0.0333, 0.0624, "unequip1"},
-        {0.0666, 0.0624, "unequip1"},
-        {0.0999, 0.0624, "unequip1", FRAMEPOINT_TOPRIGHT},
-        {0.1332, 0.0624, "unequip1", FRAMEPOINT_TOPRIGHT},
-        {0.1665, 0.0624, "unequip1", FRAMEPOINT_TOPRIGHT},
+        {INVENTORY_COLUMN_PITCH, 0.0624, "unequip1"},
+        {INVENTORY_COLUMN_PITCH * 2, 0.0624, "unequip1"},
+        {INVENTORY_COLUMN_PITCH * 3, 0.0624, "unequip1", FRAMEPOINT_TOPRIGHT},
+        {INVENTORY_COLUMN_PITCH * 4, 0.0624, "unequip1", FRAMEPOINT_TOPRIGHT},
+        {INVENTORY_COLUMN_PITCH * 5, 0.0624, "unequip1", FRAMEPOINT_TOPRIGHT},
 
         {0.0000, 0.0312, "unequip2"},
-        {0.0333, 0.0312, "unequip2"},
-        {0.0666, 0.0312, "unequip2"},
-        {0.0999, 0.0312, "unequip2", FRAMEPOINT_TOPRIGHT},
-        {0.1332, 0.0312, "unequip2", FRAMEPOINT_TOPRIGHT},
-        {0.1665, 0.0312, "unequip2", FRAMEPOINT_TOPRIGHT},
+        {INVENTORY_COLUMN_PITCH, 0.0312, "unequip2"},
+        {INVENTORY_COLUMN_PITCH * 2, 0.0312, "unequip2"},
+        {INVENTORY_COLUMN_PITCH * 3, 0.0312, "unequip2", FRAMEPOINT_TOPRIGHT},
+        {INVENTORY_COLUMN_PITCH * 4, 0.0312, "unequip2", FRAMEPOINT_TOPRIGHT},
+        {INVENTORY_COLUMN_PITCH * 5, 0.0312, "unequip2", FRAMEPOINT_TOPRIGHT},
 
         {0.0000, 0.0,    "unequip3"},
-        {0.0333, 0.0,    "unequip3"},
-        {0.0666, 0.0,    "unequip3"},
-        {0.0999, 0.0,    "unequip3", FRAMEPOINT_TOPRIGHT},
-        {0.1332, 0.0,    "unequip3", FRAMEPOINT_TOPRIGHT},
-        {0.1665, 0.0,    "unequip3", FRAMEPOINT_TOPRIGHT},
+        {INVENTORY_COLUMN_PITCH, 0.0, "unequip3"},
+        {INVENTORY_COLUMN_PITCH * 2, 0.0, "unequip3"},
+        {INVENTORY_COLUMN_PITCH * 3, 0.0, "unequip3", FRAMEPOINT_TOPRIGHT},
+        {INVENTORY_COLUMN_PITCH * 4, 0.0, "unequip3", FRAMEPOINT_TOPRIGHT},
+        {INVENTORY_COLUMN_PITCH * 5, 0.0, "unequip3", FRAMEPOINT_TOPRIGHT},
     }
 
     local disabled_for_player = {}
@@ -913,12 +917,22 @@ OnInit.final("Inventory", function(Require)
 
                 local parent = parent_table[kind]
                 local col    = column_for(id, kind)
-                local offx   = 0.0032 + INVENTORY_GAPX * (col - 1)
+                local offx = 0.0032 + INVENTORY_COLUMN_PITCH * (col - 1)
                 local offy   = y_offset(kind)
 
                 slots[id] = Button.create(parent, INVENTORY_SLOT_SIZE, INVENTORY_SLOT_SIZE, offx, offy, false)
                 slots[id].rarityBorder = BlzCreateFrameByType("BACKDROP", "", slots[id].iconFrame, "", 0)
-                BlzFrameSetAllPoints(slots[id].rarityBorder, slots[id].iconFrame)
+                local pixel_x = math.abs(BlzPixelToFrameX(1) -
+                                             BlzPixelToFrameX(0))
+                local pixel_y = math.abs(BlzPixelToFrameY(1) -
+                                             BlzPixelToFrameY(0))
+                BlzFrameSetPoint(slots[id].rarityBorder, FRAMEPOINT_TOPLEFT,
+                                 slots[id].iconFrame, FRAMEPOINT_TOPLEFT,
+                                 -pixel_x, pixel_y)
+                BlzFrameSetPoint(slots[id].rarityBorder,
+                                 FRAMEPOINT_BOTTOMRIGHT,
+                                 slots[id].iconFrame,
+                                 FRAMEPOINT_BOTTOMRIGHT, -pixel_x, pixel_y)
                 BlzFrameSetEnable(slots[id].rarityBorder, false)
                 BlzFrameSetLevel(slots[id].rarityBorder, 1)
                 BlzFrameSetLevel(slots[id].chargeFrame, 2)
