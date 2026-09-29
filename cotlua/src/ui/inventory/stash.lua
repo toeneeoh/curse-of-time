@@ -24,6 +24,8 @@ OnInit.final("StashUI", function(Require)
     local FIRST_ROW_TOP = FRAME_TOP - 0.036
     local SLOT_LEFT_INSET = 0.0032
     local SLOT_TOP_INSET = 0.0023
+    local ROW_TEXTURE = "inventory_row.tga"
+    local LOCKED_ROW_TEXTURE = "inventory_row_disabled.tga"
 
     local frame = BlzCreateFrame("ListBoxWar3",
         BlzGetFrameByName("ConsoleUIBackdrop", 0), 0, 0)
@@ -57,7 +59,7 @@ OnInit.final("StashUI", function(Require)
                          FRAMEPOINT_TOPLEFT, 0.02,
                          -0.036 - ROW_HEIGHT * (row - 1))
         BlzFrameSetSize(rows[row], ROW_WIDTH, ROW_HEIGHT)
-        BlzFrameSetTexture(rows[row], "inventory_row.tga", 0, false)
+        BlzFrameSetTexture(rows[row], ROW_TEXTURE, 0, false)
         BlzFrameSetEnable(rows[row], false)
 
         locks[row] = BlzCreateFrameByType("BACKDROP", "", rows[row], "", 0)
@@ -228,7 +230,10 @@ OnInit.final("StashUI", function(Require)
         BlzFrameSetText(title, "Stash  " .. used .. " / " ..
                             unlocked_rows * STASH_COLUMNS)
         for row = 1, STASH_MAX_ROWS do
-            BlzFrameSetVisible(locks[row], row > unlocked_rows)
+            local locked = row > unlocked_rows
+            BlzFrameSetTexture(rows[row], locked and LOCKED_ROW_TEXTURE or
+                                   ROW_TEXTURE, 0, false)
+            BlzFrameSetVisible(locks[row], locked)
             if row > 1 then
                 local show_plus = not read_only and row == unlocked_rows + 1
                 plus_buttons[row]:visible(show_plus)
