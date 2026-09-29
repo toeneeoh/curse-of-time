@@ -40,10 +40,10 @@ OnInit.final("PotionService", function(Require)
     local REROLL_SEED_STATE = 4
     local COOLDOWN_QUALITY_STATE = 5
     local INFUSION_QUALITY_STATE = 6
-    local CHAOS_CHARGE_MIN = 5
-    local CHAOS_CHARGE_MAX = 7
+    local CHAOS_CHARGE_MIN = 4
+    local CHAOS_CHARGE_MAX = 8
     local CHAOS_COOLDOWN_MIN = 2.5
-    local CHAOS_COOLDOWN_MAX = 3.5
+    local CHAOS_COOLDOWN_MAX = 5
     local INFUSION_ROLL_MIN = 0.90
     local INFUSION_ROLL_MAX = 1.10
     -- Potion definitions currently roll at most five properties. The final two
@@ -120,6 +120,15 @@ OnInit.final("PotionService", function(Require)
         return string.format("%.1f", value)
     end
 
+    local function effect_amount(base, multiplier, maximum_multiplier)
+        local minimum = concise_number(base * multiplier)
+        if maximum_multiplier then
+            return minimum .. "-" ..
+                       concise_number(base * maximum_multiplier)
+        end
+        return minimum
+    end
+
     local function affix_count(item)
         local count = 0
         if (item.quality[INFUSION_QUALITY_INDEX] or 0) ~= 0 then
@@ -131,18 +140,32 @@ OnInit.final("PotionService", function(Require)
         return count
     end
 
-    local function adjust_restoration_for_affixes(item)
+    -- Bounty's entire purpose is restoration, so it does not pay the generic
+    -- restoration penalty for occupying its own suffix slot. Other affixes,
+    -- including a prefix paired with Bounty, retain their normal sacrifice.
+    local function restoration_affix_count(item)
         local count = affix_count(item)
-        if count == 0 then
+        if (item.quality[CATALYST_QUALITY_INDEX] or 0) ==
+            CATALYST_BOUNTIFUL then
+            count = count - 1
+        end
+        return math.max(0, count)
+    end
+
+    local function adjust_restoration_for_affixes(item)
+        local count = restoration_affix_count(item)
+        local catalyst_id = item.quality[CATALYST_QUALITY_INDEX] or 0
+        local catalyst = catalysts[catalyst_id]
+        local catalyst_multiplier = catalyst and
+                                        catalyst.restoration_multiplier or 1.
+        if count == 0 and catalyst_multiplier == 1. then
             item.potion_unmodified_stats = nil
             return nil
         end
         local reduction = count >= 2 and 60 or 30
-        local catalyst_id = item.quality[CATALYST_QUALITY_INDEX] or 0
-        local catalyst = catalysts[catalyst_id]
         local multiplier = (100 - reduction) * 0.01 *
-                               (catalyst and
-                                   catalyst.restoration_multiplier or 1.)
+                               catalyst_multiplier
+        if count == 0 then multiplier = catalyst_multiplier end
         local original = {}
         for _, stat in ipairs(restoration_stats) do
             original[stat] = item.cached_stats[stat]
@@ -162,7 +185,7 @@ OnInit.final("PotionService", function(Require)
         item.potion_unmodified_stats = original
         local adjustments = {}
         for _, stat in ipairs(restoration_stats) do
-            if original[stat] ~= 0 then
+            if original[stat] ~= 0 and multiplier < 1. then
                 adjustments[stat] = math.floor((1. - multiplier) * 100. + 0.5)
             end
         end
@@ -225,7 +248,7 @@ OnInit.final("PotionService", function(Require)
     ---@field cooldown_multiplier? number
     ---@field restoration_multiplier? number
     ---@field preserve_charge_chance? number
-    ---@field describe? fun(multiplier: number): string
+    ---@field describe? fun(multiplier: number, maximum_multiplier?: number): string
 
     local function register_customization(registry, definition)
         if type(definition) ~= "table" or type(definition.id) ~= "number" or
@@ -295,6 +318,22 @@ OnInit.final("PotionService", function(Require)
         spec.metadata = spec.metadata or {}
         spec.metadata.potion = behavior or {}
         spec.adjust_cached_stats = adjust_restoration_for_affixes
+        spec.append_stats = function(item, text, alt_text)
+            local current = PotionService.getUseCooldown(item)
+            local lower, upper = PotionService.getUseCooldownRange(item)
+            text[#text + 1] = "|n + |cffffcc00" .. concise_number(current) ..
+                                  "|r Cooldown"
+            if math.abs(lower - upper) > 0.001 then
+                alt_text[#alt_text + 1] = "|n + |cffffcc00" ..
+                                              concise_number(lower) .. "-" ..
+                                              concise_number(upper) ..
+                                              "|r Cooldown"
+            else
+                alt_text[#alt_text + 1] = "|n + |cffffcc00" ..
+                                              concise_number(current) ..
+                                              "|r Cooldown"
+            end
+        end
         spec.initialize_item = function(item)
             local potion = spec.metadata.potion
             if potion.initial_prefix then
@@ -662,9 +701,9 @@ OnInit.final("PotionService", function(Require)
         icon = BLOOD_FLASK_ICON,
         description = "Restores |cffffcc008%|r of damage dealt as Health " ..
             "for |cffffcc0012 seconds|r.",
-        describe = function(multiplier)
+        describe = function(multiplier, maximum_multiplier)
             return "Restores |cffffcc00" ..
-                       concise_number(8. * multiplier) ..
+                       effect_amount(8., multiplier, maximum_multiplier) ..
                        "%|r of damage dealt as Health for |cffffcc0012 seconds|r."
         end,
         on_use = function(context)
@@ -681,9 +720,9 @@ OnInit.final("PotionService", function(Require)
         icon = YELLOW_FLASK_ICON,
         description = "Grants a shield equal to |cffffcc0020%|r of maximum " ..
             "Health for |cffffcc0010 seconds|r.",
-        describe = function(multiplier)
+        describe = function(multiplier, maximum_multiplier)
             return "Grants a shield equal to |cffffcc00" ..
-                       concise_number(20. * multiplier) ..
+                       effect_amount(20., multiplier, maximum_multiplier) ..
                        "%|r of maximum Health for |cffffcc0010 seconds|r."
         end,
         on_use = function(context)
@@ -702,9 +741,9 @@ OnInit.final("PotionService", function(Require)
         icon = POWER_FLASK_ICON,
         description = "Increases total damage by |cffffcc0025%|r for " ..
             "|cffffcc0010 seconds|r.",
-        describe = function(multiplier)
+        describe = function(multiplier, maximum_multiplier)
             return "Increases total damage by |cffffcc00" ..
-                       concise_number(25. * multiplier) ..
+                       effect_amount(25., multiplier, maximum_multiplier) ..
                        "%|r for |cffffcc0010 seconds|r."
         end,
         on_use = function(context)
@@ -721,9 +760,9 @@ OnInit.final("PotionService", function(Require)
         icon = PURPLE_FLASK_ICON,
         description = "Increases Spell Power by |cffffcc0025%|r for " ..
             "|cffffcc0010 seconds|r.",
-        describe = function(multiplier)
+        describe = function(multiplier, maximum_multiplier)
             return "Increases Spell Power by |cffffcc00" ..
-                       concise_number(25. * multiplier) ..
+                       effect_amount(25., multiplier, maximum_multiplier) ..
                        "%|r for |cffffcc0010 seconds|r."
         end,
         on_use = function(context)
@@ -741,9 +780,9 @@ OnInit.final("PotionService", function(Require)
         icon = BLUE_FLASK_ICON,
         description = "Increases movement speed by |cffffcc0025%|r for " ..
             "|cffffcc0010 seconds|r.",
-        describe = function(multiplier)
+        describe = function(multiplier, maximum_multiplier)
             return "Increases movement speed by |cffffcc00" ..
-                       concise_number(25. * multiplier) ..
+                       effect_amount(25., multiplier, maximum_multiplier) ..
                        "%|r for |cffffcc0010 seconds|r."
         end,
         on_use = function(context)
@@ -761,9 +800,9 @@ OnInit.final("PotionService", function(Require)
         icon = EMPTY_FLASK_ICON,
         description = "Removes negative effects and grants |cffffcc0040%|r " ..
             "Status Resistance for |cffffcc008 seconds|r.",
-        describe = function(multiplier)
+        describe = function(multiplier, maximum_multiplier)
             return "Removes negative effects and grants |cffffcc00" ..
-                       concise_number(40. * multiplier) ..
+                       effect_amount(40., multiplier, maximum_multiplier) ..
                        "%|r Status Resistance for |cffffcc008 seconds|r."
         end,
         on_use = function(context)
@@ -782,9 +821,9 @@ OnInit.final("PotionService", function(Require)
         icon = GREEN_FLASK_ICON,
         description = "Reduces damage taken by |cffffcc0015%|r for " ..
             "|cffffcc0012 seconds|r.",
-        describe = function(multiplier)
+        describe = function(multiplier, maximum_multiplier)
             return "Reduces damage taken by |cffffcc00" ..
-                       concise_number(15. * multiplier) ..
+                       effect_amount(15., multiplier, maximum_multiplier) ..
                        "%|r for |cffffcc0012 seconds|r."
         end,
         on_use = function(context)
@@ -801,9 +840,9 @@ OnInit.final("PotionService", function(Require)
         icon = TEMPEST_ICON,
         description = "Ability cooldowns recover |cffffcc00100%|r faster " ..
             "for |cffffcc008 seconds|r.",
-        describe = function(multiplier)
+        describe = function(multiplier, maximum_multiplier)
             return "Ability cooldowns recover |cffffcc00" ..
-                       concise_number(100. * multiplier) ..
+                       effect_amount(100., multiplier, maximum_multiplier) ..
                        "%|r faster for |cffffcc008 seconds|r."
         end,
         on_use = function(context)
@@ -1079,18 +1118,16 @@ OnInit.final("PotionService", function(Require)
         local description = definition.describe and
                                 definition.describe(multiplier or 1.) or
                                 definition.description
+        local alt_description = definition.describe and multiplier and
+                                    definition.describe(INFUSION_ROLL_MIN,
+                                                        INFUSION_ROLL_MAX) or
+                                    description
         local line = "|n|cff0080c0" .. definition.name .. ":|r " ..
                          description
+        local alt_line = "|n|cff0080c0" .. definition.name .. ":|r " ..
+                             alt_description
         item.tooltip = (item.tooltip or "") .. line
-        item.alt_tooltip = (item.alt_tooltip or "") .. line
-    end
-
-    local function append_use_cooldown(item)
-        local line = "|n|cff808080Use Cooldown:|r |cffffcc00" ..
-                         concise_number(PotionService.getUseCooldown(item)) ..
-                         " seconds|r"
-        item.tooltip = (item.tooltip or "") .. line
-        item.alt_tooltip = (item.alt_tooltip or "") .. line
+        item.alt_tooltip = (item.alt_tooltip or "") .. alt_line
     end
 
     local function affix_capacity(item)
@@ -1131,7 +1168,7 @@ OnInit.final("PotionService", function(Require)
     end
 
     local function restoration_multiplier(item)
-        local count = affix_count(item)
+        local count = restoration_affix_count(item)
         local multiplier = count >= 2 and 0.40 or count == 1 and 0.70 or 1.
         local catalyst = selected_customization(item, catalysts,
                                                 CATALYST_QUALITY_INDEX)
@@ -1161,7 +1198,6 @@ OnInit.final("PotionService", function(Require)
         append_customization(item, infusion,
                              PotionService.getInfusionMultiplier(item))
         append_customization(item, catalyst)
-        append_use_cooldown(item)
         local name = customized_name(item, name_prefix, catalyst)
         local icon = name_prefix and name_prefix.icon or catalyst and
                          catalyst.icon or
@@ -1377,6 +1413,28 @@ OnInit.final("PotionService", function(Require)
                        (catalyst and catalyst.cooldown_multiplier or 1.)
 
         return math.max(0., cooldown)
+    end
+
+    ---Returns the displayed roll bounds after any suffix modifier. Ordinary
+    ---and pre-Chaos potions expose their fixed cooldown as both bounds.
+    function PotionService.getUseCooldownRange(item)
+        local behavior = potion_behavior(item)
+        local cooldown = behavior and behavior.cooldown or nil
+        if type(cooldown) == "function" then cooldown = cooldown(item) end
+        if type(cooldown) ~= "number" then cooldown = DEFAULT_USE_COOLDOWN end
+
+        local catalyst = selected_customization(item, catalysts,
+                                                CATALYST_QUALITY_INDEX)
+        local catalyst_multiplier = catalyst and
+                                        catalyst.cooldown_multiplier or 1.
+        if PotionService.getCooldownQuality(item) == nil then
+            cooldown = math.max(0., cooldown * catalyst_multiplier)
+            return cooldown, cooldown
+        end
+        return math.max(0., cooldown * CHAOS_COOLDOWN_MIN /
+                            DEFAULT_USE_COOLDOWN * catalyst_multiplier),
+               math.max(0., cooldown * CHAOS_COOLDOWN_MAX /
+                            DEFAULT_USE_COOLDOWN * catalyst_multiplier)
     end
 
     ---Returns the complete potion property set used by future refinement and

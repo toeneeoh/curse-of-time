@@ -93,7 +93,7 @@ visual cleanup are intentionally excluded.
     recover 100% faster for 8 seconds.
   - **Vampiric Flask — Ashen Vanguard:** restores Health and Mana and restores
     8% of damage dealt as Health for 12 seconds.
-- Faction flasks have five to seven charges and a level requirement of 200.
+- Faction flasks have four to eight charges and a level requirement of 200.
 - Added a Potion Master in town with separate services for refilling, rerolling,
   and transferring flask prefixes or suffixes.
 - The Potion Master can work with flasks in any inventory or backpack slot.
@@ -119,6 +119,9 @@ visual cleanup are intentionally excluded.
   two-slot Legendary Flask base is exceptionally rare.
 - Prefix effect strength rolls within a narrow range and transfers with the
   prefix when its donor flask is consumed.
+- Holding Alt shows the possible prefix-effect and use-cooldown ranges.
+- Bounty increases restoration without paying the normal one-affix restoration
+  penalty for its own suffix slot.
 - Faction flasks carry one transferable faction prefix and do not support a
   second affix.
 - Added a Legendary Flask base that supports both a prefix and suffix.

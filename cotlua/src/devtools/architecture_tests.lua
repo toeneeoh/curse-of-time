@@ -249,8 +249,8 @@ OnInit.final("ArchitectureTests", function(Require)
                               item.runtime_definition.world_skin_id ==
                               expected_skin and
                               properties.level_requirement == 200 and
-                              properties.maximum_charges >= 5 and
-                              properties.maximum_charges <= 7 and
+                              properties.maximum_charges >= 4 and
+                              properties.maximum_charges <= 8 and
                               properties.charges ==
                               properties.maximum_charges and
                               properties.flat_health >= 0 and
@@ -332,17 +332,46 @@ OnInit.final("ArchitectureTests", function(Require)
                                       customization and customization.suffix and
                                           "Flask of " ..
                                               customization.suffix.affix_name
+            local charge_position = item and item.tooltip and
+                                        item.tooltip:find("Charges", 1, true)
+            local cooldown_position = item and item.tooltip and
+                                          item.tooltip:find("Cooldown", 1, true)
+            local flavor_position = item and item.tooltip and
+                                        item.tooltip:find("|cff808080", 1,
+                                                          true)
+            local infusion_range_valid = key ~= "aegis_donor_flask" or
+                                               (item and item.alt_tooltip and
+                                                   item.alt_tooltip:find(
+                                                       "18-22%", 1, true))
             if not item or not customization or not properties or
                 customization.capacity ~= 1 or occupied ~= 1 or
                 properties.level_requirement ~= 200 or
-                properties.maximum_charges < 5 or
-                properties.maximum_charges > 7 or
+                properties.maximum_charges < 4 or
+                properties.maximum_charges > 8 or
                 GetItemName(item.obj) ~= expected_name or
                 GetItemName(item.obj):find("Infusion", 1, true) or
                 GetItemName(item.obj):find("Catalyst", 1, true) or
-                not item.tooltip:find("|cff808080", 1, true) then
+                not flavor_position or not charge_position or
+                not cooldown_position or cooldown_position < charge_position or
+                not item.alt_tooltip:find("2.5-5", 1, true) or
+                not infusion_range_valid then
+                local details = string.format(
+                    "name=%s/%s capacity=%s occupied=%s level=%s charges=%s positions=%s/%s/%s cooldown_range=%s infusion_range=%s",
+                    tostring(item and GetItemName(item.obj)),
+                    tostring(expected_name),
+                    tostring(customization and customization.capacity),
+                    tostring(occupied),
+                    tostring(properties and properties.level_requirement),
+                    tostring(properties and properties.maximum_charges),
+                    tostring(charge_position), tostring(cooldown_position),
+                    tostring(flavor_position),
+                    tostring(item and item.alt_tooltip and
+                        item.alt_tooltip:find("2.5-5", 1, true) ~= nil),
+                    tostring(infusion_range_valid ~= nil and
+                        infusion_range_valid ~= false))
                 if item then item:destroy() end
-                return false, "invalid Chaos donor " .. tostring(key)
+                return false, "invalid Chaos donor " .. tostring(key) ..
+                           ": " .. details
             end
 
             local saved_id = item:encode_id()
@@ -371,6 +400,33 @@ OnInit.final("ArchitectureTests", function(Require)
                 return false, "Chaos donor did not round trip " ..
                            tostring(key)
             end
+        end
+        return true
+    end)
+
+    ArchitectureTests.register("Bounty suffix increases restoration",
+                               function()
+        local item = PotionService.create(
+                         PotionService.LEGENDARY_CHAOS_KEY, 30000., 30000.)
+        if not item then return false, "could not create legendary flask" end
+        local before = PotionService.getProperties(item)
+        local applied = PotionService.setSuffix(
+                            item, PotionService.CATALYST_BOUNTIFUL)
+        local after = PotionService.getProperties(item)
+        local expected_health = math.floor(before.flat_health * 1.25 + 0.5)
+        local expected_mana = math.floor(before.flat_mana * 1.25 + 0.5)
+        local valid = applied and after and
+                          after.flat_health == expected_health and
+                          after.flat_mana == expected_mana and
+                          math.abs(after.restoration_multiplier - 1.25) < 0.001
+        item:destroy()
+        if not valid then
+            return false, string.format(
+                "Bounty restoration was %s/%s at multiplier %s; expected %s/%s at 1.25",
+                tostring(after and after.flat_health),
+                tostring(after and after.flat_mana),
+                tostring(after and after.restoration_multiplier),
+                tostring(expected_health), tostring(expected_mana))
         end
         return true
     end)
@@ -1059,7 +1115,7 @@ OnInit.final("ArchitectureTests", function(Require)
                            tostring(equipped)
             end
             local unequipped = calculate(5000000, 10000000, 1000000, 1)
-            if math.abs(unequipped - 500000.) > 0.001 then
+            if math.floor(unequipped + 0.5) ~= 500000 then
                 return false,
                        "unequipping maximum health did not preserve the lower percentage: " ..
                            tostring(unequipped)

@@ -1372,6 +1372,14 @@
                 end
             end
 
+            -- Runtime logical items can add calculated, non-core properties
+            -- directly after ordinary stats. This keeps values such as flask
+            -- cooldown beside Charges without inventing a global item stat.
+            if self.runtime_definition and
+                self.runtime_definition.append_stats then
+                self.runtime_definition.append_stats(self, text, alt_text)
+            end
+
             -- flavor text
             -- remove bracket pairs, extra spaces, and extra newlines
             local flavor = orig:gsub("(%b[]%s*)", "")

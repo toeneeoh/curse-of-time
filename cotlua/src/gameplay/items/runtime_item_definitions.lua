@@ -17,6 +17,7 @@ OnInit.final("RuntimeItemDefinitions", function(Require)
     ---@field inherit_stats? integer[] Formula stats copied from the carrier.
     ---@field prepare_data? fun(data: table, carrier_data: table)
     ---@field adjust_cached_stats? fun(item: Item): table<integer, integer>?
+    ---@field append_stats? fun(item: Item, text: string[], alt_text: string[])
     ---@field initialize_item? fun(item: Item)
 
     ---@class RuntimeLogicalItemDefinition: RuntimeLogicalItemSpec
