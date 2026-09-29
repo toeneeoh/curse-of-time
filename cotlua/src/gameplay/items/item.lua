@@ -1479,7 +1479,7 @@
             local id = 0
 
             for i = 3, 7 do
-                id = id + self.quality[i] << ((i - 3) * 6)
+                id = id + (self.quality[i] << ((i - 3) * 6))
             end
 
             return id

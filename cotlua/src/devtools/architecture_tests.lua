@@ -249,7 +249,8 @@ OnInit.final("ArchitectureTests", function(Require)
                               item.runtime_definition.world_skin_id ==
                               expected_skin and
                               properties.level_requirement == 200 and
-                              properties.maximum_charges == 6 and
+                              properties.maximum_charges >= 5 and
+                              properties.maximum_charges <= 7 and
                               properties.charges ==
                               properties.maximum_charges and
                               properties.flat_health >= 0 and
@@ -334,7 +335,8 @@ OnInit.final("ArchitectureTests", function(Require)
             if not item or not customization or not properties or
                 customization.capacity ~= 1 or occupied ~= 1 or
                 properties.level_requirement ~= 200 or
-                properties.maximum_charges ~= 6 or
+                properties.maximum_charges < 5 or
+                properties.maximum_charges > 7 or
                 GetItemName(item.obj) ~= expected_name or
                 GetItemName(item.obj):find("Infusion", 1, true) or
                 GetItemName(item.obj):find("Catalyst", 1, true) or
@@ -349,6 +351,7 @@ OnInit.final("ArchitectureTests", function(Require)
             local saved_state = item:encode_state()
             local expected_prefix = customization.prefix_id
             local expected_suffix = customization.suffix_id
+            local expected_infusion_quality = customization.infusion_quality
             item:destroy()
 
             local restored = Item.decode(saved_id, saved_stats, saved_extra,
@@ -360,7 +363,9 @@ OnInit.final("ArchitectureTests", function(Require)
                               restored_customization.prefix_id ==
                               expected_prefix and
                               restored_customization.suffix_id ==
-                              expected_suffix
+                              expected_suffix and
+                              restored_customization.infusion_quality ==
+                              expected_infusion_quality
             if restored then restored:destroy() end
             if not valid then
                 return false, "Chaos donor did not round trip " ..
@@ -370,17 +375,39 @@ OnInit.final("ArchitectureTests", function(Require)
         return true
     end)
 
+    ArchitectureTests.register("Chaos potion boss odds scale upward",
+                               function()
+        local low_donor, low_legendary =
+            PotionService.getChaosBossDropChances(200, 1)
+        local high_donor, high_legendary =
+            PotionService.getChaosBossDropChances(500, 1)
+        local challenge_donor, challenge_legendary =
+            PotionService.getChaosBossDropChances(500, 5)
+        local valid = math.abs(low_donor - 0.08) < 0.000001 and
+                          math.abs(low_legendary - 0.00005) < 0.000001 and
+                          high_donor > low_donor and
+                          high_legendary > low_legendary and
+                          challenge_donor > high_donor and
+                          challenge_legendary > high_legendary and
+                          challenge_donor <= 0.40 and
+                          challenge_legendary <= 0.0025
+        if not valid then
+            return false, "Chaos boss potion odds are not level/difficulty scaled"
+        end
+        return true
+    end)
+
     ArchitectureTests.register("runtime potion saves preserve identity and charges",
                                function()
         local cases = {
             {
                 PotionService.STONEBLOOD_KEY, 0, FourCC('phea'),
-                PotionService.INFUSION_TEMPEST, 0, 3., "Tempest Flask"
+                PotionService.INFUSION_TEMPEST, 0, "Tempest Flask"
             },
             {
                 PotionService.LEGENDARY_CHAOS_KEY, 2, FourCC('phea'),
                 PotionService.INFUSION_STONE,
-                PotionService.CATALYST_ACCELERANT, 2.,
+                PotionService.CATALYST_ACCELERANT,
                 "Stoneblood Flask of Acceleration"
             }
         }
@@ -427,8 +454,13 @@ OnInit.final("ArchitectureTests", function(Require)
                               customization and
                               customization.infusion_id == case[4] and
                               customization.catalyst_id == case[5] and
-                              GetItemName(restored.obj) == case[7] and
-                              math.abs(properties.cooldown - case[6]) < 0.001 and
+                              GetItemName(restored.obj) == case[6] and
+                              math.abs(properties.cooldown - expected.cooldown) <
+                                  0.001 and
+                              properties.cooldown_quality ==
+                                  expected.cooldown_quality and
+                              properties.infusion_quality ==
+                                  expected.infusion_quality and
                               restored.tooltip:find(
                                   customization.infusion.name .. ":", 1,
                                   true) and
@@ -500,6 +532,8 @@ OnInit.final("ArchitectureTests", function(Require)
                           a.base_percent_health == b.base_percent_health and
                           a.base_flat_mana == b.base_flat_mana and
                           a.base_percent_mana == b.base_percent_mana and
+                          a.maximum_charges == b.maximum_charges and
+                          math.abs(a.cooldown - b.cooldown) < 0.001 and
                           PotionService.getRerollCount(first) == 1 and
                           PotionService.getRerollCount(second) == 1 and
                           math.abs(second_price / initial_price - 1.35) < 0.002
@@ -529,6 +563,10 @@ OnInit.final("ArchitectureTests", function(Require)
                                            next_b.base_flat_mana and
                                        next_a.base_percent_mana ==
                                            next_b.base_percent_mana and
+                                       next_a.maximum_charges ==
+                                           next_b.maximum_charges and
+                                       math.abs(next_a.cooldown -
+                                           next_b.cooldown) < 0.001 and
                                        PotionService.getRerollCount(first) == 2 and
                                        PotionService.getRerollCount(restored) == 2
         if not continuation_valid and not failure_stage then
@@ -553,7 +591,11 @@ OnInit.final("ArchitectureTests", function(Require)
                                             previous.base_flat_mana ~=
                                             advanced_a.base_flat_mana or
                                             previous.base_percent_mana ~=
-                                            advanced_a.base_percent_mana)
+                                                advanced_a.base_percent_mana or
+                                            previous.maximum_charges ~=
+                                                advanced_a.maximum_charges or
+                                            math.abs(previous.cooldown -
+                                                advanced_a.cooldown) > 0.001)
             local roll_valid = first_advanced and restored_advanced and
                                    advanced_a and advanced_b and
                                    visibly_changed and
@@ -565,6 +607,10 @@ OnInit.final("ArchitectureTests", function(Require)
                                        advanced_b.base_flat_mana and
                                    advanced_a.base_percent_mana ==
                                        advanced_b.base_percent_mana and
+                                   advanced_a.maximum_charges ==
+                                       advanced_b.maximum_charges and
+                                   math.abs(advanced_a.cooldown -
+                                       advanced_b.cooldown) < 0.001 and
                                    PotionService.getRerollCount(first) == roll
             if not roll_valid and not failure_stage then
                 failure_stage = "reroll " .. roll
@@ -600,27 +646,33 @@ OnInit.final("ArchitectureTests", function(Require)
                                     capped_a.base_flat_mana ==
                                         capped_b.base_flat_mana and
                                     capped_a.base_percent_mana ==
-                                        capped_b.base_percent_mana
+                                        capped_b.base_percent_mana and
+                                    capped_a.maximum_charges ==
+                                        capped_b.maximum_charges and
+                                    math.abs(capped_a.cooldown -
+                                        capped_b.cooldown) < 0.001
         if not continued_valid and not failure_stage then
             failure_stage = "post-twelve save continuation"
         end
         valid = valid and continued_valid
 
-        for _, stat in ipairs({ITEM_FLAT_HEAL, ITEM_PERCENT_HEAL,
-                               ITEM_FLAT_MANA, ITEM_PERCENT_MANA}) do
+        for _, stat in ipairs(PotionService.ROLLABLE_STATS) do
             local quality_index = first.data.quality_index[stat]
             if quality_index then first.quality[quality_index] = 63 end
         end
+        first.persistent_state[PotionService.COOLDOWN_QUALITY_STATE] = 63
+        first.persistent_state[PotionService.INFUSION_QUALITY_STATE] = 63
         PotionService.refreshItem(first)
         local perfect = PotionService.getRestorationRollResult(first)
         valid = valid and perfect and perfect.perfect and
                     perfect.near_perfect and perfect.text ~= ""
 
-        for _, stat in ipairs({ITEM_FLAT_HEAL, ITEM_PERCENT_HEAL,
-                               ITEM_FLAT_MANA, ITEM_PERCENT_MANA}) do
+        for _, stat in ipairs(PotionService.ROLLABLE_STATS) do
             local quality_index = first.data.quality_index[stat]
             if quality_index then first.quality[quality_index] = 60 end
         end
+        first.persistent_state[PotionService.COOLDOWN_QUALITY_STATE] = 60
+        first.persistent_state[PotionService.INFUSION_QUALITY_STATE] = 60
         PotionService.refreshItem(first)
         local near_perfect = PotionService.getRestorationRollResult(first)
         valid = valid and near_perfect and not near_perfect.perfect and
@@ -1007,7 +1059,7 @@ OnInit.final("ArchitectureTests", function(Require)
                            tostring(equipped)
             end
             local unequipped = calculate(5000000, 10000000, 1000000, 1)
-            if unequipped ~= 500000 then
+            if math.abs(unequipped - 500000.) > 0.001 then
                 return false,
                        "unequipping maximum health did not preserve the lower percentage: " ..
                            tostring(unequipped)

@@ -80,8 +80,8 @@ visual cleanup are intentionally excluded.
   - Greater Flasks at level 50.
   - Superior Flasks at level 110.
   - Grand Flasks at level 170.
-- Pre-Chaos flasks may roll restoration values and maximum charges within their
-  tier ranges.
+- Chaos flasks may roll restoration values, maximum charges, and use cooldown
+  within their tier ranges.
 - Potion healing and mana restoration may include both flat and percentage
   values. Percentage healing is now labelled `Max Health Restored`.
 - Flasks begin with their maximum charges, consume one charge per use, and may
@@ -93,15 +93,16 @@ visual cleanup are intentionally excluded.
     recover 100% faster for 8 seconds.
   - **Vampiric Flask — Ashen Vanguard:** restores Health and Mana and restores
     8% of damage dealt as Health for 12 seconds.
-- Faction flasks have six charges and a level requirement of 200.
+- Faction flasks have five to seven charges and a level requirement of 200.
 - Added a Potion Master in town with separate services for refilling, rerolling,
   and transferring flask prefixes or suffixes.
 - The Potion Master can work with flasks in any inventory or backpack slot.
-- Potion Services can reroll a Chaos flask's restoration. Its base cost scales
-  with the flask's tier and level, each subsequent reroll costs 35% more, and
-  its saved roll sequence cannot be changed by reloading.
-- Restoration rerolls report their new values, with perfect and near-perfect
-  results announced to all players.
+- Potion Services can reroll a Chaos flask's restoration, maximum charges, and
+  use cooldown. Its base cost scales with the flask's tier and level, each
+  subsequent reroll costs 35% more, and its saved roll sequence cannot be
+  changed by reloading.
+- Flask rerolls report their new values, with perfect and near-perfect results
+  announced to all players.
 - Flask prefixes include Vampiric, Stoneblood, Tempest, Aegis, Fury, Arcane,
   Swiftness, and Purity. Applying one requires extracting it from another flask
   and consumes the donor.
@@ -113,9 +114,11 @@ visual cleanup are intentionally excluded.
   - **Bounty:** stronger Health and Mana restoration.
   - **Conservation:** a chance not to consume a charge.
   - **Echoes:** repeats part of the flask's restoration after a delay.
-- In Chaos, ordinary enemies can drop suffix flasks, elite enemies can drop
-  prefix flasks, and bosses can drop either. Chaos bosses also have a rare
-  chance to drop the two-slot Legendary Flask base.
+- Chaos bosses can drop prefix or suffix donor flasks. Higher-level and
+  higher-difficulty bosses have better odds. Their separate chance to drop the
+  two-slot Legendary Flask base is exceptionally rare.
+- Prefix effect strength rolls within a narrow range and transfers with the
+  prefix when its donor flask is consumed.
 - Faction flasks carry one transferable faction prefix and do not support a
   second affix.
 - Added a Legendary Flask base that supports both a prefix and suffix.

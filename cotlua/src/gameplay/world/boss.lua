@@ -445,17 +445,19 @@ OnInit.final("Boss", function(Require)
 
             DropTable:rollColosseumTicket(x, y, 0.05)
 
-            -- Chaos bosses are the dependable source of transferable generic
-            -- affixes and the rare source of the two-slot legendary base.
+            -- Chaos bosses exclusively supply transferable generic affixes.
+            -- The legendary two-slot base uses a separate, Jah-like rare roll.
+            -- Higher-level bosses and higher difficulties improve both odds.
             if CHAOS_MODE then
-                for _ = 1, self.difficulty do
-                    if GetRandomReal(0., 1.) < 0.10 then
-                        PotionService.createChaosDonor(x, y, 600.)
-                    end
-                    if GetRandomReal(0., 1.) < 0.01 then
-                        PotionService.create(PotionService.LEGENDARY_CHAOS_KEY,
-                                             x, y, 600.)
-                    end
+                local donor_chance, legendary_chance =
+                    PotionService.getChaosBossDropChances(self.level,
+                                                          self.difficulty)
+                if GetRandomReal(0., 1.) < donor_chance then
+                    PotionService.createChaosDonor(x, y, 600.)
+                end
+                if GetRandomReal(0., 1.) < legendary_chance then
+                    PotionService.create(PotionService.LEGENDARY_CHAOS_KEY,
+                                         x, y, 600.)
                 end
             end
 

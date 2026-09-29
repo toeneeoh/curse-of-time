@@ -182,12 +182,12 @@ OnInit.final("ShopServiceDialogs", function(Require)
             if result.perfect then
                 DisplayTimedTextToForce(FORCE_PLAYING, 20.,
                     User[dialog.pid - 1].nameColored ..
-                        " rolled |cffffcc00PERFECT|r restoration on " ..
+                        " rolled a |cffffcc00PERFECT|r flask: " ..
                         item_name .. "! " .. result.text)
             elseif result.near_perfect then
                 DisplayTimedTextToForce(FORCE_PLAYING, 20.,
                     User[dialog.pid - 1].nameColored ..
-                        " rolled |cff40bf5fnear-perfect|r restoration on " ..
+                        " rolled a |cff40bf5fnear-perfect|r flask: " ..
                         item_name .. "! " .. result.text)
             else
                 DisplayTimedTextToPlayer(Player(dialog.pid - 1), 0, 0, 15.,
@@ -210,7 +210,7 @@ OnInit.final("ShopServiceDialogs", function(Require)
             action = "Refine " ..
                          PotionBrewingService.stat_names[data.value]
         elseif data.operation == "reroll" then
-            action = "Reroll restoration"
+            action = "Reroll flask properties"
         else
             action = "Extract and apply " .. quote.option.name
         end
@@ -414,7 +414,7 @@ OnInit.final("ShopServiceDialogs", function(Require)
         ShopAddOffer(shop_id, {
             key = "potion_master_reroll",
             name = "Reroll Flask",
-            tooltip = "Reroll the restoration values on a flask. Repeated rerolls on the same flask cost substantially more.",
+            tooltip = "Reroll a flask's restoration, maximum charges, and use cooldown. Repeated rerolls on the same flask cost substantially more.",
             icon = "ReplaceableTextures\\CommandButtons\\BTNStrongDrink.blp",
             categories = category,
             availability = function(pid)

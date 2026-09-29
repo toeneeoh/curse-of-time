@@ -8,6 +8,7 @@ OnInit.final("Inspect", function(Require)
     Require('Users')
     Require('Frames')
     Require('Events')
+    Require('Hotkeys')
 
     local backdrop = BlzCreateFrameByType("BACKDROP", "", BlzGetOriginFrame(ORIGIN_FRAME_GAME_UI, 0), "", 0)
     INSPECT_HUD_ANCHOR = backdrop

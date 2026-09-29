@@ -13,8 +13,6 @@
     local COLOSSEUM_ELITE_TICKET_CHANCE = 0.01
     local PRECHAOS_FLASK_CHANCE = 0.002
     local PRECHAOS_ELITE_FLASK_CHANCE = 0.02
-    local CHAOS_DONOR_CHANCE = 0.0005
-    local CHAOS_ELITE_DONOR_CHANCE = 0.005
 
     ---@class DropTable
     ---@field pickItem function
@@ -87,9 +85,8 @@
         -- than another entry in equipment pools. Enemy level selects the
         -- current 50/110/170 band, while the independent chance suits overworld
         -- pack clearing without a pity counter. Elites provide a noticeably
-        -- better opportunity. In Chaos, ordinary enemies supply passive
-        -- suffix donors while elites supply active prefix donors. Faction
-        -- prefixes and two-slot bases retain their dedicated sources.
+        -- better opportunity. Chaos affix donors and two-slot bases are kept
+        -- out of ordinary enemy tables and awarded by bosses instead.
         local function roll_prechaos_flask(level, x, y, elite)
             if level < 50 or level >= 200 then return false end
             local chance = elite and PRECHAOS_ELITE_FLASK_CHANCE or
@@ -99,15 +96,6 @@
             local key = PotionService.getPrechaosDropKey(level)
             if not key then return false end
             return PotionService.create(key, x, y, 600.) ~= nil
-        end
-
-        local function roll_chaos_donor(level, x, y, elite)
-            if level < 200 then return false end
-            local chance = elite and CHAOS_ELITE_DONOR_CHANCE or
-                               CHAOS_DONOR_CHANCE
-            if math.random() >= chance then return false end
-            return PotionService.createChaosDonor(
-                       x, y, 600., elite and "prefix" or "suffix") ~= nil
         end
 
         ---@type fun(id: integer, ...)
@@ -146,7 +134,6 @@
                                       COLOSSEUM_TICKET_CHANCE
             thistype:rollColosseumTicket(x, y, ticket_chance)
             roll_prechaos_flask(lvl, x, y, IsUnitType(killed, UNIT_TYPE_HERO))
-            roll_chaos_donor(lvl, x, y, IsUnitType(killed, UNIT_TYPE_HERO))
         end
 
         local id = 69 -- destructables

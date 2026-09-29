@@ -38,6 +38,14 @@ OnInit.final("PotionService", function(Require)
     local PREFIX_REROLL_STATE = 2
     local SUFFIX_REROLL_STATE = 3
     local REROLL_SEED_STATE = 4
+    local COOLDOWN_QUALITY_STATE = 5
+    local INFUSION_QUALITY_STATE = 6
+    local CHAOS_CHARGE_MIN = 5
+    local CHAOS_CHARGE_MAX = 7
+    local CHAOS_COOLDOWN_MIN = 2.5
+    local CHAOS_COOLDOWN_MAX = 3.5
+    local INFUSION_ROLL_MIN = 0.90
+    local INFUSION_ROLL_MAX = 1.10
     -- Potion definitions currently roll at most five properties. The final two
     -- six-bit quality slots are therefore stable, already-saved customization
     -- storage that does not compete with logical identity or item charges.
@@ -97,6 +105,20 @@ OnInit.final("PotionService", function(Require)
     local restoration_stats = {
         ITEM_FLAT_HEAL, ITEM_PERCENT_HEAL, ITEM_FLAT_MANA, ITEM_PERCENT_MANA
     }
+
+    local function quality_fraction(quality)
+        return math.max(0, math.min(63, quality or 0)) / 63.
+    end
+
+    local function rolled_value(minimum, maximum, quality)
+        return minimum + (maximum - minimum) * quality_fraction(quality)
+    end
+
+    local function concise_number(value)
+        local rounded = math.floor(value + 0.5)
+        if math.abs(value - rounded) < 0.05 then return tostring(rounded) end
+        return string.format("%.1f", value)
+    end
 
     local function affix_count(item)
         local count = 0
@@ -172,6 +194,8 @@ OnInit.final("PotionService", function(Require)
     PotionService.SUFFIX_NONE = CATALYST_NONE
     PotionService.DEFAULT_USE_COOLDOWN = DEFAULT_USE_COOLDOWN
     PotionService.EQUIP_COOLDOWN = EQUIP_COOLDOWN
+    PotionService.COOLDOWN_QUALITY_STATE = COOLDOWN_QUALITY_STATE
+    PotionService.INFUSION_QUALITY_STATE = INFUSION_QUALITY_STATE
     PotionService.GREATER_HEALTH_KEY = GREATER_HEALTH_KEY
     PotionService.GREATER_MANA_KEY = GREATER_MANA_KEY
     PotionService.SUPERIOR_HEALTH_KEY = SUPERIOR_HEALTH_KEY
@@ -201,6 +225,7 @@ OnInit.final("PotionService", function(Require)
     ---@field cooldown_multiplier? number
     ---@field restoration_multiplier? number
     ---@field preserve_charge_chance? number
+    ---@field describe? fun(multiplier: number): string
 
     local function register_customization(registry, definition)
         if type(definition) ~= "table" or type(definition.id) ~= "number" or
@@ -284,6 +309,10 @@ OnInit.final("PotionService", function(Require)
                 item.persistent_state[SUFFIX_REROLL_STATE] = 0
                 item.persistent_state[REROLL_SEED_STATE] =
                     GetRandomInt(1, 0x7FFFFFFF)
+                item.persistent_state[COOLDOWN_QUALITY_STATE] =
+                    GetRandomInt(0, 63)
+                item.persistent_state[INFUSION_QUALITY_STATE] =
+                    GetRandomInt(0, 63)
             end
         end
         return RuntimeItemDefinitions.define(key, spec)
@@ -477,7 +506,9 @@ OnInit.final("PotionService", function(Require)
             restoration(ITEM_PERCENT_HEAL, percent_health)
             restoration(ITEM_FLAT_MANA, flat_mana)
             restoration(ITEM_PERCENT_MANA, percent_mana)
-            data[ITEM_CHARGES] = math.max(6, carrier_data[ITEM_CHARGES])
+            data[ITEM_CHARGES] = math.max(CHAOS_CHARGE_MIN,
+                                          carrier_data[ITEM_CHARGES])
+            data[ITEM_CHARGES .. "range"] = CHAOS_CHARGE_MAX
             data[ITEM_CHARGES .. "fixed"] = 1
         end
     end
@@ -631,6 +662,11 @@ OnInit.final("PotionService", function(Require)
         icon = BLOOD_FLASK_ICON,
         description = "Restores |cffffcc008%|r of damage dealt as Health " ..
             "for |cffffcc0012 seconds|r.",
+        describe = function(multiplier)
+            return "Restores |cffffcc00" ..
+                       concise_number(8. * multiplier) ..
+                       "%|r of damage dealt as Health for |cffffcc0012 seconds|r."
+        end,
         on_use = function(context)
             apply_vampiric_effect(context, 0.08, 12.)
         end
@@ -645,6 +681,11 @@ OnInit.final("PotionService", function(Require)
         icon = YELLOW_FLASK_ICON,
         description = "Grants a shield equal to |cffffcc0020%|r of maximum " ..
             "Health for |cffffcc0010 seconds|r.",
+        describe = function(multiplier)
+            return "Grants a shield equal to |cffffcc00" ..
+                       concise_number(20. * multiplier) ..
+                       "%|r of maximum Health for |cffffcc0010 seconds|r."
+        end,
         on_use = function(context)
             Shield.add(context.hero, context.unit.hp * 0.20 *
                            context.potency_multiplier,
@@ -661,6 +702,11 @@ OnInit.final("PotionService", function(Require)
         icon = POWER_FLASK_ICON,
         description = "Increases total damage by |cffffcc0025%|r for " ..
             "|cffffcc0010 seconds|r.",
+        describe = function(multiplier)
+            return "Increases total damage by |cffffcc00" ..
+                       concise_number(25. * multiplier) ..
+                       "%|r for |cffffcc0010 seconds|r."
+        end,
         on_use = function(context)
             apply_scaled_buff(context, FuryFlaskBuff, "damage", 0.25, 10.)
         end
@@ -675,6 +721,11 @@ OnInit.final("PotionService", function(Require)
         icon = PURPLE_FLASK_ICON,
         description = "Increases Spell Power by |cffffcc0025%|r for " ..
             "|cffffcc0010 seconds|r.",
+        describe = function(multiplier)
+            return "Increases Spell Power by |cffffcc00" ..
+                       concise_number(25. * multiplier) ..
+                       "%|r for |cffffcc0010 seconds|r."
+        end,
         on_use = function(context)
             apply_scaled_buff(context, ArcaneFlaskBuff, "spellboost", 0.25,
                               10.)
@@ -690,6 +741,11 @@ OnInit.final("PotionService", function(Require)
         icon = BLUE_FLASK_ICON,
         description = "Increases movement speed by |cffffcc0025%|r for " ..
             "|cffffcc0010 seconds|r.",
+        describe = function(multiplier)
+            return "Increases movement speed by |cffffcc00" ..
+                       concise_number(25. * multiplier) ..
+                       "%|r for |cffffcc0010 seconds|r."
+        end,
         on_use = function(context)
             apply_scaled_buff(context, SwiftnessFlaskBuff, "movespeed", 0.25,
                               10.)
@@ -705,6 +761,11 @@ OnInit.final("PotionService", function(Require)
         icon = EMPTY_FLASK_ICON,
         description = "Removes negative effects and grants |cffffcc0040%|r " ..
             "Status Resistance for |cffffcc008 seconds|r.",
+        describe = function(multiplier)
+            return "Removes negative effects and grants |cffffcc00" ..
+                       concise_number(40. * multiplier) ..
+                       "%|r Status Resistance for |cffffcc008 seconds|r."
+        end,
         on_use = function(context)
             Buff.dispelType(context.hero, BUFF_NEGATIVE)
             apply_scaled_buff(context, PurityFlaskBuff, "status_resist", 40.,
@@ -721,6 +782,11 @@ OnInit.final("PotionService", function(Require)
         icon = GREEN_FLASK_ICON,
         description = "Reduces damage taken by |cffffcc0015%|r for " ..
             "|cffffcc0012 seconds|r.",
+        describe = function(multiplier)
+            return "Reduces damage taken by |cffffcc00" ..
+                       concise_number(15. * multiplier) ..
+                       "%|r for |cffffcc0012 seconds|r."
+        end,
         on_use = function(context)
             apply_stone_effect(context, 0.15, 12.)
         end
@@ -735,6 +801,11 @@ OnInit.final("PotionService", function(Require)
         icon = TEMPEST_ICON,
         description = "Ability cooldowns recover |cffffcc00100%|r faster " ..
             "for |cffffcc008 seconds|r.",
+        describe = function(multiplier)
+            return "Ability cooldowns recover |cffffcc00" ..
+                       concise_number(100. * multiplier) ..
+                       "%|r faster for |cffffcc008 seconds|r."
+        end,
         on_use = function(context)
             apply_tempest_effect(context, 1., 8.)
         end
@@ -873,9 +944,8 @@ OnInit.final("PotionService", function(Require)
                        "ReplaceableTextures\\CommandButtons\\BTNBootsOfSpeed.blp",
                        nil, CATALYST_ACCELERANT)
 
-    ---Creates a non-faction affix donor from the Chaos drop pool. Ordinary
-    ---enemies can be limited to suffixes while elites award the more active
-    ---prefix effects; omitting kind retains the complete boss/test pool.
+    ---Creates a non-faction affix donor from the Chaos boss drop pool.
+    ---The optional kind remains useful for tests and future targeted rewards.
     function PotionService.createChaosDonor(x, y, expire, kind)
         local pool = kind == "prefix" and chaos_prefix_donor_keys or
                          kind == "suffix" and chaos_suffix_donor_keys or
@@ -892,6 +962,22 @@ OnInit.final("PotionService", function(Require)
         local result = {}
         for index, key in ipairs(pool) do result[index] = key end
         return result
+    end
+
+    ---Returns independent Chaos-boss drop chances. Affix donors remain
+    ---obtainable enough to support brewing, while the two-affix legendary
+    ---base deliberately ranges from roughly 1:20,000 to 1:1,000 per kill.
+    ---Both rewards improve with boss level and selected boss difficulty.
+    function PotionService.getChaosBossDropChances(level, difficulty)
+        local progress = math.max(0., math.min(1., ((level or 200) - 200.) /
+                                                      300.))
+        local challenge = math.max(1, math.floor(difficulty or 1))
+        local donor = math.min(0.40, 0.08 + 0.12 * progress +
+                                   0.02 * (challenge - 1))
+        local legendary = math.min(0.0025,
+            (0.00005 + 0.00045 * progress * progress) *
+                (1. + 0.25 * (challenge - 1)))
+        return donor, legendary
     end
 
     local function potion_at(pid, index)
@@ -956,10 +1042,53 @@ OnInit.final("PotionService", function(Require)
         return registry[id], id
     end
 
-    local function append_customization(item, definition)
+    local function persistent_quality(item, index, salt)
+        local state = item.persistent_state
+        local quality = state[index]
+        if quality == nil then
+            local seed = state[REROLL_SEED_STATE] or
+                             ((item.runtime_definition and
+                                 item.runtime_definition.id or item.id) *
+                                 0x45D9F3B)
+            quality = (seed ~ salt) & 0x3F
+            state[index] = quality
+        end
+        return math.max(0, math.min(63, math.floor(quality)))
+    end
+
+    function PotionService.getCooldownQuality(item)
+        if not item or not item.runtime_definition or
+            item.data[ITEM_LEVEL_REQUIREMENT] < 200 then return nil end
+        return persistent_quality(item, COOLDOWN_QUALITY_STATE, 0x17A2D39)
+    end
+
+    function PotionService.getInfusionQuality(item)
+        if not item or not item.runtime_definition or
+            item.data[ITEM_LEVEL_REQUIREMENT] < 200 then return nil end
+        return persistent_quality(item, INFUSION_QUALITY_STATE, 0x2C9277B)
+    end
+
+    function PotionService.getInfusionMultiplier(item)
+        local quality = PotionService.getInfusionQuality(item)
+        if quality == nil then return 1. end
+        return rolled_value(INFUSION_ROLL_MIN, INFUSION_ROLL_MAX, quality)
+    end
+
+    local function append_customization(item, definition, multiplier)
         if not definition then return end
+        local description = definition.describe and
+                                definition.describe(multiplier or 1.) or
+                                definition.description
         local line = "|n|cff0080c0" .. definition.name .. ":|r " ..
-                         definition.description
+                         description
+        item.tooltip = (item.tooltip or "") .. line
+        item.alt_tooltip = (item.alt_tooltip or "") .. line
+    end
+
+    local function append_use_cooldown(item)
+        local line = "|n|cff808080Use Cooldown:|r |cffffcc00" ..
+                         concise_number(PotionService.getUseCooldown(item)) ..
+                         " seconds|r"
         item.tooltip = (item.tooltip or "") .. line
         item.alt_tooltip = (item.alt_tooltip or "") .. line
     end
@@ -1029,8 +1158,10 @@ OnInit.final("PotionService", function(Require)
             name_prefix = infusions[behavior.inherent_infusion]
         end
         append_affix_slots(item, infusion, catalyst)
-        append_customization(item, infusion)
+        append_customization(item, infusion,
+                             PotionService.getInfusionMultiplier(item))
         append_customization(item, catalyst)
+        append_use_cooldown(item)
         local name = customized_name(item, name_prefix, catalyst)
         local icon = name_prefix and name_prefix.icon or catalyst and
                          catalyst.icon or
@@ -1045,7 +1176,7 @@ OnInit.final("PotionService", function(Require)
 
     ---@param item Item
     ---@param infusion integer
-    function PotionService.setInfusion(item, infusion)
+    function PotionService.setInfusion(item, infusion, quality)
         if not item or item.type ~= TYPE_POTION_INDEX then return false end
         if infusion ~= INFUSION_NONE and not infusions[infusion] then
             return false
@@ -1075,6 +1206,10 @@ OnInit.final("PotionService", function(Require)
 
         local changed = item.quality[INFUSION_QUALITY_INDEX] ~= infusion
         item.quality[INFUSION_QUALITY_INDEX] = infusion
+        if infusion ~= INFUSION_NONE and quality ~= nil then
+            item.persistent_state[INFUSION_QUALITY_STATE] =
+                math.max(0, math.min(63, math.floor(quality)))
+        end
         PotionService.refreshItem(item)
         if item.pid then NotifyItemChanged(item.pid) end
         return changed
@@ -1114,7 +1249,9 @@ OnInit.final("PotionService", function(Require)
             prefix = infusion,
             suffix_id = catalyst and catalyst_id or CATALYST_NONE,
             suffix = catalyst,
-            capacity = affix_capacity(item)
+            capacity = affix_capacity(item),
+            infusion_quality = PotionService.getInfusionQuality(item),
+            infusion_multiplier = PotionService.getInfusionMultiplier(item)
         }
     end
 
@@ -1225,6 +1362,15 @@ OnInit.final("PotionService", function(Require)
             cooldown = DEFAULT_USE_COOLDOWN
         end
 
+        local cooldown_quality = PotionService.getCooldownQuality(item)
+        if cooldown_quality ~= nil then
+            cooldown = cooldown *
+                           (rolled_value(CHAOS_COOLDOWN_MAX,
+                                         CHAOS_COOLDOWN_MIN,
+                                         cooldown_quality) /
+                               DEFAULT_USE_COOLDOWN)
+        end
+
         local catalyst = selected_customization(item, catalysts,
                                                 CATALYST_QUALITY_INDEX)
         cooldown = cooldown *
@@ -1257,6 +1403,9 @@ OnInit.final("PotionService", function(Require)
             base_percent_mana = original[ITEM_PERCENT_MANA],
             restoration_multiplier = restoration_multiplier(item),
             cooldown = PotionService.getUseCooldown(item),
+            cooldown_quality = PotionService.getCooldownQuality(item),
+            infusion_quality = PotionService.getInfusionQuality(item),
+            infusion_multiplier = PotionService.getInfusionMultiplier(item),
             behavior = potion_behavior(item)
         }
     end
@@ -1349,11 +1498,10 @@ OnInit.final("PotionService", function(Require)
         if not item or item.type ~= TYPE_POTION_INDEX or
             item.data[ITEM_LEVEL_REQUIREMENT] < 200 or
             not item.runtime_definition then return false end
-        for _, stat in ipairs({ITEM_FLAT_HEAL, ITEM_PERCENT_HEAL,
-                               ITEM_FLAT_MANA, ITEM_PERCENT_MANA}) do
+        for _, stat in ipairs(PotionService.ROLLABLE_STATS) do
             if refinement_index(item, stat) then return true end
         end
-        return false
+        return PotionService.getCooldownQuality(item) ~= nil
     end
 
     function PotionService.getRerollCount(item, kind)
@@ -1395,7 +1543,7 @@ OnInit.final("PotionService", function(Require)
     end
 
     ---Produces independent property rolls from the fixed seed, saved attempt,
-    ---and currently saved restoration qualities. Including the current rolls
+    ---and currently saved flask qualities. Including the current rolls
     ---keeps each result evolving while remaining reproducible after save/load.
     local function next_restoration_rolls(seed, attempt, current)
         local state = (seed ~ ((attempt + 1) * 0x45D9F3B)) & 0x7FFFFFFF
@@ -1424,7 +1572,7 @@ OnInit.final("PotionService", function(Require)
     end
 
     ---Returns the player-facing values and quality classification for the
-    ---current restoration roll. Near-perfect requires every rolled property
+    ---current flask. Near-perfect requires every rolled property
     ---to be within the top four of the 64 possible quality values.
     ---@param item Item
     ---@return table?
@@ -1441,12 +1589,13 @@ OnInit.final("PotionService", function(Require)
             [ITEM_FLAT_MANA] = {properties.flat_mana, " Mana"},
             [ITEM_PERCENT_MANA] = {
                 properties.percent_mana, "% Max Mana"
-            }
+            },
+            [ITEM_CHARGES] = {properties.maximum_charges, " Charges"}
         }
         local parts = {}
         local minimum_quality = 63
         local count = 0
-        for _, stat in ipairs(restoration_stats) do
+        for _, stat in ipairs(PotionService.ROLLABLE_STATS) do
             local quality_index = refinement_index(item, stat)
             if quality_index then
                 local quality = item.quality[quality_index]
@@ -1455,6 +1604,23 @@ OnInit.final("PotionService", function(Require)
                 count = count + 1
                 parts[#parts + 1] = tostring(shown[1]) .. shown[2]
             end
+        end
+        local cooldown_quality = PotionService.getCooldownQuality(item)
+        if cooldown_quality ~= nil then
+            minimum_quality = math.min(minimum_quality, cooldown_quality)
+            count = count + 1
+            parts[#parts + 1] = concise_number(properties.cooldown) ..
+                                    "s Cooldown"
+        end
+        local customization = PotionService.getCustomization(item)
+        if customization and customization.prefix and
+            customization.infusion_quality ~= nil then
+            minimum_quality = math.min(minimum_quality,
+                                       customization.infusion_quality)
+            count = count + 1
+            parts[#parts + 1] = concise_number(
+                                    customization.infusion_multiplier * 100.) ..
+                                    "% Infusion"
         end
         if count == 0 then return nil end
 
@@ -1481,22 +1647,29 @@ OnInit.final("PotionService", function(Require)
 
         local quality_indices = {}
         local current = {}
-        for _, stat in ipairs({ITEM_FLAT_HEAL, ITEM_PERCENT_HEAL,
-                               ITEM_FLAT_MANA, ITEM_PERCENT_MANA}) do
+        for _, stat in ipairs(PotionService.ROLLABLE_STATS) do
             local quality_index = refinement_index(item, stat)
             if quality_index then
                 quality_indices[#quality_indices + 1] = quality_index
                 current[#current + 1] = item.quality[quality_index]
             end
         end
-        if #quality_indices == 0 then return false end
+        local cooldown_quality = PotionService.getCooldownQuality(item)
+        if cooldown_quality ~= nil then current[#current + 1] = cooldown_quality end
+        if #quality_indices == 0 and cooldown_quality == nil then return false end
 
         local rolls = next_restoration_rolls(seed, attempt, current)
         for index = 1, #quality_indices do
             item.quality[quality_indices[index]] = rolls[index]
         end
+        if cooldown_quality ~= nil then
+            item.persistent_state[COOLDOWN_QUALITY_STATE] =
+                rolls[#quality_indices + 1]
+        end
         increment_reroll_count(item, "restoration")
         PotionService.refreshItem(item)
+        item.charges = math.min(item.charges,
+                                item.cached_stats[ITEM_CHARGES])
         if item.pid then NotifyItemChanged(item.pid) end
         return true
     end
@@ -1532,7 +1705,8 @@ OnInit.final("PotionService", function(Require)
         local changed
         if kind == "prefix" then
             changed = PotionService.setPrefix(target,
-                                               donor_customization.prefix_id)
+                                               donor_customization.prefix_id,
+                                               donor_customization.infusion_quality)
         else
             changed = PotionService.setSuffix(target,
                                                donor_customization.suffix_id)
@@ -1593,8 +1767,8 @@ OnInit.final("PotionService", function(Require)
             item = item,
             hero = hero,
             unit = Unit[hero],
-            potency_multiplier = catalyst and
-                catalyst.potency_multiplier or 1.,
+            potency_multiplier = PotionService.getInfusionMultiplier(item) *
+                (catalyst and catalyst.potency_multiplier or 1.),
             duration_multiplier = catalyst and
                 catalyst.duration_multiplier or 1.,
             heal = heal,
