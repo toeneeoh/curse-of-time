@@ -39,6 +39,10 @@ OnInit.final("StashService", function(Require)
         changed_actions[#changed_actions + 1] = action
     end
 
+    function StashService.isInTown(pid)
+        return in_town(pid) == true
+    end
+
     function StashService.getUnlockedSlots(pid)
         local hero = hero_data(pid)
         return hero and unlocked_slots(hero) or 0

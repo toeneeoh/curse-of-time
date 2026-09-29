@@ -175,10 +175,12 @@ OnInit.final("Inventory", function(Require)
         end
 
         local function get_hovered_slot()
+            local local_pid = GetPlayerId(GetLocalPlayer()) + 1
             if StashUI and StashUI.getLocalHoveredSlot and
-                StashUI.isOpen(GetPlayerId(GetLocalPlayer()) + 1) then
+                StashUI.isOpen(local_pid) then
                 local stash_slot = StashUI.getLocalHoveredSlot()
                 if stash_slot >= 0 then
+                    if StashUI.isReadOnly(local_pid) then return 0 end
                     return stash_slot > 0 and
                                MAX_INVENTORY_SLOTS + stash_slot or 0
                 end
@@ -406,6 +408,7 @@ OnInit.final("Inventory", function(Require)
         BlzFrameSetEnable(tracker, false)
         BlzFrameSetSize(tracker, INVENTORY_SLOT_SIZE, INVENTORY_SLOT_SIZE)
         BlzFrameSetTexture(tracker, "trans32.blp", 0, true)
+        BlzFrameSetLevel(tracker, 25)
 
         ---@param snap boolean?
         local function update_tracker_position(snap)
@@ -885,7 +888,7 @@ OnInit.final("Inventory", function(Require)
                 if not disabled_for_player[pid] and not move_item_cooldown[pid] then
                     local highlighted = get_local_item_slot(pid)
                     if ctrl_down[pid] and highlighted > 0 and StashUI and
-                        StashUI.isOpen(pid) then
+                        StashUI.isOpen(pid) and not StashUI.isReadOnly(pid) then
                         skip_drag_release[pid] = true
                         if GetLocalPlayer() == Player(pid - 1) then
                             BlzSendSyncData("stash_action",

@@ -74,9 +74,12 @@ OnInit.final("StashUI", function(Require)
                 FRAMEPOINT_TOPLEFT, FRAMEPOINT_TOPLEFT, 0.224,
                 -0.040 - ROW_HEIGHT * (row - 1), function()
                     local pid = GetPlayerId(GetTriggerPlayer()) + 1
-                    if GetLocalPlayer() == GetTriggerPlayer() then
+                    if GetLocalPlayer() == GetTriggerPlayer() and
+                        StashService.isInTown(pid) then
                         BlzSendSyncData("stash_action",
                                         "unlock:" .. captured_row)
+                    else
+                        StashUI.refresh(pid)
                     end
                 end, "Unlock Stash Row")
             plus_buttons[row]:text("+")
@@ -124,21 +127,28 @@ OnInit.final("StashUI", function(Require)
     local context_frame = BlzCreateFrameByType("FRAME", "", frame, "", 0)
     BlzFrameSetSize(context_frame, 0.001, 0.001)
     BlzFrameSetEnable(context_frame, false)
+    BlzFrameSetLevel(context_frame, 20)
     BlzFrameSetVisible(context_frame, false)
     local context_buttons = {}
-    local context_names = {"Withdraw", "Drop", "Sell", "Details"}
+    local context_names = {"Take", "Drop", "Sell", "Details"}
     for index, name in ipairs(context_names) do
         local button = SimpleButton.create(context_frame,
             "inventorymenubuttons.dds", 0.055, 0.016, FRAMEPOINT_TOPLEFT,
             FRAMEPOINT_TOPLEFT, 0., -0.016 * (index - 1))
+        BlzFrameSetLevel(button.frame, 21)
         button:text(name)
         context_buttons[index] = button
+    end
+
+    local function set_tooltips_visible(visible)
+        for _, slot in ipairs(slots) do slot.tooltip:visible(visible) end
     end
 
     local function close_context(pid)
         context_slot[pid] = 0
         if GetLocalPlayer() == Player(pid - 1) then
             BlzFrameSetVisible(context_frame, false)
+            set_tooltips_visible(true)
         end
     end
 
@@ -156,6 +166,10 @@ OnInit.final("StashUI", function(Require)
 
     function StashUI.isOpen(pid)
         return open_for[pid] == true
+    end
+
+    function StashUI.isReadOnly(pid)
+        return not StashService.isInTown(pid)
     end
 
     ---Returns -1 outside the stash frame, 0 over its non-slot chrome, or the
@@ -198,6 +212,8 @@ OnInit.final("StashUI", function(Require)
         if not open_for[pid] or GetLocalPlayer() ~= Player(pid - 1) then return end
         local hero = Profile[pid] and Profile[pid].hero
         if not hero then return end
+        local read_only = StashUI.isReadOnly(pid)
+        if read_only then close_context(pid) end
         local unlocked_rows = math.max(1,
             math.min(STASH_MAX_ROWS, hero.stash_rows or 1))
         local used = 0
@@ -207,11 +223,12 @@ OnInit.final("StashUI", function(Require)
             INVENTORY.renderItemButton(slots[slot], item, pid)
         end
         BlzFrameSetText(title, "Stash  " .. used .. " / " ..
-                            unlocked_rows * STASH_COLUMNS)
+                            unlocked_rows * STASH_COLUMNS ..
+                            (read_only and "  |cff808080(Read Only)|r" or ""))
         for row = 1, STASH_MAX_ROWS do
             BlzFrameSetVisible(locks[row], row > unlocked_rows)
             if row > 1 then
-                local show_plus = row == unlocked_rows + 1
+                local show_plus = not read_only and row == unlocked_rows + 1
                 plus_buttons[row]:visible(show_plus)
                 if show_plus then
                     plus_buttons[row]:setTooltipText(
@@ -262,6 +279,11 @@ OnInit.final("StashUI", function(Require)
 
     local function context_clicked()
         local pid = GetPlayerId(GetTriggerPlayer()) + 1
+        if StashUI.isReadOnly(pid) then
+            close_context(pid)
+            StashUI.refresh(pid)
+            return
+        end
         local clicked = BlzGetTriggerFrame()
         local selected = context_slot[pid]
         if selected <= 0 then return end
@@ -293,6 +315,11 @@ OnInit.final("StashUI", function(Require)
     local function on_m1_down()
         local pid = GetPlayerId(GetTriggerPlayer()) + 1
         if not open_for[pid] then return end
+        if StashUI.isReadOnly(pid) then
+            close_context(pid)
+            StashUI.refresh(pid)
+            return
+        end
         local stash_slot = GetLocalPlayer() == Player(pid - 1) and
                                StashUI.getLocalHoveredSlot() or 0
         local hero = Profile[pid] and Profile[pid].hero
@@ -315,6 +342,12 @@ OnInit.final("StashUI", function(Require)
 
     local function on_m2_down()
         local pid = GetPlayerId(GetTriggerPlayer()) + 1
+        if StashUI.isReadOnly(pid) then
+            right_click_origin[pid] = 0
+            close_context(pid)
+            StashUI.refresh(pid)
+            return
+        end
         right_click_origin[pid] = open_for[pid] and
                                       (GetLocalPlayer() == Player(pid - 1) and
                                           StashUI.getLocalHoveredSlot() or 0) or 0
@@ -322,6 +355,12 @@ OnInit.final("StashUI", function(Require)
 
     local function on_m2_up()
         local pid = GetPlayerId(GetTriggerPlayer()) + 1
+        if StashUI.isReadOnly(pid) then
+            right_click_origin[pid] = 0
+            close_context(pid)
+            StashUI.refresh(pid)
+            return
+        end
         local released = GetLocalPlayer() == Player(pid - 1) and
                              StashUI.getLocalHoveredSlot() or 0
         local selected = right_click_origin[pid]
@@ -331,6 +370,7 @@ OnInit.final("StashUI", function(Require)
             hero.stash[selected] then
             context_slot[pid] = selected
             if GetLocalPlayer() == Player(pid - 1) then
+                set_tooltips_visible(false)
                 BlzFrameClearAllPoints(context_frame)
                 BlzFrameSetPoint(context_frame, FRAMEPOINT_TOPLEFT,
                                  slots[selected].frame, FRAMEPOINT_TOPRIGHT,
@@ -348,6 +388,11 @@ OnInit.final("StashUI", function(Require)
         if source <= 0 then return end
         dragging[pid] = 0
         INVENTORY.hideDragTracker(pid)
+
+        if StashUI.isReadOnly(pid) then
+            StashUI.refresh(pid)
+            return
+        end
 
         local stash_target = GetLocalPlayer() == Player(pid - 1) and
                                  StashUI.getLocalHoveredSlot() or 0
