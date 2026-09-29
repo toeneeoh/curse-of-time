@@ -55,7 +55,7 @@
         ["factionrep"] = "Set the active faction's lifetime Faction Points to #. usage: -factionrep [#]",
         ["mining"] = "Spawn a common, rich, or rare deposit beside your hero. usage: -mining [common|rich|rare]",
         ["factionevent"] = "Immediately start the next hourly faction event.",
-        ["potion"] = "Spawn potion test drops. usage: -potion [all|legendary|donor|aegis|fury|arcane|swiftness|purity|potent|lingering|accelerant|bountiful|conserving|echoing]",
+        ["potion"] = "Spawn potion test drops. usage: -potion [all|legendary|donor|prefixes|suffixes|aegis|fury|arcane|swiftness|purity|potent|lingering|accelerant|bountiful|conserving|echoing]",
         ["lvl"] = "Set the selected hero's level to #. usage: -lvl [1-500]",
         ["str"] = "Set the selected hero's strength to #. usage: -str [#]",
         ["agi"] = "Set the selected hero's agility to #. usage: -agi [#]",
@@ -332,6 +332,12 @@ modifiers:
                 spawn(PotionService.LEGENDARY_CHAOS_KEY, 0)
             elseif choice == "donor" then
                 PotionService.createChaosDonor(x + 150., y, 600.)
+            elseif choice == "prefixes" or choice == "suffixes" then
+                local kind = choice == "prefixes" and "prefix" or "suffix"
+                for index, key in ipairs(
+                    PotionService.getChaosDonorKeys(kind)) do
+                    spawn(key, index - 1)
+                end
             elseif choice == "all" then
                 local catalog = {
                     PotionService.GREATER_HEALTH_KEY,

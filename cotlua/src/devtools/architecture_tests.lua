@@ -310,8 +310,12 @@ OnInit.final("ArchitectureTests", function(Require)
     ArchitectureTests.register("Chaos affix donor flasks are saveable",
                                function()
         local keys = PotionService.getChaosDonorKeys()
-        if #keys ~= 11 then
-            return false, "Chaos donor pool has " .. #keys .. " entries"
+        local prefix_keys = PotionService.getChaosDonorKeys("prefix")
+        local suffix_keys = PotionService.getChaosDonorKeys("suffix")
+        if #keys ~= 11 or #prefix_keys ~= 5 or #suffix_keys ~= 6 then
+            return false, string.format(
+                "Chaos donor pools have %d/%d/%d total/prefix/suffix entries",
+                #keys, #prefix_keys, #suffix_keys)
         end
 
         for _, key in ipairs(keys) do

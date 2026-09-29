@@ -87,8 +87,9 @@
         -- than another entry in equipment pools. Enemy level selects the
         -- current 50/110/170 band, while the independent chance suits overworld
         -- pack clearing without a pity counter. Elites provide a noticeably
-        -- better opportunity. Chaos content receives separate potion tiers
-        -- later through factions and brewing.
+        -- better opportunity. In Chaos, ordinary enemies supply passive
+        -- suffix donors while elites supply active prefix donors. Faction
+        -- prefixes and two-slot bases retain their dedicated sources.
         local function roll_prechaos_flask(level, x, y, elite)
             if level < 50 or level >= 200 then return false end
             local chance = elite and PRECHAOS_ELITE_FLASK_CHANCE or
@@ -105,7 +106,8 @@
             local chance = elite and CHAOS_ELITE_DONOR_CHANCE or
                                CHAOS_DONOR_CHANCE
             if math.random() >= chance then return false end
-            return PotionService.createChaosDonor(x, y, 600.) ~= nil
+            return PotionService.createChaosDonor(
+                       x, y, 600., elite and "prefix" or "suffix") ~= nil
         end
 
         ---@type fun(id: integer, ...)

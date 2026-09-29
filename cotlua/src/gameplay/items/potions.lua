@@ -92,6 +92,8 @@ OnInit.final("PotionService", function(Require)
     local infusions = {}
     local catalysts = {}
     local chaos_donor_keys = {}
+    local chaos_prefix_donor_keys = {}
+    local chaos_suffix_donor_keys = {}
     local restoration_stats = {
         ITEM_FLAT_HEAL, ITEM_PERCENT_HEAL, ITEM_FLAT_MANA, ITEM_PERCENT_MANA
     }
@@ -779,7 +781,7 @@ OnInit.final("PotionService", function(Require)
         name = "Bountiful Catalyst",
         affix_name = "Bounty",
         flavor = "The flask feels impossibly full whenever it is lifted.",
-        icon = "ReplaceableTextures\\CommandButtons\\BTNReplenishHealthMana.blp",
+        icon = "ReplaceableTextures\\CommandButtons\\BTNPotionOfRestoration.blp",
         description = "Restores |cffffcc0025%|r more Health and Mana.",
         restoration_multiplier = 1.25
     })
@@ -833,6 +835,9 @@ OnInit.final("PotionService", function(Require)
             affix_capacity = 1
         })
         chaos_donor_keys[#chaos_donor_keys + 1] = key
+        local pool = prefix and chaos_prefix_donor_keys or
+                         chaos_suffix_donor_keys
+        pool[#pool + 1] = key
     end
 
     define_affix_donor(FIRST_DONOR_ID, "aegis_donor_flask", YELLOW_FLASK_ICON,
@@ -850,7 +855,7 @@ OnInit.final("PotionService", function(Require)
                        EMPTY_FLASK_ICON,
                        INFUSION_PURITY)
     define_affix_donor(FIRST_DONOR_ID + 5, "bountiful_donor_flask",
-                       "ReplaceableTextures\\CommandButtons\\BTNReplenishHealthMana.blp",
+                       "ReplaceableTextures\\CommandButtons\\BTNPotionOfRestoration.blp",
                        nil, CATALYST_BOUNTIFUL)
     define_affix_donor(FIRST_DONOR_ID + 6, "conserving_donor_flask",
                        "ReplaceableTextures\\CommandButtons\\BTNRestoration.blp",
@@ -868,16 +873,24 @@ OnInit.final("PotionService", function(Require)
                        "ReplaceableTextures\\CommandButtons\\BTNBootsOfSpeed.blp",
                        nil, CATALYST_ACCELERANT)
 
-    ---Creates a non-faction affix donor from the Chaos drop pool.
-    function PotionService.createChaosDonor(x, y, expire)
-        if #chaos_donor_keys == 0 then return nil end
-        local key = chaos_donor_keys[GetRandomInt(1, #chaos_donor_keys)]
+    ---Creates a non-faction affix donor from the Chaos drop pool. Ordinary
+    ---enemies can be limited to suffixes while elites award the more active
+    ---prefix effects; omitting kind retains the complete boss/test pool.
+    function PotionService.createChaosDonor(x, y, expire, kind)
+        local pool = kind == "prefix" and chaos_prefix_donor_keys or
+                         kind == "suffix" and chaos_suffix_donor_keys or
+                         chaos_donor_keys
+        if #pool == 0 then return nil end
+        local key = pool[GetRandomInt(1, #pool)]
         return PotionService.create(key, x, y, expire)
     end
 
-    function PotionService.getChaosDonorKeys()
+    function PotionService.getChaosDonorKeys(kind)
+        local pool = kind == "prefix" and chaos_prefix_donor_keys or
+                         kind == "suffix" and chaos_suffix_donor_keys or
+                         chaos_donor_keys
         local result = {}
-        for index, key in ipairs(chaos_donor_keys) do result[index] = key end
+        for index, key in ipairs(pool) do result[index] = key end
         return result
     end
 
