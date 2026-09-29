@@ -275,11 +275,9 @@ OnInit.final("ShopServices", function(Require)
             changed, old_value, new_value =
                 PotionService.refine(quote.item, value)
         elseif operation == "reroll" then
-            changed = PotionService.rerollRestoration(quote.item)
-            if changed then
-                quote.reroll_result =
-                    PotionService.getRestorationRollResult(quote.item)
-            end
+            quote.reroll_options =
+                PotionService.beginRestorationReroll(quote.item)
+            changed = quote.reroll_options ~= nil
         else
             changed = PotionService.transferAffix(quote.item, quote.donor,
                                                    operation)
@@ -301,6 +299,26 @@ OnInit.final("ShopServices", function(Require)
             quote.donor:destroy()
         end
         return quote
+    end
+
+    function PotionBrewingService.acceptRestoration(pid, slot, attempt, mode)
+        local item = PotionService.getStored(pid, slot)
+        if not item then return result(false, "NO POTION") end
+        local accepted = PotionService.acceptRestorationReroll(item, attempt,
+                                                               mode)
+        local quote = result(accepted, accepted and nil or "STALE REROLL")
+        quote.item = item
+        if accepted then
+            quote.reroll_result = PotionService.getRestorationRollResult(item)
+        end
+        return quote
+    end
+
+    function PotionBrewingService.rejectRestoration(pid, slot)
+        local item = PotionService.getStored(pid, slot)
+        if not item then return result(false, "NO POTION") end
+        local rejected = PotionService.rejectRestorationReroll(item)
+        return result(rejected, rejected and nil or "NO PENDING REROLL")
     end
 
     function CurrencyConverterService.quote(pid)

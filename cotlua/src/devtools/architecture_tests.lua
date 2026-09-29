@@ -782,6 +782,89 @@ OnInit.final("ArchitectureTests", function(Require)
         return true
     end)
 
+    ArchitectureTests.register("potion reroll choices preserve their sequence",
+                               function()
+        local source = PotionService.create(PotionService.STONEBLOOD_KEY,
+                                            30000., 30000.)
+        if not source then return false, "could not create chaos flask" end
+        local saved_id = source:encode_id()
+        local saved_stats = source:encode_stats()
+        local saved_extra = source:encode_extra()
+        local saved_state = source:encode_state()
+        source:destroy()
+
+        local health_flask = Item.decode(saved_id, saved_stats, saved_extra,
+                                         saved_state)
+        local mana_flask = Item.decode(saved_id, saved_stats, saved_extra,
+                                       saved_state)
+        if not health_flask or not mana_flask then
+            if health_flask then health_flask:destroy() end
+            if mana_flask then mana_flask:destroy() end
+            return false, "could not restore choice test flasks"
+        end
+
+        local function same_options(first, second)
+            if not first or not second or #first ~= #second then return false end
+            for option_index = 1, #first do
+                local a = first[option_index]
+                local b = second[option_index]
+                if a.mode ~= b.mode or a.attempt ~= b.attempt or
+                    a.text ~= b.text or #a.rolls ~= #b.rolls then
+                    return false
+                end
+                for roll_index = 1, #a.rolls do
+                    if a.rolls[roll_index] ~= b.rolls[roll_index] then
+                        return false
+                    end
+                end
+            end
+            return true
+        end
+
+        local first_health = PotionService.beginRestorationReroll(health_flask)
+        local first_mana = PotionService.beginRestorationReroll(mana_flask)
+        local valid = same_options(first_health, first_mana)
+
+        -- A generated but unanswered choice must survive save/load verbatim.
+        local pending_id = health_flask:encode_id()
+        local pending_stats = health_flask:encode_stats()
+        local pending_extra = health_flask:encode_extra()
+        local pending_state = health_flask:encode_state()
+        local pending_restore = Item.decode(pending_id, pending_stats,
+                                            pending_extra, pending_state)
+        local restored_options = pending_restore and
+                                     PotionService.getPendingRestorationReroll(
+                                         pending_restore)
+        valid = valid and same_options(first_health, restored_options)
+
+        local attempt = first_health and first_health[1].attempt
+        valid = valid and attempt ~= nil and
+                    PotionService.acceptRestorationReroll(
+                        health_flask, attempt, PotionService.RESTORATION_HEALTH) and
+                    PotionService.acceptRestorationReroll(
+                        mana_flask, attempt, PotionService.RESTORATION_MANA)
+        local health = PotionService.getProperties(health_flask)
+        local mana = PotionService.getProperties(mana_flask)
+        valid = valid and health and mana and health.flat_health > 0 and
+                    health.percent_health > 0 and health.flat_mana == 0 and
+                    health.percent_mana == 0 and mana.flat_health == 0 and
+                    mana.percent_health == 0 and mana.flat_mana > 0 and
+                    mana.percent_mana > 0
+
+        -- Different accepted choices must not perturb any future candidate.
+        local next_health = PotionService.beginRestorationReroll(health_flask)
+        local next_mana = PotionService.beginRestorationReroll(mana_flask)
+        valid = valid and same_options(next_health, next_mana)
+
+        health_flask:destroy()
+        mana_flask:destroy()
+        if pending_restore then pending_restore:destroy() end
+        if not valid then
+            return false, "choice, pending save, or future sequence diverged"
+        end
+        return true
+    end)
+
     ArchitectureTests.register("charged items preserve charges when saved",
                                function()
         -- Sword of Revival exercises the ordinary managed-item path rather
