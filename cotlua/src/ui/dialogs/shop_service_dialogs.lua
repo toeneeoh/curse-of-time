@@ -6,6 +6,7 @@ OnInit.final("ShopServiceDialogs", function(Require)
     Require('ShopActions')
     Require('ShopRegistry')
     Require('ShopServices')
+    Require('Prices')
     Require('TomeService')
     Require('Users')
 
@@ -457,27 +458,30 @@ OnInit.final("ShopServiceDialogs", function(Require)
         return true
     end
 
-    local function upgrade_confirm(dialog, _, id)
-        local quote = BackpackUpgradeService.commit(dialog.pid, id)
-        dialog:destroy()
+    local function purchase_upgrade(pid, id)
+        local quote = BackpackUpgradeService.commit(pid, id)
         if not quote.available then
-            failure(dialog.pid, quote.reason)
+            failure(pid, quote.reason)
         else
-            DisplayTimedTextToPlayer(Player(dialog.pid - 1), 0, 0, 20,
+            DisplayTimedTextToPlayer(Player(pid - 1), 0, 0, 20,
                 "You successfully upgraded to: " .. quote.name
                     .. " [|cffffcc00Level " .. quote.new_level .. "|r]")
+            NotifyShopActionChanged(pid)
         end
-        return false
+        return quote.available
     end
 
-    local function open_upgrade(pid, id)
+    local function upgrade_availability(pid, id)
         local quote = BackpackUpgradeService.quote(pid, id)
-        if not quote.available then return false end
-        local dialog = DialogWindow.create(pid,
-            "Upgrade cost: " .. price_text(quote.gold, quote.platinum),
-            upgrade_confirm, "backpack-upgrade-service")
-        dialog:addButton("Upgrade", id)
-        return dialog:display()
+        if quote.available or quote.reason == "currency" then return true end
+        return false, quote.reason
+    end
+
+    local function upgrade_price(id)
+        return function(pid)
+            local quote = BackpackUpgradeService.quote(pid, id)
+            return {gold = quote.gold or 0, platinum = quote.platinum or 0}
+        end
     end
 
     local function service_availability(quote)
@@ -520,14 +524,18 @@ OnInit.final("ShopServiceDialogs", function(Require)
         availability = function(pid) return service_availability(CurrencyConverterService.quote(pid)) end,
         open = open_converter,
     })
+    SetItemPrice('I101', upgrade_price('I101'))
     RegisterShopAction('I101', {
         label = "AVAILABLE",
-        availability = function(pid) return service_availability(BackpackUpgradeService.quote(pid, 'I101')) end,
-        open = function(pid) return open_upgrade(pid, 'I101') end,
+        availability = function(pid) return upgrade_availability(pid, 'I101') end,
+        open = function(pid) return purchase_upgrade(pid, 'I101') end,
+        handles_price = true,
     })
+    SetItemPrice('I102', upgrade_price('I102'))
     RegisterShopAction('I102', {
         label = "AVAILABLE",
-        availability = function(pid) return service_availability(BackpackUpgradeService.quote(pid, 'I102')) end,
-        open = function(pid) return open_upgrade(pid, 'I102') end,
+        availability = function(pid) return upgrade_availability(pid, 'I102') end,
+        open = function(pid) return purchase_upgrade(pid, 'I102') end,
+        handles_price = true,
     })
 end, Debug and Debug.getLine())

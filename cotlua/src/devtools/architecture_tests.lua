@@ -1241,6 +1241,10 @@ OnInit.final("ArchitectureTests", function(Require)
         if not ShopAction.get('I0JS').cooldown then
             return false, "recharge action has no cooldown presentation"
         end
+        if not ShopAction.get('I101').handles_price or
+            not ShopAction.get('I102').handles_price then
+            return false, "backpack upgrades can be charged twice"
+        end
         if type(PotionBrewingService.quote) ~= "function" or
             type(PotionBrewingService.commit) ~= "function" or
             type(PotionMasterServices.addToShop) ~= "function" then

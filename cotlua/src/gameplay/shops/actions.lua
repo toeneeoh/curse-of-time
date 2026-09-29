@@ -17,6 +17,7 @@ OnInit.final("ShopActions", function(Require)
     ---@field availability fun(pid: integer): boolean, string?
     ---@field open fun(pid: integer): boolean
     ---@field cooldown? fun(pid: integer): number, number?
+    ---@field handles_price? boolean True when open performs its own authoritative charge.
 
     ---@param id string|integer
     ---@param definition ShopActionDefinition

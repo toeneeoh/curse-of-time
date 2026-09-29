@@ -40,9 +40,11 @@ OnInit.final("ShopTransaction", function(Require)
                 quote.reason = "action"
                 return quote
             end
-            for currency = 0, CURRENCY_COUNT - 1 do
-                if quote.cost[currency] > 0 then
-                    AddCurrency(pid, currency, -quote.cost[currency])
+            if not quote.action.handles_price then
+                for currency = 0, CURRENCY_COUNT - 1 do
+                    if quote.cost[currency] > 0 then
+                        AddCurrency(pid, currency, -quote.cost[currency])
+                    end
                 end
             end
             return quote
