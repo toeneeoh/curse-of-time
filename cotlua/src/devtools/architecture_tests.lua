@@ -344,6 +344,9 @@ OnInit.final("ArchitectureTests", function(Require)
                                                (item and item.alt_tooltip and
                                                    item.alt_tooltip:find(
                                                        "18-22%", 1, true))
+            local cooldown_range_valid = item and item.alt_tooltip and
+                                             item.alt_tooltip:find(
+                                                 "%d[%d%.]*%-%d[%d%.]*|r Cooldown")
             if not item or not customization or not properties or
                 customization.capacity ~= 1 or occupied ~= 1 or
                 properties.level_requirement ~= 200 or
@@ -354,7 +357,7 @@ OnInit.final("ArchitectureTests", function(Require)
                 GetItemName(item.obj):find("Catalyst", 1, true) or
                 not flavor_position or not charge_position or
                 not cooldown_position or cooldown_position < charge_position or
-                not item.alt_tooltip:find("2.5-5", 1, true) or
+                not cooldown_range_valid or
                 not infusion_range_valid then
                 local details = string.format(
                     "name=%s/%s capacity=%s occupied=%s level=%s charges=%s positions=%s/%s/%s cooldown_range=%s infusion_range=%s",
@@ -366,8 +369,8 @@ OnInit.final("ArchitectureTests", function(Require)
                     tostring(properties and properties.maximum_charges),
                     tostring(charge_position), tostring(cooldown_position),
                     tostring(flavor_position),
-                    tostring(item and item.alt_tooltip and
-                        item.alt_tooltip:find("2.5-5", 1, true) ~= nil),
+                    tostring(cooldown_range_valid ~= nil and
+                        cooldown_range_valid ~= false),
                     tostring(infusion_range_valid ~= nil and
                         infusion_range_valid ~= false))
                 if item then item:destroy() end

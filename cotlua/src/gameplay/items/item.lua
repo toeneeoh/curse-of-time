@@ -1519,7 +1519,7 @@
             return id
         end
 
-        function thistype:drop(x, y, mute)
+        function thistype:drop(x, y, mute, suppress_refresh)
             if self.holder == nil or self.index == nil then return end
 
             refresh_item_abilities(self, true, self.holder)
@@ -1543,7 +1543,7 @@
             self.holder = nil
             self.index = nil
 
-            NotifyItemChanged(self.pid)
+            if not suppress_refresh then NotifyItemChanged(self.pid) end
         end
 
         function thistype:onDestroy()

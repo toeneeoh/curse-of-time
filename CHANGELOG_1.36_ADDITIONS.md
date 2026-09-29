@@ -144,9 +144,11 @@ visual cleanup are intentionally excluded.
   unlocked from the stash interface for progressively higher gold costs.
 - The stash may be viewed anywhere, while depositing, withdrawing, and buying
   rows require the player's hero to be in town.
-- Inventory items can be sent directly to the stash from their right-click
-  menu. Clicking a stored item withdraws it to the first compatible backpack
-  slot.
+- The stash opens beside Inventory as a companion window. Items can be dragged
+  within either window or moved and swapped between them.
+- Ctrl-clicking an item quickly transfers it to the first available slot in the
+  other window. Stored items also support Withdraw, Drop, Sell, and Details
+  actions from their right-click menu.
 
 ## Item and Shop Fixes
 

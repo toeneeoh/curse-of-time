@@ -4,6 +4,7 @@ OnInit.final("StashService", function(Require)
     Require('Currency')
     Require('Items')
     Require('ItemEventRegistry')
+    Require('Audio')
 
     StashService = {}
 
@@ -100,6 +101,16 @@ OnInit.final("StashService", function(Require)
         return nil
     end
 
+    local function valid_stash_slot(hero, slot)
+        return type(slot) == "number" and slot % 1 == 0 and slot >= 1 and
+                   slot <= unlocked_slots(hero)
+    end
+
+    local function valid_inventory_slot(slot)
+        return type(slot) == "number" and slot % 1 == 0 and slot >= 1 and
+                   slot <= MAX_INVENTORY_SLOTS
+    end
+
     function StashService.canDeposit(pid, inventory_slot)
         local hero = hero_data(pid)
         if not hero then return result(false, "invalid_player") end
@@ -125,7 +136,7 @@ OnInit.final("StashService", function(Require)
         end
         if hero.stash[stash_slot] then return result(false, "occupied") end
 
-        item:drop(30000., 30000., true)
+        item:drop(30000., 30000., true, true)
         SetItemVisible(item.obj, false)
         item.stash_index = stash_slot
         hero.stash[stash_slot] = item
@@ -133,20 +144,22 @@ OnInit.final("StashService", function(Require)
         return result(true, "deposited")
     end
 
-    function StashService.withdraw(pid, stash_slot)
+    function StashService.withdraw(pid, stash_slot, inventory_slot)
         local hero = hero_data(pid)
         if not hero then return result(false, "invalid_player") end
         if not in_town(pid) then return result(false, "not_in_town") end
-        if stash_slot < 1 or stash_slot > unlocked_slots(hero) or
-            stash_slot % 1 ~= 0 then
+        if not valid_stash_slot(hero, stash_slot) then
             return result(false, "locked_slot")
         end
         local item = hero.stash[stash_slot]
         if not item or not item.alive then
             return result(false, "missing_source")
         end
-        local target = first_empty_backpack(pid, item)
+        local target = inventory_slot or first_empty_backpack(pid, item)
         if not target then return result(false, "no_backpack_slot") end
+        if not valid_inventory_slot(target) or hero.items[target] then
+            return result(false, "invalid_target")
+        end
 
         hero.stash[stash_slot] = nil
         item.stash_index = nil
@@ -157,5 +170,124 @@ OnInit.final("StashService", function(Require)
         end
         notify(pid)
         return result(true, "withdrawn")
+    end
+
+    ---Moves or swaps a pair of inventory/stash slots. Either side may be the
+    ---source, allowing the UI to use the same synchronized command regardless
+    ---of drag direction.
+    function StashService.transfer(pid, inventory_slot, stash_slot)
+        local hero = hero_data(pid)
+        if not hero then return result(false, "invalid_player") end
+        if not in_town(pid) then return result(false, "not_in_town") end
+        if not valid_inventory_slot(inventory_slot) then
+            return result(false, "invalid_target")
+        end
+        if not valid_stash_slot(hero, stash_slot) then
+            return result(false, "locked_slot")
+        end
+
+        local inventory_item = hero.items[inventory_slot]
+        local stash_item = hero.stash[stash_slot]
+        if not inventory_item and not stash_item then
+            return result(false, "missing_source")
+        elseif inventory_item and not stash_item then
+            return StashService.deposit(pid, inventory_slot, stash_slot)
+        elseif stash_item and not inventory_item then
+            return StashService.withdraw(pid, stash_slot, inventory_slot)
+        end
+
+        local valid, message = ValidateItemSlot(stash_item, inventory_slot,
+                                                 inventory_item)
+        if not valid then
+            local response = result(false, "invalid_target")
+            response.message = message
+            return response
+        end
+
+        inventory_item:drop(30000., 30000., true, true)
+        hero.stash[stash_slot] = nil
+        stash_item.stash_index = nil
+        ItemRuntime.commit_slot(stash_item, inventory_slot, true)
+
+        inventory_item.stash_index = stash_slot
+        hero.stash[stash_slot] = inventory_item
+        SetItemVisible(inventory_item.obj, false)
+        notify(pid)
+        return result(true, "swapped")
+    end
+
+    function StashService.move(pid, from, to)
+        local hero = hero_data(pid)
+        if not hero then return result(false, "invalid_player") end
+        if not in_town(pid) then return result(false, "not_in_town") end
+        if not valid_stash_slot(hero, from) or
+            not valid_stash_slot(hero, to) then
+            return result(false, "locked_slot")
+        end
+        local source = hero.stash[from]
+        if not source or not source.alive then
+            return result(false, "missing_source")
+        end
+        if from == to then return result(true, "unchanged") end
+
+        local target = hero.stash[to]
+        hero.stash[from], hero.stash[to] = target, source
+        source.stash_index = to
+        if target then target.stash_index = from end
+        notify(pid)
+        return result(true, target and "swapped" or "moved")
+    end
+
+    function StashService.drop(pid, stash_slot)
+        local hero = hero_data(pid)
+        if not hero then return result(false, "invalid_player") end
+        if not in_town(pid) then return result(false, "not_in_town") end
+        if not valid_stash_slot(hero, stash_slot) then
+            return result(false, "locked_slot")
+        end
+        local item = hero.stash[stash_slot]
+        if not item or not item.alive then
+            return result(false, "missing_source")
+        end
+
+        hero.stash[stash_slot] = nil
+        item.stash_index = nil
+        SetItemPosition(item.obj, GetUnitX(Hero[pid]), GetUnitY(Hero[pid]))
+        SetItemVisible(item.obj, true)
+        SoundHandler("Sound\\Interface\\HeroDropItem1.flac", true,
+                     Player(pid - 1), Hero[pid])
+        notify(pid)
+        return result(true, "dropped")
+    end
+
+    function StashService.sell(pid, stash_slot)
+        local hero = hero_data(pid)
+        if not hero then return result(false, "invalid_player") end
+        if not in_town(pid) then return result(false, "not_in_town") end
+        if not valid_stash_slot(hero, stash_slot) then
+            return result(false, "locked_slot")
+        end
+        local item = hero.stash[stash_slot]
+        if not item or not item.alive then
+            return result(false, "missing_source")
+        end
+
+        local total, gold, platinum = GetItemSellPrice(item)
+        if total <= 0 then return result(false, "unsellable") end
+
+        hero.stash[stash_slot] = nil
+        item.stash_index = nil
+        if not item:destroy() then
+            hero.stash[stash_slot] = item
+            item.stash_index = stash_slot
+            return result(false, "destroy_failed")
+        end
+        AddCurrency(pid, GOLD, gold)
+        AddCurrency(pid, PLATINUM, platinum)
+        local response = result(true, "sold")
+        response.gold = gold
+        response.platinum = platinum
+        notify(pid)
+        return response
     end
 end, Debug and Debug.getLine())

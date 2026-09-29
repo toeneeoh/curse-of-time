@@ -59,7 +59,9 @@ OnInit.global("SimpleButton", function(Require)
         end
 
         function thistype:setTooltipText(string)
-            BlzFrameSetText(self.tooltip, string)
+            local tooltip = type(self.tooltip) == "table" and
+                                self.tooltip.tooltip or self.tooltip
+            if tooltip then BlzFrameSetText(tooltip, string) end
         end
 
         function thistype:setTooltipName(name)
@@ -74,8 +76,11 @@ OnInit.global("SimpleButton", function(Require)
         end
 
         function thistype:point(p1, p2, x, y)
-            BlzFrameClearAllPoints(self.tooltip)
-            BlzFrameSetPoint(self.tooltip, p1, self.frame, p2, x, y)
+            local tooltip = type(self.tooltip) == "table" and
+                                self.tooltip.tooltip or self.tooltip
+            if not tooltip then return end
+            BlzFrameClearAllPoints(tooltip)
+            BlzFrameSetPoint(tooltip, p1, self.frame, p2, x, y)
         end
 
         -- advanced tooltip

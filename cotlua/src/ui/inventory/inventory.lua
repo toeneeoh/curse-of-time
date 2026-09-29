@@ -96,6 +96,7 @@ OnInit.final("Inventory", function(Require)
 
     local disabled_for_player = {}
     local alt_down = {} ---@type boolean[]
+    local ctrl_down = {} ---@type boolean[]
 
     ---@param pid integer
     ---@param disable boolean
@@ -119,6 +120,7 @@ OnInit.final("Inventory", function(Require)
         local synced_context, synced_target = {}, {}
         local ui_mode = __jarray(0) -- 0 = normal, 1 = context menu open
         local right_click_origin = __jarray(0)
+        local skip_drag_release = __jarray(false)
 
         ---@param itm Item
         ---@return string
@@ -140,7 +142,7 @@ OnInit.final("Inventory", function(Require)
 
         -- determines what item slot a user has their cursor over
         ---@return integer
-        local get_hovered_slot = function()
+        local get_inventory_hovered_slot = function()
             local x, y = get_mouse_frame_position()
 
             if not x or not y then
@@ -172,6 +174,18 @@ OnInit.final("Inventory", function(Require)
             return 0
         end
 
+        local function get_hovered_slot()
+            if StashUI and StashUI.getLocalHoveredSlot and
+                StashUI.isOpen(GetPlayerId(GetLocalPlayer()) + 1) then
+                local stash_slot = StashUI.getLocalHoveredSlot()
+                if stash_slot >= 0 then
+                    return stash_slot > 0 and
+                               MAX_INVENTORY_SLOTS + stash_slot or 0
+                end
+            end
+            return get_inventory_hovered_slot()
+        end
+
         -- Screen coordinates are local-only. The resulting slot is synchronized
         -- separately before it can cause an inventory mutation.
         ---@param pid integer
@@ -195,11 +209,19 @@ OnInit.final("Inventory", function(Require)
             return 0
         end
 
+        function thistype.getLocalInventoryHoveredSlot(pid)
+            if GetLocalPlayer() == Player(pid - 1) then
+                return get_inventory_hovered_slot()
+            end
+            return 0
+        end
+
         --#region frame setup
         local frame = BlzCreateFrame("ListBoxWar3", BlzGetFrameByName("ConsoleUIBackdrop", 0), 0, 0)
         BlzFrameSetAbsPoint(frame, FRAMEPOINT_TOPLEFT, 0.575, 0.408)
         BlzFrameSetSize(frame, INVENTORY_WIDTH + 0.072, INVENTORY_HEIGHT)
         BlzFrameSetEnable(frame, false)
+        thistype.frame = frame
 
         local title = BlzCreateFrame("TitleText", frame, 0, 0)
         BlzFrameSetPoint(title, FRAMEPOINT_TOP, frame, FRAMEPOINT_TOP, 0., -0.013)
@@ -415,6 +437,9 @@ OnInit.final("Inventory", function(Require)
             end
         end
 
+        thistype.showDragTracker = show_tracker
+        thistype.hideDragTracker = hide_tracker
+
         --#endregion
 
         INVENTORY.open = function(pid, tpid)
@@ -444,6 +469,7 @@ OnInit.final("Inventory", function(Require)
 
         INVENTORY.close = function(pid)
             if viewing[pid] ~= -1 then
+                if StashUI and StashUI.isOpen(pid) then StashUI.close(pid) end
                 if GetLocalPlayer() == Player(pid - 1) then
                     frame_set_visible(frame, false)
                 end
@@ -510,6 +536,25 @@ OnInit.final("Inventory", function(Require)
             end
         end
 
+        function thistype.renderItemButton(button, itm, pid)
+            if itm then
+                local icon = BlzGetItemIconPath(itm.obj)
+                button:icon(icon)
+                button.tooltip:icon(icon)
+                button.tooltip:name(GetItemName(itm.obj))
+                button.tooltip:text(alt_down[pid] and itm.alt_tooltip or
+                                        itm.tooltip)
+                update_socket_tooltips(button.tooltip, itm)
+                button:visible(true)
+                button:charge(itm.charges)
+                set_rarity_border(button, get_rarity_border(itm))
+            else
+                update_socket_tooltips(button.tooltip)
+                set_rarity_border(button)
+                button:visible(false)
+            end
+        end
+
         INVENTORY.refresh = function(pid)
             if not pid or pid < 1 or not Profile[pid] or not Profile[pid].hero then
                 return
@@ -526,23 +571,7 @@ OnInit.final("Inventory", function(Require)
             -- local block for players viewing this inventory
             local items = Profile[pid].hero.items
             for i = 1, MAX_INVENTORY_SLOTS do
-                local itm = items[i]
-
-                if itm then
-                    local icon = BlzGetItemIconPath(itm.obj)
-                    slots[i]:icon(icon)
-                    slots[i].tooltip:icon(icon)
-                    slots[i].tooltip:name(GetItemName(itm.obj))
-                    slots[i].tooltip:text(alt_down[pid] and itm.alt_tooltip or itm.tooltip)
-                    update_socket_tooltips(slots[i].tooltip, itm)
-                    slots[i]:visible(true)
-                    slots[i]:charge(itm.charges)
-                    set_rarity_border(slots[i], get_rarity_border(itm))
-                else
-                    update_socket_tooltips(slots[i].tooltip)
-                    set_rarity_border(slots[i])
-                    slots[i]:visible(false)
-                end
+                thistype.renderItemButton(slots[i], items[i], pid)
             end
         end
 
@@ -564,17 +593,15 @@ OnInit.final("Inventory", function(Require)
         local esc_button = SimpleButton.create(frame, "ReplaceableTextures\\CommandButtons\\BTNCancel.blp", 0.015, 0.015, FRAMEPOINT_TOPRIGHT, FRAMEPOINT_TOPRIGHT, -0.02, -0.02, onCloseButton, "Close 'I'", FRAMEPOINT_BOTTOM, FRAMEPOINT_TOP, 0., 0.01)
         RegisterHotkeyTooltip(esc_button, 5)
 
-        local function open_stash_tab()
+        local function toggle_stash()
             local pid = GetPlayerId(GetTriggerPlayer()) + 1
-            thistype.close(pid)
-            if StashUI then StashUI.open(pid) end
+            if StashUI and viewing[pid] == pid then StashUI.display(pid) end
         end
-        local stash_tab = SimpleButton.create(
-            frame, "inventorymenubuttons.dds", 0.055, 0.017,
-            FRAMEPOINT_BOTTOMLEFT, FRAMEPOINT_BOTTOMLEFT, 0.02, 0.013,
-            open_stash_tab, "View your Stash", FRAMEPOINT_BOTTOM,
+        SimpleButton.create(
+            frame, "ReplaceableTextures\\CommandButtons\\BTNArcaneVault.blp",
+            0.025, 0.025, FRAMEPOINT_TOPLEFT, FRAMEPOINT_TOPLEFT, 0.017,
+            -0.015, toggle_stash, "Open Stash", FRAMEPOINT_BOTTOM,
             FRAMEPOINT_TOP, 0., 0.006)
-        stash_tab:text("Stash")
 
         local function send_context(pid, slot)
             -- set context asynchronously
@@ -808,8 +835,12 @@ OnInit.final("Inventory", function(Require)
                             hero.item_to_drop = itm
                             IssuePointOrder(itm.holder, DROP_ITEM_COMMAND, GetMouseX(pid), GetMouseY(pid))
                         end
+                    elseif slot > MAX_INVENTORY_SLOTS and itm then
+                        render_inventory_result(pid, StashService.transfer(
+                            pid, context[pid], slot - MAX_INVENTORY_SLOTS))
                     elseif slot > 0 and itm then
-                        render_inventory_result(pid, InventoryService.move(pid, context[pid], slot))
+                        render_inventory_result(pid,
+                            InventoryService.move(pid, context[pid], slot))
                     end
                 end
 
@@ -852,7 +883,18 @@ OnInit.final("Inventory", function(Require)
 
             if ui_mode[pid] == 0 then
                 if not disabled_for_player[pid] and not move_item_cooldown[pid] then
-                    pick_item(pid)
+                    local highlighted = get_local_item_slot(pid)
+                    if ctrl_down[pid] and highlighted > 0 and StashUI and
+                        StashUI.isOpen(pid) then
+                        skip_drag_release[pid] = true
+                        if GetLocalPlayer() == Player(pid - 1) then
+                            BlzSendSyncData("stash_action",
+                                            "deposit:" .. highlighted)
+                        end
+                    else
+                        skip_drag_release[pid] = false
+                        pick_item(pid)
+                    end
                 end
             end
 
@@ -868,7 +910,9 @@ OnInit.final("Inventory", function(Require)
         on_m1_up = function()
             local pid = GetPlayerId(GetTriggerPlayer()) + 1
 
-            if ui_mode[pid] == 0 then
+            if skip_drag_release[pid] then
+                skip_drag_release[pid] = false
+            elseif ui_mode[pid] == 0 then
                 if not disabled_for_player[pid] then
                     confirm_item(pid)
                 end
@@ -904,6 +948,12 @@ OnInit.final("Inventory", function(Require)
 
         RegisterHotkeyToFunc('ALT', nil, extended_item_tooltip, nil, true)
         RegisterHotkeyToFunc('ALT+ALT', nil, extended_item_tooltip, nil, true)
+
+        local function control_state(pid, is_down)
+            ctrl_down[pid] = is_down
+        end
+        RegisterHotkeyToFunc('CTRL', nil, control_state, nil, true)
+        RegisterHotkeyToFunc('CTRL+CTRL', nil, control_state, nil, true)
 
         -- slot initialization
         do
