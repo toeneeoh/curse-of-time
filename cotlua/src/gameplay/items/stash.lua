@@ -8,8 +8,8 @@ OnInit.final("StashService", function(Require)
 
     StashService = {}
 
-    local BASE_ROW_PRICE = 250000
-    local ROW_PRICE_MULTIPLIER = 4
+    local BASE_ROW_PRICE = 1000000
+    local ROW_PRICE_MULTIPLIER = 5
     local changed_actions = {}
 
     local function result(ok, code)

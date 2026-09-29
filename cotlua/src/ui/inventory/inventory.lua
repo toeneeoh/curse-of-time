@@ -598,6 +598,10 @@ OnInit.final("Inventory", function(Require)
 
         local function toggle_stash()
             local pid = GetPlayerId(GetTriggerPlayer()) + 1
+            local f = BlzGetTriggerFrame()
+            BlzFrameSetEnable(f, false)
+            BlzFrameSetEnable(f, true)
+
             if StashUI and viewing[pid] == pid then StashUI.display(pid) end
         end
         SimpleButton.create(

@@ -62,7 +62,7 @@ OnInit.final("StashUI", function(Require)
 
         locks[row] = BlzCreateFrameByType("BACKDROP", "", rows[row], "", 0)
         BlzFrameSetAllPoints(locks[row], rows[row])
-        BlzFrameSetTexture(locks[row], "black.dds", 0, true)
+        BlzFrameSetTexture(locks[row], "trans32.blp", 0, true)
         BlzFrameSetVertexColor(locks[row], BlzConvertColor(185, 0, 0, 0))
         BlzFrameSetEnable(locks[row], false)
         BlzFrameSetLevel(locks[row], 3)
@@ -74,6 +74,9 @@ OnInit.final("StashUI", function(Require)
                 FRAMEPOINT_TOPLEFT, FRAMEPOINT_TOPLEFT, 0.224,
                 -0.040 - ROW_HEIGHT * (row - 1), function()
                     local pid = GetPlayerId(GetTriggerPlayer()) + 1
+                    local f = BlzGetTriggerFrame()
+                    BlzFrameSetEnable(f, false)
+                    BlzFrameSetEnable(f, true)
                     if GetLocalPlayer() == GetTriggerPlayer() and
                         StashService.isInTown(pid) then
                         BlzSendSyncData("stash_action",
@@ -223,18 +226,17 @@ OnInit.final("StashUI", function(Require)
             INVENTORY.renderItemButton(slots[slot], item, pid)
         end
         BlzFrameSetText(title, "Stash  " .. used .. " / " ..
-                            unlocked_rows * STASH_COLUMNS ..
-                            (read_only and "  |cff808080(Read Only)|r" or ""))
+                            unlocked_rows * STASH_COLUMNS)
         for row = 1, STASH_MAX_ROWS do
             BlzFrameSetVisible(locks[row], row > unlocked_rows)
             if row > 1 then
                 local show_plus = not read_only and row == unlocked_rows + 1
                 plus_buttons[row]:visible(show_plus)
                 if show_plus then
+                    local platinum = StashService.getRowPrice(row) // 1000000
                     plus_buttons[row]:setTooltipText(
                         "Unlock Row " .. row .. ": " ..
-                            RealToString(StashService.getRowPrice(row)) ..
-                            " Gold")
+                            platinum .. " Platinum")
                 end
             end
         end
@@ -279,12 +281,14 @@ OnInit.final("StashUI", function(Require)
 
     local function context_clicked()
         local pid = GetPlayerId(GetTriggerPlayer()) + 1
+        local clicked = BlzGetTriggerFrame()
+        BlzFrameSetEnable(clicked, false)
+        BlzFrameSetEnable(clicked, true)
         if StashUI.isReadOnly(pid) then
             close_context(pid)
             StashUI.refresh(pid)
             return
         end
-        local clicked = BlzGetTriggerFrame()
         local selected = context_slot[pid]
         if selected <= 0 then return end
         for index, button in ipairs(context_buttons) do
@@ -448,6 +452,9 @@ OnInit.final("StashUI", function(Require)
     end
 
     local function close_clicked()
+        local clicked = BlzGetTriggerFrame()
+        BlzFrameSetEnable(clicked, false)
+        BlzFrameSetEnable(clicked, true)
         StashUI.close(GetPlayerId(GetTriggerPlayer()) + 1)
     end
     SimpleButton.create(frame,

@@ -1117,11 +1117,11 @@ OnInit.final("ArchitectureTests", function(Require)
         "stash capacity and row prices remain stable", function()
             local hero = HeroData.create()
             if hero.stash_rows ~= 1 or MAX_STASH_SLOTS ~= 36 or
-                StashService.getRowPrice(2) ~= 250000 or
-                StashService.getRowPrice(3) ~= 1000000 or
-                StashService.getRowPrice(4) ~= 4000000 or
-                StashService.getRowPrice(5) ~= 16000000 or
-                StashService.getRowPrice(6) ~= 64000000 then
+                StashService.getRowPrice(2) ~= 1000000 or
+                StashService.getRowPrice(3) ~= 5000000 or
+                StashService.getRowPrice(4) ~= 25000000 or
+                StashService.getRowPrice(5) ~= 125000000 or
+                StashService.getRowPrice(6) ~= 625000000 then
                 return false, "stash defaults or row price curve changed"
             end
             return true
