@@ -452,10 +452,10 @@ OnInit.final("PotionService", function(Require)
             display_rarity = 3,
             health_key = GRAND_HEALTH_KEY,
             mana_key = GRAND_MANA_KEY,
-            flat_min = 8000,
-            flat_max = 12000,
-            percent_min = 20,
-            percent_max = 25,
+            flat_min = 6000,
+            flat_max = 9000,
+            percent_min = 16,
+            percent_max = 20,
             charge_min = 2,
             charge_max = 3,
             flavor = "Concentrated restorative essence glimmers beneath the glass."
@@ -635,7 +635,7 @@ OnInit.final("PotionService", function(Require)
         display_rarity = 3,
         faction_rank_requirement = 4,
         inherit_stats = chaos_inherited_stats,
-        prepare_data = prepare_chaos_flask(15000, 30, 0, 0)
+        prepare_data = prepare_chaos_flask(30000, 30, 0, 0)
     }, {
         cooldown = DEFAULT_USE_COOLDOWN,
         initial_prefix = INFUSION_STONE,
@@ -651,7 +651,7 @@ OnInit.final("PotionService", function(Require)
         display_rarity = 3,
         faction_rank_requirement = 4,
         inherit_stats = chaos_inherited_stats,
-        prepare_data = prepare_chaos_flask(0, 0, 15000, 30)
+        prepare_data = prepare_chaos_flask(0, 0, 30000, 30)
     }, {
         cooldown = DEFAULT_USE_COOLDOWN,
         initial_prefix = INFUSION_TEMPEST,
@@ -667,7 +667,7 @@ OnInit.final("PotionService", function(Require)
         display_rarity = 3,
         faction_rank_requirement = 4,
         inherit_stats = chaos_inherited_stats,
-        prepare_data = prepare_chaos_flask(7500, 15, 7500, 15)
+        prepare_data = prepare_chaos_flask(15000, 15, 15000, 15)
     }, {
         cooldown = DEFAULT_USE_COOLDOWN,
         initial_prefix = INFUSION_VAMPIRIC,
@@ -682,7 +682,7 @@ OnInit.final("PotionService", function(Require)
         tooltip = "|cff808080Two currents spiral through the glass without ever mingling.|r",
         display_rarity = 4,
         inherit_stats = chaos_inherited_stats,
-        prepare_data = prepare_chaos_flask(12000, 25, 12000, 25)
+        prepare_data = prepare_chaos_flask(40000, 25, 40000, 25)
     }, {
         cooldown = DEFAULT_USE_COOLDOWN,
         affix_capacity = 2

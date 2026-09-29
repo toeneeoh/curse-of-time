@@ -239,15 +239,21 @@ OnInit.final("ArchitectureTests", function(Require)
             return false, "starter flask tooltip is missing its cooldown"
         end
 
+        local grand = PotionService.PRECHAOS_TIERS[3]
+        if not grand or grand.flat_min ~= 6000 or grand.flat_max ~= 9000 or
+            grand.percent_min ~= 16 or grand.percent_max ~= 20 then
+            return false, "Grand Flask restoration range changed"
+        end
+
         return true
     end)
 
     ArchitectureTests.register("faction potion definitions are usable",
                                function()
         local cases = {
-            {PotionService.STONEBLOOD_KEY, FourCC('I02F'), 10500, 0},
-            {PotionService.TEMPEST_KEY, FourCC('I00E'), 0, 10500},
-            {PotionService.HUNTERS_KEY, FourCC('I02F'), 5250, 5250}
+            {PotionService.STONEBLOOD_KEY, FourCC('I02F'), 21000, 0},
+            {PotionService.TEMPEST_KEY, FourCC('I00E'), 0, 21000},
+            {PotionService.HUNTERS_KEY, FourCC('I02F'), 10500, 10500}
         }
 
         for index = 1, #cases do
@@ -297,7 +303,9 @@ OnInit.final("ArchitectureTests", function(Require)
         end
 
         local shop_ids = {'n004', 'n0P0', 'n0P1'}
-        local restoration_ranges = {"5250-10500", "5250-10500", "2625-5250"}
+        local restoration_ranges = {
+            "10500-21000", "10500-21000", "5250-10500"
+        }
         for index = 1, #shop_ids do
             local shop = ShopRegistry.get(FourCC(shop_ids[index]))
             if not shop or #shop.offers ~= 1 then
@@ -429,6 +437,13 @@ OnInit.final("ArchitectureTests", function(Require)
         local item = PotionService.create(
                          PotionService.LEGENDARY_CHAOS_KEY, 30000., 30000.)
         if not item then return false, "could not create legendary flask" end
+        if item.cached_lower[ITEM_FLAT_HEAL] ~= 20000 or
+            item.cached_upper[ITEM_FLAT_HEAL] ~= 40000 or
+            item.cached_lower[ITEM_FLAT_MANA] ~= 20000 or
+            item.cached_upper[ITEM_FLAT_MANA] ~= 40000 then
+            item:destroy()
+            return false, "Legendary Flask flat restoration range changed"
+        end
         local before = PotionService.getProperties(item)
         local applied = PotionService.setSuffix(
                             item, PotionService.CATALYST_BOUNTIFUL)

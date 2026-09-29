@@ -82,6 +82,8 @@ visual cleanup are intentionally excluded.
   - Grand Flasks at level 170.
 - Chaos flasks may roll restoration values, maximum charges, and use cooldown
   within their tier ranges.
+- Tightened Grand Flask restoration rolls and raised the flat restoration of
+  faction and Legendary flasks to create a clearer late-game progression.
 - Potion healing and mana restoration may include both flat and percentage
   values. Percentage healing is now labelled `Max Health Restored`.
 - Flasks begin with their maximum charges, consume one charge per use, and may
