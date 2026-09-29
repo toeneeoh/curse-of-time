@@ -120,6 +120,8 @@ visual cleanup are intentionally excluded.
 - Prefix effect strength rolls within a narrow range and transfers with the
   prefix when its donor flask is consumed.
 - Holding Alt shows the possible prefix-effect and use-cooldown ranges.
+- Shop previews show the complete possible flask ranges instead of the random
+  values rolled by a temporary catalog item.
 - Bounty increases restoration without paying the normal one-affix restoration
   penalty for its own suffix slot.
 - Faction flasks carry one transferable faction prefix and do not support a
@@ -133,6 +135,8 @@ visual cleanup are intentionally excluded.
   preserved when saving.
 - Moving a different flask into a potion slot applies a 10-second cooldown so
   backpack flask stockpiles cannot bypass normal potion-use pacing.
+- Basic Health and Mana Flask tooltips now list their three-second use
+  cooldown.
 - Added Status Resistance, which reduces the duration of applicable negative
   effects, and Cooldown Acceleration, which makes ability cooldowns recover
   faster.

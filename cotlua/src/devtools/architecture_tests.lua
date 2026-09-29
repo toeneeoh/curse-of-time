@@ -229,6 +229,16 @@ OnInit.final("ArchitectureTests", function(Require)
             end
         end
 
+        local starter = ItemRuntime.create(FourCC('I02F'), 30000., 30000.)
+        PotionService.refreshItem(starter)
+        local starter_valid = starter and starter.tooltip and
+                                  starter.tooltip:find(
+                                      "+ |cffffcc003|r Cooldown", 1, true)
+        if starter then starter:destroy() end
+        if not starter_valid then
+            return false, "starter flask tooltip is missing its cooldown"
+        end
+
         return true
     end)
 
@@ -287,6 +297,7 @@ OnInit.final("ArchitectureTests", function(Require)
         end
 
         local shop_ids = {'n004', 'n0P0', 'n0P1'}
+        local restoration_ranges = {"5250-10500", "5250-10500", "2625-5250"}
         for index = 1, #shop_ids do
             local shop = ShopRegistry.get(FourCC(shop_ids[index]))
             if not shop or #shop.offers ~= 1 then
@@ -297,8 +308,13 @@ OnInit.final("ArchitectureTests", function(Require)
                 return false, "Faction Shop access gate is missing from " ..
                            shop_ids[index]
             end
-            if not shop.offers[1]:getTooltip(1):find("|cff0080c0", 1, true) then
+            local tooltip = shop.offers[1]:getTooltip(1)
+            if not tooltip:find("|cff0080c0", 1, true) then
                 return false, "Faction Shop tooltip lost its flask affix"
+            end
+            if not tooltip:find(restoration_ranges[index], 1, true) or
+                not tooltip:find("2.5-5|r Cooldown", 1, true) then
+                return false, "Faction Shop tooltip does not show roll ranges"
             end
             local faction = Faction[index]
             if not faction or GetUnitTypeId(faction.shop) ~=

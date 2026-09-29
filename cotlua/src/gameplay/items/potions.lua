@@ -393,7 +393,13 @@ OnInit.final("PotionService", function(Require)
     function PotionService.getCatalogPresentation(key)
         local item = PotionService.create(key, 30000., 30000., nil, false)
         if not item then return nil end
-        local name, icon, description = PotionService.describe(item)
+        PotionService.refreshItem(item)
+        local name = GetItemName(item.obj)
+        local icon = BlzGetItemIconPath(item.obj)
+        -- A catalog represents the item that may be rolled, not the disposable
+        -- preview instance created to obtain its native presentation fields.
+        local description = item.alt_tooltip or item.tooltip or
+                                BlzGetItemDescription(item.obj)
         item:destroy()
         return name, icon, description
     end
@@ -1273,6 +1279,12 @@ OnInit.final("PotionService", function(Require)
             return
         end
         item:update(true)
+        if not item.runtime_definition then
+            local cooldown = concise_number(PotionService.getUseCooldown(item))
+            local line = "|n + |cffffcc00" .. cooldown .. "|r Cooldown"
+            item.tooltip = (item.tooltip or "") .. line
+            item.alt_tooltip = (item.alt_tooltip or "") .. line
+        end
         local infusion = selected_customization(item, infusions,
                                                 INFUSION_QUALITY_INDEX)
         local catalyst = selected_customization(item, catalysts,
