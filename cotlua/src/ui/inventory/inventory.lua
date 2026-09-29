@@ -593,7 +593,7 @@ OnInit.final("Inventory", function(Require)
         end
 
         -- escape button
-        local esc_button = SimpleButton.create(frame, "ReplaceableTextures\\CommandButtons\\BTNCancel.blp", 0.015, 0.015, FRAMEPOINT_TOPRIGHT, FRAMEPOINT_TOPRIGHT, -0.02, -0.02, onCloseButton, "Close 'I'", FRAMEPOINT_BOTTOM, FRAMEPOINT_TOP, 0., 0.01)
+        local esc_button = SimpleButton.create(frame, "ReplaceableTextures\\CommandButtons\\BTNCancel.blp", 0.018, 0.018, FRAMEPOINT_TOPRIGHT, FRAMEPOINT_TOPRIGHT, -0.02, -0.02, onCloseButton, "Close 'I'", FRAMEPOINT_BOTTOM, FRAMEPOINT_TOP, 0., 0.01)
         RegisterHotkeyTooltip(esc_button, 5)
 
         local function toggle_stash()

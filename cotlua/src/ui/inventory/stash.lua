@@ -458,7 +458,7 @@ OnInit.final("StashUI", function(Require)
         StashUI.close(GetPlayerId(GetTriggerPlayer()) + 1)
     end
     SimpleButton.create(frame,
-        "ReplaceableTextures\\CommandButtons\\BTNCancel.blp", 0.015, 0.015,
+        "ReplaceableTextures\\CommandButtons\\BTNCancel.blp", 0.018, 0.018,
         FRAMEPOINT_TOPRIGHT, FRAMEPOINT_TOPRIGHT, -0.02, -0.02,
         close_clicked, "Close Stash", FRAMEPOINT_BOTTOM, FRAMEPOINT_TOP, 0.,
         0.01)

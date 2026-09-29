@@ -61,10 +61,13 @@ OnInit.final("ItemDetails", function(Require)
     end
 
     local function close()
+        local clicked = BlzGetTriggerFrame()
+        BlzFrameSetEnable(clicked, false)
+        BlzFrameSetEnable(clicked, true)
         ItemDetails.hide(GetPlayerId(GetTriggerPlayer()) + 1)
     end
 
-    SimpleButton.create(frame, "ReplaceableTextures\\CommandButtons\\BTNCancel.blp", 0.015, 0.015,
+    SimpleButton.create(frame, "ReplaceableTextures\\CommandButtons\\BTNCancel.blp", 0.018, 0.018,
         FRAMEPOINT_TOPRIGHT, FRAMEPOINT_TOPRIGHT, -0.018, -0.018, close,
         "Close", FRAMEPOINT_BOTTOM, FRAMEPOINT_TOP, 0., 0.01)
     AddToEsc(ItemDetails.hide)

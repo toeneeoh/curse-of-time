@@ -82,7 +82,7 @@ OnInit.final("Prompt", function(Require)
         end
 
         local accept = SimpleButton.create(main, "ReplaceableTextures\\CommandButtons\\BTNcheck.blp", 0.025, 0.025, FRAMEPOINT_TOP, FRAMEPOINT_TOP, 0., -0.15, onAccept)
-        local exit = SimpleButton.create(main, "ReplaceableTextures\\CommandButtons\\BTNCancel.blp", 0.015, 0.015, FRAMEPOINT_TOPRIGHT, FRAMEPOINT_TOPRIGHT, -0.02, -0.02, onClose, "Close", FRAMEPOINT_BOTTOM, FRAMEPOINT_TOP, 0., 0.01)
+        local exit = SimpleButton.create(main, "ReplaceableTextures\\CommandButtons\\BTNCancel.blp", 0.018, 0.018, FRAMEPOINT_TOPRIGHT, FRAMEPOINT_TOPRIGHT, -0.02, -0.02, onClose, "Close", FRAMEPOINT_BOTTOM, FRAMEPOINT_TOP, 0., 0.01)
 
         ---@type fun(pid: integer, t: table): boolean
         function PromptFrame.create(pid, t)

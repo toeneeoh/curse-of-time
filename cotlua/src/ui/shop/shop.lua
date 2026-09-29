@@ -31,6 +31,7 @@ OnInit.final("Shop", function(Require)
     local WIDTH                          = 0.6 ---@type number 
     local HEIGHT                         = 0.35 ---@type number 
     local TOOLBAR_BUTTON_SIZE            = 0.02 ---@type number 
+    local CLOSE_BUTTON_SIZE              = 0.018 ---@type number
     local ROWS                           = 4 ---@type integer 
     local COLUMNS                        = 10 ---@type integer 
     local DETAILED_ROWS                  = 4 ---@type integer 
@@ -53,7 +54,8 @@ OnInit.final("Shop", function(Require)
     local DETAIL_USED_COUNT              = 6 ---@type integer 
     local DETAIL_BUTTON_SIZE             = 0.028 ---@type number 
     local DETAIL_BUTTON_GAP              = 0.045 ---@type number 
-    local DETAIL_CLOSE_BUTTON_SIZE       = 0.02 ---@type number 
+    local DETAIL_CLOSE_BUTTON_SIZE       = 0.018 ---@type number
+    local DETAIL_ACTION_BUTTON_SIZE      = 0.02 ---@type number
     local DETAIL_SHIFT_BUTTON_SIZE       = 0.012 ---@type number 
     local USED_RIGHT                     = "ReplaceableTextures\\CommandButtons\\BTNReplay-SpeedDown.blp" ---@type string 
     local USED_LEFT                      = "ReplaceableTextures\\CommandButtons\\BTNReplay-SpeedUp.blp" ---@type string 
@@ -782,7 +784,7 @@ OnInit.final("Shop", function(Require)
             self.close:icon(CLOSE_ICON)
             self.close:onClick(thistype.onClick)
             self.close.tooltip:text("Close")
-            self.purchase = Button.create(self.frame, DETAIL_CLOSE_BUTTON_SIZE, DETAIL_CLOSE_BUTTON_SIZE, 0., 0., true)
+            self.purchase = Button.create(self.frame, DETAIL_ACTION_BUTTON_SIZE, DETAIL_ACTION_BUTTON_SIZE, 0., 0., true)
             self.purchase:icon(PURCHASE_ICON)
             self.purchase:onClick(thistype.onPurchase)
             self.purchase.tooltip:text("Purchase")
@@ -1507,7 +1509,7 @@ OnInit.final("Shop", function(Require)
                 self.sliderValue = 0
                 self.category = Category.create(self)
                 self.details = Detail.create(self)
-                self.close = Button.create(self.main, TOOLBAR_BUTTON_SIZE, TOOLBAR_BUTTON_SIZE, (WIDTH - 2*TOOLBAR_BUTTON_SIZE), 0.015000, true)
+                self.close = Button.create(self.main, CLOSE_BUTTON_SIZE, CLOSE_BUTTON_SIZE, (WIDTH - 2*TOOLBAR_BUTTON_SIZE), 0.015000, true)
                 self.close:icon(CLOSE_ICON)
                 self.close:onClick(thistype.onClose)
                 self.close.tooltip:text("Close 'ESC'")

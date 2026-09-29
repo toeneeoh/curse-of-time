@@ -345,7 +345,7 @@ OnInit.final("DialogWindow", function(Require)
             return false
         end
 
-        close_button = SimpleButton.create(main, "ReplaceableTextures\\CommandButtons\\BTNCancel.blp", 0.015, 0.015, FRAMEPOINT_TOPRIGHT, FRAMEPOINT_TOPRIGHT, -0.018, -0.018, onClose, "Close", FRAMEPOINT_BOTTOM, FRAMEPOINT_TOP, 0.0, 0.01)
+        close_button = SimpleButton.create(main, "ReplaceableTextures\\CommandButtons\\BTNCancel.blp", 0.018, 0.018, FRAMEPOINT_TOPRIGHT, FRAMEPOINT_TOPRIGHT, -0.018, -0.018, onClose, "Close", FRAMEPOINT_BOTTOM, FRAMEPOINT_TOP, 0.0, 0.01)
         previous_button = SimpleButton.create(main, "ReplaceableTextures\\CommandButtons\\BTNCycleLeft.blp", 0.022, 0.022, FRAMEPOINT_BOTTOMRIGHT, FRAMEPOINT_BOTTOMRIGHT, -0.17, 0.015, onPrevious, "Previous Page", FRAMEPOINT_BOTTOM, FRAMEPOINT_TOP, 0.0, 0.01)
         next_button = SimpleButton.create(main, "ReplaceableTextures\\CommandButtons\\BTNCycleRight.blp", 0.022, 0.022, FRAMEPOINT_BOTTOMLEFT, FRAMEPOINT_BOTTOMLEFT, 0.17, 0.015, onNext, "Next Page", FRAMEPOINT_BOTTOM, FRAMEPOINT_TOP, 0.0, 0.01)
 

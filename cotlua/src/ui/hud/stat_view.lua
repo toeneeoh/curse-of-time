@@ -417,6 +417,8 @@
     for page = 1, #tab_tags do init_tab(page) end
 
     local tab_frame = BlzCreateFrameByType("FRAME", "", frame, "", 0)
+    local tab_background = BlzCreateFrameByType("BACKDROP", "", tab_frame,
+                                                "", 0)
     local tab_separator_top = BlzCreateFrameByType("BACKDROP", "", tab_frame,
                                                    "", 0)
     local tab_separator_bottom = BlzCreateFrameByType("BACKDROP", "", tab_frame,
@@ -449,6 +451,15 @@
                      FRAMEPOINT_BOTTOM, 0., 0.009)
     BlzFrameSetSize(tab_separator_top, 0.28, 0.001)
     BlzFrameSetSize(tab_separator_bottom, 0.28, 0.001)
+    BlzFrameSetPoint(tab_background, FRAMEPOINT_TOPLEFT, tab_separator_top,
+                     FRAMEPOINT_BOTTOMLEFT, 0., 0.)
+    BlzFrameSetPoint(tab_background, FRAMEPOINT_BOTTOMRIGHT,
+                     tab_separator_bottom, FRAMEPOINT_TOPRIGHT, 0., 0.)
+    BlzFrameSetTexture(tab_background,
+                       "UI\\Widgets\\EscMenu\\Human\\human-options-menu-background.blp",
+                       0, true)
+    BlzFrameSetVertexColor(tab_background, BlzConvertColor(215, 35, 35, 45))
+    BlzFrameSetEnable(tab_background, false)
     BlzFrameSetTexture(tab_separator_top,
                        "replaceabletextures\\teamcolor\\teamcolor08", 0, true)
     BlzFrameSetTexture(tab_separator_bottom,
@@ -512,7 +523,7 @@
     -- escape button
     local esc_button = SimpleButton.create(frame,
                                            "ReplaceableTextures\\CommandButtons\\BTNCancel.blp",
-                                           0.015, 0.015, FRAMEPOINT_TOPRIGHT,
+                                           0.018, 0.018, FRAMEPOINT_TOPRIGHT,
                                            FRAMEPOINT_TOPRIGHT, -0.02, -0.02,
                                            onClose, "Close 'B'",
                                            FRAMEPOINT_BOTTOM, FRAMEPOINT_TOP,

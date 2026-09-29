@@ -194,12 +194,14 @@ OnInit.final("Hotkeys", function(Require)
         esc_functions[#esc_functions + 1] = f
     end
 
+    ---Closes every custom window registered with the Escape hotkey.
+    ---@param pid integer
+    function CloseAllWindows(pid)
+        for _, close in ipairs(esc_functions) do close(pid) end
+    end
+
     local function close_all_windows(pid, is_down)
-        if is_down then
-            for _, v in ipairs(esc_functions) do
-                v(pid)
-            end
-        end
+        if is_down then CloseAllWindows(pid) end
     end
 
     local function second_spell_special_cast(pid, is_down)

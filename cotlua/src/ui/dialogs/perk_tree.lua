@@ -14,11 +14,16 @@ OnInit.final("PerkTree", function(Require)
 
     PerkTree = {}
 
-    -- Match StatView's 0.30 x 0.33 footprint and begin at its right edge.
-    local FRAME_X, FRAME_TOP = 0.25, 0.55
-    local FRAME_WIDTH, FRAME_HEIGHT = 0.3, 0.33
+    -- The fullscreen bounds span Stat View's left/bottom edges through the
+    -- Inventory window's right/top edges.
+    local NORMAL_FRAME_X, NORMAL_FRAME_TOP = 0.25, 0.55
+    local NORMAL_FRAME_WIDTH, NORMAL_FRAME_HEIGHT = 0.3, 0.33
+    local FULL_FRAME_X, FULL_FRAME_TOP = -0.05, 0.55
+    local FULL_FRAME_WIDTH, FULL_FRAME_HEIGHT = 0.8951, 0.38
+    local FRAME_X, FRAME_TOP = NORMAL_FRAME_X, NORMAL_FRAME_TOP
+    local FRAME_WIDTH, FRAME_HEIGHT = NORMAL_FRAME_WIDTH, NORMAL_FRAME_HEIGHT
     local VIEW_X, VIEW_TOP = FRAME_X + 0.015, FRAME_TOP - 0.075
-    local VIEW_WIDTH, VIEW_HEIGHT = 0.27, 0.215
+    local VIEW_WIDTH, VIEW_HEIGHT = FRAME_WIDTH - 0.03, FRAME_HEIGHT - 0.115
     local VIEW_CENTER_X, VIEW_CENTER_Y = VIEW_X + VIEW_WIDTH * .5,
         VIEW_TOP - VIEW_HEIGHT * .5
     local GRAPH_STEP = 0.043
@@ -223,11 +228,69 @@ OnInit.final("PerkTree", function(Require)
         if GetLocalPlayer() == Player(pid - 1) then BlzFrameSetVisible(frame, false) end
     end
 
-    SimpleButton.create(frame, "ReplaceableTextures\\CommandButtons\\BTNCancel.blp",
+    local close_button = SimpleButton.create(frame,
+        "ReplaceableTextures\\CommandButtons\\BTNCancel.blp",
         0.018, 0.018, FRAMEPOINT_TOPRIGHT, FRAMEPOINT_TOPRIGHT, -0.018, -0.018,
         function()
+            local clicked = BlzGetTriggerFrame()
+            BlzFrameSetEnable(clicked, false)
+            BlzFrameSetEnable(clicked, true)
             close(GetPlayerId(GetTriggerPlayer()) + 1)
         end, "Close", FRAMEPOINT_BOTTOM, FRAMEPOINT_TOP, 0., 0.008)
+
+    local fullscreen_button
+
+    local function apply_layout(pid)
+        local fullscreen = state_for(pid).fullscreen == true
+        FRAME_X = fullscreen and FULL_FRAME_X or NORMAL_FRAME_X
+        FRAME_TOP = fullscreen and FULL_FRAME_TOP or NORMAL_FRAME_TOP
+        FRAME_WIDTH = fullscreen and FULL_FRAME_WIDTH or NORMAL_FRAME_WIDTH
+        FRAME_HEIGHT = fullscreen and FULL_FRAME_HEIGHT or NORMAL_FRAME_HEIGHT
+        VIEW_X, VIEW_TOP = FRAME_X + 0.015, FRAME_TOP - 0.075
+        VIEW_WIDTH, VIEW_HEIGHT = FRAME_WIDTH - 0.03, FRAME_HEIGHT - 0.115
+        VIEW_CENTER_X = VIEW_X + VIEW_WIDTH * .5
+        VIEW_CENTER_Y = VIEW_TOP - VIEW_HEIGHT * .5
+
+        if GetLocalPlayer() == Player(pid - 1) then
+            BlzFrameClearAllPoints(frame)
+            BlzFrameSetAbsPoint(frame, FRAMEPOINT_TOPLEFT, FRAME_X, FRAME_TOP)
+            BlzFrameSetSize(frame, FRAME_WIDTH, FRAME_HEIGHT)
+            BlzFrameClearAllPoints(viewport)
+            BlzFrameSetAbsPoint(viewport, FRAMEPOINT_TOPLEFT, VIEW_X, VIEW_TOP)
+            BlzFrameSetSize(viewport, VIEW_WIDTH, VIEW_HEIGHT)
+            fullscreen_button:icon(fullscreen and
+                "ReplaceableTextures\\CommandButtons\\BTNReplay-SpeedDown.blp" or
+                "ReplaceableTextures\\CommandButtons\\BTNReplay-SpeedUp.blp")
+            fullscreen_button:setTooltipText(fullscreen and "Restore Window" or
+                                                 "Fullscreen")
+        end
+    end
+
+    local function toggle_fullscreen()
+        local pid = GetPlayerId(GetTriggerPlayer()) + 1
+        local clicked = BlzGetTriggerFrame()
+        BlzFrameSetEnable(clicked, false)
+        BlzFrameSetEnable(clicked, true)
+        local state = state_for(pid)
+        state.fullscreen = not state.fullscreen
+        if state.fullscreen then
+            local target_pid = state.target_pid
+            CloseAllWindows(pid)
+            state.target_pid = target_pid
+            is_open[pid] = true
+        end
+        apply_layout(pid)
+        if GetLocalPlayer() == Player(pid - 1) then
+            BlzFrameSetVisible(frame, true)
+        end
+        PerkTree.refresh(pid)
+    end
+
+    fullscreen_button = SimpleButton.create(close_button.frame,
+        "ReplaceableTextures\\CommandButtons\\BTNReplay-SpeedUp.blp",
+        0.018, 0.018, FRAMEPOINT_TOPRIGHT, FRAMEPOINT_TOPLEFT, -0.004, 0.,
+        toggle_fullscreen, "Fullscreen", FRAMEPOINT_BOTTOM, FRAMEPOINT_TOP, 0.,
+        0.008)
 
     local reset = SimpleButton.create(frame,
         "ReplaceableTextures\\CommandButtons\\BTNReplay-Loop.blp",
@@ -354,6 +417,7 @@ OnInit.final("PerkTree", function(Require)
         local same_target = state.target_pid == target_pid
         state.target_pid = target_pid
         is_open[pid] = not (is_open[pid] and same_target)
+        apply_layout(pid)
         if GetLocalPlayer() == Player(pid - 1) then
             BlzFrameSetVisible(frame, is_open[pid])
         end

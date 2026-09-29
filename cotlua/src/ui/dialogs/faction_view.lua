@@ -162,8 +162,8 @@ OnInit.final("FactionView", function(Require)
     SimpleButton.create(
         main,
         "ReplaceableTextures\\CommandButtons\\BTNCancel.blp",
-        0.015,
-        0.015,
+        0.018,
+        0.018,
         FRAMEPOINT_TOPRIGHT,
         FRAMEPOINT_TOPRIGHT,
         -0.02,
