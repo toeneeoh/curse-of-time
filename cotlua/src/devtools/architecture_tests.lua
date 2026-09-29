@@ -865,6 +865,61 @@ OnInit.final("ArchitectureTests", function(Require)
         return true
     end)
 
+    ArchitectureTests.register("potion rerolls permanently lock one property",
+                               function()
+        local item = PotionService.create(PotionService.STONEBLOOD_KEY,
+                                          30000., 30000.)
+        if not item then return false, "could not create category test flask" end
+
+        local restoration_before = PotionService.getProperties(item)
+        local cooldown_before = PotionService.getCooldownQuality(item)
+        local prefix_before = PotionService.getInfusionQuality(item)
+        local charges_index = item.data.quality_index[ITEM_CHARGES]
+        local all_available =
+            PotionService.canRerollCategory(
+                item, PotionService.REROLL_RESTORATION) and
+                PotionService.canRerollCategory(
+                    item, PotionService.REROLL_CHARGES) and
+                PotionService.canRerollCategory(
+                    item, PotionService.REROLL_COOLDOWN) and
+                PotionService.canRerollCategory(
+                    item, PotionService.REROLL_PREFIX)
+        local options = PotionService.beginReroll(
+                            item, PotionService.REROLL_CHARGES)
+        local accepted = options and PotionService.acceptReroll(
+                             item, options[1].attempt, options[1].option)
+        local restoration_after = PotionService.getProperties(item)
+        local locked = PotionService.getRerollCategory(item) ==
+                           PotionService.REROLL_CHARGES and
+                           PotionService.canRerollCategory(
+                               item, PotionService.REROLL_CHARGES) and
+                           not PotionService.canRerollCategory(
+                               item, PotionService.REROLL_RESTORATION) and
+                           not PotionService.canRerollCategory(
+                               item, PotionService.REROLL_COOLDOWN) and
+                           not PotionService.canRerollCategory(
+                               item, PotionService.REROLL_PREFIX)
+        local isolated = restoration_before and restoration_after and
+                             restoration_before.base_flat_health ==
+                                 restoration_after.base_flat_health and
+                             restoration_before.base_percent_health ==
+                                 restoration_after.base_percent_health and
+                             restoration_before.base_flat_mana ==
+                                 restoration_after.base_flat_mana and
+                             restoration_before.base_percent_mana ==
+                                 restoration_after.base_percent_mana and
+                             PotionService.getCooldownQuality(item) ==
+                                 cooldown_before and
+                             PotionService.getInfusionQuality(item) ==
+                                 prefix_before and charges_index and options and
+                             item.quality[charges_index] == options[1].rolls[1]
+        item:destroy()
+        if not (all_available and accepted and locked and isolated) then
+            return false, "category was unavailable, mutable, or changed another property"
+        end
+        return true
+    end)
+
     ArchitectureTests.register("charged items preserve charges when saved",
                                function()
         -- Sword of Revival exercises the ordinary managed-item path rather

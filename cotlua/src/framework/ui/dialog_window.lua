@@ -64,7 +64,8 @@ OnInit.final("DialogWindow", function(Require)
         local FOOTER_HEIGHT = 0.042
         local SIDE_PADDING = 0.018
         local ICON_SIZE = 0.024
-        local BUTTON_FONT_SIZE = 0.014
+        local BUTTON_FONT_SIZE = 0.012
+        local TITLE_FONT_SIZE = 0.014
 
         local main = BlzCreateFrame("ListBoxWar3", BlzGetFrameByName("ConsoleUIBackdrop", 0), 0, 0)
         BlzFrameSetAbsPoint(main, FRAMEPOINT_TOP, 0.4, 0.542)
@@ -74,12 +75,13 @@ OnInit.final("DialogWindow", function(Require)
         -- such as the saved-character browser.
         BlzFrameSetLevel(main, 100)
 
-        local title = BlzCreateFrame("TitleText", main, 0, 0)
-        BlzFrameSetPoint(title, FRAMEPOINT_TOP, main, FRAMEPOINT_TOP, 0.0, -0.015)
-        BlzFrameSetSize(title, MAIN_WIDTH - 0.04, 0)
+        local title = BlzCreateFrameByType("TEXT", "", main, "", 0)
+        BlzFrameSetPoint(title, FRAMEPOINT_TOP, main, FRAMEPOINT_TOP, -0.006,
+                         -0.009)
+        BlzFrameSetSize(title, MAIN_WIDTH - 0.08, 0.026)
+        BlzFrameSetFont(title, "MasterFont", TITLE_FONT_SIZE, 0)
         BlzFrameSetTextAlignment(title, TEXT_JUSTIFY_MIDDLE, TEXT_JUSTIFY_CENTER)
         BlzFrameSetEnable(title, false)
-        BlzFrameSetScale(title, 0.8)
 
         local close_button
         local previous_button

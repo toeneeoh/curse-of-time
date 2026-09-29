@@ -45,9 +45,14 @@ OnInit.final("PotionService", function(Require)
     local INFUSION_QUALITY_STATE = 6
     local RESTORATION_MODE_STATE = 7
     local PENDING_REROLL_STATE = 8
+    local REROLL_CATEGORY_STATE = 9
     local RESTORATION_HEALTH = 1
     local RESTORATION_MANA = 2
     local RESTORATION_HYBRID = 3
+    local REROLL_RESTORATION = 1
+    local REROLL_CHARGES = 2
+    local REROLL_COOLDOWN = 3
+    local REROLL_PREFIX = 4
     local CHAOS_CHARGE_MIN = 4
     local CHAOS_CHARGE_MAX = 8
     local CHAOS_COOLDOWN_MIN = 2.5
@@ -264,9 +269,14 @@ OnInit.final("PotionService", function(Require)
     PotionService.INFUSION_QUALITY_STATE = INFUSION_QUALITY_STATE
     PotionService.RESTORATION_MODE_STATE = RESTORATION_MODE_STATE
     PotionService.PENDING_REROLL_STATE = PENDING_REROLL_STATE
+    PotionService.REROLL_CATEGORY_STATE = REROLL_CATEGORY_STATE
     PotionService.RESTORATION_HEALTH = RESTORATION_HEALTH
     PotionService.RESTORATION_MANA = RESTORATION_MANA
     PotionService.RESTORATION_HYBRID = RESTORATION_HYBRID
+    PotionService.REROLL_RESTORATION = REROLL_RESTORATION
+    PotionService.REROLL_CHARGES = REROLL_CHARGES
+    PotionService.REROLL_COOLDOWN = REROLL_COOLDOWN
+    PotionService.REROLL_PREFIX = REROLL_PREFIX
     PotionService.GREATER_HEALTH_KEY = GREATER_HEALTH_KEY
     PotionService.GREATER_MANA_KEY = GREATER_MANA_KEY
     PotionService.SUPERIOR_HEALTH_KEY = SUPERIOR_HEALTH_KEY
@@ -397,6 +407,7 @@ OnInit.final("PotionService", function(Require)
                 item.persistent_state[SUFFIX_REROLL_STATE] = 0
                 item.persistent_state[RESTORATION_MODE_STATE] =
                     potion.initial_restoration_mode or RESTORATION_HYBRID
+                item.persistent_state[REROLL_CATEGORY_STATE] = 0
                 item.persistent_state[REROLL_SEED_STATE] =
                     GetRandomInt(1, 0x7FFFFFFF)
                 item.persistent_state[COOLDOWN_QUALITY_STATE] =
@@ -1347,6 +1358,17 @@ OnInit.final("PotionService", function(Require)
         append_customization(item, infusion,
                              PotionService.getInfusionMultiplier(item))
         append_customization(item, catalyst)
+        local reroll_category = item.persistent_state and math.floor(
+                                    item.persistent_state[REROLL_CATEGORY_STATE] or
+                                        0) or 0
+        local reroll_name = PotionService.REROLL_CATEGORY_NAMES and
+                                PotionService.REROLL_CATEGORY_NAMES[reroll_category]
+        if reroll_name then
+            local line = "|n|cff808080Reroll Property:|r |cff0080c0" ..
+                             reroll_name .. "|r"
+            item.tooltip = (item.tooltip or "") .. line
+            item.alt_tooltip = (item.alt_tooltip or "") .. line
+        end
         local name = customized_name(item, name_prefix, catalyst)
         local icon = name_prefix and name_prefix.icon or catalyst and
                          catalyst.icon or
@@ -1696,19 +1718,58 @@ OnInit.final("PotionService", function(Require)
         return true, old_value, item.cached_stats[stat]
     end
 
-    ---Chaos restoration is rerolled as one deterministic property group. The
-    ---next result is derived from the flask's saved seed, counter, and current
-    ---qualities, so reloading a save cannot produce a different candidate.
-    ---@param item Item
-    ---@return boolean
-    function PotionService.canRerollRestoration(item)
+    PotionService.REROLL_CATEGORY_NAMES = {
+        [REROLL_RESTORATION] = "Restoration",
+        [REROLL_CHARGES] = "Charges",
+        [REROLL_COOLDOWN] = "Cooldown",
+        [REROLL_PREFIX] = "Prefix"
+    }
+
+    function PotionService.getRerollCategory(item)
+        if not item or not item.persistent_state then return nil end
+        local category = math.floor(
+                             item.persistent_state[REROLL_CATEGORY_STATE] or 0)
+        return PotionService.REROLL_CATEGORY_NAMES[category] and category or nil
+    end
+
+    function PotionService.canRerollCategory(item, category)
         if not item or item.type ~= TYPE_POTION_INDEX or
-            item.data[ITEM_LEVEL_REQUIREMENT] < 200 or
-            not item.runtime_definition then return false end
-        for _, stat in ipairs(PotionService.ROLLABLE_STATS) do
-            if refinement_index(item, stat) then return true end
+            not item.persistent_state then return false end
+        local locked = PotionService.getRerollCategory(item)
+        if locked and locked ~= category then return false end
+
+        if category == REROLL_RESTORATION then
+            for _, stat in ipairs(restoration_stats) do
+                local index = refinement_index(item, stat)
+                if index and index < INFUSION_QUALITY_INDEX then return true end
+            end
+            return false
+        elseif category == REROLL_CHARGES then
+            local index = refinement_index(item, ITEM_CHARGES)
+            return index ~= nil and index < INFUSION_QUALITY_INDEX
+        elseif category == REROLL_COOLDOWN then
+            return PotionService.getCooldownQuality(item) ~= nil
+        elseif category == REROLL_PREFIX then
+            local customization = PotionService.getCustomization(item)
+            return customization ~= nil and customization.prefix ~= nil and
+                       customization.infusion_quality ~= nil
         end
-        return PotionService.getCooldownQuality(item) ~= nil
+        return false
+    end
+
+    function PotionService.canReroll(item)
+        local locked = PotionService.getRerollCategory(item)
+        if locked then return PotionService.canRerollCategory(item, locked) end
+        for category = REROLL_RESTORATION, REROLL_PREFIX do
+            if PotionService.canRerollCategory(item, category) then return true end
+        end
+        return false
+    end
+
+    -- Compatibility for callers and tests written against the original
+    -- all-properties prototype.
+    function PotionService.canRerollRestoration(item)
+        return PotionService.canRerollCategory(item, REROLL_RESTORATION)
     end
 
     function PotionService.getRerollCount(item, kind)
@@ -1749,12 +1810,13 @@ OnInit.final("PotionService", function(Require)
         return values
     end
 
-    ---Produces a candidate from only the fixed item seed, paid attempt, and
-    ---candidate mode. Accepting, rejecting, or choosing a different mode can
-    ---therefore never alter later reroll outcomes.
-    local function next_restoration_rolls(seed, attempt, mode, count)
+    ---Produces a candidate from only the fixed item seed, paid attempt,
+    ---permanent category, and displayed option. Accepting or rejecting a
+    ---choice therefore never alters any later reroll.
+    local function next_reroll_rolls(seed, attempt, category, option, count)
         local state = (seed ~ ((attempt + 1) * 0x45D9F3B) ~
-                          (mode * 0x1F123BB)) & 0x7FFFFFFF
+                          (category * 0x1F123BB) ~
+                          (option * 0x119DE1F3)) & 0x7FFFFFFF
         local rolls = {}
         for index = 1, count do
             local permutation = restoration_permutation(
@@ -1776,105 +1838,168 @@ OnInit.final("PotionService", function(Require)
         return value
     end
 
-    local function restoration_candidates(item, attempt)
+    local function reroll_seed(item)
         local seed = item.persistent_state[REROLL_SEED_STATE] or 0
         if seed == 0 then
-            seed = ((item.runtime_definition.id * 0x45D9F3B) ~ 0x119DE1F3) &
+            local identity = item.runtime_definition and
+                                 item.runtime_definition.id or item.id
+            seed = ((identity * 0x45D9F3B) ~ 0x119DE1F3) &
                        0x7FFFFFFF
             item.persistent_state[REROLL_SEED_STATE] = seed
         end
+        return seed
+    end
+
+    local function restoration_candidates(item, attempt)
+        local seed = reroll_seed(item)
         local quality_indices = {}
         local stats = {}
-        for _, stat in ipairs(PotionService.ROLLABLE_STATS) do
+        local has_health = false
+        local has_mana = false
+        for _, stat in ipairs(restoration_stats) do
             local quality_index = refinement_index(item, stat)
-            if quality_index then
+            if quality_index and quality_index < INFUSION_QUALITY_INDEX then
                 quality_indices[#quality_indices + 1] = quality_index
                 stats[#stats + 1] = stat
+                if stat == ITEM_FLAT_HEAL or stat == ITEM_PERCENT_HEAL then
+                    has_health = true
+                else
+                    has_mana = true
+                end
             end
         end
-        local has_cooldown = PotionService.getCooldownQuality(item) ~= nil
-        local roll_count = #quality_indices + (has_cooldown and 1 or 0)
         local options = {}
-        local modes = {
+        local modes = has_health and has_mana and {
             RESTORATION_HEALTH, RESTORATION_MANA, RESTORATION_HYBRID
+        } or has_health and {
+            RESTORATION_HEALTH, RESTORATION_HEALTH, RESTORATION_HEALTH
+        } or {
+            RESTORATION_MANA, RESTORATION_MANA, RESTORATION_MANA
         }
-        local mode_names = {"Health", "Mana", "Hybrid"}
+        local mode_names = has_health and has_mana and
+                               {"Health", "Mana", "Hybrid"} or
+                               {"Option 1", "Option 2", "Option 3"}
         for option_index, mode in ipairs(modes) do
-            local rolls = next_restoration_rolls(seed, attempt, mode,
-                                                  roll_count)
+            local rolls = next_reroll_rolls(seed, attempt,
+                                            REROLL_RESTORATION, option_index,
+                                            #quality_indices)
             local parts = {}
             for index, stat in ipairs(stats) do
                 local show = restoration_stat_enabled(mode, stat)
                 if show then
                     local value = candidate_value(item, stat, rolls[index])
-                    local suffix = stat == ITEM_FLAT_HEAL and " Health" or
+                    local suffix = stat == ITEM_FLAT_HEAL and " HP" or
                                        stat == ITEM_PERCENT_HEAL and
-                                           "% Max Health" or
-                                       stat == ITEM_FLAT_MANA and " Mana" or
+                                           "% Max HP" or
+                                       stat == ITEM_FLAT_MANA and " MP" or
                                        stat == ITEM_PERCENT_MANA and
-                                           "% Max Mana" or " Charges"
+                                           "% Max MP" or ""
                     parts[#parts + 1] = tostring(value) .. suffix
                 end
             end
-            if has_cooldown then
-                local lower, upper = PotionService.getUseCooldownRange(item)
-                local cooldown = rolled_value(upper, lower,
-                                              rolls[#quality_indices + 1])
-                parts[#parts + 1] = concise_number(cooldown) .. "s Cooldown"
-            end
             options[#options + 1] = {
+                option = option_index,
+                category = REROLL_RESTORATION,
+                category_name = "Restoration",
                 mode = mode,
                 mode_name = mode_names[option_index],
                 attempt = attempt,
                 rolls = rolls,
                 quality_indices = quality_indices,
-                has_cooldown = has_cooldown,
                 text = table.concat(parts, ", ")
             }
         end
         return options
     end
 
-    function PotionService.getPendingRestorationReroll(item)
+    local function single_property_candidates(item, attempt, category)
+        local seed = reroll_seed(item)
+        local options = {}
+        local quality_index = category == REROLL_CHARGES and
+                                  refinement_index(item, ITEM_CHARGES) or nil
+        for option_index = 1, 3 do
+            local quality = next_reroll_rolls(seed, attempt, category,
+                                              option_index, 1)[1]
+            local text
+            if category == REROLL_CHARGES then
+                text = tostring(candidate_value(item, ITEM_CHARGES, quality)) ..
+                           " Charges"
+            elseif category == REROLL_COOLDOWN then
+                local lower, upper = PotionService.getUseCooldownRange(item)
+                text = concise_number(rolled_value(upper, lower, quality)) ..
+                           "s Cooldown"
+            else
+                text = concise_number(rolled_value(INFUSION_ROLL_MIN,
+                                                   INFUSION_ROLL_MAX,
+                                                   quality) * 100.) ..
+                           "% Prefix Potency"
+            end
+            options[#options + 1] = {
+                option = option_index,
+                category = category,
+                category_name = PotionService.REROLL_CATEGORY_NAMES[category],
+                attempt = attempt,
+                rolls = {quality},
+                quality_indices = quality_index and {quality_index} or {},
+                text = text
+            }
+        end
+        return options
+    end
+
+    local function reroll_candidates(item, attempt, category)
+        if category == REROLL_RESTORATION then
+            return restoration_candidates(item, attempt)
+        end
+        return single_property_candidates(item, attempt, category)
+    end
+
+    function PotionService.getPendingReroll(item)
         if not item or not item.persistent_state then return nil end
         local marker = math.floor(item.persistent_state[PENDING_REROLL_STATE] or
                                       0)
         if marker <= 0 then return nil end
-        return restoration_candidates(item, marker - 1)
+        local category = PotionService.getRerollCategory(item)
+        if not category then return nil end
+        return reroll_candidates(item, marker - 1, category)
     end
 
-    function PotionService.beginRestorationReroll(item)
-        if not PotionService.canRerollRestoration(item) then return nil end
+    function PotionService.beginReroll(item, category)
+        if not PotionService.canRerollCategory(item, category) then return nil end
         local attempt = PotionService.getRerollCount(item)
         increment_reroll_count(item, "restoration")
+        item.persistent_state[REROLL_CATEGORY_STATE] = category
         item.persistent_state[PENDING_REROLL_STATE] = attempt + 1
         if item.pid then NotifyItemChanged(item.pid) end
-        return restoration_candidates(item, attempt)
+        return reroll_candidates(item, attempt, category)
     end
 
-    function PotionService.rejectRestorationReroll(item)
-        if not PotionService.getPendingRestorationReroll(item) then return false end
+    function PotionService.rejectReroll(item)
+        if not PotionService.getPendingReroll(item) then return false end
         item.persistent_state[PENDING_REROLL_STATE] = 0
         if item.pid then NotifyItemChanged(item.pid) end
         return true
     end
 
-    function PotionService.acceptRestorationReroll(item, attempt, mode)
-        local options = PotionService.getPendingRestorationReroll(item)
+    function PotionService.acceptReroll(item, attempt, option_index)
+        local options = PotionService.getPendingReroll(item)
         if not options or options[1].attempt ~= attempt then return false end
-        local selected
-        for _, option in ipairs(options) do
-            if option.mode == mode then selected = option break end
-        end
+        local selected = options[option_index]
         if not selected then return false end
-        for index, quality_index in ipairs(selected.quality_indices) do
-            item.quality[quality_index] = selected.rolls[index]
-        end
-        if selected.has_cooldown then
+        if selected.category == REROLL_RESTORATION or
+            selected.category == REROLL_CHARGES then
+            for index, quality_index in ipairs(selected.quality_indices) do
+                item.quality[quality_index] = selected.rolls[index]
+            end
+        elseif selected.category == REROLL_COOLDOWN then
             item.persistent_state[COOLDOWN_QUALITY_STATE] =
-                selected.rolls[#selected.quality_indices + 1]
+                selected.rolls[1]
+        elseif selected.category == REROLL_PREFIX then
+            item.persistent_state[INFUSION_QUALITY_STATE] = selected.rolls[1]
         end
-        item.persistent_state[RESTORATION_MODE_STATE] = mode
+        if selected.mode then
+            item.persistent_state[RESTORATION_MODE_STATE] = selected.mode
+        end
         item.persistent_state[PENDING_REROLL_STATE] = 0
         PotionService.refreshItem(item)
         item.charges = math.min(item.charges, item.cached_stats[ITEM_CHARGES])
@@ -1882,12 +2007,7 @@ OnInit.final("PotionService", function(Require)
         return true
     end
 
-    ---Returns the player-facing values and quality classification for the
-    ---current flask. Near-perfect requires every rolled property
-    ---to be within the top four of the 64 possible quality values.
-    ---@param item Item
-    ---@return table?
-    function PotionService.getRestorationRollResult(item)
+    function PotionService.getRerollResult(item, category)
         if not item or item.type ~= TYPE_POTION_INDEX then return nil end
         local properties = PotionService.getProperties(item)
         if not properties then return nil end
@@ -1907,32 +2027,41 @@ OnInit.final("PotionService", function(Require)
         local minimum_quality = 63
         local count = 0
         local mode = restoration_mode(item)
-        for _, stat in ipairs(PotionService.ROLLABLE_STATS) do
-            local quality_index = refinement_index(item, stat)
-            if quality_index and restoration_stat_enabled(mode, stat) then
-                local quality = item.quality[quality_index]
-                local shown = presentation[stat]
-                minimum_quality = math.min(minimum_quality, quality)
-                count = count + 1
-                parts[#parts + 1] = tostring(shown[1]) .. shown[2]
+        if category == REROLL_RESTORATION then
+            for _, stat in ipairs(restoration_stats) do
+                local quality_index = refinement_index(item, stat)
+                if quality_index and restoration_stat_enabled(mode, stat) then
+                    local quality = item.quality[quality_index]
+                    local shown = presentation[stat]
+                    minimum_quality = math.min(minimum_quality, quality)
+                    count = count + 1
+                    parts[#parts + 1] = tostring(shown[1]) .. shown[2]
+                end
             end
-        end
-        local cooldown_quality = PotionService.getCooldownQuality(item)
-        if cooldown_quality ~= nil then
+        elseif category == REROLL_CHARGES then
+            local quality_index = refinement_index(item, ITEM_CHARGES)
+            if quality_index then
+                minimum_quality = item.quality[quality_index]
+                count = 1
+                parts[1] = tostring(properties.maximum_charges) .. " Charges"
+            end
+        elseif category == REROLL_COOLDOWN then
+            local cooldown_quality = PotionService.getCooldownQuality(item)
+            if cooldown_quality == nil then return nil end
             minimum_quality = math.min(minimum_quality, cooldown_quality)
             count = count + 1
             parts[#parts + 1] = concise_number(properties.cooldown) ..
                                     "s Cooldown"
-        end
-        local customization = PotionService.getCustomization(item)
-        if customization and customization.prefix and
-            customization.infusion_quality ~= nil then
+        elseif category == REROLL_PREFIX then
+            local customization = PotionService.getCustomization(item)
+            if not customization or not customization.prefix or
+                customization.infusion_quality == nil then return nil end
             minimum_quality = math.min(minimum_quality,
                                        customization.infusion_quality)
             count = count + 1
             parts[#parts + 1] = concise_number(
                                     customization.infusion_multiplier * 100.) ..
-                                    "% Infusion"
+                                    "% Prefix Potency"
         end
         if count == 0 then return nil end
 
@@ -1941,8 +2070,37 @@ OnInit.final("PotionService", function(Require)
             perfect = minimum_quality == 63,
             near_perfect = minimum_quality >= 60,
             minimum_quality = minimum_quality,
-            property_count = count
+            property_count = count,
+            category = category,
+            category_name = PotionService.REROLL_CATEGORY_NAMES[category]
         }
+    end
+
+    function PotionService.getPendingRestorationReroll(item)
+        return PotionService.getPendingReroll(item)
+    end
+
+    function PotionService.beginRestorationReroll(item)
+        return PotionService.beginReroll(item, REROLL_RESTORATION)
+    end
+
+    function PotionService.rejectRestorationReroll(item)
+        return PotionService.rejectReroll(item)
+    end
+
+    function PotionService.acceptRestorationReroll(item, attempt, mode)
+        local options = PotionService.getPendingReroll(item)
+        if not options then return false end
+        for index, option in ipairs(options) do
+            if option.mode == mode then
+                return PotionService.acceptReroll(item, attempt, index)
+            end
+        end
+        return false
+    end
+
+    function PotionService.getRestorationRollResult(item)
+        return PotionService.getRerollResult(item, REROLL_RESTORATION)
     end
 
     ---@param item Item

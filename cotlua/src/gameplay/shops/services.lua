@@ -204,7 +204,7 @@ OnInit.final("ShopServices", function(Require)
     ---@param pid integer
     ---@param slot integer Absolute potion or backpack inventory slot.
     ---@param operation string "refine", "reroll", "prefix", or "suffix".
-    ---@param value integer Stat index or donor potion slot.
+    ---@param value integer Stat index, reroll category, or donor potion slot.
     ---@return table
     function PotionBrewingService.quote(pid, slot, operation, value)
         if not Hero[pid] then return result(false, "NO HERO") end
@@ -217,7 +217,7 @@ OnInit.final("ShopServices", function(Require)
             available = PotionService.canRefine(item, value)
             reason = available and nil or "NOT REFINABLE"
         elseif operation == "reroll" then
-            available = PotionService.canRerollRestoration(item)
+            available = PotionService.canRerollCategory(item, value)
             reason = available and nil or "NOT REFINABLE"
         elseif operation == "prefix" or operation == "suffix" then
             local donor = PotionService.getStored(pid, value)
@@ -276,7 +276,7 @@ OnInit.final("ShopServices", function(Require)
                 PotionService.refine(quote.item, value)
         elseif operation == "reroll" then
             quote.reroll_options =
-                PotionService.beginRestorationReroll(quote.item)
+                PotionService.beginReroll(quote.item, value)
             changed = quote.reroll_options ~= nil
         else
             changed = PotionService.transferAffix(quote.item, quote.donor,
@@ -301,25 +301,31 @@ OnInit.final("ShopServices", function(Require)
         return quote
     end
 
-    function PotionBrewingService.acceptRestoration(pid, slot, attempt, mode)
+    function PotionBrewingService.acceptReroll(pid, slot, attempt, option)
         local item = PotionService.getStored(pid, slot)
         if not item then return result(false, "NO POTION") end
-        local accepted = PotionService.acceptRestorationReroll(item, attempt,
-                                                               mode)
+        local accepted = PotionService.acceptReroll(item, attempt, option)
         local quote = result(accepted, accepted and nil or "STALE REROLL")
         quote.item = item
         if accepted then
-            quote.reroll_result = PotionService.getRestorationRollResult(item)
+            quote.reroll_result = PotionService.getRerollResult(
+                                      item,
+                                      PotionService.getRerollCategory(item))
         end
         return quote
     end
 
-    function PotionBrewingService.rejectRestoration(pid, slot)
+    function PotionBrewingService.rejectReroll(pid, slot)
         local item = PotionService.getStored(pid, slot)
         if not item then return result(false, "NO POTION") end
-        local rejected = PotionService.rejectRestorationReroll(item)
+        local rejected = PotionService.rejectReroll(item)
         return result(rejected, rejected and nil or "NO PENDING REROLL")
     end
+
+    PotionBrewingService.acceptRestoration =
+        PotionBrewingService.acceptReroll
+    PotionBrewingService.rejectRestoration =
+        PotionBrewingService.rejectReroll
 
     function CurrencyConverterService.quote(pid)
         if HasCurrencyConverter(pid) then return result(false, "OWNED") end

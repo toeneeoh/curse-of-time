@@ -171,6 +171,7 @@ OnInit.final("ShopServiceDialogs", function(Require)
 
     local open_restoration_choices
     local open_restoration_ready
+    local open_reroll_category
 
     local function announce_reroll(pid, quote)
         local result = quote.reroll_result
@@ -219,14 +220,19 @@ OnInit.final("ShopServiceDialogs", function(Require)
             action = "Refine " ..
                          PotionBrewingService.stat_names[data.value]
         elseif data.operation == "reroll" then
-            action = "Reroll flask properties"
+            action = "Lock rerolls to " ..
+                         PotionService.REROLL_CATEGORY_NAMES[data.value]
         else
             action = "Extract and apply " .. quote.option.name
         end
-        local dialog = DialogWindow.create(pid,
-            action .. " for " .. quote.price .. " |cffffcc00Gold|r?",
+        local title = data.operation == "reroll" and action .. "?" or
+                          action .. " for " .. quote.price ..
+                              " |cffffcc00Gold|r?"
+        local dialog = DialogWindow.create(pid, title,
             brewing_confirm, "potion-brewing-confirm")
-        dialog:addButton("Confirm", data)
+        local confirm = data.operation == "reroll" and
+                            "Confirm (" .. quote.price .. " Gold)" or "Confirm"
+        dialog:addButton(confirm, data)
         return dialog:display()
     end
 
@@ -278,13 +284,16 @@ OnInit.final("ShopServiceDialogs", function(Require)
     end
 
     local function restoration_roll_again(pid, slot, replace_pending)
-        local quote = PotionBrewingService.quote(pid, slot, "reroll", 0)
+        local item = PotionService.getStored(pid, slot)
+        local category = PotionService.getRerollCategory(item)
+        if not category then return false end
+        local quote = PotionBrewingService.quote(pid, slot, "reroll", category)
         if not quote.available then
             failure(pid, quote.reason)
             return false
         end
-        if replace_pending then PotionBrewingService.rejectRestoration(pid, slot) end
-        quote = PotionBrewingService.commit(pid, slot, "reroll", 0)
+        if replace_pending then PotionBrewingService.rejectReroll(pid, slot) end
+        quote = PotionBrewingService.commit(pid, slot, "reroll", category)
         if not quote.available then
             failure(pid, quote.reason)
             return false
@@ -304,13 +313,14 @@ OnInit.final("ShopServiceDialogs", function(Require)
     open_restoration_ready = function(pid, slot)
         local item = PotionService.getStored(pid, slot)
         if not item then return false end
-        local quote = PotionBrewingService.quote(pid, slot, "reroll", 0)
+        local category = PotionService.getRerollCategory(item)
+        if not category then return open_reroll_category(pid, slot) end
+        local quote = PotionBrewingService.quote(pid, slot, "reroll", category)
         local label = "Reroll Again (" .. quote.price .. " Gold"
         if not quote.available then label = label .. " - NOT ENOUGH" end
         label = label .. ")"
-        local current = PotionService.getRestorationRollResult(item)
         local dialog = DialogWindow.create(pid,
-            current and ("Current: " .. current.text) or "Reroll flask properties",
+            "Reroll " .. PotionService.REROLL_CATEGORY_NAMES[category],
             restoration_ready_action, "potion-reroll-loop")
         dialog:addButton(label, slot, BlzGetItemIconPath(item.obj))
         return dialog:display()
@@ -320,8 +330,8 @@ OnInit.final("ShopServiceDialogs", function(Require)
         local pid = dialog.pid
         dialog:destroy()
         if data.action == "accept" then
-            local quote = PotionBrewingService.acceptRestoration(
-                              pid, data.slot, data.attempt, data.mode)
+            local quote = PotionBrewingService.acceptReroll(
+                              pid, data.slot, data.attempt, data.option)
             if not quote.available then
                 failure(pid, quote.reason)
                 return open_restoration_ready(pid, data.slot)
@@ -329,11 +339,11 @@ OnInit.final("ShopServiceDialogs", function(Require)
             announce_reroll(pid, quote)
             return open_restoration_ready(pid, data.slot)
         elseif data.action == "keep" then
-            PotionBrewingService.rejectRestoration(pid, data.slot)
+            PotionBrewingService.rejectReroll(pid, data.slot)
             return open_restoration_ready(pid, data.slot)
         end
         if not restoration_roll_again(pid, data.slot, true) then
-            local pending = PotionService.getPendingRestorationReroll(
+            local pending = PotionService.getPendingReroll(
                                 PotionService.getStored(pid, data.slot))
             if pending then
                 return open_restoration_choices(pid, data.slot, pending)
@@ -346,19 +356,27 @@ OnInit.final("ShopServiceDialogs", function(Require)
     open_restoration_choices = function(pid, slot, options)
         local item = PotionService.getStored(pid, slot)
         if not item or not options then return false end
-        local dialog = DialogWindow.create(pid, "Choose a restoration result",
+        local category_name = options[1].category_name or "Reroll"
+        local dialog = DialogWindow.create(pid, category_name .. " Results",
                                            restoration_choice,
                                            "potion-reroll-options")
         for _, option in ipairs(options) do
-            dialog:addButton(option.mode_name .. ": " .. option.text, {
+            local prefix = option.mode_name or ("Option " .. option.option)
+            dialog:addButton(prefix .. ": " .. option.text, {
                 action = "accept",
                 slot = slot,
                 attempt = option.attempt,
-                mode = option.mode
-            }, BlzGetItemIconPath(item.obj))
+                option = option.option
+            })
         end
         dialog:addButton("Keep Current", {action = "keep", slot = slot})
-        local quote = PotionBrewingService.quote(pid, slot, "reroll", 0)
+        local category = PotionService.getRerollCategory(item)
+        if not category then
+            dialog:destroy()
+            return false
+        end
+        local quote = PotionBrewingService.quote(
+                          pid, slot, "reroll", category)
         local reroll_label = "Reroll Again (" .. quote.price .. " Gold"
         if not quote.available then reroll_label = reroll_label .. " - NOT ENOUGH" end
         dialog:addButton(reroll_label .. ")", {
@@ -368,17 +386,43 @@ OnInit.final("ShopServiceDialogs", function(Require)
         return dialog:display()
     end
 
+    local function reroll_category_choice(dialog, _, data)
+        local pid = dialog.pid
+        dialog:destroy()
+        return confirm_brewing(pid, data)
+    end
+
+    open_reroll_category = function(pid, slot)
+        local item = PotionService.getStored(pid, slot)
+        if not item then return false end
+        local dialog = DialogWindow.create(pid, "Choose a permanent property",
+                                           reroll_category_choice,
+                                           "potion-reroll-category")
+        for category = PotionService.REROLL_RESTORATION,
+            PotionService.REROLL_PREFIX do
+            if PotionService.canRerollCategory(item, category) then
+                add_brewing_option(
+                    dialog, slot, "reroll", category,
+                    PotionService.REROLL_CATEGORY_NAMES[category])
+            end
+        end
+        return dialog:display()
+    end
+
     local function reroll_target(dialog, _, slot)
         local pid = dialog.pid
         dialog:destroy()
         local item = PotionService.getStored(pid, slot)
         if not item then return false end
-        if PotionService.canRerollRestoration(item) then
-            local pending = PotionService.getPendingRestorationReroll(item)
+        if PotionService.canReroll(item) then
+            local pending = PotionService.getPendingReroll(item)
             if pending then return open_restoration_choices(pid, slot, pending) end
-            return open_restoration_ready(pid, slot)
+            if PotionService.getRerollCategory(item) then
+                return open_restoration_ready(pid, slot)
+            end
+            return open_reroll_category(pid, slot)
         end
-        return open_refinement(pid, slot)
+        return false
     end
 
     local function open_reroll(pid)
@@ -387,15 +431,7 @@ OnInit.final("ShopServiceDialogs", function(Require)
                                            "potion-reroll-target")
         for _, entry in ipairs(PotionService.getStoredAll(pid)) do
             local item = entry.item
-            local refinable = PotionService.canRerollRestoration(item)
-            if not refinable then
-                for _, stat in ipairs(PotionService.ROLLABLE_STATS) do
-                    if PotionService.canRefine(item, stat) then
-                        refinable = true
-                        break
-                    end
-                end
-            end
+            local refinable = PotionService.canReroll(item)
             if refinable then
                 dialog:addButton(stored_slot_name(entry.slot) .. ": " ..
                                      GetItemName(item.obj), entry.slot,
@@ -512,7 +548,7 @@ OnInit.final("ShopServiceDialogs", function(Require)
         ShopAddOffer(shop_id, {
             key = "potion_master_reroll",
             name = "Reroll Flask",
-            tooltip = "Generate Health, Mana, and Hybrid restoration choices while rerolling maximum charges and use cooldown. You may keep the current flask; repeated rerolls cost substantially more.",
+            tooltip = "Permanently choose Restoration, Charges, Cooldown, or Prefix as this flask's reroll property. Each attempt offers deterministic choices that may be rejected; repeated rerolls cost substantially more.",
             icon = "ReplaceableTextures\\CommandButtons\\BTNStrongDrink.blp",
             categories = category,
             availability = function(pid)
