@@ -28,6 +28,9 @@ OnInit.final("Profile", function(Require)
     MAX_INVENTORY_SLOTS = 26 ---@type integer 
     BACKPACK_INDEX      = 9
     POTION_INDEX        = 7
+    STASH_COLUMNS       = 6
+    STASH_MAX_ROWS      = 6
+    MAX_STASH_SLOTS     = STASH_COLUMNS * STASH_MAX_ROWS
 
     Require('CodeGen')
     Require('TimerQueue')
@@ -775,6 +778,31 @@ OnInit.final("Profile", function(Require)
                 end
             end
 
+            for i = 1, MAX_STASH_SLOTS do
+                local itm = hero.stash[i]
+                if itm then
+                    itm.owner = p
+                    if (itm:encode_id() or 0) == 0 then
+                        DisplayTimedTextToPlayer(p, 0, 0, 30.,
+                            "Stash item in slot " .. i .. " (" ..
+                                GetObjectName(itm.id) ..
+                                ") cannot be represented by the current save format. Character was not saved.")
+                        return false
+                    end
+                    for socket_index = 1,
+                        math.min(#(itm.sockets or {}), MAX_SOCKETS) do
+                        local socket = itm.sockets[socket_index]
+                        if not socket or (socket:encode_id() or 0) == 0 then
+                            DisplayTimedTextToPlayer(p, 0, 0, 30.,
+                                "Socket " .. socket_index ..
+                                    " in stash slot " .. i ..
+                                    " cannot be represented by the current save format. Character was not saved.")
+                            return false
+                        end
+                    end
+                end
+            end
+
             hero:update_saved_items()
 
             local s = Compile(self.pid, hero:values())
@@ -861,6 +889,9 @@ OnInit.final("Profile", function(Require)
     ---@field time integer
     ---@field items Item[]
     ---@field saved_items table[]
+    ---@field stash Item[]
+    ---@field saved_stash table[]
+    ---@field stash_rows integer
     ---@field honor integer
     ---@field faction_points integer
     ---@field faction_id integer
@@ -1113,13 +1144,20 @@ OnInit.final("Profile", function(Require)
             for slot = 1, MAX_INVENTORY_SLOTS do
                 self.saved_items[slot] = snapshot_item(self.items[slot])
             end
+            for slot = 1, MAX_STASH_SLOTS do
+                self.saved_stash[slot] = snapshot_item(self.stash[slot])
+            end
         end
 
         ---@return integer item_count
         ---@return integer socket_count
+        ---@return integer stash_count
+        ---@return integer stash_socket_count
         function thistype:get_saved_item_counts()
             local item_count = 0
             local socket_count = 0
+            local stash_count = 0
+            local stash_socket_count = 0
 
             for slot = 1, MAX_INVENTORY_SLOTS do
                 local saved = self.saved_items[slot]
@@ -1129,7 +1167,16 @@ OnInit.final("Profile", function(Require)
                 end
             end
 
-            return item_count, socket_count
+            for slot = 1, MAX_STASH_SLOTS do
+                local saved = self.saved_stash[slot]
+                if saved then
+                    stash_count = stash_count + 1
+                    stash_socket_count = stash_socket_count +
+                                             #(saved.sockets or {})
+                end
+            end
+
+            return item_count, socket_count, stash_count, stash_socket_count
         end
 
         local function deserialize_item(data, index)
@@ -1274,15 +1321,37 @@ OnInit.final("Profile", function(Require)
                 end
             end
 
+            self.stash = {}
+            for slot = 1, MAX_STASH_SLOTS do
+                local itm = instantiate_item(self.saved_stash[slot])
+                self.stash[slot] = itm
+
+                if itm then
+                    itm.pid = pid
+                    itm.owner = owner
+                    itm.stash_index = slot
+                    SetItemPosition(itm.obj, 30000., 30000.)
+                    SetItemVisible(itm.obj, false)
+
+                    for i = 1, #itm.sockets do
+                        local socket = itm.sockets[i]
+                        socket.pid = pid
+                        socket.owner = owner
+                    end
+                end
+            end
+
             SetHeroXP(Hero[pid], Progression.getCumulativeXP(self.level,
                 self.experience or 0), false)
 
             if GetLocalPlayer() == owner then
-                local item_count, socket_count = self:get_saved_item_counts()
+                local item_count, socket_count, stash_count,
+                    stash_socket_count = self:get_saved_item_counts()
                 DevLog.write("PERSISTENCE", string.format(
-                    "loaded slot=%d hero=%s level=%d xp=%d items=%d sockets=%d",
+                    "loaded slot=%d hero=%s level=%d xp=%d items=%d sockets=%d stash=%d stash_sockets=%d",
                     Profile[pid].current_slot, GetObjectName(self.unit_id), self.level,
-                    self.experience or 0, item_count, socket_count))
+                    self.experience or 0, item_count, socket_count, stash_count,
+                    stash_socket_count))
             end
 
             for index = 1, #hero_loaded_actions do
@@ -1317,6 +1386,11 @@ OnInit.final("Profile", function(Require)
             end
             for faction_id = 1, 6 do
                 result[#result + 1] = (self.faction_point_balances and self.faction_point_balances[faction_id]) or 0
+            end
+            result[#result + 1] = math.max(1,
+                math.min(STASH_MAX_ROWS, self.stash_rows or 1))
+            for slot = 1, MAX_STASH_SLOTS do
+                serialize_item(result, self.stash[slot])
             end
 
             return result
@@ -1377,7 +1451,7 @@ OnInit.final("Profile", function(Require)
             local version = read_value(data, 2)
             local index = 3
 
-            if version ~= CHARACTER_SAVE_VERSION then
+            if version ~= CHARACTER_SAVE_VERSION and version ~= 2 then
                 return false, "Unsupported character save version: " .. tostring(version)
             end
 
@@ -1410,6 +1484,20 @@ OnInit.final("Profile", function(Require)
                 self.faction_point_balances[faction_id] = read_value(data, index + 11 + faction_id)
             end
 
+            self.stash_rows = 1
+            self.saved_stash = {}
+            if version >= 3 then
+                self.stash_rows = math.max(1,
+                    math.min(STASH_MAX_ROWS, read_value(data, index + 18)))
+                local stash_index = index + 19
+                for slot = 1, MAX_STASH_SLOTS do
+                    local err
+                    self.saved_stash[slot], stash_index, err =
+                        deserialize_item(data, stash_index)
+                    if err then return false, err end
+                end
+            end
+
             return true
         end
 
@@ -1418,6 +1506,9 @@ OnInit.final("Profile", function(Require)
             return setmetatable({
                 items = {},
                 saved_items = {},
+                stash = {},
+                saved_stash = {},
+                stash_rows = 1,
                 summon_essence = 0,
                 struggle_best_wave = 0,
                 struggle_claim_wave = 0,

@@ -2,6 +2,7 @@
 OnInit.final("ArchitectureTests", function(Require)
     Require('Events')
     Require('InventoryService')
+    Require('StashService')
     Require('ShopTransaction')
     Require('ShopRegistry')
     Require('TownShops')
@@ -313,7 +314,7 @@ OnInit.final("ArchitectureTests", function(Require)
         local keys = PotionService.getChaosDonorKeys()
         local prefix_keys = PotionService.getChaosDonorKeys("prefix")
         local suffix_keys = PotionService.getChaosDonorKeys("suffix")
-        if #keys ~= 11 or #prefix_keys ~= 5 or #suffix_keys ~= 6 then
+        if #keys ~= 14 or #prefix_keys ~= 8 or #suffix_keys ~= 6 then
             return false, string.format(
                 "Chaos donor pools have %d/%d/%d total/prefix/suffix entries",
                 #keys, #prefix_keys, #suffix_keys)
@@ -955,6 +956,10 @@ OnInit.final("ArchitectureTests", function(Require)
                 return false, "trailing character fields did not round-trip"
             end
 
+            -- The following compatibility checks target the older optional
+            -- character fields, so first remove the complete stash extension.
+            for _ = 1, MAX_STASH_SLOTS + 1 do current[#current] = nil end
+
             for _ = 1, 13 do current[#current] = nil end
             local before_factions = HeroData.create()
             if not before_factions:propagate(current) or
@@ -1025,6 +1030,11 @@ OnInit.final("ArchitectureTests", function(Require)
             }, {7, 8, 9})
             source.items[MAX_INVENTORY_SLOTS] =
                 saved_item(201, 202, 203, nil, {31, 32, 33, 34})
+            source.stash_rows = STASH_MAX_ROWS
+            source.stash[MAX_STASH_SLOTS] =
+                saved_item(301, 302, 303, {
+                    saved_item(311, 312, 313, nil, {41, 42})
+                }, {35, 36})
 
             local decoded = HeroData.create()
             if not decoded:propagate(source:values()) then
@@ -1051,9 +1061,34 @@ OnInit.final("ArchitectureTests", function(Require)
                 return false, "last inventory slot did not round-trip"
             end
 
-            local item_count, socket_count = decoded:get_saved_item_counts()
-            if item_count ~= 2 or socket_count ~= 2 then
+            local stash_last = decoded.saved_stash[MAX_STASH_SLOTS]
+            if decoded.stash_rows ~= STASH_MAX_ROWS or not stash_last or
+                stash_last.id ~= 301 or stash_last.stats ~= 302 or
+                stash_last.extra ~= 303 or stash_last.state[2] ~= 36 or
+                #stash_last.sockets ~= 1 or stash_last.sockets[1].id ~= 311 or
+                stash_last.sockets[1].state[2] ~= 42 then
+                return false, "last stash slot did not round-trip"
+            end
+
+            local item_count, socket_count, stash_count, stash_socket_count =
+                decoded:get_saved_item_counts()
+            if item_count ~= 2 or socket_count ~= 2 or stash_count ~= 1 or
+                stash_socket_count ~= 1 then
                 return false, "saved inventory counts are incorrect"
+            end
+            return true
+        end)
+
+    ArchitectureTests.register(
+        "stash capacity and row prices remain stable", function()
+            local hero = HeroData.create()
+            if hero.stash_rows ~= 1 or MAX_STASH_SLOTS ~= 36 or
+                StashService.getRowPrice(2) ~= 250000 or
+                StashService.getRowPrice(3) ~= 1000000 or
+                StashService.getRowPrice(4) ~= 4000000 or
+                StashService.getRowPrice(5) ~= 16000000 or
+                StashService.getRowPrice(6) ~= 64000000 then
+                return false, "stash defaults or row price curve changed"
             end
             return true
         end)

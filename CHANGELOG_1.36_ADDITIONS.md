@@ -104,8 +104,8 @@ visual cleanup are intentionally excluded.
 - Flask rerolls report their new values, with perfect and near-perfect results
   announced to all players.
 - Flask prefixes include Vampiric, Stoneblood, Tempest, Aegis, Fury, Arcane,
-  Swiftness, and Purity. Applying one requires extracting it from another flask
-  and consumes the donor.
+  Swiftness, Purity, Omniscient, Frenzied, and Phasing. Applying one requires
+  extracting it from another flask and consumes the donor.
 - Flask suffixes include:
   - **Potent:** stronger infusion effects.
   - **Lingering:** longer infusion effects.
@@ -136,6 +136,17 @@ visual cleanup are intentionally excluded.
 - Added Status Resistance, which reduces the duration of applicable negative
   effects, and Cooldown Acceleration, which makes ability cooldowns recover
   faster.
+
+## Stash Changes
+
+- Added a saveable 6-by-6 personal stash for holding flasks and other items.
+- The first six-slot row is available by default. Five additional rows can be
+  unlocked from the stash interface for progressively higher gold costs.
+- The stash may be viewed anywhere, while depositing, withdrawing, and buying
+  rows require the player's hero to be in town.
+- Inventory items can be sent directly to the stash from their right-click
+  menu. Clicking a stored item withdraws it to the first compatible backpack
+  slot.
 
 ## Item and Shop Fixes
 

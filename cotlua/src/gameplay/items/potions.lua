@@ -27,6 +27,9 @@ OnInit.final("PotionService", function(Require)
     local INFUSION_ARCANE = 6
     local INFUSION_SWIFTNESS = 7
     local INFUSION_PURITY = 8
+    local INFUSION_OMNISCIENCE = 9
+    local INFUSION_FRENZY = 10
+    local INFUSION_PHASING = 11
     local CATALYST_NONE = 0
     local CATALYST_POTENT = 1
     local CATALYST_LINGERING = 2
@@ -201,6 +204,9 @@ OnInit.final("PotionService", function(Require)
     PotionService.INFUSION_ARCANE = INFUSION_ARCANE
     PotionService.INFUSION_SWIFTNESS = INFUSION_SWIFTNESS
     PotionService.INFUSION_PURITY = INFUSION_PURITY
+    PotionService.INFUSION_OMNISCIENCE = INFUSION_OMNISCIENCE
+    PotionService.INFUSION_FRENZY = INFUSION_FRENZY
+    PotionService.INFUSION_PHASING = INFUSION_PHASING
     PotionService.CATALYST_NONE = CATALYST_NONE
     PotionService.CATALYST_POTENT = CATALYST_POTENT
     PotionService.CATALYST_LINGERING = CATALYST_LINGERING
@@ -602,6 +608,11 @@ OnInit.final("PotionService", function(Require)
             unit.ms_percent = unit.ms_percent - previous + value
         elseif field == "status_resist" then
             unit.status_resist_flat = unit.status_resist_flat - previous + value
+        elseif field == "evasion" then
+            unit.evasion = unit.evasion - previous + value
+        elseif field == "attack_speed" then
+            unit.bonus_bat = unit.bonus_bat * (1. + previous) /
+                                 (1. + value)
         end
 
         buff[field] = value
@@ -813,6 +824,76 @@ OnInit.final("PotionService", function(Require)
     })
 
     PotionService.registerInfusion({
+        id = INFUSION_OMNISCIENCE,
+        key = "omniscience",
+        name = "Omniscience Infusion",
+        affix_name = "Omniscient",
+        flavor = "Every drifting mote seems to contain a possible future.",
+        icon =
+            "ReplaceableTextures\\CommandButtons\\BTNPotionOfOmniscience.blp",
+        description = "Grants |cffffcc0015%|r Critical Chance and " ..
+            "|cffffcc0030%|r Critical Damage for |cffffcc0010 seconds|r.",
+        describe = function(multiplier, maximum_multiplier)
+            return "Grants |cffffcc00" ..
+                       effect_amount(15., multiplier, maximum_multiplier) ..
+                       "%|r Critical Chance and |cffffcc00" ..
+                       effect_amount(30., multiplier, maximum_multiplier) ..
+                       "%|r Critical Damage for |cffffcc0010 seconds|r."
+        end,
+        on_use = function(context)
+            local buff = OmniscienceFlaskBuff:add(context.hero, context.hero)
+            local unit = context.unit
+            local crit = 15. * context.potency_multiplier
+            local crit_damage = 30. * context.potency_multiplier
+            unit.cc_flat = unit.cc_flat - (buff.crit or 0.) + crit
+            unit.cd_flat = unit.cd_flat - (buff.crit_damage or 0.) +
+                               crit_damage
+            buff.crit = crit
+            buff.crit_damage = crit_damage
+            buff:duration(10. * context.duration_multiplier)
+            UnitRefreshBuff(context.hero, buff)
+        end
+    })
+
+    PotionService.registerInfusion({
+        id = INFUSION_FRENZY,
+        key = "frenzy",
+        name = "Frenzy Infusion",
+        affix_name = "Frenzied",
+        flavor = "The contents refuse to remain still, even when untouched.",
+        icon = "ReplaceableTextures\\CommandButtons\\BTNStrongDrink.blp",
+        description = "Increases attack speed by |cffffcc0025%|r for " ..
+            "|cffffcc0010 seconds|r.",
+        describe = function(multiplier, maximum_multiplier)
+            return "Increases attack speed by |cffffcc00" ..
+                       effect_amount(25., multiplier, maximum_multiplier) ..
+                       "%|r for |cffffcc0010 seconds|r."
+        end,
+        on_use = function(context)
+            apply_scaled_buff(context, FrenzyFlaskBuff, "attack_speed", 0.25,
+                              10.)
+        end
+    })
+
+    PotionService.registerInfusion({
+        id = INFUSION_PHASING,
+        key = "phasing",
+        name = "Phasing Infusion",
+        affix_name = "Phasing",
+        flavor = "Its pale surface slips out of focus whenever watched.",
+        icon = "ReplaceableTextures\\CommandButtons\\BTNInvulnerable.blp",
+        description = "Grants |cffffcc0020%|r Evasion for |cffffcc0010 seconds|r.",
+        describe = function(multiplier, maximum_multiplier)
+            return "Grants |cffffcc00" ..
+                       effect_amount(20., multiplier, maximum_multiplier) ..
+                       "%|r Evasion for |cffffcc0010 seconds|r."
+        end,
+        on_use = function(context)
+            apply_scaled_buff(context, PhasingFlaskBuff, "evasion", 20., 10.)
+        end
+    })
+
+    PotionService.registerInfusion({
         id = INFUSION_STONE,
         key = "stone",
         name = "Stone Infusion",
@@ -982,6 +1063,15 @@ OnInit.final("PotionService", function(Require)
     define_affix_donor(FIRST_DONOR_ID + 10, "accelerant_donor_flask",
                        "ReplaceableTextures\\CommandButtons\\BTNBootsOfSpeed.blp",
                        nil, CATALYST_ACCELERANT)
+    define_affix_donor(FIRST_DONOR_ID + 11, "omniscience_donor_flask",
+                       "ReplaceableTextures\\CommandButtons\\BTNPotionOfOmniscience.blp",
+                       INFUSION_OMNISCIENCE)
+    define_affix_donor(FIRST_DONOR_ID + 12, "frenzy_donor_flask",
+                       "ReplaceableTextures\\CommandButtons\\BTNStrongDrink.blp",
+                       INFUSION_FRENZY)
+    define_affix_donor(FIRST_DONOR_ID + 13, "phasing_donor_flask",
+                       "ReplaceableTextures\\CommandButtons\\BTNInvulnerable.blp",
+                       INFUSION_PHASING)
 
     ---Creates a non-faction affix donor from the Chaos boss drop pool.
     ---The optional kind remains useful for tests and future targeted rewards.

@@ -302,6 +302,65 @@ OnInit.final("BuffsItems", function(Require)
         function thistype:onApply() self.status_resist = 0. end
     end
 
+    ---@class OmniscienceFlaskBuff : Buff
+    OmniscienceFlaskBuff = Buff.new()
+    do
+        local thistype = OmniscienceFlaskBuff
+        thistype.NAME = "Omniscience Infusion"
+        thistype.ICON =
+            "ReplaceableTextures\\CommandButtons\\BTNPotionOfOmniscience.blp"
+        thistype.DESC = "This unit has +$crit% Critical Chance and +$crit_damage% Critical Damage"
+        thistype.DISPEL_TYPE = BUFF_POSITIVE
+        thistype.STACK_TYPE = BUFF_STACK_NONE
+
+        function thistype:onRemove()
+            local unit = Unit[self.target]
+            unit.cc_flat = unit.cc_flat - self.crit
+            unit.cd_flat = unit.cd_flat - self.crit_damage
+        end
+
+        function thistype:onApply()
+            self.crit = 0.
+            self.crit_damage = 0.
+        end
+    end
+
+    ---@class FrenzyFlaskBuff : Buff
+    FrenzyFlaskBuff = Buff.new()
+    do
+        local thistype = FrenzyFlaskBuff
+        thistype.NAME = "Frenzy Infusion"
+        thistype.ICON = "ReplaceableTextures\\CommandButtons\\BTNStrongDrink.blp"
+        thistype.DESC = "This unit attacks +^$attack_speed% faster"
+        thistype.DISPEL_TYPE = BUFF_POSITIVE
+        thistype.STACK_TYPE = BUFF_STACK_NONE
+
+        function thistype:onRemove()
+            Unit[self.target].bonus_bat = Unit[self.target].bonus_bat *
+                                               (1. + self.attack_speed)
+        end
+
+        function thistype:onApply() self.attack_speed = 0. end
+    end
+
+    ---@class PhasingFlaskBuff : Buff
+    PhasingFlaskBuff = Buff.new()
+    do
+        local thistype = PhasingFlaskBuff
+        thistype.NAME = "Phasing Infusion"
+        thistype.ICON =
+            "ReplaceableTextures\\CommandButtons\\BTNInvulnerable.blp"
+        thistype.DESC = "This unit has +$evasion% Evasion"
+        thistype.DISPEL_TYPE = BUFF_POSITIVE
+        thistype.STACK_TYPE = BUFF_STACK_NONE
+
+        function thistype:onRemove()
+            Unit[self.target].evasion = Unit[self.target].evasion - self.evasion
+        end
+
+        function thistype:onApply() self.evasion = 0. end
+    end
+
     ---@class IntenseFocusBuff : Buff
     IntenseFocusBuff = Buff.new()
     do

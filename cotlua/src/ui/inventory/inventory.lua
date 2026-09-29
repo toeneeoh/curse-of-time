@@ -5,6 +5,7 @@
 ]]
 OnInit.final("Inventory", function(Require)
     Require('InventoryService')
+    Require('StashService')
     Require('ItemDetails')
     Require('ItemEventRegistry')
     Require('Users')
@@ -239,7 +240,9 @@ OnInit.final("Inventory", function(Require)
         BlzFrameSetEnable(context_menu_backdrop, false)
         frame_set_visible(context_menu_backdrop, false)
         local context_buttons = {}
-        local CONTEXT_IDS = { "Equip", "Unequip", "Drop", "Sell", "Details" }
+        local CONTEXT_IDS = {
+            "Equip", "Unequip", "Drop", "Sell", "Details", "Stash"
+        }
         for i, name in ipairs(CONTEXT_IDS) do
             context_buttons[i] = SimpleButton.create(context_menu_backdrop, "inventorymenubuttons.dds", CONTEXT_BUTTON_WIDTH, CONTEXT_BUTTON_HEIGHT, FRAMEPOINT_TOPLEFT, FRAMEPOINT_TOPLEFT, 0, 0)
             context_buttons[i]:text(name)
@@ -278,6 +281,7 @@ OnInit.final("Inventory", function(Require)
         BlzFrameSetTooltip(context_buttons[3].frame, transparent_placeholder)
         BlzFrameSetTooltip(context_buttons[4].frame, cost_frame)
         BlzFrameSetTooltip(context_buttons[5].frame, transparent_placeholder)
+        BlzFrameSetTooltip(context_buttons[6].frame, transparent_placeholder)
 
         local result_messages = {
             invalid_slot = "That inventory slot is invalid.",
@@ -292,6 +296,9 @@ OnInit.final("Inventory", function(Require)
             unsellable = "That item cannot be sold.",
             stale = "Your inventory changed before the move completed.",
             destroy_failed = "That item could not be removed.",
+            stash_full = "Your unlocked stash rows are full.",
+            locked_slot = "That stash row is locked.",
+            occupied = "That stash slot is occupied.",
         }
 
         ---@param pid integer
@@ -330,6 +337,9 @@ OnInit.final("Inventory", function(Require)
                     local info = itm:info()
                     ItemDetails.show(pid, info.name, info.icon, info.description)
                 end
+            end,
+            function(pid, slot) -- STASH
+                return StashService.deposit(pid, slot)
             end,
         }
 
@@ -554,6 +564,18 @@ OnInit.final("Inventory", function(Require)
         local esc_button = SimpleButton.create(frame, "ReplaceableTextures\\CommandButtons\\BTNCancel.blp", 0.015, 0.015, FRAMEPOINT_TOPRIGHT, FRAMEPOINT_TOPRIGHT, -0.02, -0.02, onCloseButton, "Close 'I'", FRAMEPOINT_BOTTOM, FRAMEPOINT_TOP, 0., 0.01)
         RegisterHotkeyTooltip(esc_button, 5)
 
+        local function open_stash_tab()
+            local pid = GetPlayerId(GetTriggerPlayer()) + 1
+            thistype.close(pid)
+            if StashUI then StashUI.open(pid) end
+        end
+        local stash_tab = SimpleButton.create(
+            frame, "inventorymenubuttons.dds", 0.055, 0.017,
+            FRAMEPOINT_BOTTOMLEFT, FRAMEPOINT_BOTTOMLEFT, 0.02, 0.013,
+            open_stash_tab, "View your Stash", FRAMEPOINT_BOTTOM,
+            FRAMEPOINT_TOP, 0., 0.006)
+        stash_tab:text("Stash")
+
         local function send_context(pid, slot)
             -- set context asynchronously
             context[pid] = slot
@@ -644,6 +666,10 @@ OnInit.final("Inventory", function(Require)
                         end
                     end
                 end
+
+                if it and StashService.canDeposit(pid, slot.index).ok then
+                    visible_buttons[#visible_buttons + 1] = 6 -- STASH
+                end
             end
 
             -- always allow viewing details
@@ -729,7 +755,7 @@ OnInit.final("Inventory", function(Require)
             action = tonumber(action)
             slot = tonumber(slot)
 
-            if action and action >= 1 and action <= 4 and slot then
+            if action and action >= 1 and action <= 6 and action ~= 5 and slot then
                 local response = context_functions[action](pid, slot)
                 render_inventory_result(pid, response)
             end
