@@ -1471,6 +1471,14 @@
                 itm.extra[1] = 0
             end
 
+            -- Item:lvl performs the final generic tooltip rebuild. Logical
+            -- subsystems can now restore presentation that depends on saved
+            -- state (for example potion affix slots, names, and icons).
+            local runtime_definition = itm.runtime_definition
+            if runtime_definition and runtime_definition.restore_item then
+                runtime_definition.restore_item(itm)
+            end
+
             return itm
         end
 

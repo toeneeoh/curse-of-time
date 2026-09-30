@@ -529,7 +529,6 @@ OnInit.final("ArchitectureTests", function(Require)
 
             local restored = Item.decode(saved_id, saved_stats, saved_extra,
                                          saved_state)
-            PotionService.refreshItem(restored)
             local properties = PotionService.getProperties(restored)
             local customization = PotionService.getCustomization(restored)
             local valid = restored and properties and
@@ -555,6 +554,8 @@ OnInit.final("ArchitectureTests", function(Require)
                               restored.tooltip:find(
                                   customization.infusion.name .. ":", 1,
                                   true) and
+                              restored.tooltip:find("Prefix:", 1, true) and
+                              restored.tooltip:find("Suffix:", 1, true) and
                               (not customization.catalyst or
                                   restored.tooltip:find(
                                       customization.catalyst.name .. ":", 1,

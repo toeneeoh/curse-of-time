@@ -377,6 +377,7 @@ OnInit.final("PotionService", function(Require)
         spec.metadata = spec.metadata or {}
         spec.metadata.potion = behavior or {}
         spec.adjust_cached_stats = adjust_restoration_for_affixes
+        spec.restore_item = function(item) PotionService.refreshItem(item) end
         spec.append_stats = function(item, text, alt_text)
             local current = PotionService.getUseCooldown(item)
             local lower, upper = PotionService.getUseCooldownRange(item)

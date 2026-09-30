@@ -532,7 +532,7 @@ OnInit.final("ShopServiceDialogs", function(Require)
         ShopAddOffer(shop_id, {
             key = "potion_master_refill",
             name = "Refill Flasks",
-            tooltip = "Refill every flask in your inventory and backpack.",
+            tooltip = "Refill all carried flasks.",
             icon = "ReplaceableTextures\\CommandButtons\\BTNPotionGreenSmall.blp",
             categories = category,
             availability = function(pid)
@@ -548,7 +548,8 @@ OnInit.final("ShopServiceDialogs", function(Require)
         ShopAddOffer(shop_id, {
             key = "potion_master_reroll",
             name = "Reroll Flask",
-            tooltip = "Permanently choose Restoration, Charges, Cooldown, or Prefix as this flask's reroll property. Each attempt offers deterministic choices that may be rejected; repeated rerolls cost substantially more.",
+            tooltip = "Choose one flask property to reroll." ..
+                "|n|cffff0000Warning: Each flask can only reroll one property.|r",
             icon = "ReplaceableTextures\\CommandButtons\\BTNStrongDrink.blp",
             categories = category,
             availability = function(pid)
@@ -559,7 +560,8 @@ OnInit.final("ShopServiceDialogs", function(Require)
         ShopAddOffer(shop_id, {
             key = "potion_master_prefix",
             name = "Transfer Prefix",
-            tooltip = "Transfer a prefix from another flask in your inventory or backpack. The donor flask is destroyed.",
+            tooltip = "Move a prefix from one flask to another." ..
+                "|n|cffff0000The donor flask is destroyed.|r",
             icon = "ReplaceableTextures\\CommandButtons\\BTNPotionOfVampirism.blp",
             categories = category,
             availability = function(pid)
@@ -570,7 +572,8 @@ OnInit.final("ShopServiceDialogs", function(Require)
         ShopAddOffer(shop_id, {
             key = "potion_master_suffix",
             name = "Transfer Suffix",
-            tooltip = "Transfer a suffix from another flask in your inventory or backpack. The donor flask is destroyed.",
+            tooltip = "Move a suffix from one flask to another." ..
+                "|n|cffff0000The donor flask is destroyed.|r",
             icon = "ReplaceableTextures\\CommandButtons\\BTNCloudOfFog.blp",
             categories = category,
             availability = function(pid)

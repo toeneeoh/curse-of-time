@@ -19,6 +19,7 @@ OnInit.final("RuntimeItemDefinitions", function(Require)
     ---@field adjust_cached_stats? fun(item: Item): table<integer, integer>?
     ---@field append_stats? fun(item: Item, text: string[], alt_text: string[])
     ---@field initialize_item? fun(item: Item)
+    ---@field restore_item? fun(item: Item) Rebuild subsystem presentation after decode.
 
     ---@class RuntimeLogicalItemDefinition: RuntimeLogicalItemSpec
     ---@field key string
