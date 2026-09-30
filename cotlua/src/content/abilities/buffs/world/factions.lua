@@ -65,6 +65,23 @@ OnInit.final("BuffsWorldFactions", function(Require)
         thistype.DISPEL_TYPE     = BUFF_POSITIVE
         thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
         thistype.CANNOT_PURGE    = true
+
+    end
+
+    ---@class SharedStormwatchBuff : Buff
+    SharedStormwatchBuff = Buff.new()
+    do
+        local thistype = SharedStormwatchBuff
+        thistype.NAME            = "Shared Stormwise"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNMonsoon.blp"
+        thistype.DESC            = "This unit temporarily shares an ally's Stormwatch blessing"
+        thistype.DISPEL_TYPE     = BUFF_POSITIVE
+        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
+        thistype.CANNOT_PURGE    = true
+
+        function thistype:onRemove()
+            if Weather then Weather.refreshUnit(self.target) end
+        end
     end
 
     ---@class AshenVanguardBuff : Buff

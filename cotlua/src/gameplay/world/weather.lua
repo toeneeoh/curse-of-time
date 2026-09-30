@@ -413,14 +413,14 @@ OnInit.final("Weather", function(Require)
         return w
     end
 
-    local function pick_weighted_weather(time)
+    local function pick_weighted_weather(time, excluded)
         local pool = {}
         local prefix = {}
         local total = 0
 
         -- build pool of valid weathers with cumulative weights
         for id = 1, #WeatherTable do
-            if is_valid_weather(id, time) then
+            if id ~= excluded and is_valid_weather(id, time) then
                 local w = weight_for_weather(id)
                 if w > 0 then
                     pool[#pool + 1] = id
@@ -434,7 +434,7 @@ OnInit.final("Weather", function(Require)
         if #pool == 0 or total <= 0 then
             local fallback = {}
             for id = 1, #WeatherTable do
-                if is_valid_weather(id, time) then
+                if id ~= excluded and is_valid_weather(id, time) then
                     fallback[#fallback + 1] = id
                 end
             end
@@ -457,12 +457,12 @@ OnInit.final("Weather", function(Require)
         return pool[#pool]
     end
 
-    weather_periodic = function()
+    local function begin_weather_change(excluded)
         TQ:disableCallback(callback)
         local time = GetTimeOfDay()
         weather_iterations = weather_iterations + 1
 
-        local choice = pick_weighted_weather(time)
+        local choice = pick_weighted_weather(time, excluded)
 
         if DEV_ENABLED and WEATHER_OVERRIDE > 0 then
             choice = WEATHER_OVERRIDE
@@ -473,6 +473,11 @@ OnInit.final("Weather", function(Require)
 
         buff:removeAll()
         callback = TQ:callDelayed(4., grace_period, choice)
+        return choice ~= excluded
+    end
+
+    weather_periodic = function()
+        begin_weather_change(nil)
     end
 
     if DEV_ENABLED then
@@ -494,6 +499,12 @@ OnInit.final("Weather", function(Require)
     ---@return boolean
     function Weather.isHarmful(id)
         return is_bad_weather(id or CURRENT_WEATHER)
+    end
+
+    ---Immediately begins a weighted transition to a different valid weather.
+    ---@return boolean
+    function Weather.reroll()
+        return begin_weather_change(CURRENT_WEATHER)
     end
 
     ---@param action fun(weather: integer, definition: table)

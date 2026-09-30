@@ -88,7 +88,8 @@ OnInit.global("ItemHelpers", function(Require)
             or (Profile[pid] and Profile[pid].hero and Profile[pid].hero.unit_id)
         if not HERO_STATS[id] then return false end
         return BlzBitAnd(HERO_STATS[id].prof, prof) ~= 0
-            or prof == 0 or prof == PROF_SHIELD or prof == PROF_POTION
+            or prof == 0 or prof == PROF_SHIELD or prof == PROF_POTION or
+                   prof == PROF_CONSUMABLE
     end
 
     ---@type fun(id: integer, pid: integer): number

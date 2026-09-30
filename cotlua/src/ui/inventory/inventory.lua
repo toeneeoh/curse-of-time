@@ -8,6 +8,7 @@ OnInit.final("Inventory", function(Require)
     Require('StashService')
     Require('ItemDetails')
     Require('ItemEventRegistry')
+    Require('ItemUse')
     Require('Users')
     Require('Frames')
     Require('Currency')
@@ -265,7 +266,7 @@ OnInit.final("Inventory", function(Require)
         frame_set_visible(context_menu_backdrop, false)
         local context_buttons = {}
         local CONTEXT_IDS = {
-            "Equip", "Unequip", "Drop", "Sell", "Details", "Stash"
+            "Equip", "Unequip", "Drop", "Sell", "Details", "Stash", "Use"
         }
         for i, name in ipairs(CONTEXT_IDS) do
             context_buttons[i] = SimpleButton.create(context_menu_backdrop, "inventorymenubuttons.dds", CONTEXT_BUTTON_WIDTH, CONTEXT_BUTTON_HEIGHT, FRAMEPOINT_TOPLEFT, FRAMEPOINT_TOPLEFT, 0, 0)
@@ -306,6 +307,7 @@ OnInit.final("Inventory", function(Require)
         BlzFrameSetTooltip(context_buttons[4].frame, cost_frame)
         BlzFrameSetTooltip(context_buttons[5].frame, transparent_placeholder)
         BlzFrameSetTooltip(context_buttons[6].frame, transparent_placeholder)
+        BlzFrameSetTooltip(context_buttons[7].frame, transparent_placeholder)
 
         local result_messages = {
             invalid_slot = "That inventory slot is invalid.",
@@ -323,6 +325,8 @@ OnInit.final("Inventory", function(Require)
             stash_full = "Your unlocked stash rows are full.",
             locked_slot = "That stash row is locked.",
             occupied = "That stash slot is occupied.",
+            not_usable = "That item cannot be used.",
+            use_failed = "That item could not be used.",
         }
 
         ---@param pid integer
@@ -364,6 +368,9 @@ OnInit.final("Inventory", function(Require)
             end,
             function(pid, slot) -- STASH
                 return StashService.deposit(pid, slot)
+            end,
+            function(pid, slot) -- USE
+                return ItemUse.use(pid, slot)
             end,
         }
 
@@ -668,6 +675,10 @@ OnInit.final("Inventory", function(Require)
 
             -- buttons only shown to the owner
             if pid == viewing[pid] then
+                if it and ItemUse.canUse(pid, it) then
+                    visible_buttons[#visible_buttons + 1] = 7 -- USE
+                end
+
                 -- unequip logic
                 if slot.index < BACKPACK_INDEX then
                     if InventoryService.findUnequipTarget(pid, slot.index) then
@@ -789,7 +800,7 @@ OnInit.final("Inventory", function(Require)
             action = tonumber(action)
             slot = tonumber(slot)
 
-            if action and action >= 1 and action <= 6 and action ~= 5 and slot then
+            if action and action >= 1 and action <= 7 and action ~= 5 and slot then
                 local response = context_functions[action](pid, slot)
                 render_inventory_result(pid, response)
             end

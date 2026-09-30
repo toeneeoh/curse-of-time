@@ -18,6 +18,7 @@ OnInit.final("Stormwatch", function(Require)
     local QUEST_DIFF_EASY = 1
     local QUEST_DIFF_MEDIUM = 2
     local QUEST_DIFF_HARD = 3
+    local SHARED_BLESSING_DURATION = 300.
 
     local stormwatch = Faction.create(
         STORMWATCH_ID,
@@ -71,12 +72,7 @@ OnInit.final("Stormwatch", function(Require)
         end
     end)
 
-    StormwatchBuff.getEffectMultiplier = function(target, harmful)
-        local pid = GetPlayerId(GetOwningPlayer(target)) + 1
-        if pid > PLAYER_CAP or not is_member(pid) then
-            return 1.
-        end
-        local rank = Faction.getRank(Faction.getReputation(pid, STORMWATCH_ID))
+    local function rank_weather_multiplier(rank, harmful)
         if harmful then
             if rank >= 7 then return 0.65 end
             if rank >= 4 then return 0.75 end
@@ -87,11 +83,56 @@ OnInit.final("Stormwatch", function(Require)
         return 1.10
     end
 
+    StormwatchBuff.getEffectMultiplier = function(target, harmful)
+        local pid = GetPlayerId(GetOwningPlayer(target)) + 1
+        if pid > PLAYER_CAP or not is_member(pid) then return 1. end
+        local rank = Faction.getRank(Faction.getReputation(pid, STORMWATCH_ID))
+        return rank_weather_multiplier(rank, harmful)
+    end
+
     WeatherBuff.getEffectMultiplier = function(target, harmful)
         if StormwatchBuff:get(nil, target) then
             return StormwatchBuff.getEffectMultiplier(target, harmful)
         end
+        local shared = SharedStormwatchBuff:get(nil, target)
+        if shared then
+            return rank_weather_multiplier(shared.ablev or 1, harmful)
+        end
         return 1.
+    end
+
+    StormwatchServices = {}
+
+    ---Temporarily grants the buyer's current Stormwatch rank benefit to
+    ---living allied player heroes. Native Stormwatch membership takes priority.
+    function StormwatchServices.shareBlessing(pid)
+        if not is_member(pid) or not Hero[pid] then return false end
+        local rank = Faction.getRank(Faction.getReputation(pid, STORMWATCH_ID))
+        local source = Hero[pid]
+        local owner = Player(pid - 1)
+        local shared = 0
+        local user = User.first
+        while user do
+            local target = Hero[user.id]
+            if user.id ~= pid and target and UnitAlive(target) and
+                IsPlayerAlly(user.player, owner) then
+                SharedStormwatchBuff:add(source, target, rank):duration(
+                    SHARED_BLESSING_DURATION)
+                Weather.refreshUnit(target)
+                shared = shared + 1
+            end
+            user = user.next
+        end
+        DisplayTimedTextToForce(FORCE_PLAYING, 15.,
+            User[pid - 1].nameColored ..
+                " shared their Stormwatch blessing with " .. shared ..
+                " allied hero" .. (shared == 1 and "." or "es."))
+        return true
+    end
+
+    function StormwatchServices.rerollWeather(pid)
+        if not is_member(pid) then return false end
+        return Weather.reroll()
     end
 
     local EVENT_RADIUS = 2600.

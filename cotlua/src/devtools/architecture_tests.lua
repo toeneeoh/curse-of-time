@@ -55,6 +55,8 @@ OnInit.final("ArchitectureTests", function(Require)
     Require('Perks')
     Require('PotionService')
     Require('ShopServices')
+    Require('FactionConsumables')
+    Require('ItemUse')
 
     ArchitectureTests = {tests = {}}
 
@@ -303,13 +305,14 @@ OnInit.final("ArchitectureTests", function(Require)
         end
 
         local shop_ids = {'n004', 'n0P0', 'n0P1'}
+        local expected_offer_counts = {1, 3, 1}
         local restoration_ranges = {
             "10500-21000", "10500-21000", "5250-10500"
         }
         for index = 1, #shop_ids do
             local shop = ShopRegistry.get(FourCC(shop_ids[index]))
-            if not shop or #shop.offers ~= 1 then
-                return false, "Faction Shop flask offer is missing from " ..
+            if not shop or #shop.offers ~= expected_offer_counts[index] then
+                return false, "Faction Shop offers are missing from " ..
                            shop_ids[index]
             end
             if type(shop.access) ~= "function" then
@@ -332,6 +335,71 @@ OnInit.final("ArchitectureTests", function(Require)
         end
         return true
     end)
+
+    ArchitectureTests.register(
+        "direct-use faction items preserve runtime identity", function()
+            local cases = {
+                {
+                    FactionConsumables.STORMWISE_BEACON_KEY,
+                    "Stormwise Beacon", "Shares your current Stormwatch blessing"
+                }, {
+                    FactionConsumables.GOBLIN_SPACE_LASER_KEY,
+                    "Goblin Space Laser", "Rerolls the current weather"
+                }
+            }
+
+            for index = 1, #cases do
+                local case = cases[index]
+                local item = RuntimeItemDefinitions.create(case[1], 30000.,
+                                                           30000.)
+                if not item then
+                    return false, "could not create " .. case[1]
+                end
+                local saved_id = item:encode_id()
+                local saved_stats = item:encode_stats()
+                local saved_extra = item:encode_extra()
+                local saved_state = item:encode_state()
+                item:destroy()
+
+                local restored = Item.decode(saved_id, saved_stats,
+                                             saved_extra, saved_state)
+                local valid = restored and
+                                  RuntimeItemDefinitions.is(restored, case[1]) and
+                                  ItemUse.isUsable(restored) and
+                                  restored.type == TYPE_CONSUMABLE_INDEX and
+                                  GetItemName(restored.obj) == case[2] and
+                                  restored.tooltip:find("|cff0080c0Use:|r", 1,
+                                                        true) and
+                                  restored.tooltip:find(case[3], 1, true)
+                if restored then restored:destroy() end
+                if not valid then
+                    return false, case[1] ..
+                               " did not retain its direct-use presentation"
+                end
+            end
+
+            local basic = ItemRuntime.create(FourCC('I00K'), 30000., 30000.)
+            local advanced = ItemRuntime.create(FourCC('I00U'), 30000.,
+                                                30000.)
+            local chisels_are_usable = ItemUse.isUsable(basic) and
+                                           ItemUse.isUsable(advanced)
+            if basic then basic:destroy() end
+            if advanced then advanced:destroy() end
+            if not chisels_are_usable then
+                return false, "socketing chisels lack direct Use handlers"
+            end
+
+            local stormwatch_shop = ShopRegistry.get(FourCC('n0P0'))
+            local offer_keys = {}
+            for index = 1, #stormwatch_shop.offers do
+                offer_keys[stormwatch_shop.offers[index].key] = true
+            end
+            if not offer_keys.stormwatch_stormwise_beacon or
+                not offer_keys.stormwatch_goblin_space_laser then
+                return false, "Stormwatch consumable offers are missing"
+            end
+            return true
+        end)
 
     ArchitectureTests.register("Chaos affix donor flasks are saveable",
                                function()

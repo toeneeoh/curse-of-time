@@ -1,5 +1,6 @@
 OnInit.final("ItemSocketingAbilities", function(Require)
     Require("Spells")
+    Require("ItemUse")
 
     local SOCKET_ITEM_CHISEL = Spell.define('A00D')
     do
@@ -113,29 +114,26 @@ OnInit.final("ItemSocketingAbilities", function(Require)
             return false
         end
 
-        ---Shared entry point for chisel variants.
+        ---Shared entry point for equipped casts and inventory context use.
         ---A limit of 1 only accepts unsocketed targets; 3 accepts 0-2 sockets.
-        ---@param spell table
-        ---@param chisel_id string
+        ---@param pid integer
+        ---@param owner player
+        ---@param chisel Item
         ---@param socket_limit integer
-        local function cast_socket_chisel(spell, chisel_id, socket_limit)
-            local pid = spell.pid
-            local chisel = GetItemFromPlayer(pid, chisel_id)
-
-            if not chisel then
-                return
-            end
-
+        local function use_socket_chisel(pid, owner, chisel, socket_limit)
+            if not chisel or not chisel.alive then return false end
             socket_limit = math.min(socket_limit, MAX_SOCKETS)
 
             local has_target, has_socketable = get_socket_options(pid, socket_limit)
 
             if not has_target then
-                DisplayTextToPlayer(spell.owner, 0., 0., "You have no items that can receive sockets.")
-                return
+                DisplayTextToPlayer(owner, 0., 0.,
+                                    "You have no items that can receive sockets.")
+                return true
             elseif not has_socketable then
-                DisplayTextToPlayer(spell.owner, 0., 0., "You have no socketable items to use.")
-                return
+                DisplayTextToPlayer(owner, 0., 0.,
+                                    "You have no socketable items to use.")
+                return true
             end
 
             local dw = DialogWindow.create(pid, "Choose an item to socket", choose_socketable, TARGET_DIALOG_KIND)
@@ -154,15 +152,33 @@ OnInit.final("ItemSocketingAbilities", function(Require)
             if not dw:display() then
                 dw:destroy()
             end
+            return true
         end
 
         function thistype:onCast()
-            cast_socket_chisel(self, 'I00K:-1', 1)
+            local chisel = GetItemFromPlayer(self.pid, 'I00K:-1')
+            if chisel then
+                use_socket_chisel(self.pid, self.owner, chisel, 1)
+            end
         end
 
         local ADVANCED_SOCKET_ITEM_CHISEL = Spell.define('A01G')
         function ADVANCED_SOCKET_ITEM_CHISEL:onCast()
-            cast_socket_chisel(self, 'I00U:-1', 3)
+            local chisel = GetItemFromPlayer(self.pid, 'I00U:-1')
+            if chisel then
+                use_socket_chisel(self.pid, self.owner, chisel, 3)
+            end
         end
+
+        ItemUse.register('I00K', {
+            use = function(pid, chisel)
+                return use_socket_chisel(pid, Player(pid - 1), chisel, 1)
+            end
+        })
+        ItemUse.register('I00U', {
+            use = function(pid, chisel)
+                return use_socket_chisel(pid, Player(pid - 1), chisel, 3)
+            end
+        })
     end
 end, Debug and Debug.getLine())

@@ -11,6 +11,7 @@ OnInit.global("ItemSchema", function()
     PROF_STAFF = 0x200
     PROF_POTION = 0x400
     PROF_SOCKETABLE = 0x800
+    PROF_CONSUMABLE = 0x1000
 
     MAX_REINCARNATION_CHARGES = 3
     ITEM_MIN_LEVEL_VARIANCE = 8
@@ -45,7 +46,7 @@ OnInit.global("ItemSchema", function()
     PROF = {
         PROF_PLATE, PROF_FULLPLATE, PROF_LEATHER, PROF_CLOTH, PROF_SHIELD,
         PROF_HEAVY, PROF_SWORD, PROF_DAGGER, PROF_BOW, PROF_STAFF, PROF_POTION,
-        PROF_SOCKETABLE
+        PROF_SOCKETABLE, PROF_CONSUMABLE
     }
     PROF[0] = 0
 
@@ -93,12 +94,14 @@ OnInit.global("ItemSchema", function()
         "Bow",
         "Staff",
         "Potion",
-        "Socketable"
+        "Socketable",
+        "Consumable"
     }
     TYPE_ALL = 0x1FFF
     TYPE_EQUIPPABLE = 0x3FF
     TYPE_POTION = 0x400
     TYPE_POTION_INDEX = 11
+    TYPE_CONSUMABLE_INDEX = 13
 
     ITEM_MODEL = {
         FourCC('rar1'), FourCC('rar2'), FourCC('rar3'), FourCC('rar4'),

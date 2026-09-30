@@ -2,6 +2,7 @@
 
 OnInit.final("FactionShop", function(Require)
     Require('ItemHelpers')
+    Require('FactionConsumables')
     Require('PotionService')
     Require('Prices')
     Require('ShopRegistry')
@@ -9,6 +10,8 @@ OnInit.final("FactionShop", function(Require)
     local REQUIRED_LEVEL = 200
     local REQUIRED_RANK = 4
     local FLASK_PRICE = 150
+    local STORMWISE_BEACON_PRICE = 40
+    local SPACE_LASER_PRICE = 15
     local POTION_ICON =
         "ReplaceableTextures\\CommandButtons\\BTNPotionGreenSmall.blp"
 
@@ -28,7 +31,7 @@ OnInit.final("FactionShop", function(Require)
         }
     }
 
-    local function availability(pid, faction_id)
+    local function availability(pid, faction_id, required_rank)
         local hero = Hero[pid]
         if not hero then return false, "NO HERO" end
         if GetHeroLevel(hero) < REQUIRED_LEVEL then
@@ -41,8 +44,9 @@ OnInit.final("FactionShop", function(Require)
         end
 
         local rank = Faction.getRank(Faction.getReputation(pid, faction_id))
-        if rank < REQUIRED_RANK then
-            return false, "REQUIRES RANK " .. REQUIRED_RANK
+        required_rank = required_rank or REQUIRED_RANK
+        if rank < required_rank then
+            return false, "REQUIRES RANK " .. required_rank
         end
         return true
     end
@@ -88,5 +92,46 @@ OnInit.final("FactionShop", function(Require)
                 return purchase(pid, shop.potion)
             end
         })
+
+        if shop.faction_id == 2 then
+            local beacon_name, beacon_icon, beacon_tooltip =
+                FactionConsumables.getCatalogPresentation(
+                    FactionConsumables.STORMWISE_BEACON_KEY)
+            ShopAddOffer(shop.id, {
+                key = "stormwatch_stormwise_beacon",
+                name = beacon_name,
+                icon = beacon_icon,
+                tooltip = beacon_tooltip ..
+                    "|n|cffff0000Faction Rank Requirement: |r4",
+                categories = misc,
+                price = {faction = STORMWISE_BEACON_PRICE},
+                availability = function(pid)
+                    return availability(pid, shop.faction_id, 4)
+                end,
+                purchase = function(pid)
+                    return FactionConsumables.create(
+                               FactionConsumables.STORMWISE_BEACON_KEY, pid)
+                end
+            })
+            local laser_name, laser_icon, laser_tooltip =
+                FactionConsumables.getCatalogPresentation(
+                    FactionConsumables.GOBLIN_SPACE_LASER_KEY)
+            ShopAddOffer(shop.id, {
+                key = "stormwatch_goblin_space_laser",
+                name = laser_name,
+                icon = laser_icon,
+                tooltip = laser_tooltip ..
+                    "|n|cffff0000Faction Rank Requirement: |r2",
+                categories = misc,
+                price = {faction = SPACE_LASER_PRICE},
+                availability = function(pid)
+                    return availability(pid, shop.faction_id, 2)
+                end,
+                purchase = function(pid)
+                    return FactionConsumables.create(
+                               FactionConsumables.GOBLIN_SPACE_LASER_KEY, pid)
+                end
+            })
+        end
     end
 end, Debug and Debug.getLine())
