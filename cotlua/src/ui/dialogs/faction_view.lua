@@ -88,8 +88,8 @@ OnInit.final("FactionView", function(Require)
 
     local bounty_frame = BlzCreateFrameByType("FRAME", "", main, "", 0)
     BlzFrameSetPoint(bounty_frame, FRAMEPOINT_TOP, main, FRAMEPOINT_TOP,
-                     0., -0.29)
-    BlzFrameSetSize(bounty_frame, 0.215, 0.07)
+                     0., -0.124)
+    BlzFrameSetSize(bounty_frame, 0.205, 0.076)
     BlzFrameSetEnable(bounty_frame, false)
 
     local bounty_title = BlzCreateFrame("TitleText", bounty_frame, 0, 0)
@@ -440,6 +440,7 @@ OnInit.final("FactionView", function(Require)
         BlzFrameSetText(buff_blurb, "|cffffcc00" .. buff.NAME .. "|r\n\n" .. buff.DESC_FACTION)
         BlzFrameSetTextAlignment(buff_blurb, TEXT_JUSTIFY_LEFT, TEXT_JUSTIFY_CENTER)
         local show_bounty = faction.id == 3 and AshenVanguardServices ~= nil
+        BlzFrameSetVisible(bulletin_text, not show_bounty)
         BlzFrameSetVisible(bounty_frame, show_bounty)
         BlzFrameClearAllPoints(blurb)
         if show_bounty then
@@ -469,14 +470,10 @@ OnInit.final("FactionView", function(Require)
                                    " | |cff80ff80Ready at Quartermaster|r"
             end
             BlzFrameSetText(bounty_status, bounty_state)
-            BlzFrameSetPoint(blurb, FRAMEPOINT_TOP, main, FRAMEPOINT_TOP,
-                             0.01, -0.367)
-            BlzFrameSetScale(blurb, 0.78)
-        else
-            BlzFrameSetPoint(blurb, FRAMEPOINT_TOP, main, FRAMEPOINT_TOP,
-                             0.01, -0.302)
-            BlzFrameSetScale(blurb, 0.9)
         end
+        BlzFrameSetPoint(blurb, FRAMEPOINT_TOP, main, FRAMEPOINT_TOP,
+                         0.01, -0.302)
+        BlzFrameSetScale(blurb, 0.9)
         BlzFrameSetText(blurb, "|cffffcc00Lifetime Faction Points:|r " .. lifetime_line
             .. (next_threshold and "\n|cffffcc00Next Rank:|r "
                 .. (next_threshold - lifetime_points) .. " Points" or "")

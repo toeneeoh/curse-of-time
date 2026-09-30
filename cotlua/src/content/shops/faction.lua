@@ -34,7 +34,7 @@ OnInit.final("FactionShop", function(Require)
             {
                 offer_key = "cave_voyagers_reinforced_pit_prop",
                 item_key = FactionConsumables.REINFORCED_PIT_PROP_KEY,
-                price = 40,
+                price = 100,
                 rank = 4,
             }, {
                 offer_key = "cave_voyagers_seismic_survey_charge",
@@ -47,12 +47,12 @@ OnInit.final("FactionShop", function(Require)
             {
                 offer_key = "stormwatch_stormwise_beacon",
                 item_key = FactionConsumables.STORMWISE_BEACON_KEY,
-                price = 40,
+                price = 100,
                 rank = 4,
             }, {
                 offer_key = "stormwatch_goblin_space_laser",
                 item_key = FactionConsumables.GOBLIN_SPACE_LASER_KEY,
-                price = 15,
+                price = 50,
                 rank = 2,
             },
         },

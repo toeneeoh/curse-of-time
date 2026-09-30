@@ -9,6 +9,13 @@ OnInit.final("ItemSocketingAbilities", function(Require)
         local TARGET_DIALOG_KIND = "socket_item_target"
         local GEM_DIALOG_KIND = "socket_item_gem"
 
+        -- Chisels are one-use inventory tools, so present them alongside the
+        -- other context-menu consumables rather than as equippable items.
+        for _, id in ipairs({ FourCC('I00K'), FourCC('I00U') }) do
+            ItemData[id][ITEM_TYPE] = TYPE_CONSUMABLE_INDEX
+            ItemData[id][ITEM_TYPE .. "fixed"] = 1
+        end
+
         ---@param itm Item?
         ---@return boolean
         local function is_socketable(itm)

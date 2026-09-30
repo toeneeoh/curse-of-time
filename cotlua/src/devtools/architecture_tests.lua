@@ -384,6 +384,7 @@ OnInit.final("ArchitectureTests", function(Require)
                                   RuntimeItemDefinitions.is(restored, case[1]) and
                                   ItemUse.isUsable(restored) and
                                   restored.type == TYPE_CONSUMABLE_INDEX and
+                                  restored.runtime_definition.data[ITEM_TIER] == 1 and
                                   GetItemName(restored.obj) == case[2] and
                                   restored.tooltip:find(
                                       "|cffff0000Faction Rank Requirement: |r" ..
@@ -404,7 +405,9 @@ OnInit.final("ArchitectureTests", function(Require)
             local advanced = ItemRuntime.create(FourCC('I00U'), 30000.,
                                                 30000.)
             local chisels_are_usable = ItemUse.isUsable(basic) and
-                                           ItemUse.isUsable(advanced)
+                                           ItemUse.isUsable(advanced) and
+                                           basic.type == TYPE_CONSUMABLE_INDEX and
+                                           advanced.type == TYPE_CONSUMABLE_INDEX
             if basic then basic:destroy() end
             if advanced then advanced:destroy() end
             if not chisels_are_usable then
@@ -424,6 +427,25 @@ OnInit.final("ArchitectureTests", function(Require)
             local ashen_shop = ShopRegistry.get(FourCC('n0P1'))
             if #cave_shop.offers ~= 3 or #ashen_shop.offers ~= 3 then
                 return false, "faction consumable shop offers are missing"
+            end
+            local expected_prices = {
+                cave_voyagers_reinforced_pit_prop = 100,
+                cave_voyagers_seismic_survey_charge = 20,
+                stormwatch_stormwise_beacon = 100,
+                stormwatch_goblin_space_laser = 50,
+            }
+            for _, shop in ipairs({ cave_shop, stormwatch_shop }) do
+                for index = 1, #shop.offers do
+                    local offer = shop.offers[index]
+                    local expected = expected_prices[offer.key]
+                    if expected and offer:getPrice(1)[FACTION] ~= expected then
+                        return false, offer.key .. " has the wrong price"
+                    end
+                    expected_prices[offer.key] = nil
+                end
+            end
+            if next(expected_prices) then
+                return false, "a priced faction consumable offer is missing"
             end
             if type(FactionMining.refreshDeposits) ~= "function" or
                 type(CaveVoyagersServices.shareBlessing) ~= "function" or

@@ -31,6 +31,8 @@ OnInit.final("FactionConsumables", function(Require)
             item_type = TYPE_CONSUMABLE_INDEX,
             faction_rank_requirement = required_rank,
             prepare_data = function(data)
+                data[ITEM_TIER] = 1
+                data[ITEM_TIER .. "fixed"] = 1
                 data[ITEM_NOCRAFT] = 1
                 data[ITEM_NOCRAFT .. "fixed"] = 1
                 data[ITEM_LIMIT] = 1

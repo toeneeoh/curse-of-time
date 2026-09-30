@@ -42,7 +42,7 @@ OnInit.final("AshenVanguard", function(Require)
         -13124.,
         AshenVanguardBuff,
         "The Ashen Vanguard hunt the most dangerous creatures unleashed by Chaos and reward those who seek varied, formidable quarry.|n|n|cffffcc00Membership, rank progress, and unspent Faction Points are saved with this character.|r",
-        "ReplaceableTextures\\CommandButtons\\BTNHarbingerHelm.blp"
+        "war3mapImported\\BTNHarbingerHelm.blp"
     )
 
     local rare_by_unit = setmetatable({}, { __mode = 'k' })

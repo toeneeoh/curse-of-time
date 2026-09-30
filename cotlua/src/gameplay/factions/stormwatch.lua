@@ -27,7 +27,7 @@ OnInit.final("Stormwatch", function(Require)
         15400.,
         StormwatchBuff,
         "The Stormwatch study the skies and turn volatile weather to their advantage.|n|n|cffffcc00Membership, rank progress, and unspent Faction Points are saved with this character.|r",
-        "ReplaceableTextures\\CommandButtons\\BTNTownWatch.blp"
+        "war3mapImported\\BTNTownWatch.blp"
     )
 
     stormwatch:addQuest(Quest.create(
