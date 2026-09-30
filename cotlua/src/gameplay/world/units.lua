@@ -195,7 +195,7 @@ OnInit.final("Units", function(Require)
         -- Disable it now, then remove the handle after the current death event
         -- so later synchronous reward and quest callbacks can still inspect it.
         SetUnitPathing(killed, false)
-        RewardItem(killed)
+        RewardItem(killed, killer)
         RewardXPGold(killed, killer)
         TimerQueue:callDelayed(0., RemoveUnit, killed)
         TimerQueue:callDelayed(20.0, on_respawn, uid, x, y, CHAOS_MODE, on_death)

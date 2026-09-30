@@ -168,8 +168,9 @@ OnInit.global("StatSchema", function(Require)
             priority = 3,
             suffix = "%"
         },
-        [HERO_TIME] = {tag = "|cff808000Hero Time Played|r", priority = 3},
-        [PLAYER_TIME] = {tag = "|cff808000Total Time Played|r", priority = 3},
+        -- Playtime is profile metadata and is rendered on the Profile tab.
+        [HERO_TIME] = {tag = "|cff808000Hero Time Played|r", priority = 4},
+        [PLAYER_TIME] = {tag = "|cff808000Total Time Played|r", priority = 4},
         [STATUS_RESISTANCE] = {
             tag = "|cff66ccffStatus Resistance|r",
             priority = 2,
@@ -180,6 +181,16 @@ OnInit.global("StatSchema", function(Require)
             tag = "|cffcc99ffCooldown Acceleration|r",
             priority = 2,
             suffix = " sec/sec"
+        },
+        [DROP_RATE] = {
+            tag = "|cffffcc00Drop Rate|r",
+            priority = 3,
+            suffix = "%"
+        },
+        [BOSS_DROP_RATE] = {
+            tag = "|cffff8040Boss Drop Rate|r",
+            priority = 3,
+            suffix = "%"
         }
     }
 end, Debug and Debug.getLine())

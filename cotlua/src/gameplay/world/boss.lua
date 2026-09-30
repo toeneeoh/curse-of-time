@@ -425,7 +425,7 @@ OnInit.final("Boss", function(Require)
             end
         end
 
-        ---@type fun(boss: table, chance: integer, x: number, y: number)
+        ---@type fun(boss: table, chance: number, x: number, y: number)
         local function boss_drop(boss, chance, x, y)
             for _ = 1, boss.difficulty do
                 if random(0, 99) < chance then
@@ -435,20 +435,42 @@ OnInit.final("Boss", function(Require)
             end
         end
 
+        local function boss_drop_multiplier(boss, x, y)
+            local best = 1.
+            local selected_pid
+            local user = User.first
+            while user do
+                local hero = Hero[user.id]
+                if hero and UnitAlive(hero) and
+                    IsUnitInRangeXY(hero, x, y, NEARBY_BOSS_RANGE) and
+                    GetHeroLevel(hero) >= boss.level then
+                    local unit = Unit[hero]
+                    local multiplier = math.max(0., unit.drop_rate) *
+                                           math.max(0., unit.boss_drop_rate)
+                    if multiplier > best then
+                        best = multiplier
+                        selected_pid = user.id
+                    end
+                end
+                user = user.next
+            end
+            if selected_pid and AshenVanguardServices then
+                AshenVanguardServices.consumeBountyForBoss(selected_pid, boss)
+            end
+            return best
+        end
+
         function thistype:reward(x, y)
             local base_chance = Rates[self.id] or 0
-            local drop_multiplier = AshenVanguardServices and
-                                        AshenVanguardServices.consumeBountyForBoss(
-                                            self, x, y) or 1.
-            local bounty_bonus = base_chance * (drop_multiplier - 1.)
+            local drop_multiplier = boss_drop_multiplier(self, x, y)
             if self.first_drop then
                 self.first_drop = false
-                boss_drop(self, base_chance + 25 + bounty_bonus, x, y)
+                boss_drop(self, (base_chance + 25) * drop_multiplier, x, y)
             else
-                boss_drop(self, base_chance + bounty_bonus, x, y)
+                boss_drop(self, base_chance * drop_multiplier, x, y)
             end
 
-            DropTable:rollColosseumTicket(x, y, 0.05)
+            DropTable:rollColosseumTicket(x, y, 0.05 * drop_multiplier)
 
             -- Chaos bosses exclusively supply transferable generic affixes.
             -- The legendary two-slot base uses a separate, Jah-like rare roll.

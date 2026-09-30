@@ -206,6 +206,12 @@ OnInit.final("StatValues", function(Require)
     STAT_TAG[COOLDOWN_ACCELERATION].getter = function(u)
         return format("%.2f", Unit[u].cooldown_acceleration)
     end
+    STAT_TAG[DROP_RATE].getter = function(u)
+        return format("%.0f", Unit[u].drop_rate * 100.)
+    end
+    STAT_TAG[BOSS_DROP_RATE].getter = function(u)
+        return format("%.0f", Unit[u].boss_drop_rate * 100.)
+    end
     STAT_TAG[HERO_TIME].getter = function(u)
         local pid = GetPlayerId(GetOwningPlayer(u)) + 1
         return (Profile[pid].hero.time // 60) .. " hours and " ..

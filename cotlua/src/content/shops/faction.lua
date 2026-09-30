@@ -62,6 +62,11 @@ OnInit.final("FactionShop", function(Require)
                 item_key = FactionConsumables.CAMPAIGN_STANDARD_KEY,
                 price = 40,
                 rank = 4,
+            }, {
+                offer_key = "ashen_vanguard_bounty",
+                item_key = FactionConsumables.VANGUARD_BOUNTY_KEY,
+                price = 150,
+                rank = 4,
             },
         },
     }
@@ -146,39 +151,6 @@ OnInit.final("FactionShop", function(Require)
                 purchase = function(pid)
                     return FactionConsumables.create(offer.item_key, pid)
                 end
-            })
-        end
-
-        if shop.faction_id == 3 then
-            ShopAddOffer(shop.id, {
-                key = "ashen_vanguard_bounty",
-                name = "Vanguard Bounty",
-                icon = "ReplaceableTextures\\CommandButtons\\BTNMarkOfFire.blp",
-                tooltip = "|cff0080c0Service:|r Stores a lobby-wide bounty. The next eligible Chaos boss defeated while an Ashen Vanguard member is present gains 25% increased equipment and Chaos flask drop chances. Stores up to 3."
-                    .. "|n|cffff0000Faction Rank Requirement: |r4"
-                    .. "|n|cffffcc00Hunt Renown Requirement:|r 12"
-                    .. "|n|cff808080Lobby progress resets when the lobby ends.|r",
-                categories = misc,
-                price = {faction = 150},
-                availability = function(pid)
-                    local available, reason = availability(pid, 3, 4)
-                    if not available then return false, reason end
-                    if not AshenVanguardServices then
-                        return false, "SERVICE UNAVAILABLE"
-                    end
-                    return AshenVanguardServices.canPurchaseBounty(pid)
-                end,
-                purchase = function(pid)
-                    return AshenVanguardServices and
-                               AshenVanguardServices.purchaseBounty(pid) or
-                               false
-                end,
-                cooldown = function()
-                    if not AshenVanguardServices then return 0., 900. end
-                    local _, _, _, _, remaining, total =
-                        AshenVanguardServices.getBountyState()
-                    return remaining, total
-                end,
             })
         end
     end

@@ -10,6 +10,7 @@
     Require('PerkTree')
     Require('Faction')
     Require('TimerQueue')
+    Require('TeleportAbilities')
 
     ---@class STAT_WINDOW
     ---@field display function
@@ -51,7 +52,9 @@
         gold_rate = ITEM_GOLD_GAIN,
         xp_rate = XP_RATE,
         status_resist_flat = STATUS_RESISTANCE,
-        cooldown_acceleration = COOLDOWN_ACCELERATION
+        cooldown_acceleration = COOLDOWN_ACCELERATION,
+        drop_rate = DROP_RATE,
+        boss_drop_rate = BOSS_DROP_RATE
     }
 
     local function owner_pid(u) return GetPlayerId(GetOwningPlayer(u)) + 1 end
@@ -64,6 +67,12 @@
     end
 
     local difficulty_names = {"Easy", "Medium", "Hard"}
+
+    local function format_profile_time(minutes)
+        minutes = minutes or 0
+        return (minutes // 60) .. " hours and " ..
+                   ModuloInteger(minutes, 60) .. " minutes"
+    end
 
     local tab_tags = {
         ST, {
@@ -127,6 +136,44 @@
                     end
                     return IsCurrencyConverterEnabled(pid) and "Enabled" or
                                "Disabled"
+                end
+            }, {
+                tag = "|cff808000Hero Time Played|r",
+                priority = 1,
+                getter = function(u)
+                    return format_profile_time(Profile[owner_pid(u)].hero.time)
+                end
+            }, {
+                tag = "|cff808000Total Time Played|r",
+                priority = 1,
+                getter = function(u)
+                    return format_profile_time(Profile[owner_pid(u)].total_time)
+                end
+            }, {
+                tag = "|cff80c0ffTeleport Level|r",
+                priority = 1,
+                getter = function(u)
+                    local pid = owner_pid(u)
+                    local backpack = Backpack[pid]
+                    return backpack and
+                               GetUnitAbilityLevel(backpack, TELEPORT_HOME.id) or
+                               (Profile[pid].hero.teleport or 1)
+                end
+            }, {
+                tag = "|cff80c0ffReveal Level|r",
+                priority = 1,
+                getter = function(u)
+                    local pid = owner_pid(u)
+                    local backpack = Backpack[pid]
+                    return backpack and
+                               GetUnitAbilityLevel(backpack, FourCC('A0FK')) or
+                               (Profile[pid].hero.reveal or 1)
+                end
+            }, {
+                tag = "|cffff8040Max Struggle Wave|r",
+                priority = 1,
+                getter = function(u)
+                    return Profile[owner_pid(u)].hero.struggle_best_wave or 0
                 end
             }
         }, {
@@ -283,7 +330,7 @@
     BlzFrameSetLevel(frame, 20)
 
     local MAX_ROWS = 32
-    local CURRENCY_TAB = 2
+    local PROFILE_TAB = 2
     local PERKS_TAB = 3
     local HONOR_TAB = 4
     local FACTION_TAB = 5
@@ -384,7 +431,7 @@
                                  FRAMEPOINT_TOPLEFT, 0.205, y)
             end
 
-            if page == CURRENCY_TAB then
+            if page == PROFILE_TAB then
                 BlzFrameClearAllPoints(slot.val)
                 BlzFrameSetPoint(slot.val, FRAMEPOINT_TOPLEFT, frame,
                                  FRAMEPOINT_TOPLEFT, 0.17, y)
@@ -602,7 +649,7 @@
                                                        FRAMEPOINT_TOPLEFT,
                                                        FRAMEPOINT_TOPLEFT,
                                                        0.042, -0.0125, nil,
-                                                       "View Currency",
+                                                       "View Profile",
                                                        FRAMEPOINT_BOTTOM,
                                                        FRAMEPOINT_TOP, 0., 0.01),
         SimpleButton.create(tab_frame,
@@ -993,7 +1040,7 @@
         local pid = GetPlayerId(GetLocalPlayer()) + 1
         local selected = viewing[pid].unit
         if selected and
-            (viewing[pid].page == HONOR_TAB or viewing[pid].page == CURRENCY_TAB) and
+            (viewing[pid].page == HONOR_TAB or viewing[pid].page == PROFILE_TAB) and
             GetPlayerId(GetOwningPlayer(selected)) + 1 == changed_pid then
             STAT_WINDOW.refresh(pid)
         end
@@ -1002,7 +1049,7 @@
     RegisterCurrencyChangedAction(function(changed_pid)
         local pid = GetPlayerId(GetLocalPlayer()) + 1
         local selected = viewing[pid].unit
-        if selected and viewing[pid].page == CURRENCY_TAB and
+        if selected and viewing[pid].page == PROFILE_TAB and
             GetPlayerId(GetOwningPlayer(selected)) + 1 == changed_pid then
             STAT_WINDOW.refresh(pid)
         end
@@ -1012,7 +1059,7 @@
         function(changed_pid)
             local pid = GetPlayerId(GetLocalPlayer()) + 1
             local selected = viewing[pid].unit
-            if selected and viewing[pid].page == CURRENCY_TAB and
+            if selected and viewing[pid].page == PROFILE_TAB and
                 GetPlayerId(GetOwningPlayer(selected)) + 1 == changed_pid then
                 STAT_WINDOW.refresh(pid)
             end

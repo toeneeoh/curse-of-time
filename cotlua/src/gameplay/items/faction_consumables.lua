@@ -9,6 +9,7 @@ OnInit.final("FactionConsumables", function(Require)
     local REINFORCED_PIT_PROP_KEY = "reinforced_pit_prop"
     local SEISMIC_SURVEY_CHARGE_KEY = "seismic_survey_charge"
     local CAMPAIGN_STANDARD_KEY = "campaign_standard"
+    local VANGUARD_BOUNTY_KEY = "vanguard_bounty"
 
     FactionConsumables.STORMWISE_BEACON_KEY = STORMWISE_BEACON_KEY
     FactionConsumables.GOBLIN_SPACE_LASER_KEY = GOBLIN_SPACE_LASER_KEY
@@ -16,6 +17,7 @@ OnInit.final("FactionConsumables", function(Require)
     FactionConsumables.SEISMIC_SURVEY_CHARGE_KEY =
         SEISMIC_SURVEY_CHARGE_KEY
     FactionConsumables.CAMPAIGN_STANDARD_KEY = CAMPAIGN_STANDARD_KEY
+    FactionConsumables.VANGUARD_BOUNTY_KEY = VANGUARD_BOUNTY_KEY
     local definitions = {}
 
     local function define(key, id, name, icon, world_skin, required_rank,
@@ -71,6 +73,12 @@ OnInit.final("FactionConsumables", function(Require)
            4, "Rallying Standard",
            "Shares your current Ashen Vanguard blessing with allied heroes for |cffffcc005 minutes|r.",
            "Its scars recount victories more faithfully than any ledger.")
+    define(VANGUARD_BOUNTY_KEY, 105, "Vanguard Bounty",
+           "ReplaceableTextures\\CommandButtons\\BTNMarkOfFire.blp",
+           FourCC('flag'),
+           4, "Marked Quarry",
+           "Increases your |cffff8040Boss Drop Rate|r by |cffffcc0025%|r until the next eligible boss is slain while you are nearby.",
+           "The Vanguard's seal promises richer spoils to whoever claims its mark.")
 
     local function register(key, action)
         ItemUse.registerRuntime(key, {
@@ -100,6 +108,25 @@ OnInit.final("FactionConsumables", function(Require)
         return AshenVanguardServices and
                    AshenVanguardServices.shareBlessing(pid)
     end)
+    ItemUse.registerRuntime(VANGUARD_BOUNTY_KEY, {
+        available = function(pid)
+            if not AshenVanguardServices then
+                return false, "The Vanguard Bounty is unavailable."
+            end
+            if AshenVanguardServices.hasBounty(pid) then
+                return false, "You already have an active Vanguard Bounty."
+            end
+            return true
+        end,
+        use = function(pid, item)
+            if not AshenVanguardServices or
+                not AshenVanguardServices.armBounty(pid) then
+                return false
+            end
+            item:destroy()
+            return true
+        end
+    })
 
     function FactionConsumables.create(key, pid)
         local hero = Hero[pid]

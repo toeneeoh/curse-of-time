@@ -100,6 +100,8 @@
     ---@field status_resist_flat number Status resistance in percentage points.
     ---@field status_resist number Clamped status resistance multiplier.
     ---@field cooldown_acceleration number Additional cooldown seconds recovered per second.
+    ---@field drop_rate number General item-drop multiplier.
+    ---@field boss_drop_rate number Additional boss-specific drop multiplier.
     ---@field overworld_base_hp number
     ---@field overworld_base_bonus_hp number
     ---@field overworld_base_dm number
@@ -505,7 +507,9 @@
             xp_rate = 0,
             status_resist_flat = 0.,
             status_resist = 0.,
-            cooldown_acceleration = 0.
+            cooldown_acceleration = 0.,
+            drop_rate = 1.,
+            boss_drop_rate = 1.
         }
         base_proxy.__index = base_proxy
 

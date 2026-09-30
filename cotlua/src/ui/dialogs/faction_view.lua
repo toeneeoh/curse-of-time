@@ -57,7 +57,7 @@ OnInit.final("FactionView", function(Require)
     BlzFrameSetSize(bulletin_text, 0.185, 0.058)
     BlzFrameSetTextAlignment(bulletin_text, TEXT_JUSTIFY_CENTER,
                              TEXT_JUSTIFY_MIDDLE)
-    BlzFrameSetScale(bulletin_text, 0.82)
+    BlzFrameSetScale(bulletin_text, 0.95)
     BlzFrameSetEnable(bulletin_text, false)
 
     local rank_icon = SimpleButton.create(
@@ -96,38 +96,13 @@ OnInit.final("FactionView", function(Require)
     BlzFrameSetEnable(bounty_title, false)
     BlzFrameSetText(bounty_title, "|cffffcc00Vanguard Bounty|r")
 
-    local bounty_bar_backdrop = BlzCreateFrame(
-        "EscMenuControlBackdropTemplate", bounty_frame, 0, 0)
-    BlzFrameSetPoint(bounty_bar_backdrop, FRAMEPOINT_TOP, bounty_frame,
-                     FRAMEPOINT_TOP, 0., -0.021)
-    BlzFrameSetSize(bounty_bar_backdrop, 0.19, 0.022)
-    BlzFrameSetEnable(bounty_bar_backdrop, false)
-    local bounty_bar = BlzCreateFrameByType("SIMPLESTATUSBAR", "",
-                                            bounty_bar_backdrop, "", 0)
-    BlzFrameSetPoint(bounty_bar, FRAMEPOINT_TOPLEFT, bounty_bar_backdrop,
-                     FRAMEPOINT_TOPLEFT, 0.004, -0.004)
-    BlzFrameSetPoint(bounty_bar, FRAMEPOINT_BOTTOMRIGHT, bounty_bar_backdrop,
-                     FRAMEPOINT_BOTTOMRIGHT, -0.004, 0.004)
-    BlzFrameSetTexture(bounty_bar,
-                       "ui\\feedback\\xpbar\\human-bigbar-fill", 0, true)
-    BlzFrameSetMinMaxValue(bounty_bar, 0., 12.)
-    BlzFrameSetValue(bounty_bar, 0.)
-    BlzFrameSetEnable(bounty_bar, false)
-    local bounty_progress = BlzCreateFrameByType("TEXT", "",
-                                                 bounty_bar_backdrop, "", 0)
-    BlzFrameSetAllPoints(bounty_progress, bounty_bar_backdrop)
-    BlzFrameSetTextAlignment(bounty_progress, TEXT_JUSTIFY_CENTER,
-                             TEXT_JUSTIFY_MIDDLE)
-    BlzFrameSetScale(bounty_progress, 0.72)
-    BlzFrameSetEnable(bounty_progress, false)
-
     local bounty_status = BlzCreateFrameByType("TEXT", "", bounty_frame, "", 0)
-    BlzFrameSetPoint(bounty_status, FRAMEPOINT_BOTTOM, bounty_frame,
-                     FRAMEPOINT_BOTTOM, 0., 0.002)
-    BlzFrameSetSize(bounty_status, 0.21, 0.017)
+    BlzFrameSetPoint(bounty_status, FRAMEPOINT_CENTER, bounty_frame,
+                     FRAMEPOINT_CENTER, 0., -0.012)
+    BlzFrameSetSize(bounty_status, 0.2, 0.04)
     BlzFrameSetTextAlignment(bounty_status, TEXT_JUSTIFY_CENTER,
                              TEXT_JUSTIFY_MIDDLE)
-    BlzFrameSetScale(bounty_status, 0.7)
+    BlzFrameSetScale(bounty_status, 0.85)
     BlzFrameSetEnable(bounty_status, false)
     BlzFrameSetVisible(bounty_frame, false)
 
@@ -437,34 +412,15 @@ OnInit.final("FactionView", function(Require)
         BlzFrameSetText(buff_blurb, "|cffffcc00" .. buff.NAME .. "|r\n\n" .. buff.DESC_FACTION)
         BlzFrameSetTextAlignment(buff_blurb, TEXT_JUSTIFY_LEFT, TEXT_JUSTIFY_CENTER)
         local show_bounty = faction.id == 3 and AshenVanguardServices ~= nil
-        BlzFrameSetVisible(bulletin_text, not show_bounty)
+        BlzFrameSetVisible(bulletin, not show_bounty)
         BlzFrameSetVisible(bounty_frame, show_bounty)
         BlzFrameClearAllPoints(blurb)
         if show_bounty then
-            local renown, required, stacks, maximum, remaining =
-                AshenVanguardServices.getBountyState()
-            BlzFrameSetMinMaxValue(bounty_bar, 0., required)
-            BlzFrameSetValue(bounty_bar, math.min(renown, required))
-            BlzFrameSetText(bounty_progress, "Hunt Renown: " ..
-                                math.min(renown, required) .. " / " .. required)
-            local bounty_state
+            local bounty_state = "|cff808080Inactive|r|nBoss Drop Rate: 100%"
             if rank < 4 then
-                bounty_state = "Unlocks at Rank 4 | Stored: " .. stacks ..
-                                   " / " .. maximum
-            elseif stacks >= maximum then
-                bounty_state = "Stored: " .. stacks .. " / " .. maximum ..
-                                   " | |cff80ff80Full|r"
-            elseif renown < required then
-                bounty_state = "Stored: " .. stacks .. " / " .. maximum
-            elseif remaining > 0. then
-                local seconds = math.ceil(remaining)
-                bounty_state = "Stored: " .. stacks .. " / " .. maximum ..
-                                   " | Available in " ..
-                                   string.format("%d:%02d", seconds // 60,
-                                                 seconds % 60)
-            else
-                bounty_state = "Stored: " .. stacks .. " / " .. maximum ..
-                                   " | |cff80ff80Ready at Quartermaster|r"
+                bounty_state = "Unlocks at Rank 4"
+            elseif AshenVanguardServices.hasBounty(pid) then
+                bounty_state = "|cff80ff80Armed|r|nBoss Drop Rate: 125%"
             end
             BlzFrameSetText(bounty_status, bounty_state)
         end

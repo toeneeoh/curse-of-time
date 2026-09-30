@@ -144,7 +144,8 @@ OnInit.final("ArchitectureTests", function(Require)
             return false, "rawcode exports changed"
         end
         if ITEM_LEVEL ~= 1 or PLAYER_TIME ~= 44 or STATUS_RESISTANCE ~= 45 or
-            TOTAL_STATS ~= 45 or COOLDOWN_ACCELERATION ~= 46 then
+            TOTAL_STATS ~= 45 or COOLDOWN_ACCELERATION ~= 46 or
+            DROP_RATE ~= 47 or BOSS_DROP_RATE ~= 48 then
             return false, "serialized item stat indexes changed"
         end
         if #LIMIT_STRING ~= 28 or TIER_NAME[25] ~= "|cff999999Devourer|r" then
@@ -158,7 +159,9 @@ OnInit.final("ArchitectureTests", function(Require)
         end
         if STAT_TAG[ITEM_DAMAGE].syntax ~= "damage" or
             type(STAT_TAG[ITEM_DAMAGE].getter) ~= "function" or
-            type(STAT_TAG[ITEM_DAMAGE_RESIST].breakdown) ~= "function" then
+            type(STAT_TAG[ITEM_DAMAGE_RESIST].breakdown) ~= "function" or
+            type(STAT_TAG[DROP_RATE].getter) ~= "function" or
+            type(STAT_TAG[BOSS_DROP_RATE].getter) ~= "function" then
             return false, "stat schema or runtime values are unavailable"
         end
         if math.abs(Unit.calculateStatusDuration(10., 0.25) - 7.5) > 0.001 or
@@ -362,6 +365,10 @@ OnInit.final("ArchitectureTests", function(Require)
                     FactionConsumables.CAMPAIGN_STANDARD_KEY,
                     "Campaign Standard", "Rallying Standard", 4,
                     "Shares your current Ashen Vanguard blessing"
+                }, {
+                    FactionConsumables.VANGUARD_BOUNTY_KEY,
+                    "Vanguard Bounty", "Marked Quarry", 4,
+                    "Boss Drop Rate"
                 }
             }
 
@@ -433,8 +440,9 @@ OnInit.final("ArchitectureTests", function(Require)
                 cave_voyagers_seismic_survey_charge = 20,
                 stormwatch_stormwise_beacon = 100,
                 stormwatch_goblin_space_laser = 50,
+                ashen_vanguard_bounty = 150,
             }
-            for _, shop in ipairs({ cave_shop, stormwatch_shop }) do
+            for _, shop in ipairs({ cave_shop, stormwatch_shop, ashen_shop }) do
                 for index = 1, #shop.offers do
                     local offer = shop.offers[index]
                     local expected = expected_prices[offer.key]
@@ -450,20 +458,12 @@ OnInit.final("ArchitectureTests", function(Require)
             if type(FactionMining.refreshDeposits) ~= "function" or
                 type(CaveVoyagersServices.shareBlessing) ~= "function" or
                 type(AshenVanguardServices.shareBlessing) ~= "function" or
-                type(AshenVanguardServices.getBountyState) ~= "function" or
-                type(AshenVanguardServices.canPurchaseBounty) ~= "function" or
-                type(AshenVanguardServices.purchaseBounty) ~= "function" or
+                type(AshenVanguardServices.hasBounty) ~= "function" or
+                type(AshenVanguardServices.armBounty) ~= "function" or
                 type(AshenVanguardServices.consumeBountyForBoss) ~= "function" or
                 type(Faction.registerQuestCompletionAction) ~= "function" or
                 type(Faction.leaveForTesting) ~= "function" then
                 return false, "faction consumable services are unavailable"
-            end
-            local renown, required, stacks, maximum, remaining, cooldown =
-                AshenVanguardServices.getBountyState()
-            if type(renown) ~= "number" or required ~= 12 or
-                type(stacks) ~= "number" or maximum ~= 3 or
-                type(remaining) ~= "number" or cooldown ~= 900. then
-                return false, "Vanguard Bounty defaults are invalid"
             end
             local bounty_offer
             for index = 1, #ashen_shop.offers do
@@ -473,7 +473,8 @@ OnInit.final("ArchitectureTests", function(Require)
                 end
             end
             if not bounty_offer or bounty_offer:getPrice(1)[FACTION] ~= 150 or
-                type(bounty_offer.cooldown) ~= "function" then
+                bounty_offer:getName(1) ~= "Vanguard Bounty" or
+                not bounty_offer:getTooltip(1):find("Boss Drop Rate", 1, true) then
                 return false, "Vanguard Bounty shop offer is invalid"
             end
             return true

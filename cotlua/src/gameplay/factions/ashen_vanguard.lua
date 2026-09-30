@@ -29,11 +29,6 @@ OnInit.final("AshenVanguard", function(Require)
     local EVENT_REWARD = 30
     local EVENT_PRESENCE_REQUIRED = 30
     local SHARED_BLESSING_DURATION = 300.
-    local HUNT_RENOWN_REQUIRED = 12
-    local BOUNTY_MAX_STACKS = 3
-    local BOUNTY_REQUIRED_RANK = 4
-    local BOUNTY_SERVICE_COOLDOWN = 900.
-    local BOUNTY_DROP_MULTIPLIER = 1.25
 
     local ashen_vanguard = Faction.create(
         ASHEN_VANGUARD_ID,
@@ -361,7 +356,6 @@ OnInit.final("AshenVanguard", function(Require)
         return 0.05
     end
 
-    local grand_active = false
     AshenVanguardBuff.getFactionDamage = function(target)
         local pid = GetPlayerId(GetOwningPlayer(target)) + 1
         return rank_damage(Faction.getRank(
@@ -371,22 +365,6 @@ OnInit.final("AshenVanguard", function(Require)
     SharedAshenVanguardBuff.getRankDamage = rank_damage
 
     AshenVanguardServices = {}
-    local hunt_renown = 0
-    local bounty_stacks = 0
-    local bounty_cooldown ---@type integer?
-
-    local function notify_bounty_changed()
-        local user = User.first
-        while user do
-            NotifyShopActionChanged(user.id)
-            user = user.next
-        end
-    end
-
-    local function clear_bounty_cooldown()
-        bounty_cooldown = nil
-        notify_bounty_changed()
-    end
 
     function AshenVanguardServices.shareBlessing(pid)
         local success, shared = Faction.shareBlessing(
@@ -401,96 +379,36 @@ OnInit.final("AshenVanguard", function(Require)
         return true
     end
 
-    function AshenVanguardServices.getBountyState()
-        local remaining = bounty_cooldown and
-                              (TimerQueue:getRemaining(bounty_cooldown) or 0.) or
-                              0.
-        return hunt_renown, HUNT_RENOWN_REQUIRED, bounty_stacks,
-               BOUNTY_MAX_STACKS, remaining, BOUNTY_SERVICE_COOLDOWN
+    function AshenVanguardServices.hasBounty(pid)
+        local hero = Hero[pid]
+        return hero ~= nil and VanguardBountyBuff:has(nil, hero)
     end
 
-    function AshenVanguardServices.canPurchaseBounty(pid)
-        if not is_member(pid) then return false, "WRONG FACTION" end
-        local rank = Faction.getRank(
-                         Faction.getReputation(pid, ASHEN_VANGUARD_ID))
-        if rank < BOUNTY_REQUIRED_RANK then
-            return false, "REQUIRES RANK " .. BOUNTY_REQUIRED_RANK
+    function AshenVanguardServices.armBounty(pid)
+        local hero = Hero[pid]
+        if not hero or AshenVanguardServices.hasBounty(pid) then
+            return false
         end
-        if bounty_stacks >= BOUNTY_MAX_STACKS then
-            return false, "BOUNTIES FULL"
-        end
-        if hunt_renown < HUNT_RENOWN_REQUIRED then
-            return false, "REQUIRES " .. HUNT_RENOWN_REQUIRED ..
-                       " HUNT RENOWN"
-        end
-        if bounty_cooldown and
-            (TimerQueue:getRemaining(bounty_cooldown) or 0.) > 0. then
-            return false, "COOLDOWN"
-        end
+        VanguardBountyBuff:add(hero, hero)
+        DisplayTextToPlayer(Player(pid - 1), 0., 0.,
+            "|cffffcc00Vanguard Bounty armed:|r Boss Drop Rate increased until your next eligible boss kill.")
         return true
     end
 
-    function AshenVanguardServices.purchaseBounty(pid)
-        if not AshenVanguardServices.canPurchaseBounty(pid) then return false end
-        hunt_renown = hunt_renown - HUNT_RENOWN_REQUIRED
-        bounty_stacks = bounty_stacks + 1
-        bounty_cooldown = TimerQueue:callDelayed(
-                              BOUNTY_SERVICE_COOLDOWN,
-                              clear_bounty_cooldown)
-        announce(User[pid - 1].nameColored ..
-            " commissioned a |cffffcc00Vanguard Bounty|r. " ..
-            bounty_stacks .. " / " .. BOUNTY_MAX_STACKS .. " stored.",
-            bj_questCompletedSound)
-        notify_bounty_changed()
-        return true
-    end
-
-    function AshenVanguardServices.addHuntRenown(amount, contributor)
-        amount = math.max(0, math.floor(amount or 0))
-        if amount == 0 then return false end
-        hunt_renown = hunt_renown + amount
-        local progress = math.min(hunt_renown, HUNT_RENOWN_REQUIRED)
-        announce("|cffffcc00Hunt Renown:|r " .. progress .. " / " ..
-            HUNT_RENOWN_REQUIRED .. (contributor and
-            (" |cff808080(" .. contributor .. ")|r") or ""))
-        notify_bounty_changed()
-        return true
-    end
-
-    ---Consumes one lobby bounty when an eligible Ashen member is present for
-    ---a Chaos boss kill, returning the multiplier for that boss's drop rolls.
-    function AshenVanguardServices.consumeBountyForBoss(boss, x, y)
-        if not CHAOS_MODE or bounty_stacks <= 0 then return 1. end
-        local user = User.first
-        local eligible = false
-        while user do
-            local hero = Hero[user.id]
-            if is_member(user.id) and hero and UnitAlive(hero) and
-                IsUnitInRangeXY(hero, x, y, 2500.) and
-                GetHeroLevel(hero) >= boss.level then
-                eligible = true
-                break
-            end
-            user = user.next
-        end
-        if not eligible then return 1. end
-
-        bounty_stacks = bounty_stacks - 1
-        DisplayTimedTextToForce(FORCE_PLAYING, 15.,
+    ---Consumes the selected player's active bounty after its multiplier has
+    ---already been included in the boss drop calculation.
+    function AshenVanguardServices.consumeBountyForBoss(pid, boss)
+        local hero = Hero[pid]
+        local buff = hero and VanguardBountyBuff:get(nil, hero)
+        if not buff then return false end
+        buff:remove()
+        DisplayTextToPlayer(Player(pid - 1), 0., 0.,
             "|cffffcc00Vanguard Bounty claimed:|r " .. boss.name ..
-                " has improved drop rates. " .. bounty_stacks .. " / " ..
-                BOUNTY_MAX_STACKS .. " remain.")
-        notify_bounty_changed()
-        return BOUNTY_DROP_MULTIPLIER
+                " consumed your bounty.")
+        return true
     end
 
-    Faction.registerQuestCompletionAction(function(pid, faction)
-        if faction and faction.id == ASHEN_VANGUARD_ID then
-            AshenVanguardServices.addHuntRenown(
-                1, User[pid - 1].nameColored .. " completed a quest")
-        end
-    end)
-
+    local grand_active = false
     local grand_state
     local grand_timeout ---@type integer?
     local grand_presence ---@type integer?
@@ -591,10 +509,6 @@ OnInit.final("AshenVanguard", function(Require)
             end
         end
         if success then
-            if rewarded > 0 then
-                AshenVanguardServices.addHuntRenown(3,
-                                                    "Grand Hunt completed")
-            end
             announce("|cff80ff80Grand Hunt complete!|r " .. rewarded
                 .. " hunter" .. (rewarded == 1 and " was" or "s were") .. " rewarded.")
         else

@@ -4,6 +4,7 @@
     Defines item drop tables for units, adjusts rates to equalize drop chances
 ]] OnInit.final("DropTable", function(Require)
     Require('PotionService')
+    Require('UnitTable')
 
     ItemDrops = array2d(0)
     Rates = __jarray(0)
@@ -87,11 +88,11 @@
         -- pack clearing without a pity counter. Elites provide a noticeably
         -- better opportunity. Chaos affix donors and two-slot bases are kept
         -- out of ordinary enemy tables and awarded by bosses instead.
-        local function roll_prechaos_flask(level, x, y, elite)
+        local function roll_prechaos_flask(level, x, y, elite, multiplier)
             if level < 50 or level >= 200 then return false end
             local chance = elite and PRECHAOS_ELITE_FLASK_CHANCE or
                                PRECHAOS_FLASK_CHANCE
-            if math.random() >= chance then return false end
+            if math.random() >= chance * multiplier then return false end
 
             local key = PotionService.getPrechaosDropKey(level)
             if not key then return false end
@@ -110,12 +111,20 @@
             end
         end
 
-        function RewardItem(killed)
+        local function killer_drop_rate(killer)
+            if not killer then return 1. end
+            local pid = GetPlayerId(GetOwningPlayer(killer)) + 1
+            local hero = pid <= PLAYER_CAP and Hero[pid] or nil
+            return hero and math.max(0., Unit[hero].drop_rate) or 1.
+        end
+
+        function RewardItem(killed, killer)
             local uid = GetType(killed)
             local rand = math.random(0, 99)
             local x, y = GetUnitX(killed), GetUnitY(killed)
             local lvl = GetUnitLevel(killed)
-            if rand < Rates[uid] then
+            local drop_rate = killer_drop_rate(killer)
+            if rand < Rates[uid] * drop_rate then
                 ItemRuntime.create(thistype:pickItem(uid), x, y, 600.)
             end
 
@@ -123,17 +132,19 @@
             -- chaotic ore
 
             rand = math.random(0, 99)
-            if lvl > 45 and lvl < 85 and rand < (0.05 * lvl) then
+            if lvl > 45 and lvl < 85 and rand < (0.05 * lvl) * drop_rate then
                 ItemRuntime.create(FourCC('I02Q'), x, y, 600.)
-            elseif lvl > 265 and lvl < 305 and rand < (0.02 * lvl) then
+            elseif lvl > 265 and lvl < 305 and
+                rand < (0.02 * lvl) * drop_rate then
                 ItemRuntime.create(FourCC('I04Z'), x, y, 600.)
             end
 
             local ticket_chance = IsUnitType(killed, UNIT_TYPE_HERO) and
                                       COLOSSEUM_ELITE_TICKET_CHANCE or
                                       COLOSSEUM_TICKET_CHANCE
-            thistype:rollColosseumTicket(x, y, ticket_chance)
-            roll_prechaos_flask(lvl, x, y, IsUnitType(killed, UNIT_TYPE_HERO))
+            thistype:rollColosseumTicket(x, y, ticket_chance * drop_rate)
+            roll_prechaos_flask(lvl, x, y,
+                                IsUnitType(killed, UNIT_TYPE_HERO), drop_rate)
         end
 
         local id = 69 -- destructables

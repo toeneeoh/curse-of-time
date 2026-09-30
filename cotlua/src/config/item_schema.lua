@@ -40,6 +40,8 @@ OnInit.global("ItemSchema", function()
     -- Runtime-only stats follow the serialized item-stat range. They may be
     -- displayed by Stat View, but are never rolled or saved on items.
     COOLDOWN_ACCELERATION = TOTAL_STATS + 1
+    DROP_RATE = TOTAL_STATS + 2
+    BOSS_DROP_RATE = TOTAL_STATS + 3
 
     CUSTOM_ITEM_OFFSET = FourCC('I000')
 
