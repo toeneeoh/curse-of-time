@@ -75,6 +75,7 @@ OnInit.final("Faction", function(Require)
     local faction_switch_timer = {}
     local reroll_used = {}
     local rotation_completed = {}
+    local quest_completion_actions = {}
     local QUEST_REFRESH_PERIOD = 1800.
     local QUEST_REROLL_COST = 5
     local FACTION_SWITCH_COOLDOWN = 600.
@@ -135,6 +136,11 @@ OnInit.final("Faction", function(Require)
     ---@return integer?
     function Faction.getNextRankThreshold(reputation)
         return FACTION_RANK_THRESHOLDS[Faction.getRank(reputation) + 1]
+    end
+
+    ---@param action fun(pid: integer, faction: Faction, quest: Quest)
+    function Faction.registerQuestCompletionAction(action)
+        quest_completion_actions[#quest_completion_actions + 1] = action
     end
 
     ---Temporarily shares a faction's rank-scaled blessing with allied heroes
@@ -588,6 +594,9 @@ OnInit.final("Faction", function(Require)
         if view then
             view.questCompleted(pid, quest)
             view.refreshFaction(player_faction[pid], pid)
+        end
+        for index = 1, #quest_completion_actions do
+            quest_completion_actions[index](pid, player_faction[pid], quest)
         end
     end
 

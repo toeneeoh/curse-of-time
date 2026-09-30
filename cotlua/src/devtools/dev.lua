@@ -30,6 +30,7 @@
     Require('Perks')
     Require('FactionMining')
     Require('FactionEvents')
+    Require('AshenVanguard')
     Require('BalanceHarness')
     local pack, find, lower = string.pack, string.find, string.lower
     local searchable = {} ---@type boolean[]
@@ -55,6 +56,7 @@
         ["factionrep"] = "Set the active faction's lifetime Faction Points to #. usage: -factionrep [#]",
         ["mining"] = "Spawn a common, rich, or rare deposit beside your hero. usage: -mining [common|rich|rare]",
         ["factionevent"] = "Immediately start the next hourly faction event.",
+        ["huntrenown"] = "Add lobby Hunt Renown. usage: -huntrenown [#]",
         ["potion"] = "Spawn potion test drops. usage: -potion [all|legendary|donor|prefixes|suffixes|aegis|fury|arcane|swiftness|purity|omniscience|frenzy|phasing|potent|lingering|accelerant|bountiful|conserving|echoing]",
         ["lvl"] = "Set the selected hero's level to #. usage: -lvl [1-500]",
         ["str"] = "Set the selected hero's strength to #. usage: -str [#]",
@@ -316,6 +318,11 @@ modifiers:
                 DisplayTextToPlayer(p, 0., 0.,
                                     "Unable to start the faction event.")
             end
+        end,
+        ["huntrenown"] = function(p, pid, args)
+            local amount = math.max(1, S2I(args[2] or "12"))
+            AshenVanguardServices.addHuntRenown(
+                amount, User[pid - 1].nameColored .. " used a test command")
         end,
         ["potion"] = function(p, pid, args)
             local choice = lower(args[2] or "all")

@@ -308,7 +308,7 @@ OnInit.final("ArchitectureTests", function(Require)
         end
 
         local shop_ids = {'n004', 'n0P0', 'n0P1'}
-        local expected_offer_counts = {3, 3, 2}
+        local expected_offer_counts = {3, 3, 3}
         local restoration_ranges = {
             "10500-21000", "10500-21000", "5250-10500"
         }
@@ -412,13 +412,36 @@ OnInit.final("ArchitectureTests", function(Require)
             end
             local cave_shop = ShopRegistry.get(FourCC('n004'))
             local ashen_shop = ShopRegistry.get(FourCC('n0P1'))
-            if #cave_shop.offers ~= 3 or #ashen_shop.offers ~= 2 then
+            if #cave_shop.offers ~= 3 or #ashen_shop.offers ~= 3 then
                 return false, "faction consumable shop offers are missing"
             end
             if type(FactionMining.refreshDeposits) ~= "function" or
                 type(CaveVoyagersServices.shareBlessing) ~= "function" or
-                type(AshenVanguardServices.shareBlessing) ~= "function" then
+                type(AshenVanguardServices.shareBlessing) ~= "function" or
+                type(AshenVanguardServices.getBountyState) ~= "function" or
+                type(AshenVanguardServices.canPurchaseBounty) ~= "function" or
+                type(AshenVanguardServices.purchaseBounty) ~= "function" or
+                type(AshenVanguardServices.consumeBountyForBoss) ~= "function" or
+                type(Faction.registerQuestCompletionAction) ~= "function" then
                 return false, "faction consumable services are unavailable"
+            end
+            local renown, required, stacks, maximum, remaining, cooldown =
+                AshenVanguardServices.getBountyState()
+            if type(renown) ~= "number" or required ~= 12 or
+                type(stacks) ~= "number" or maximum ~= 3 or
+                type(remaining) ~= "number" or cooldown ~= 900. then
+                return false, "Vanguard Bounty defaults are invalid"
+            end
+            local bounty_offer
+            for index = 1, #ashen_shop.offers do
+                if ashen_shop.offers[index].key == "ashen_vanguard_bounty" then
+                    bounty_offer = ashen_shop.offers[index]
+                    break
+                end
+            end
+            if not bounty_offer or bounty_offer:getPrice(1)[FACTION] ~= 150 or
+                type(bounty_offer.cooldown) ~= "function" then
+                return false, "Vanguard Bounty shop offer is invalid"
             end
             return true
         end)

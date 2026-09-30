@@ -436,11 +436,16 @@ OnInit.final("Boss", function(Require)
         end
 
         function thistype:reward(x, y)
+            local base_chance = Rates[self.id] or 0
+            local drop_multiplier = AshenVanguardServices and
+                                        AshenVanguardServices.consumeBountyForBoss(
+                                            self, x, y) or 1.
+            local bounty_bonus = base_chance * (drop_multiplier - 1.)
             if self.first_drop then
                 self.first_drop = false
-                boss_drop(self, Rates[self.id] + 25, x, y)
+                boss_drop(self, base_chance + 25 + bounty_bonus, x, y)
             else
-                boss_drop(self, Rates[self.id], x, y)
+                boss_drop(self, base_chance + bounty_bonus, x, y)
             end
 
             DropTable:rollColosseumTicket(x, y, 0.05)
@@ -452,6 +457,8 @@ OnInit.final("Boss", function(Require)
                 local donor_chance, legendary_chance =
                     PotionService.getChaosBossDropChances(self.level,
                                                           self.difficulty)
+                donor_chance = donor_chance * drop_multiplier
+                legendary_chance = legendary_chance * drop_multiplier
                 if GetRandomReal(0., 1.) < donor_chance then
                     PotionService.createChaosDonor(x, y, 600.)
                 end
