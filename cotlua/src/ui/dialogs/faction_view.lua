@@ -36,17 +36,14 @@ OnInit.final("FactionView", function(Require)
     BlzFrameSetSize(blurb, 0.2, 0.075)
     BlzFrameSetScale(blurb, 0.9)
 
-    local faction_icon = SimpleButton.create(
-        main,
-        "ReplaceableTextures\\CommandButtons\\BTNMedalionOfCourage.blp",
-        0.05,
-        0.05,
-        FRAMEPOINT_TOP,
-        FRAMEPOINT_TOP,
-        0.,
-        -0.065
-    )
-    BlzFrameSetEnable(faction_icon.frame, false)
+    local faction_icon = BlzCreateFrameByType("BACKDROP", "", main, "", 0)
+    BlzFrameSetPoint(faction_icon, FRAMEPOINT_TOP, main, FRAMEPOINT_TOP,
+                     0., -0.065)
+    BlzFrameSetSize(faction_icon, 0.05, 0.05)
+    BlzFrameSetTexture(faction_icon,
+                       "ReplaceableTextures\\CommandButtons\\BTNMedalionOfCourage.blp",
+                       0, true)
+    BlzFrameSetEnable(faction_icon, false)
 
     local bulletin = BlzCreateFrame("QuestButtonDisabledBackdropTemplate",
                                     main, 0, 0)
@@ -424,7 +421,7 @@ OnInit.final("FactionView", function(Require)
             lifetime_line = lifetime_points .. " |cff80ff80(MAX)|r"
         end
         BlzFrameSetText(rank_count, "|cffffcc00" .. rank .. "|r")
-        faction_icon:icon(faction.icon)
+        BlzFrameSetTexture(faction_icon, faction.icon, 0, true)
         local faction_bulletins = bulletins[faction.id]
         local current_bulletin = bulletin_index[pid] or 1
         BlzFrameSetText(bulletin_text, faction_bulletins[
