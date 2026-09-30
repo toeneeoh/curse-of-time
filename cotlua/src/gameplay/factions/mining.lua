@@ -491,6 +491,34 @@ OnInit.final("FactionMining", function(Require)
         return true
     end
 
+    ---Relocates every currently available deposit while leaving deposits that
+    ---are already being mined in place. Outstanding respawn timers are not
+    ---changed, so the configured population cannot grow through repeated use.
+    ---@return integer|false
+    function FactionMining.refreshDeposits()
+        if not active then return false end
+        local available = {}
+        for _, deposit in pairs(deposits) do
+            if deposit.unit and not deposit.miner_pid then
+                available[#available + 1] = deposit
+            end
+        end
+        if #available == 0 then return false end
+
+        local kinds = {}
+        for index = 1, #available do
+            kinds[index] = available[index].kind
+            remove_deposit(available[index], false)
+        end
+        local refreshed = 0
+        for index = 1, #kinds do
+            if spawn_deposit(kinds[index]) then
+                refreshed = refreshed + 1
+            end
+        end
+        return refreshed > 0 and refreshed or false
+    end
+
     if DEV_ENABLED then
         ---Spawns a deposit immediately for object-data and interaction testing.
         ---@param kind "common"|"rich"|"rare"

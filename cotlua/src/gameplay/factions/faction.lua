@@ -42,6 +42,7 @@ OnInit.final("Faction", function(Require)
     ---@field desc string
     ---@field quests Quest[]
     ---@field buff Buff
+    ---@field icon string
     ---@field leader unit
     ---@field shop unit
     Faction = {}
@@ -134,6 +135,38 @@ OnInit.final("Faction", function(Require)
     ---@return integer?
     function Faction.getNextRankThreshold(reputation)
         return FACTION_RANK_THRESHOLDS[Faction.getRank(reputation) + 1]
+    end
+
+    ---Temporarily shares a faction's rank-scaled blessing with allied heroes
+    ---who do not already belong to that faction.
+    ---@param pid integer
+    ---@param faction_id integer
+    ---@param shared_buff Buff
+    ---@param duration number
+    ---@return boolean, integer
+    function Faction.shareBlessing(pid, faction_id, shared_buff, duration)
+        local faction = player_faction[pid]
+        local source = Hero[pid]
+        if not faction or faction.id ~= faction_id or not source then
+            return false, 0
+        end
+
+        local rank = Faction.getRank(Faction.getReputation(pid, faction_id))
+        local owner = Player(pid - 1)
+        local shared = 0
+        local user = User.first
+        while user do
+            local target = Hero[user.id]
+            local target_faction = player_faction[user.id]
+            if user.id ~= pid and target and UnitAlive(target) and
+                IsPlayerAlly(user.player, owner) and
+                (not target_faction or target_faction.id ~= faction_id) then
+                shared_buff:add(source, target, rank):duration(duration)
+                shared = shared + 1
+            end
+            user = user.next
+        end
+        return shared > 0, shared
     end
 
     local function refresh_faction_buff(pid, faction)
@@ -367,8 +400,9 @@ OnInit.final("Faction", function(Require)
     ---@param y number
     ---@param buff Buff
     ---@param desc string
+    ---@param icon string?
     ---@return Faction
-    function Faction.create(id, name, x, y, buff, desc)
+    function Faction.create(id, name, x, y, buff, desc, icon)
         local shop_type = faction_shop_types[id]
         local self = setmetatable({
             id = id,
@@ -378,6 +412,7 @@ OnInit.final("Faction", function(Require)
             name = name,
             quests = {},
             buff = buff,
+            icon = icon or buff.ICON,
             desc = desc,
         }, Faction)
 

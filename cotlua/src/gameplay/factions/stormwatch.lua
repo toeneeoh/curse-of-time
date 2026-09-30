@@ -26,7 +26,8 @@ OnInit.final("Stormwatch", function(Require)
         0.,
         15400.,
         StormwatchBuff,
-        "The Stormwatch study the skies and turn volatile weather to their advantage.|n|n|cffffcc00Membership, rank progress, and unspent Faction Points are saved with this character.|r"
+        "The Stormwatch study the skies and turn volatile weather to their advantage.|n|n|cffffcc00Membership, rank progress, and unspent Faction Points are saved with this character.|r",
+        "ReplaceableTextures\\CommandButtons\\BTNMonsoon.blp"
     )
 
     stormwatch:addQuest(Quest.create(
@@ -106,20 +107,16 @@ OnInit.final("Stormwatch", function(Require)
     ---Temporarily grants the buyer's current Stormwatch rank benefit to
     ---living allied player heroes. Native Stormwatch membership takes priority.
     function StormwatchServices.shareBlessing(pid)
-        if not is_member(pid) or not Hero[pid] then return false end
-        local rank = Faction.getRank(Faction.getReputation(pid, STORMWATCH_ID))
-        local source = Hero[pid]
-        local owner = Player(pid - 1)
-        local shared = 0
+        local success, shared = Faction.shareBlessing(
+                                    pid, STORMWATCH_ID,
+                                    SharedStormwatchBuff,
+                                    SHARED_BLESSING_DURATION)
+        if not success then return false end
         local user = User.first
         while user do
             local target = Hero[user.id]
-            if user.id ~= pid and target and UnitAlive(target) and
-                IsPlayerAlly(user.player, owner) then
-                SharedStormwatchBuff:add(source, target, rank):duration(
-                    SHARED_BLESSING_DURATION)
+            if target and SharedStormwatchBuff:get(nil, target) then
                 Weather.refreshUnit(target)
-                shared = shared + 1
             end
             user = user.next
         end

@@ -50,6 +50,9 @@ OnInit.final("ArchitectureTests", function(Require)
     Require('FactionView')
     Require('FactionMining')
     Require('FactionEvents')
+    Require('CaveVoyagers')
+    Require('Stormwatch')
+    Require('AshenVanguard')
     Require('DropTable')
     Require('StruggleRewards')
     Require('Perks')
@@ -305,7 +308,7 @@ OnInit.final("ArchitectureTests", function(Require)
         end
 
         local shop_ids = {'n004', 'n0P0', 'n0P1'}
-        local expected_offer_counts = {1, 3, 1}
+        local expected_offer_counts = {3, 3, 2}
         local restoration_ranges = {
             "10500-21000", "10500-21000", "5250-10500"
         }
@@ -345,6 +348,15 @@ OnInit.final("ArchitectureTests", function(Require)
                 }, {
                     FactionConsumables.GOBLIN_SPACE_LASER_KEY,
                     "Goblin Space Laser", "Rerolls the current weather"
+                }, {
+                    FactionConsumables.REINFORCED_PIT_PROP_KEY,
+                    "Reinforced Pit Prop", "Shares your current Cave Voyagers blessing"
+                }, {
+                    FactionConsumables.SEISMIC_SURVEY_CHARGE_KEY,
+                    "Seismic Survey Charge", "Relocates every unclaimed ore deposit"
+                }, {
+                    FactionConsumables.CAMPAIGN_STANDARD_KEY,
+                    "Campaign Standard", "Shares your current Ashen Vanguard blessing"
                 }
             }
 
@@ -397,6 +409,16 @@ OnInit.final("ArchitectureTests", function(Require)
             if not offer_keys.stormwatch_stormwise_beacon or
                 not offer_keys.stormwatch_goblin_space_laser then
                 return false, "Stormwatch consumable offers are missing"
+            end
+            local cave_shop = ShopRegistry.get(FourCC('n004'))
+            local ashen_shop = ShopRegistry.get(FourCC('n0P1'))
+            if #cave_shop.offers ~= 3 or #ashen_shop.offers ~= 2 then
+                return false, "faction consumable shop offers are missing"
+            end
+            if type(FactionMining.refreshDeposits) ~= "function" or
+                type(CaveVoyagersServices.shareBlessing) ~= "function" or
+                type(AshenVanguardServices.shareBlessing) ~= "function" then
+                return false, "faction consumable services are unavailable"
             end
             return true
         end)
@@ -1771,7 +1793,8 @@ OnInit.final("ArchitectureTests", function(Require)
             'HardHatBuff', 'SingleShotDebuff', 'DarkShieldBuff',
             'AstralShieldBuff', 'ProtectedExistenceBuff', 'DivineLightBuff',
             'DemonPrinceBloodlust', 'SkullBruteThunderClap', 'NagaThorns',
-            'HolyBlessing', 'Lava', 'WeatherBuff'
+            'HolyBlessing', 'Lava', 'WeatherBuff', 'SharedHardHatBuff',
+            'SharedStormwatchBuff', 'SharedAshenVanguardBuff'
         }
 
         for index = 1, #names do

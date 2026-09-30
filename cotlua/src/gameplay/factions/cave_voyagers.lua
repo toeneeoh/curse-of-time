@@ -2,20 +2,25 @@
 
 OnInit.final("CaveVoyagers", function(Require)
     Require('Faction')
+    Require('FactionMining')
     Require('BuffsWorldFactions')
+    Require('Users')
     Require('Variables')
 
+    local CAVE_VOYAGERS_ID = 1
+    local SHARED_BLESSING_DURATION = 300.
     local QUEST_DIFF_EASY = 1
     local QUEST_DIFF_MEDIUM = 2
     local QUEST_DIFF_HARD = 3
 
     local cave_voyagers = Faction.create(
-        1,
+        CAVE_VOYAGERS_ID,
         "Cave Voyagers",
         15000.,
         10500.,
         HardHatBuff,
-        "The Cave Voyagers are a mining faction that provide access to earth materials and a special defensive buff.|n|n|cffffcc00Membership, rank progress, and unspent Faction Points are saved with this character.|r|n|nWill you join us?"
+        "The Cave Voyagers are a mining faction that provide access to earth materials and a special defensive buff.|n|n|cffffcc00Membership, rank progress, and unspent Faction Points are saved with this character.|r|n|nWill you join us?",
+        "ReplaceableTextures\\CommandButtons\\BTNPickUpItem.blp"
     )
     cave_voyagers:addQuest(Quest.create(
         "Prospector's Route",
@@ -89,11 +94,44 @@ OnInit.final("CaveVoyagers", function(Require)
     ))
     cave_voyagers:addGenericQuests()
 
-    HardHatBuff.getFactionReduction = function(target)
-        local pid = GetPlayerId(GetOwningPlayer(target)) + 1
-        local rank = Faction.getRank(Faction.getReputation(pid, 1))
+    local function rank_reduction(rank)
         if rank >= 7 then return 0.15 end
         if rank >= 4 then return 0.11 end
         return 0.08
+    end
+
+    HardHatBuff.getFactionReduction = function(target)
+        local pid = GetPlayerId(GetOwningPlayer(target)) + 1
+        return rank_reduction(Faction.getRank(
+                                  Faction.getReputation(pid,
+                                                        CAVE_VOYAGERS_ID)))
+    end
+    SharedHardHatBuff.getRankReduction = rank_reduction
+
+    CaveVoyagersServices = {}
+
+    function CaveVoyagersServices.shareBlessing(pid)
+        local success, shared = Faction.shareBlessing(
+                                    pid, CAVE_VOYAGERS_ID,
+                                    SharedHardHatBuff,
+                                    SHARED_BLESSING_DURATION)
+        if not success then return false end
+        DisplayTimedTextToForce(FORCE_PLAYING, 15.,
+            User[pid - 1].nameColored ..
+                " shared their Cave Voyagers blessing with " .. shared ..
+                " allied hero" .. (shared == 1 and "." or "es."))
+        return true
+    end
+
+    function CaveVoyagersServices.rerollDeposits(pid)
+        local faction = Faction.getFaction(pid)
+        if not faction or faction.id ~= CAVE_VOYAGERS_ID then return false end
+        local refreshed = FactionMining.refreshDeposits()
+        if not refreshed then return false end
+        DisplayTimedTextToForce(FORCE_PLAYING, 15.,
+            User[pid - 1].nameColored .. " triggered a seismic survey. " ..
+                refreshed .. " unclaimed deposit" ..
+                (refreshed == 1 and " was" or "s were") .. " relocated.")
+        return true
     end
 end, Debug and Debug.getLine())

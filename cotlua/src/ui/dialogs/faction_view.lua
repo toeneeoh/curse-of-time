@@ -31,10 +31,44 @@ OnInit.final("FactionView", function(Require)
     BlzFrameSetEnable(title, false)
 
     local blurb = BlzCreateFrameByType("TEXT", "", main, "", 0)
-    BlzFrameSetPoint(blurb, FRAMEPOINT_TOP, main, FRAMEPOINT_TOP, 0.01, -0.135)
+    BlzFrameSetPoint(blurb, FRAMEPOINT_TOP, main, FRAMEPOINT_TOP, 0.01, -0.302)
     BlzFrameSetEnable(blurb, false)
-    BlzFrameSetSize(blurb, 0.19, 1.0)
-    BlzFrameSetScale(blurb, 1.1)
+    BlzFrameSetSize(blurb, 0.2, 0.075)
+    BlzFrameSetScale(blurb, 0.9)
+
+    local faction_icon = SimpleButton.create(
+        main,
+        "ReplaceableTextures\\CommandButtons\\BTNHeroPanelFactionButton.dds",
+        0.05,
+        0.05,
+        FRAMEPOINT_TOP,
+        FRAMEPOINT_TOP,
+        0.,
+        -0.065
+    )
+    BlzFrameSetEnable(faction_icon.frame, false)
+
+    local bulletin_title = BlzCreateFrame("TitleText", main, 0, 0)
+    BlzFrameSetPoint(bulletin_title, FRAMEPOINT_TOP, main, FRAMEPOINT_TOP,
+                     0., -0.124)
+    BlzFrameSetEnable(bulletin_title, false)
+    BlzFrameSetScale(bulletin_title, 0.8)
+    BlzFrameSetText(bulletin_title, "|cffffcc00Current Events|r")
+
+    local bulletin = BlzCreateFrame("QuestButtonDisabledBackdropTemplate",
+                                    main, 0, 0)
+    BlzFrameSetPoint(bulletin, FRAMEPOINT_TOP, main, FRAMEPOINT_TOP,
+                     0., -0.148)
+    BlzFrameSetSize(bulletin, 0.205, 0.076)
+    BlzFrameSetEnable(bulletin, false)
+    local bulletin_text = BlzCreateFrameByType("TEXT", "", bulletin, "", 0)
+    BlzFrameSetPoint(bulletin_text, FRAMEPOINT_CENTER, bulletin,
+                     FRAMEPOINT_CENTER, 0., 0.)
+    BlzFrameSetSize(bulletin_text, 0.185, 0.058)
+    BlzFrameSetTextAlignment(bulletin_text, TEXT_JUSTIFY_CENTER,
+                             TEXT_JUSTIFY_MIDDLE)
+    BlzFrameSetScale(bulletin_text, 0.82)
+    BlzFrameSetEnable(bulletin_text, false)
 
     local rank_icon = SimpleButton.create(
         main,
@@ -44,7 +78,7 @@ OnInit.final("FactionView", function(Require)
         FRAMEPOINT_TOP,
         FRAMEPOINT_TOP,
         0.,
-        -0.072
+        -0.244
     )
     rank_icon:makeTooltip(FRAMEPOINT_TOPLEFT, 0.2)
     rank_icon:setTooltipIcon(
@@ -58,6 +92,31 @@ OnInit.final("FactionView", function(Require)
     local rank_count = BlzCreateFrameByType("TEXT", "", rank_icon.frame, "", 0)
     BlzFrameSetAllPoints(rank_count, rank_charge)
     BlzFrameSetTextAlignment(rank_count, TEXT_JUSTIFY_CENTER, TEXT_JUSTIFY_MIDDLE)
+
+    local bulletin_index = 1
+    local bulletins = {
+        [1] = {
+            "A prospector insists the eastern tunnels are lucky. Nobody remembers which tunnels are east.",
+            "A rich vein was discovered, then misplaced somewhere in the paperwork.",
+            "The golem safety seminar has been postponed due to a golem.",
+            "Quartermaster inventory remains, officially, mostly pickaxes.",
+            "Miners report that the ominous rumbling is probably normal.",
+        },
+        [2] = {
+            "Forecast: weather, followed by additional weather.",
+            "Stormwatch denies aiming the Goblin Space Laser at the moon.",
+            "Cloud observers report one especially suspicious cloud.",
+            "Umbrella requisitions have risen for the seventh week running.",
+            "A junior watcher predicted clear skies and has been reassigned.",
+        },
+        [3] = {
+            "A Vanguard hunter claims the beast was much larger before witnesses arrived.",
+            "The quartermaster reminds recruits that trophies are not legal tender.",
+            "Another bounty board has been damaged by an enthusiastic applicant.",
+            "Scouts report dangerous quarry. Morale has improved considerably.",
+            "The Grand Hunt betting pool remains entirely unofficial.",
+        },
+    }
 
     local buff_frame = BlzCreateFrameByType("FRAME", "", main, "", 0)
     BlzFrameSetPoint(buff_frame, FRAMEPOINT_TOPRIGHT, main, FRAMEPOINT_TOPRIGHT, -0.02, 0.016)
@@ -323,6 +382,10 @@ OnInit.final("FactionView", function(Require)
             lifetime_line = lifetime_points .. " |cff80ff80(MAX)|r"
         end
         BlzFrameSetText(rank_count, "|cffffcc00" .. rank .. "|r")
+        faction_icon:icon(faction.icon)
+        local faction_bulletins = bulletins[faction.id]
+        BlzFrameSetText(bulletin_text,
+            faction_bulletins[(bulletin_index - 1) % #faction_bulletins + 1])
         rank_icon:setTooltipName("Rank " .. rank)
         rank_icon:setTooltipText(faction.name .. " Rank " .. rank .. " of "
             .. Faction.getMaxRank() .. ".\n\n|cffffcc00Lifetime Faction Points:|r "
@@ -435,6 +498,10 @@ OnInit.final("FactionView", function(Require)
             end
             user = user.next
         end
+    end)
+
+    TimerQueue:callPeriodically(12., nil, function()
+        bulletin_index = bulletin_index + 1
     end)
 
     ---@cast view FactionViewAdapter

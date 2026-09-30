@@ -6,9 +6,16 @@ OnInit.final("FactionConsumables", function(Require)
     FactionConsumables = {}
     local STORMWISE_BEACON_KEY = "stormwise_beacon"
     local GOBLIN_SPACE_LASER_KEY = "goblin_space_laser"
+    local REINFORCED_PIT_PROP_KEY = "reinforced_pit_prop"
+    local SEISMIC_SURVEY_CHARGE_KEY = "seismic_survey_charge"
+    local CAMPAIGN_STANDARD_KEY = "campaign_standard"
 
     FactionConsumables.STORMWISE_BEACON_KEY = STORMWISE_BEACON_KEY
     FactionConsumables.GOBLIN_SPACE_LASER_KEY = GOBLIN_SPACE_LASER_KEY
+    FactionConsumables.REINFORCED_PIT_PROP_KEY = REINFORCED_PIT_PROP_KEY
+    FactionConsumables.SEISMIC_SURVEY_CHARGE_KEY =
+        SEISMIC_SURVEY_CHARGE_KEY
+    FactionConsumables.CAMPAIGN_STANDARD_KEY = CAMPAIGN_STANDARD_KEY
     local definitions = {}
 
     local function define(key, id, name, icon, world_skin, description, flavor)
@@ -40,11 +47,26 @@ OnInit.final("FactionConsumables", function(Require)
            FourCC('gobm'),
            "Rerolls the current weather.",
            "The warranty insists that weather is a perfectly valid target.")
+    define(REINFORCED_PIT_PROP_KEY, 102, "Reinforced Pit Prop",
+           "ReplaceableTextures\\CommandButtons\\BTNBundleOfLumber.blp",
+           FourCC('lmbr'),
+           "Shares your current Cave Voyagers blessing with allied heroes for |cffffcc005 minutes|r.",
+           "Tested underground under conditions best described as excessive.")
+    define(SEISMIC_SURVEY_CHARGE_KEY, 103, "Seismic Survey Charge",
+           "ReplaceableTextures\\CommandButtons\\BTNEngineeringUpgrade.blp",
+           FourCC('gobm'),
+           "Relocates every unclaimed ore deposit currently in the world.",
+           "A precise instrument, provided nobody asks precise questions.")
+    define(CAMPAIGN_STANDARD_KEY, 104, "Campaign Standard",
+           "ReplaceableTextures\\CommandButtons\\BTNHumanCaptureFlag.blp",
+           FourCC('flag'),
+           "Shares your current Ashen Vanguard blessing with allied heroes for |cffffcc005 minutes|r.",
+           "Its scars recount victories more faithfully than any ledger.")
 
     local function register(key, action)
         ItemUse.registerRuntime(key, {
             use = function(pid, item)
-                if not StormwatchServices or not action(pid) then return false end
+                if not action(pid) then return false end
                 item:destroy()
                 return true
             end
@@ -52,10 +74,22 @@ OnInit.final("FactionConsumables", function(Require)
     end
 
     register(STORMWISE_BEACON_KEY, function(pid)
-        return StormwatchServices.shareBlessing(pid)
+        return StormwatchServices and StormwatchServices.shareBlessing(pid)
     end)
     register(GOBLIN_SPACE_LASER_KEY, function(pid)
-        return StormwatchServices.rerollWeather(pid)
+        return StormwatchServices and StormwatchServices.rerollWeather(pid)
+    end)
+    register(REINFORCED_PIT_PROP_KEY, function(pid)
+        return CaveVoyagersServices and
+                   CaveVoyagersServices.shareBlessing(pid)
+    end)
+    register(SEISMIC_SURVEY_CHARGE_KEY, function(pid)
+        return CaveVoyagersServices and
+                   CaveVoyagersServices.rerollDeposits(pid)
+    end)
+    register(CAMPAIGN_STANDARD_KEY, function(pid)
+        return AshenVanguardServices and
+                   AshenVanguardServices.shareBlessing(pid)
     end)
 
     function FactionConsumables.create(key, pid)

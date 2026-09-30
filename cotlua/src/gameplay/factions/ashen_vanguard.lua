@@ -27,6 +27,7 @@ OnInit.final("AshenVanguard", function(Require)
     local EVENT_TIMEOUT = 600.
     local EVENT_REWARD = 30
     local EVENT_PRESENCE_REQUIRED = 30
+    local SHARED_BLESSING_DURATION = 300.
 
     local ashen_vanguard = Faction.create(
         ASHEN_VANGUARD_ID,
@@ -34,7 +35,8 @@ OnInit.final("AshenVanguard", function(Require)
         -8800.,
         -13124.,
         AshenVanguardBuff,
-        "The Ashen Vanguard hunt the most dangerous creatures unleashed by Chaos and reward those who seek varied, formidable quarry.|n|n|cffffcc00Membership, rank progress, and unspent Faction Points are saved with this character.|r"
+        "The Ashen Vanguard hunt the most dangerous creatures unleashed by Chaos and reward those who seek varied, formidable quarry.|n|n|cffffcc00Membership, rank progress, and unspent Faction Points are saved with this character.|r",
+        "ReplaceableTextures\\CommandButtons\\BTNMarkOfFire.blp"
     )
 
     local rare_by_unit = setmetatable({}, { __mode = 'k' })
@@ -347,16 +349,36 @@ OnInit.final("AshenVanguard", function(Require)
     ))
     ashen_vanguard:addGenericQuests()
 
-    AshenVanguardBuff.getFactionDamage = function(target)
-        local pid = GetPlayerId(GetOwningPlayer(target)) + 1
-        local rank = Faction.getRank(
-            Faction.getReputation(pid, ASHEN_VANGUARD_ID))
+    local function rank_damage(rank)
         if rank >= 7 then return 0.12 end
         if rank >= 4 then return 0.08 end
         return 0.05
     end
 
     local grand_active = false
+    AshenVanguardBuff.getFactionDamage = function(target)
+        local pid = GetPlayerId(GetOwningPlayer(target)) + 1
+        return rank_damage(Faction.getRank(
+                               Faction.getReputation(pid,
+                                                     ASHEN_VANGUARD_ID)))
+    end
+    SharedAshenVanguardBuff.getRankDamage = rank_damage
+
+    AshenVanguardServices = {}
+
+    function AshenVanguardServices.shareBlessing(pid)
+        local success, shared = Faction.shareBlessing(
+                                    pid, ASHEN_VANGUARD_ID,
+                                    SharedAshenVanguardBuff,
+                                    SHARED_BLESSING_DURATION)
+        if not success then return false end
+        DisplayTimedTextToForce(FORCE_PLAYING, 15.,
+            User[pid - 1].nameColored ..
+                " shared their Ashen Vanguard blessing with " .. shared ..
+                " allied hero" .. (shared == 1 and "." or "es."))
+        return true
+    end
+
     local grand_state
     local grand_timeout ---@type integer?
     local grand_presence ---@type integer?

@@ -54,6 +54,51 @@ OnInit.final("BuffsWorldFactions", function(Require)
         end
     end
 
+    ---@class SharedHardHatBuff : Buff
+    SharedHardHatBuff = Buff.new()
+    do
+        local thistype = SharedHardHatBuff
+        thistype.NAME            = "Shared Hard Hat"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNHelmOfValor.blp"
+        thistype.DESC            = "This unit temporarily shares an ally's Cave Voyagers blessing"
+        thistype.DISPEL_TYPE     = BUFF_POSITIVE
+        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
+        thistype.CANNOT_PURGE    = true
+
+        local function periodic(self)
+            local u = Unit[self.target]
+            if UnitAlive(self.target) and u.x == GetUnitX(self.target) and
+                u.y == GetUnitY(self.target) then
+                self.count = self.count + 1
+                if self.count >= 3 then
+                    u.dr = u.dr / self.mult
+                    local reduction = thistype.getRankReduction and
+                                          thistype.getRankReduction(
+                                              self.ablev or 1) or 0.08
+                    self.mult = 1. - reduction
+                    u.dr = u.dr * self.mult
+                end
+            else
+                u.dr = u.dr / self.mult
+                self.mult = 1.
+                self.count = 0
+            end
+            self.timer = TQ:callDelayed(1., periodic, self)
+            UnitRefreshBuff(self.target, self)
+        end
+
+        function thistype:onRemove()
+            Unit[self.target].dr = Unit[self.target].dr / self.mult
+            TQ:disableCallback(self.timer)
+        end
+
+        function thistype:onApply()
+            self.mult = 1.
+            self.count = 0
+            self.timer = TQ:callDelayed(1., periodic, self)
+        end
+    end
+
     ---@class StormwatchBuff : Buff
     StormwatchBuff = Buff.new()
     do
@@ -103,6 +148,29 @@ OnInit.final("BuffsWorldFactions", function(Require)
         function thistype:onApply()
             local bonus = thistype.getFactionDamage
                 and thistype.getFactionDamage(self.target) or 0.05
+            self.mult = 1. + bonus
+            Unit[self.target].dm = Unit[self.target].dm * self.mult
+        end
+    end
+
+    ---@class SharedAshenVanguardBuff : Buff
+    SharedAshenVanguardBuff = Buff.new()
+    do
+        local thistype = SharedAshenVanguardBuff
+        thistype.NAME            = "Shared Battle Tested"
+        thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNArcaniteMelee.blp"
+        thistype.DESC            = "This unit temporarily shares an ally's Ashen Vanguard blessing"
+        thistype.DISPEL_TYPE     = BUFF_POSITIVE
+        thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
+        thistype.CANNOT_PURGE    = true
+
+        function thistype:onRemove()
+            Unit[self.target].dm = Unit[self.target].dm / self.mult
+        end
+
+        function thistype:onApply()
+            local bonus = thistype.getRankDamage and
+                              thistype.getRankDamage(self.ablev or 1) or 0.05
             self.mult = 1. + bonus
             Unit[self.target].dm = Unit[self.target].dm * self.mult
         end
