@@ -137,8 +137,7 @@ OnInit.final("FactionShop", function(Require)
                 key = offer.offer_key,
                 name = offer_name,
                 icon = offer_icon,
-                tooltip = offer_tooltip ..
-                    "|n|cffff0000Faction Rank Requirement: |r" .. offer.rank,
+                tooltip = offer_tooltip,
                 categories = misc,
                 price = {faction = offer.price},
                 availability = function(pid)

@@ -344,19 +344,24 @@ OnInit.final("ArchitectureTests", function(Require)
             local cases = {
                 {
                     FactionConsumables.STORMWISE_BEACON_KEY,
-                    "Stormwise Beacon", "Shares your current Stormwatch blessing"
+                    "Stormwise Beacon", "Stormwise Beacon", 4,
+                    "Shares your current Stormwatch blessing"
                 }, {
                     FactionConsumables.GOBLIN_SPACE_LASER_KEY,
-                    "Goblin Space Laser", "Rerolls the current weather"
+                    "Goblin Space Laser", "Atmospheric Correction", 2,
+                    "Rerolls the current weather"
                 }, {
                     FactionConsumables.REINFORCED_PIT_PROP_KEY,
-                    "Reinforced Pit Prop", "Shares your current Cave Voyagers blessing"
+                    "Reinforced Pit Prop", "Reinforced Support", 4,
+                    "Shares your current Cave Voyagers blessing"
                 }, {
                     FactionConsumables.SEISMIC_SURVEY_CHARGE_KEY,
-                    "Seismic Survey Charge", "Relocates every unclaimed ore deposit"
+                    "Seismic Survey Charge", "Seismic Survey", 2,
+                    "Relocates every unclaimed ore deposit"
                 }, {
                     FactionConsumables.CAMPAIGN_STANDARD_KEY,
-                    "Campaign Standard", "Shares your current Ashen Vanguard blessing"
+                    "Campaign Standard", "Rallying Standard", 4,
+                    "Shares your current Ashen Vanguard blessing"
                 }
             }
 
@@ -380,9 +385,14 @@ OnInit.final("ArchitectureTests", function(Require)
                                   ItemUse.isUsable(restored) and
                                   restored.type == TYPE_CONSUMABLE_INDEX and
                                   GetItemName(restored.obj) == case[2] and
-                                  restored.tooltip:find("|cff0080c0Use:|r", 1,
-                                                        true) and
-                                  restored.tooltip:find(case[3], 1, true)
+                                  restored.tooltip:find(
+                                      "|cffff0000Faction Rank Requirement: |r" ..
+                                          case[4], 1, true) and
+                                  restored.tooltip:find(
+                                      "|cff0080c0" .. case[3] .. ":|r", 1,
+                                      true) and
+                                  restored.tooltip:find(case[5], 1, true) and
+                                  restored.tooltip:find("|cff808080", 1, true)
                 if restored then restored:destroy() end
                 if not valid then
                     return false, case[1] ..
@@ -544,6 +554,31 @@ OnInit.final("ArchitectureTests", function(Require)
         end
         return true
     end)
+
+    ArchitectureTests.register(
+        "searched legendary flasks retain open affix presentation", function()
+            local item = PotionService.create(
+                             PotionService.LEGENDARY_CHAOS_KEY, 30000.,
+                             30000., nil, false)
+            if not item then return false, "could not create legendary flask" end
+            item:lvl(0)
+            PotionService.refreshItem(item)
+            local valid = item.tooltip and
+                              item.tooltip:find(
+                                  "|cff808080Prefix:|r |cff40bf5fOpen|r", 1,
+                                  true) and
+                              item.tooltip:find(
+                                  "|cff808080Suffix:|r |cff40bf5fOpen|r", 1,
+                                  true) and
+                              item.runtime_definition.world_skin_id ==
+                                  FourCC('phea')
+            item:destroy()
+            if not valid then
+                return false,
+                       "Legendary Flask lost open affixes or potion world skin after search leveling"
+            end
+            return true
+        end)
 
     ArchitectureTests.register("Bounty suffix increases restoration",
                                function()

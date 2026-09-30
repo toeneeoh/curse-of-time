@@ -27,7 +27,7 @@ OnInit.final("Stormwatch", function(Require)
         15400.,
         StormwatchBuff,
         "The Stormwatch study the skies and turn volatile weather to their advantage.|n|n|cffffcc00Membership, rank progress, and unspent Faction Points are saved with this character.|r",
-        "ReplaceableTextures\\CommandButtons\\BTNMonsoon.blp"
+        "ReplaceableTextures\\CommandButtons\\BTNTownWatch.blp"
     )
 
     stormwatch:addQuest(Quest.create(
@@ -485,7 +485,7 @@ OnInit.final("Stormwatch", function(Require)
 
     FactionEvents.register(STORMWATCH_ID, {
         name = "Eye of the Storm",
-        icon = "ReplaceableTextures\\CommandButtons\\BTNMonsoon.blp",
+        icon = "ReplaceableTextures\\CommandButtons\\BTNTyphoon.blp",
         description = "Stand near four storm anomalies while avoiding targeted lightning strikes. Once stabilized, your faction has 5 minutes to damage the Lightning Revenant avatar. Remain nearby for at least 30 seconds to qualify.\n\nAll eligible members receive up to |cffffcc0030 Faction Points|r based on the percentage of the avatar's health removed. Defeating it grants full rewards and event-completion credit.",
         activate = function() return true end,
         start = start_event,

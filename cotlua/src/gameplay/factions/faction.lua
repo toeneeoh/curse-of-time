@@ -29,6 +29,7 @@ OnInit.final("Faction", function(Require)
     ---@field display fun(faction: Faction, pid: integer)
     ---@field refreshFaction fun(faction: Faction, pid: integer)
     ---@field refreshQuest fun(pid: integer, index: integer, quest: Quest)
+    ---@field refreshBulletin fun(pid: integer)
     ---@field promptQuest fun(quest: Quest, pid: integer, callback: fun(pid: integer): boolean): boolean
     ---@field questAccepted fun(pid: integer, accepted: Quest, quests: Quest[])
     ---@field refreshProgress fun(pid: integer, quest: Quest, progress: integer)
@@ -478,6 +479,7 @@ OnInit.final("Faction", function(Require)
             view.refreshProgress(pid, active_quest[pid], quest_progress[pid])
         end
         if view then
+            view.refreshBulletin(pid)
             view.refreshRotation(pid)
         end
     end

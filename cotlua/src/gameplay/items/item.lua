@@ -1407,6 +1407,13 @@
             self.tooltip = concat(text)
             self.alt_tooltip = concat(alt_text)
 
+            if self.runtime_definition and
+                self.runtime_definition.world_skin_id then
+                -- Generic rarity presentation may select a world skin while
+                -- rebuilding the item. Logical items own their dropped model.
+                BlzSetItemSkin(self.obj,
+                               self.runtime_definition.world_skin_id)
+            end
             BlzSetItemIconPath(self.obj, data.path)
             BlzSetItemName(self.obj, definition and definition.name and
                                definition.name(self) or data.name)

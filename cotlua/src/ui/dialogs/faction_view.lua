@@ -38,7 +38,7 @@ OnInit.final("FactionView", function(Require)
 
     local faction_icon = SimpleButton.create(
         main,
-        "ReplaceableTextures\\CommandButtons\\BTNHeroPanelFactionButton.dds",
+        "ReplaceableTextures\\CommandButtons\\BTNMedalionOfCourage.blp",
         0.05,
         0.05,
         FRAMEPOINT_TOP,
@@ -48,17 +48,10 @@ OnInit.final("FactionView", function(Require)
     )
     BlzFrameSetEnable(faction_icon.frame, false)
 
-    local bulletin_title = BlzCreateFrame("TitleText", main, 0, 0)
-    BlzFrameSetPoint(bulletin_title, FRAMEPOINT_TOP, main, FRAMEPOINT_TOP,
-                     0., -0.124)
-    BlzFrameSetEnable(bulletin_title, false)
-    BlzFrameSetScale(bulletin_title, 0.8)
-    BlzFrameSetText(bulletin_title, "|cffffcc00Current Events|r")
-
     local bulletin = BlzCreateFrame("QuestButtonDisabledBackdropTemplate",
                                     main, 0, 0)
     BlzFrameSetPoint(bulletin, FRAMEPOINT_TOP, main, FRAMEPOINT_TOP,
-                     0., -0.148)
+                     0., -0.124)
     BlzFrameSetSize(bulletin, 0.205, 0.076)
     BlzFrameSetEnable(bulletin, false)
     local bulletin_text = BlzCreateFrameByType("TEXT", "", bulletin, "", 0)
@@ -141,7 +134,7 @@ OnInit.final("FactionView", function(Require)
     BlzFrameSetEnable(bounty_status, false)
     BlzFrameSetVisible(bounty_frame, false)
 
-    local bulletin_index = 1
+    local bulletin_index = {}
     local bulletins = {
         [1] = {
             "A prospector insists the eastern tunnels are lucky. Nobody remembers which tunnels are east.",
@@ -432,8 +425,9 @@ OnInit.final("FactionView", function(Require)
         BlzFrameSetText(rank_count, "|cffffcc00" .. rank .. "|r")
         faction_icon:icon(faction.icon)
         local faction_bulletins = bulletins[faction.id]
-        BlzFrameSetText(bulletin_text,
-            faction_bulletins[(bulletin_index - 1) % #faction_bulletins + 1])
+        local current_bulletin = bulletin_index[pid] or 1
+        BlzFrameSetText(bulletin_text, faction_bulletins[
+                            (current_bulletin - 1) % #faction_bulletins + 1])
         rank_icon:setTooltipName("Rank " .. rank)
         rank_icon:setTooltipText(faction.name .. " Rank " .. rank .. " of "
             .. Faction.getMaxRank() .. ".\n\n|cffffcc00Lifetime Faction Points:|r "
@@ -499,6 +493,16 @@ OnInit.final("FactionView", function(Require)
         box.icon:setTooltipIcon(quest.icon)
         box.icon:setTooltipText(quest.desc)
         box.icon:setTooltipName(quest.name)
+    end
+
+    function view.refreshBulletin(pid)
+        bulletin_index[pid] = (bulletin_index[pid] or 0) + 1
+        if GetLocalPlayer() ~= Player(pid - 1) then return end
+        local faction = Faction.getFaction(pid)
+        if not faction then return end
+        local faction_bulletins = bulletins[faction.id]
+        BlzFrameSetText(bulletin_text, faction_bulletins[
+                            (bulletin_index[pid] - 1) % #faction_bulletins + 1])
     end
 
     function view.promptQuest(quest, pid, callback)
@@ -584,10 +588,6 @@ OnInit.final("FactionView", function(Require)
             end
             user = user.next
         end
-    end)
-
-    TimerQueue:callPeriodically(12., nil, function()
-        bulletin_index = bulletin_index + 1
     end)
 
     ---@cast view FactionViewAdapter

@@ -1016,6 +1016,9 @@ modifiers:
 
             if not itm then return false end
             itm:lvl(min_lvl)
+            if itm.type == TYPE_POTION_INDEX then
+                PotionService.refreshItem(itm)
+            end
             PlayerAddItem(pid, itm)
 
             self:destroy()

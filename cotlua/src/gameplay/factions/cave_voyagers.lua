@@ -20,7 +20,7 @@ OnInit.final("CaveVoyagers", function(Require)
         10500.,
         HardHatBuff,
         "The Cave Voyagers are a mining faction that provide access to earth materials and a special defensive buff.|n|n|cffffcc00Membership, rank progress, and unspent Faction Points are saved with this character.|r|n|nWill you join us?",
-        "ReplaceableTextures\\CommandButtons\\BTNPickUpItem.blp"
+        "ReplaceableTextures\\CommandButtons\\BTNDiamondPickaxe.blp"
     )
     cave_voyagers:addQuest(Quest.create(
         "Prospector's Route",
