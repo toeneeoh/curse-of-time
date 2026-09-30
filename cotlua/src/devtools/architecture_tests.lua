@@ -387,9 +387,11 @@ OnInit.final("ArchitectureTests", function(Require)
 
                 local restored = Item.decode(saved_id, saved_stats,
                                              saved_extra, saved_state)
+                local is_bounty = case[1] ==
+                                       FactionConsumables.VANGUARD_BOUNTY_KEY
                 local valid = restored and
                                   RuntimeItemDefinitions.is(restored, case[1]) and
-                                  ItemUse.isUsable(restored) and
+                                  ItemUse.isUsable(restored) == (not is_bounty) and
                                   restored.type == TYPE_CONSUMABLE_INDEX and
                                   restored.runtime_definition.data[ITEM_TIER] == 1 and
                                   GetItemName(restored.obj) == case[2] and
@@ -401,6 +403,12 @@ OnInit.final("ArchitectureTests", function(Require)
                                       true) and
                                   restored.tooltip:find(case[5], 1, true) and
                                   restored.tooltip:find("|cff808080", 1, true)
+                if valid and is_bounty then
+                    local data = restored.runtime_definition.data
+                    valid = data[ITEM_ABILITY .. "id"] ==
+                                FactionConsumables.VANGUARD_BOUNTY_ABILITY_ID and
+                                Spells[FactionConsumables.VANGUARD_BOUNTY_ABILITY_ID] ~= nil
+                end
                 if restored then restored:destroy() end
                 if not valid then
                     return false, case[1] ..
@@ -458,9 +466,9 @@ OnInit.final("ArchitectureTests", function(Require)
             if type(FactionMining.refreshDeposits) ~= "function" or
                 type(CaveVoyagersServices.shareBlessing) ~= "function" or
                 type(AshenVanguardServices.shareBlessing) ~= "function" or
-                type(AshenVanguardServices.hasBounty) ~= "function" or
-                type(AshenVanguardServices.armBounty) ~= "function" or
-                type(AshenVanguardServices.consumeBountyForBoss) ~= "function" or
+                type(AshenVanguardServices.hasBossBounty) ~= "function" or
+                type(AshenVanguardServices.markBoss) ~= "function" or
+                type(AshenVanguardServices.clearBossBounty) ~= "function" or
                 type(Faction.registerQuestCompletionAction) ~= "function" or
                 type(Faction.leaveForTesting) ~= "function" then
                 return false, "faction consumable services are unavailable"

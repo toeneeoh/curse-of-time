@@ -1,7 +1,8 @@
--- Saveable one-use faction tools activated through the inventory context menu.
+-- Saveable one-use faction tools activated through native or context actions.
 OnInit.final("FactionConsumables", function(Require)
     Require('ItemUse')
     Require('RuntimeItemDefinitions')
+    Require('Spells')
 
     FactionConsumables = {}
     local STORMWISE_BEACON_KEY = "stormwise_beacon"
@@ -10,6 +11,7 @@ OnInit.final("FactionConsumables", function(Require)
     local SEISMIC_SURVEY_CHARGE_KEY = "seismic_survey_charge"
     local CAMPAIGN_STANDARD_KEY = "campaign_standard"
     local VANGUARD_BOUNTY_KEY = "vanguard_bounty"
+    local VANGUARD_BOUNTY_ABILITY_ID = FourCC('A1VB')
 
     FactionConsumables.STORMWISE_BEACON_KEY = STORMWISE_BEACON_KEY
     FactionConsumables.GOBLIN_SPACE_LASER_KEY = GOBLIN_SPACE_LASER_KEY
@@ -18,18 +20,21 @@ OnInit.final("FactionConsumables", function(Require)
         SEISMIC_SURVEY_CHARGE_KEY
     FactionConsumables.CAMPAIGN_STANDARD_KEY = CAMPAIGN_STANDARD_KEY
     FactionConsumables.VANGUARD_BOUNTY_KEY = VANGUARD_BOUNTY_KEY
+    FactionConsumables.VANGUARD_BOUNTY_ABILITY_ID =
+        VANGUARD_BOUNTY_ABILITY_ID
     local definitions = {}
 
     local function define(key, id, name, icon, world_skin, required_rank,
-                          skill_name, description, flavor)
+                          skill_name, description, flavor, ability_id)
         definitions[key] = RuntimeItemDefinitions.define(key, {
             id = id,
             carrier = FourCC('I00K'),
             world_skin = world_skin,
             name = name,
             icon = icon,
-            tooltip = "|cff0080c0" .. skill_name .. ":|r " .. description ..
-                "|n|cff808080" .. flavor .. "|r",
+            tooltip = ability_id and "|cff808080" .. flavor .. "|r" or
+                "|cff0080c0" .. skill_name .. ":|r " .. description ..
+                    "|n|cff808080" .. flavor .. "|r",
             item_type = TYPE_CONSUMABLE_INDEX,
             faction_rank_requirement = required_rank,
             prepare_data = function(data)
@@ -39,6 +44,13 @@ OnInit.final("FactionConsumables", function(Require)
                 data[ITEM_NOCRAFT .. "fixed"] = 1
                 data[ITEM_LIMIT] = 1
                 data[ITEM_LIMIT .. "fixed"] = 1
+                if ability_id then
+                    data[ITEM_ABILITY] = 1
+                    data[ITEM_ABILITY .. "fixed"] = 1
+                    data[ITEM_ABILITY .. "id"] = ability_id
+                    data[ITEM_ABILITY .. "data"] = ""
+                    data[ITEM_ABILITY .. "unlock"] = 0
+                end
             end
         })
     end
@@ -77,8 +89,9 @@ OnInit.final("FactionConsumables", function(Require)
            "ReplaceableTextures\\CommandButtons\\BTNMarkOfFire.blp",
            FourCC('flag'),
            4, "Marked Quarry",
-           "Increases your |cffff8040Boss Drop Rate|r by |cffffcc0025%|r until the next eligible boss is slain while you are nearby.",
-           "The Vanguard's seal promises richer spoils to whoever claims its mark.")
+           "Marks a boss above |cffffcc0090% Health|r, increasing its |cffff8040Boss Drop Rate|r by |cffffcc0025%|r until it dies or retreats.",
+           "The Vanguard's seal promises richer spoils to whoever claims its mark.",
+           VANGUARD_BOUNTY_ABILITY_ID)
 
     local function register(key, action)
         ItemUse.registerRuntime(key, {
@@ -108,25 +121,36 @@ OnInit.final("FactionConsumables", function(Require)
         return AshenVanguardServices and
                    AshenVanguardServices.shareBlessing(pid)
     end)
-    ItemUse.registerRuntime(VANGUARD_BOUNTY_KEY, {
-        available = function(pid)
-            if not AshenVanguardServices then
-                return false, "The Vanguard Bounty is unavailable."
+    local MARK_QUARRY = Spell.define('A1VB')
+    do
+        local thistype = MARK_QUARRY
+
+        local function find_bounty(pid)
+            local profile = Profile[pid]
+            local items = profile and profile.hero and profile.hero.items
+            if not items then return nil end
+            for slot = 1, MAX_INVENTORY_SLOTS do
+                local item = items[slot]
+                if RuntimeItemDefinitions.is(item, VANGUARD_BOUNTY_KEY) then
+                    return item
+                end
             end
-            if AshenVanguardServices.hasBounty(pid) then
-                return false, "You already have an active Vanguard Bounty."
-            end
-            return true
-        end,
-        use = function(pid, item)
-            if not AshenVanguardServices or
-                not AshenVanguardServices.armBounty(pid) then
-                return false
-            end
-            item:destroy()
-            return true
+            return nil
         end
-    })
+
+        function thistype:onCast()
+            local item = find_bounty(self.pid)
+            if not item then
+                DisplayTextToPlayer(self.owner, 0., 0.,
+                                    "|cffff0000You no longer possess a Vanguard Bounty.|r")
+                return
+            end
+            if AshenVanguardServices and
+                AshenVanguardServices.markBoss(self.pid, self.target) then
+                item:destroy()
+            end
+        end
+    end
 
     function FactionConsumables.create(key, pid)
         local hero = Hero[pid]

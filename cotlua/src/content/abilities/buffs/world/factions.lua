@@ -183,7 +183,7 @@ OnInit.final("BuffsWorldFactions", function(Require)
         thistype.NAME = "Vanguard Bounty"
         thistype.ICON = "ReplaceableTextures\\CommandButtons\\BTNMarkOfFire.blp"
         thistype.DESC =
-            "This unit has +^#mult% Boss Drop Rate until the next eligible boss is slain"
+            "This boss has +^#mult% Boss Drop Rate until it dies or retreats"
         thistype.DISPEL_TYPE = BUFF_POSITIVE
         thistype.STACK_TYPE = BUFF_STACK_NONE
         thistype.CANNOT_PURGE = true

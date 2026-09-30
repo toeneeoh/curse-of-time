@@ -379,32 +379,51 @@ OnInit.final("AshenVanguard", function(Require)
         return true
     end
 
-    function AshenVanguardServices.hasBounty(pid)
-        local hero = Hero[pid]
-        return hero ~= nil and VanguardBountyBuff:has(nil, hero)
+    function AshenVanguardServices.hasBossBounty(boss)
+        local target = type(boss) == "table" and boss.unit or boss
+        return target ~= nil and VanguardBountyBuff:has(nil, target)
     end
 
-    function AshenVanguardServices.armBounty(pid)
+    function AshenVanguardServices.markBoss(pid, target)
         local hero = Hero[pid]
-        if not hero or AshenVanguardServices.hasBounty(pid) then
+        local boss = target and IsBoss(target) or nil
+        if not hero or not boss or not UnitAlive(target) then
+            DisplayTextToPlayer(Player(pid - 1), 0., 0.,
+                                "|cffff0000Vanguard Bounties can only mark living bosses.|r")
             return false
         end
-        VanguardBountyBuff:add(hero, hero)
-        DisplayTextToPlayer(Player(pid - 1), 0., 0.,
-            "|cffffcc00Vanguard Bounty armed:|r Boss Drop Rate increased until your next eligible boss kill.")
+        if boss.returning then
+            DisplayTextToPlayer(Player(pid - 1), 0., 0.,
+                                "|cffff0000That boss is retreating.|r")
+            return false
+        end
+        if GetWidgetLife(target) <= BlzGetUnitMaxHP(target) * 0.90 then
+            DisplayTextToPlayer(Player(pid - 1), 0., 0.,
+                                "|cffff0000The boss must be above 90% Health.|r")
+            return false
+        end
+        if AshenVanguardServices.hasBossBounty(boss) then
+            DisplayTextToPlayer(Player(pid - 1), 0., 0.,
+                                "|cffff0000That boss is already marked.|r")
+            return false
+        end
+        VanguardBountyBuff:add(hero, target)
+        DisplayTimedTextToForce(FORCE_PLAYING, 12.,
+            User[pid - 1].nameColored .. " marked |cffffcc00" .. boss.name ..
+                "|r with a Vanguard Bounty.")
         return true
     end
 
-    ---Consumes the selected player's active bounty after its multiplier has
-    ---already been included in the boss drop calculation.
-    function AshenVanguardServices.consumeBountyForBoss(pid, boss)
-        local hero = Hero[pid]
-        local buff = hero and VanguardBountyBuff:get(nil, hero)
+    function AshenVanguardServices.clearBossBounty(boss, escaped)
+        local target = type(boss) == "table" and boss.unit or boss
+        local buff = target and VanguardBountyBuff:get(nil, target)
         if not buff then return false end
         buff:remove()
-        DisplayTextToPlayer(Player(pid - 1), 0., 0.,
-            "|cffffcc00Vanguard Bounty claimed:|r " .. boss.name ..
-                " consumed your bounty.")
+        if escaped and type(boss) == "table" then
+            DisplayTimedTextToForce(FORCE_PLAYING, 12.,
+                "|cffff4040Vanguard Bounty lost:|r " .. boss.name ..
+                    " escaped and shed its mark.")
+        end
         return true
     end
 

@@ -439,17 +439,18 @@ OnInit.final("FactionView", function(Require)
         BlzFrameSetVisible(bounty_status, show_bounty)
         BlzFrameClearAllPoints(blurb)
         if show_bounty then
-            local bounty_state = "|cff808080Inactive|r"
             local bounty_rate = 100.
+            local bounty_text = "Vanguard Bounty"
+            local bounty_state = "Unlocks at Rank 4"
             if rank < 4 then
                 bounty_state = "Unlocks at Rank 4"
-            elseif AshenVanguardServices.hasBounty(pid) then
-                bounty_state = "|cff80ff80Armed|r"
+            else
                 bounty_rate = 125.
+                bounty_text = "Marked Boss Drop Rate: 125%"
+                bounty_state = "Use from Backpack | Boss above 90% Health"
             end
             BlzFrameSetValue(bounty_bar, bounty_rate)
-            BlzFrameSetText(bounty_progress, "Boss Drop Rate: " ..
-                                math.floor(bounty_rate) .. "%")
+            BlzFrameSetText(bounty_progress, bounty_text)
             BlzFrameSetText(bounty_status, bounty_state)
         end
         BlzFrameSetPoint(blurb, FRAMEPOINT_TOP, main, FRAMEPOINT_TOP,

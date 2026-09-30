@@ -516,7 +516,8 @@
             [FourCC('AIcd')] = 1, -- war drums
             [FourCC('Adt1')] = 1, -- gem of true sight
             [FourCC('A03F')] = 1, -- endurance aura
-            [FourCC('AIta')] = 1 -- crystal ball reveal
+            [FourCC('AIta')] = 1, -- crystal ball reveal
+            [FourCC('A1VB')] = 1 -- Vanguard Bounty boss mark
         }
 
         -- Called on equip to stack with an existing item if applicable

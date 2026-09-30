@@ -42,6 +42,7 @@ OnInit.final("Boss", function(Require)
     ---@field evergreen boolean Counts as relevant content regardless of hero level.
     ---@field respawn_modifier number
     ---@field first_drop boolean
+    ---@field returning boolean
     ---@field nearby_count integer
     ---@field nearby_linger_generation integer
     ---@field nearby_linger_target integer?
@@ -241,6 +242,9 @@ OnInit.final("Boss", function(Require)
             -- rewards
             RewardXPGold(killed, killer)
             boss:reward(x, y)
+            if AshenVanguardServices then
+                AshenVanguardServices.clearBossBounty(boss, false)
+            end
 
             local delay = BOSS_RESPAWN_TIME
 
@@ -295,6 +299,7 @@ OnInit.final("Boss", function(Require)
                 difficulty_vote = {},
                 evergreen = false,
                 first_drop = true,
+                returning = false,
                 nearby_count = 0,
                 nearby_linger_generation = 0,
                 nearby_linger_target = nil,
@@ -439,7 +444,6 @@ OnInit.final("Boss", function(Require)
 
         local function boss_drop_multiplier(boss, x, y)
             local best = 1.
-            local selected_pid
             local user = User.first
             while user do
                 local hero = Hero[user.id]
@@ -451,12 +455,11 @@ OnInit.final("Boss", function(Require)
                                            math.max(0., unit.boss_drop_rate)
                     if multiplier > best then
                         best = multiplier
-                        selected_pid = user.id
                     end
                 end
                 user = user.next
             end
-            return best, selected_pid
+            return best * math.max(0., Unit[boss.unit].boss_drop_rate)
         end
 
         function thistype:getDropMultiplier()
@@ -476,11 +479,7 @@ OnInit.final("Boss", function(Require)
 
         function thistype:reward(x, y)
             local base_chance = Rates[self.id] or 0
-            local drop_multiplier, selected_pid =
-                boss_drop_multiplier(self, x, y)
-            if selected_pid and AshenVanguardServices then
-                AshenVanguardServices.consumeBountyForBoss(selected_pid, self)
-            end
+            local drop_multiplier = boss_drop_multiplier(self, x, y)
             if self.first_drop then
                 self.first_drop = false
                 boss_drop(self, (base_chance + 25) * drop_multiplier, x, y)
@@ -569,6 +568,8 @@ OnInit.final("Boss", function(Require)
                     Unit[boss.unit].overmovespeed = nil
                     SetUnitPathing(boss.unit, true)
                     UnitRemoveAbility(boss.unit, FourCC('Amrf'))
+                    boss.returning = false
+                    boss.time = 0.
                 else
                     if GetUnitCurrentOrder(boss.unit) ~= ORDER_ID_MOVE then
                         IssuePointOrder(boss.unit, "move", boss.loc_x, boss.loc_y)
@@ -590,6 +591,10 @@ OnInit.final("Boss", function(Require)
                     -- death knight / legion exception
                     if boss.id ~= FourCC('H04R') and boss.id ~= FourCC('H040') then
                         if IsUnitInRangeXY(boss.unit, boss.loc_x, boss.loc_y, boss.leash) == false and GetUnitAbilityLevel(boss.unit, FourCC('Amrf')) == 0 then
+                            boss.returning = true
+                            if AshenVanguardServices then
+                                AshenVanguardServices.clearBossBounty(boss, true)
+                            end
                             bossUnit.regen_max = 16 -- 16 percent
                             bossUnit.overmovespeed = 750
                             UnitAddAbility(boss.unit, FourCC('Amrf'))
@@ -628,6 +633,11 @@ OnInit.final("Boss", function(Require)
                         hp = 2 -- 2 percent
                     end
 
+                    if numplayers == 0 and boss.time > 0. and
+                        AshenVanguardServices then
+                        AshenVanguardServices.clearBossBounty(boss, true)
+                    end
+
                     -- non-returning hp regeneration
                     if GetUnitAbilityLevel(boss.unit, FourCC('Amrf')) == 0 and hp ~= bossUnit.regen_max then
                         bossUnit.regen_max = hp
@@ -652,6 +662,7 @@ OnInit.final("Boss", function(Require)
 
         function thistype:revive()
             self.unit = CreateUnit(PLAYER_BOSS, self.id, self.loc_x, self.loc_y, self.facing)
+            self.returning = false
             self.nearby_count = 0
             self.nearby_linger_generation = self.nearby_linger_generation + 1
             self.nearby_linger_target = nil
