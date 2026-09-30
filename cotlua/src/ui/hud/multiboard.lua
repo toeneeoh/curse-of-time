@@ -16,6 +16,7 @@ OnInit.final("Multiboard", function(Require)
     Require("Dungeons")
     Require("Shop")
     Require("Users")
+    Require("DropTable")
 
     ---@class MULTIBOARD
     ---@field lookingAt integer[]
@@ -694,6 +695,15 @@ OnInit.final("Multiboard", function(Require)
             boss:get_anchor(1, 1).gluebutton =     {0.262, 0., ICON_SIZE * 2, ICON_SIZE * 2}
             local item_drops = boss:get_anchor(1, 1).gluebutton
             item_drops:icon("ReplaceableTextures\\CommandButtons\\BTNTreasureChest.blp")
+            local drop_chance_text = BlzCreateFrameByType(
+                                         "TEXT", "", item_drops.frame, "", 0)
+            BlzFrameSetPoint(drop_chance_text, FRAMEPOINT_BOTTOM,
+                             item_drops.frame, FRAMEPOINT_BOTTOM, 0., 0.001)
+            BlzFrameSetSize(drop_chance_text, ICON_SIZE * 2.5, 0.009)
+            BlzFrameSetTextAlignment(drop_chance_text, TEXT_JUSTIFY_CENTER,
+                                     TEXT_JUSTIFY_MIDDLE)
+            BlzFrameSetScale(drop_chance_text, 0.72)
+            BlzFrameSetEnable(drop_chance_text, false)
             local item_drop_container = BlzCreateFrameByType("FRAME", "", item_drops.frame, "", 0)
             BlzFrameSetTexture(item_drop_container, "trans32.blp", 0, true)
             BlzFrameSetSize(item_drop_container, 0.001, 0.001)
@@ -704,6 +714,19 @@ OnInit.final("Multiboard", function(Require)
             for i = 1, 10 do
                 items[i] = Button.create(item_drop_container, ICON_SIZE * 2 + 0.004, ICON_SIZE * 2 + 0.004, 0., -(ICON_SIZE * 2. + 0.004) * i, false)
                 items[i].tooltip:point(FRAMEPOINT_TOPRIGHT)
+                BlzFrameClearAllPoints(items[i].chargeFrame)
+                BlzFrameSetPoint(items[i].chargeFrame, FRAMEPOINT_BOTTOM,
+                                 items[i].iconFrame, FRAMEPOINT_BOTTOM, 0., 0.)
+                BlzFrameSetSize(items[i].chargeFrame,
+                                ICON_SIZE * 2 + 0.002, 0.009)
+                BlzFrameSetScale(items[i].chargeText, 0.72)
+            end
+
+            local function percent_text(value)
+                local percent = value * 100.
+                if percent > 0. and percent < 0.1 then return "<0.1%" end
+                if percent < 10. then return string.format("%.1f%%", percent) end
+                return string.format("%.0f%%", percent)
             end
             boss.close_items = function(p, close)
                 if GetLocalPlayer() == p then
@@ -716,6 +739,10 @@ OnInit.final("Multiboard", function(Require)
 
                 if b then
                     local boss_items = {}
+                    local distribution, item_count =
+                        DropTable:getItemDistribution(b.id)
+                    local per_roll, overall, multiplier =
+                        b:getEquipmentDropChance()
 
                     for i = 1, 10 do
                         local item = ItemDrops[b.id][i]
@@ -728,13 +755,35 @@ OnInit.final("Multiboard", function(Require)
                     end
 
                     if GetLocalPlayer() == p then
+                        local first_kill = b.first_drop and
+                                               "|n|cff80ff80First kill: +25 percentage points|r" or
+                                               ""
+                        BlzFrameSetText(drop_chance_text,
+                                        "|cffffcc00" .. percent_text(overall) ..
+                                            "|r")
+                        item_drops:setTooltipText(
+                            "Chance for at least one equipment drop: |cffffcc00" ..
+                                percent_text(overall) .. "|r|nPer roll: " ..
+                                percent_text(per_roll) .. " | Rolls: " ..
+                                b.difficulty .. "|nDrop multiplier: " ..
+                                percent_text(multiplier) .. first_kill)
                         for i = 1, 10 do
                             if boss_items[i] then
+                                local share = distribution[i] or
+                                                  (item_count > 0 and
+                                                      1. / item_count or 0.)
                                 items[i]:visible(true)
                                 items[i]:icon(boss_items[i].icon)
                                 items[i].tooltip:name(boss_items[i].name)
                                 items[i].tooltip:icon(boss_items[i].icon)
-                                items[i].tooltip:text(boss_items[i].tooltip)
+                                items[i].tooltip:text(
+                                    boss_items[i].tooltip ..
+                                        "|n|n|cffffcc00Current drop-pool share:|r " ..
+                                        percent_text(share))
+                                BlzFrameSetText(items[i].chargeText,
+                                                percent_text(share))
+                                BlzFrameSetVisible(items[i].chargeFrame, true)
+                                BlzFrameSetVisible(items[i].chargeText, true)
                             else
                                 items[i]:visible(false)
                             end

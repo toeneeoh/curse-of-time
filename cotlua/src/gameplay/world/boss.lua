@@ -50,6 +50,8 @@ OnInit.final("Boss", function(Require)
     ---@field target Unit
     ---@field init function
     ---@field reward function
+    ---@field getDropMultiplier fun(self: Boss): number
+    ---@field getEquipmentDropChance fun(self: Boss): number, number, number
     ---@field trigger trigger
     ---@field setup_range_event function
     ---@field timer TimerQueue
@@ -428,7 +430,7 @@ OnInit.final("Boss", function(Require)
         ---@type fun(boss: table, chance: number, x: number, y: number)
         local function boss_drop(boss, chance, x, y)
             for _ = 1, boss.difficulty do
-                if random(0, 99) < chance then
+                if GetRandomReal(0., 100.) < chance then
                     local itm = ItemRuntime.create(DropTable:pickItem(boss.id), x, y, 600.)
                     itm:lvl(max(0, ItemData[itm.id][ITEM_UPGRADE_MAX] - random(ITEM_MIN_LEVEL_VARIANCE, ITEM_MAX_LEVEL_VARIANCE)))
                 end
@@ -454,15 +456,31 @@ OnInit.final("Boss", function(Require)
                 end
                 user = user.next
             end
-            if selected_pid and AshenVanguardServices then
-                AshenVanguardServices.consumeBountyForBoss(selected_pid, boss)
-            end
-            return best
+            return best, selected_pid
+        end
+
+        function thistype:getDropMultiplier()
+            return boss_drop_multiplier(self, GetUnitX(self.unit),
+                                        GetUnitY(self.unit))
+        end
+
+        ---Returns per-roll chance, chance of at least one equipment drop, and
+        ---the effective nearby-player multiplier. Chances are normalized 0..1.
+        function thistype:getEquipmentDropChance()
+            local multiplier = self:getDropMultiplier()
+            local base = (Rates[self.id] or 0) + (self.first_drop and 25 or 0)
+            local per_roll = min(1., max(0., base * multiplier * 0.01))
+            local overall = 1. - (1. - per_roll) ^ self.difficulty
+            return per_roll, overall, multiplier
         end
 
         function thistype:reward(x, y)
             local base_chance = Rates[self.id] or 0
-            local drop_multiplier = boss_drop_multiplier(self, x, y)
+            local drop_multiplier, selected_pid =
+                boss_drop_multiplier(self, x, y)
+            if selected_pid and AshenVanguardServices then
+                AshenVanguardServices.consumeBountyForBoss(selected_pid, self)
+            end
             if self.first_drop then
                 self.first_drop = false
                 boss_drop(self, (base_chance + 25) * drop_multiplier, x, y)

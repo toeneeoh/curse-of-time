@@ -660,6 +660,34 @@ OnInit.final("ArchitectureTests", function(Require)
         return true
     end)
 
+    ArchitectureTests.register("boss item distributions are normalized",
+                               function()
+        local boss_ids = {
+            FourCC('H02H'), FourCC('O02H'), FourCC('H04R'),
+            FourCC('O02T')
+        }
+        for index = 1, #boss_ids do
+            local distribution, count =
+                DropTable:getItemDistribution(boss_ids[index])
+            local total = 0.
+            for item_index = 1, count do
+                local chance = distribution[item_index]
+                if not chance or chance < 0. or chance > 1. then
+                    return false, "invalid boss item distribution entry"
+                end
+                total = total + chance
+            end
+            if count <= 0 or math.abs(total - 1.) > 0.000001 then
+                return false, "boss item distribution does not total 100%"
+            end
+        end
+        if type(Boss.getDropMultiplier) ~= "function" or
+            type(Boss.getEquipmentDropChance) ~= "function" then
+            return false, "boss drop chance helpers are unavailable"
+        end
+        return true
+    end)
+
     ArchitectureTests.register("runtime potion saves preserve identity and charges",
                                function()
         local cases = {

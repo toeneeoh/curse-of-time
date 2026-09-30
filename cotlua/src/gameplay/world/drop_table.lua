@@ -17,6 +17,7 @@
 
     ---@class DropTable
     ---@field pickItem function
+    ---@field getItemDistribution fun(self: DropTable, id: integer): number[], integer
     ---@field rollColosseumTicket fun(self: DropTable, x: number, y: number, chance: number): boolean
     DropTable = {}
     do
@@ -58,7 +59,7 @@
                     break
                 end
 
-                if i > max then
+                if i >= max then
                     i = 1
                 else
                     i = i + 1
@@ -66,6 +67,52 @@
             end
 
             return ItemDrops[id][i]
+        end
+
+        ---Returns each item's actual probability of being selected by pickItem.
+        ---The picker starts at a random slot and tests each adaptive acceptance
+        ---rate in order, so these probabilities are not generally the raw rates.
+        ---@param id integer
+        ---@return number[] distribution
+        ---@return integer count
+        function thistype:getItemDistribution(id)
+            local drop = ItemDrops[id]
+            local count = drop[MAX_ITEM_COUNT]
+            local distribution = {}
+            if count <= 0 then return distribution, 0 end
+
+            local failure_cycle = 1.
+            for index = 1, count do
+                local acceptance = math.min(1., math.max(0.,
+                                            drop[index .. "%"] or 0.))
+                failure_cycle = failure_cycle * (1. - acceptance)
+            end
+            local eventual_success = 1. - failure_cycle
+            if eventual_success <= 0. then
+                local equal = 1. / count
+                for index = 1, count do distribution[index] = equal end
+                return distribution, count
+            end
+
+            for target = 1, count do
+                local acceptance = math.min(1., math.max(0.,
+                                            drop[target .. "%"] or 0.))
+                local probability = 0.
+                for start = 1, count do
+                    local reach = 1.
+                    local index = start
+                    while index ~= target do
+                        local tested = math.min(1., math.max(0.,
+                                                drop[index .. "%"] or 0.))
+                        reach = reach * (1. - tested)
+                        index = index >= count and 1 or index + 1
+                    end
+                    probability = probability + reach * acceptance /
+                                      eventual_success
+                end
+                distribution[target] = probability / count
+            end
+            return distribution, count
         end
 
         ---Rolls an explicit ticket chance. Callers define eligibility by invoking
