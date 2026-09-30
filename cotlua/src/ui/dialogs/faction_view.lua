@@ -247,6 +247,7 @@ OnInit.final("FactionView", function(Require)
             BlzFrameSetVisible(main, false)
         end
     end
+    view.close = close
 
     local function on_close()
         local clicked = BlzGetTriggerFrame()

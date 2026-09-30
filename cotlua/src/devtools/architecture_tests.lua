@@ -432,7 +432,8 @@ OnInit.final("ArchitectureTests", function(Require)
                 type(AshenVanguardServices.canPurchaseBounty) ~= "function" or
                 type(AshenVanguardServices.purchaseBounty) ~= "function" or
                 type(AshenVanguardServices.consumeBountyForBoss) ~= "function" or
-                type(Faction.registerQuestCompletionAction) ~= "function" then
+                type(Faction.registerQuestCompletionAction) ~= "function" or
+                type(Faction.leaveForTesting) ~= "function" then
                 return false, "faction consumable services are unavailable"
             end
             local renown, required, stacks, maximum, remaining, cooldown =

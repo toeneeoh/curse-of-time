@@ -54,6 +54,7 @@
         ["balance"] = "Balance tools: -balance items, -balance start [seconds] [label], -balance stop, -balance snapshot [label], or -balance equip [average|perfect] [six rawcodes].",
         ["sf"] = "Set the amount of faction points you have to #. usage: -sf [#]",
         ["factionrep"] = "Set the active faction's lifetime Faction Points to #. usage: -factionrep [#]",
+        ["leavefaction"] = "Immediately leave your active faction while preserving its progress.",
         ["mining"] = "Spawn a common, rich, or rare deposit beside your hero. usage: -mining [common|rich|rare]",
         ["factionevent"] = "Immediately start the next hourly faction event.",
         ["huntrenown"] = "Add lobby Hunt Renown. usage: -huntrenown [#]",
@@ -317,6 +318,14 @@ modifiers:
             if not FactionEvents.startNow(pid) then
                 DisplayTextToPlayer(p, 0., 0.,
                                     "Unable to start the faction event.")
+            end
+        end,
+        ["leavefaction"] = function(p, pid)
+            if Faction.leaveForTesting(pid) then
+                DisplayTextToPlayer(p, 0., 0.,
+                                    "You left your faction. Its progress was preserved.")
+            else
+                DisplayTextToPlayer(p, 0., 0., "You are not in a faction.")
             end
         end,
         ["huntrenown"] = function(p, pid, args)

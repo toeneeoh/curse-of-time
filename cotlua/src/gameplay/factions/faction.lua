@@ -27,6 +27,7 @@ OnInit.final("Faction", function(Require)
     ---@field promptJoin fun(faction: Faction, pid: integer, callback: fun(pid: integer): boolean): boolean
     ---@field promptSwitch fun(current: Faction, faction: Faction, pid: integer, callback: fun(pid: integer): boolean): boolean
     ---@field display fun(faction: Faction, pid: integer)
+    ---@field close fun(pid: integer)
     ---@field refreshFaction fun(faction: Faction, pid: integer)
     ---@field refreshQuest fun(pid: integer, index: integer, quest: Quest)
     ---@field refreshBulletin fun(pid: integer)
@@ -843,6 +844,27 @@ OnInit.final("Faction", function(Require)
             TimerQueue:disableCallback(faction_switch_timer[pid])
             faction_switch_timer[pid] = nil
         end
+    end
+
+    ---Leaves the active faction without a switch cooldown. Development only.
+    ---Saved reputation and the faction's unspent point balance are preserved.
+    ---@param pid integer
+    ---@return boolean
+    function Faction.leaveForTesting(pid)
+        if not DEV_ENABLED then return false end
+        local faction = player_faction[pid]
+        local hero = hero_data(pid)
+        if not faction or not hero or not Hero[pid] then return false end
+
+        ensure_faction_balances(hero)[faction.id] = GetCurrency(pid, FACTION)
+        hero.faction_id = 0
+        local buff = faction.buff:get(nil, Hero[pid])
+        if buff then buff:remove() end
+        clear_player(pid)
+        SetCurrency(pid, FACTION, 0)
+        Weather.refreshUnit(Hero[pid])
+        if view then view.close(pid) end
+        return true
     end
 
     local function on_currency_changed(pid, currency, amount)
