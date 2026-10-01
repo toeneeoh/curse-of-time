@@ -14,26 +14,20 @@ from 200 through 360, and the corresponding crafted sets sit 10 levels above
 their component bands from 210 through 370. All fifteen five-piece set
 families are complete.
 
-Four progression problems are high confidence:
+The high-confidence defects found in the first pass are now corrected:
 
-1. **Nightmare Set Staff (`I0CF`, level 290) is missing its primary stat.** It
-   has 2,700 Strength, 0 Agility, and only 2,700 Intelligence. The preceding
-   Void Set Staff has 18,000 Intelligence and the following Hell tier should
-   continue upward.
-2. **Hell Set Staff (`I0DJ`, level 310) repeats the same defect.** It has 3,600
-   Strength, 0 Agility, and only 3,600 Intelligence. Existence Set Staff then
-   jumps to 45,000 Intelligence at level 330.
-3. **Existence Set Bow (`I0DL`, level 330) has 14,000 damage.** Hell Set Bow has
-   100,000, while Astral Set Bow has 196,000. The surrounding curve strongly
-   indicates that this should be approximately 140,000.
-4. **Orsted (`N00F`, level 250) has no equipment drop table.** The boss exists
-   and has combat content, but `Rates[N00F]` and `setup_rates(N00F, ...)` are
-   absent. It can only award independent generic boss rewards such as tickets
-   and potion rolls.
-
-The first three should be corrected in item object data. Orsted needs a design
-decision about whether it should drop a unique family, crafting material, or a
-curated level-250 pool.
+1. Nightmare Set Staff now has 24,000 Intelligence and 2,700 in both secondary
+   attributes.
+2. Hell Set Staff now has 32,000 Intelligence and 3,600 in both secondary
+   attributes.
+3. Existence Set Bow now has 140,000 damage.
+4. Orsted now has an 85% level-250 pool of five class weapons.
+5. Arkaden's three repeated Death Knight outcomes were replaced by three
+   unique level-140 rewards; Chronos Stone remains the fourth outcome.
+6. Pure Existence is now level 340, matching both of its rewards.
+7. Exact duplicate boss-pool items and tier-23-or-higher equipment can no
+   longer occupy equipped slots together. Ordinary pre-Chaos duplicates remain
+   legal.
 
 ## Progression backbone
 
@@ -84,15 +78,9 @@ All other Chaos set archetypes follow recognizable templates:
 - Bow emphasizes Agility and the second-highest weapon damage.
 - Staff emphasizes Intelligence, regeneration, and Spellboost.
 
-Nightmare and Hell Staffs are the only two consecutive staff entries that lose
-both the large Intelligence allocation and the normal secondary Agility. The
-defect is severe enough that upgrading from Void Set Staff at level 270 is a
-large downgrade until Existence Set Staff at 330.
-
-Existence Set Bow is the only weapon in the high-level set sequence whose
-damage regresses by nearly an order of magnitude. Its name also contains a
-trailing space in object data; that part is cosmetic but worth cleaning when
-the numeric field is corrected.
+The three numeric anomalies originally identified here have been corrected in
+object data. The set sequence should be regenerated in the next balance export
+to verify its final post-upgrade curve.
 
 ## Boss-item progression
 
@@ -108,16 +96,16 @@ the numeric field is corrected.
 | Dragoon | 100 | 70% | 4 | Level 100 |
 | Death Knight | 120 | 80% | 4 | Level 120 |
 | Vengeful Paladin | 140 | 80% | 4 | Level 140 |
-| Arkaden | 140 | 80% | 4 | One level-140 item; three level-120 repeats |
+| Arkaden | 140 | 80% | 4 | Three unique level-140 items and Chronos Stone |
 | Goddesses | 180 | 100% each | 4 separate pools | Level 130 aura items |
 | Demon Prince | 190 | 100% | 1 | Level-190 crafting component |
 | Absolute Horror | 230 | 85% | 3 | Materials for level-230 Absolute gear |
-| **Orsted** | **250** | **0%** | **0** | **No equipment reward** |
+| Orsted | 250 | 85% | 5 | Level-250 class weapons |
 | Slaughter Queen | 270 | 85% | 5 | Level 270 |
 | Essence of Darkness | 300 | 70% | 4 | Three at 300; one at 308 |
 | Satan | 310 | 65% | 2 | Level 310 |
 | Thanatos | 320 | 65% | 2 | Level 320 |
-| Pure Existence | 320 | 60% | 2 | Both require level 340 |
+| Pure Existence | 340 | 60% | 2 | Level 340 |
 | Legion | 340 | 60% | 10 | Level 340 |
 | Xallarath | 360 | 30% | 3 | Level 360 |
 | Azazoth | 380 | 60% | 10 | Level 380 |
@@ -126,19 +114,8 @@ The displayed chance is the normal-difficulty chance for one equipment roll,
 before first-kill and Drop Rate modifiers. Hard difficulty performs additional
 rolls rather than replacing this percentage.
 
-### High-confidence boss oddities
+### Remaining boss oddities
 
-- **Orsted has no pool.** This is the only ordinary progression boss in the
-  sequence with neither unique equipment nor a material table.
-- **Arkaden recycles most of Death Knight's pool.** Godslayer's Cloak,
-  Savior's Armor, and Savior's Sword are shared; Chronos Stone is the only new
-  outcome. Thus 75% of successful equipment rolls can repeat the previous
-  boss's rewards.
-- **Pure Existence cannot provide an immediately equippable reward at its
-  authored level.** The level-320 boss drops Ring of Existence and Existence
-  Soul, both requiring 340. The inventory system permits picking up items up to
-  20 levels ahead, so the drops are not lost, but they are deferred rewards and
-  directly overlap Legion's level band.
 - **Dark Regeneration requires level 308 while its boss is level 300.** This is
   a small, unusual delay rather than a progression blocker.
 
@@ -153,32 +130,20 @@ rolls rather than replacing this percentage.
   guaranteed/likely crafting materials. The multiboard communicates the item
   odds, but it does not explain the finished items produced by material pools.
   Absolute Horror can consequently look much less rewarding than it is.
-- Pure Existence's level-340 requirements may intentionally make it a source
-  of future gear. If not, either the boss should be level 340 or its two items
-  should be level 320.
 
 ## Equipment-limit and optimizer mismatch
 
-The live inventory restriction only checks items whose `ITEM_LIMIT` is above
-zero. Consequently, two copies of the same limit-zero item may be equipped at
-once. This includes most ordinary Chaos equipment and several strong boss
-accessories, notably Satan's Ace, Satan's Heart, and Ring of Existence.
+The runtime now rejects exact duplicate rawcodes when an item is present in an
+authored boss pool or has tier 23 or higher. This captures pre-Chaos boss drops,
+direct Chaos boss drops, and boss-crafted endgame gear without preventing
+players from equipping duplicate ordinary pre-Chaos equipment. Existing
+`ITEM_LIMIT` groups continue to enforce broader mutually exclusive families
+such as crafted sets.
 
-The offline build analyzer now rejects duplicate rawcodes regardless of
-`ITEM_LIMIT`. Its generated builds therefore model a healthier one-copy rule
-that the game does not actually enforce. Older generated results even exposed
-six Ring of Existence copies as the leading generic spell-stat package.
-
-This requires an explicit policy:
-
-- If duplicate equipment is intended, the analyzer must allow it and balance
-  should account for six-copy boss-item builds.
-- If duplicate equipment is not intended, exact duplicate rawcodes should be
-  rejected for equipped slots even when their limit group is zero. Shared
-  limit groups can continue handling mutually exclusive families such as sets.
-
-Changing this silently would invalidate existing builds, so this audit does
-not choose one policy.
+The offline analyzer's exact-duplicate rule is therefore aligned for
+boss-grade equipment but remains stricter for ordinary items. Future analyzer
+runs should adopt the same acquisition/tier predicate if ordinary duplicate
+builds need to be modeled exactly.
 
 ## Acquisition metadata limitations
 
@@ -188,25 +153,19 @@ therefore appear unavailable in a naive export analysis even though they are
 awarded by the headhunter quests. Future exports should add a `quest_reward`
 column before using acquisition flags to identify orphaned items.
 
-One item remains suspicious after the quest cross-check: **Unbroken Bow
-(`I06X`, level 30)** exists but is not referenced by a drop pool, shop, recipe,
-quest reward, or runtime definition. Sword of Floyd is also unavailable, but
-is explicitly spawned only by developer commands and appears intentionally
+Unbroken Bow (`I06X`, level 30) remains unavailable by design: a similar
+pre-Chaos Hell component already fills its role, while Unbroken enemies are
+primarily an armor source. Sword of Floyd is also unavailable, but is
+explicitly spawned only by developer commands and appears intentionally
 non-production.
 
 ## Recommended correction order
 
-1. Correct Nightmare Set Staff, Hell Set Staff, and Existence Set Bow in object
-   data, then regenerate the item export.
-2. Decide and implement Orsted's reward identity.
-3. Decide whether exact duplicate equipped items are legal; make the runtime
-   and analyzer follow the same rule.
-4. Decide whether Pure Existence is meant to award future level-340 gear.
-5. Replace Arkaden's recycled outcomes or explicitly present Arkaden as a
-   second-chance source for Death Knight gear.
-6. Add quest rewards to the balance export and either place or retire
-   Unbroken Bow.
+1. Regenerate the item export after the object-data and pool corrections.
+2. Add quest rewards to the balance export.
+3. Decide whether Dark Regeneration's level-308 requirement is intentional.
+4. Review Orsted's new weapon values after live combat and upgrade testing.
 
-After those decisions, rerun `-balance items` and the level
+After those changes, rerun `-balance items` and the level
 50/100/200/300/400/500 build matrix. That regenerated catalog is necessary for
 a trustworthy second-pass numerical comparison after object-data corrections.

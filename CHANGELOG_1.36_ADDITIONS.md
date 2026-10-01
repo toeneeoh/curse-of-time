@@ -168,6 +168,8 @@ visual cleanup are intentionally excluded.
   resources, while removing them lowers current resources proportionally.
 - Charge counts are now preserved when saving all charged items, including
   rechargeable resurrection items.
+- Exact duplicate boss items and endgame boss-grade equipment can no longer be
+  equipped together; duplicate ordinary pre-Chaos items remain legal.
 
 ## Boss Changes
 
@@ -180,6 +182,10 @@ visual cleanup are intentionally excluded.
   Mortify or Terrify for the entire Freeze cooldown.
 - Reduced the delay between Essence of Darkness cast announcements and the
   corresponding Freeze, Mortify, or Terrify effect.
+- Added five unique level-250 weapon drops to Orsted.
+- Replaced Arkaden's repeated Death Knight rewards with three unique level-140
+  items while retaining Chronos Stone in his pool.
+- Raised Pure Existence to level 340 to match its rewards.
 
 ## Hero Changes
 

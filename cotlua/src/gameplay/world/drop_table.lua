@@ -8,6 +8,7 @@
 
     ItemDrops = array2d(0)
     Rates = __jarray(0)
+    BossDropItems = __jarray(false)
 
     local COLOSSEUM_TICKET = FourCC('I008')
     local COLOSSEUM_TICKET_CHANCE = 0.0025
@@ -22,6 +23,7 @@
     ---@field registerBossDropSource fun(self: DropTable, source: BossDropSource): boolean
     ---@field getBossDropEntries fun(self: DropTable, boss: Boss, multiplier: number): BossDropEntry[]
     ---@field rollBossDrops fun(self: DropTable, boss: Boss, x: number, y: number, multiplier: number)
+    ---@field isBossGradeItem fun(self: DropTable, item_id: integer): boolean
     DropTable = {}
     do
         local thistype = DropTable
@@ -345,6 +347,21 @@
             return hero and math.max(0., Unit[hero].drop_rate) or 1.
         end
 
+        ---Defines a boss's equipment pool and records its contents for item
+        ---equip rules. This deliberately follows authored acquisition rather
+        ---than tier alone because pre-Chaos boss items share tiers with
+        ---ordinary equipment.
+        local function setup_boss_rates(id, ...)
+            setup_rates(id, ...)
+            for _, rawcode in ipairs(table.pack(...)) do
+                BossDropItems[FourCC(rawcode)] = true
+            end
+        end
+
+        function thistype:isBossGradeItem(item_id)
+            return BossDropItems[item_id]
+        end
+
         function RewardItem(killed, killer)
             local uid = GetType(killed)
             local rand = math.random(0, 99)
@@ -500,112 +517,116 @@
 
         id = FourCC('n02U') -- nerubian
         Rates[id] = 100
-        setup_rates(id, 'I01E')
+        setup_boss_rates(id, 'I01E')
 
         id = FourCC('n0pb') -- giant polar bear
         Rates[id] = 100
-        setup_rates(id, 'I04A')
+        setup_boss_rates(id, 'I04A')
 
         id = FourCC('n03L') -- king of ogres
         Rates[id] = 100
-        setup_rates(id, 'I02M')
+        setup_boss_rates(id, 'I02M')
 
         id = FourCC('n02H') -- yeti
         Rates[id] = 100
-        setup_rates(id, 'I05R')
+        setup_boss_rates(id, 'I05R')
 
         id = FourCC('H02H') -- paladin
         Rates[id] = 80
-        setup_rates(id, 'I0F9', 'I03P', 'I0C0', 'I0FX')
+        setup_boss_rates(id, 'I0F9', 'I03P', 'I0C0', 'I0FX')
 
         id = FourCC('O002') -- minotaur
         Rates[id] = 70
-        setup_rates(id, 'I03T', 'I0FW', 'I07U', 'I076', 'I078')
+        setup_boss_rates(id, 'I03T', 'I0FW', 'I07U', 'I076', 'I078')
 
         id = FourCC('H020') -- lady vashj
         Rates[id] = 70
-        setup_rates(id, 'I09F', 'I09L')
+        setup_boss_rates(id, 'I09F', 'I09L')
 
         id = FourCC('H01V') -- dwarven
         Rates[id] = 70
-        setup_rates(id, 'I079', 'I07B', 'I0FC')
+        setup_boss_rates(id, 'I079', 'I07B', 'I0FC')
 
         id = FourCC('H040') -- death knight
         Rates[id] = 80
-        setup_rates(id, 'I02O', 'I029', 'I02C', 'I02B')
+        setup_boss_rates(id, 'I02O', 'I029', 'I02C', 'I02B')
 
         id = FourCC('U00G') -- tri fire
         Rates[id] = 70
-        setup_rates(id, 'I0FA', 'I0FU', 'I00V', 'I03Y')
+        setup_boss_rates(id, 'I0FA', 'I0FU', 'I00V', 'I03Y')
 
         id = FourCC('H045') -- mystic
         Rates[id] = 70
-        setup_rates(id, 'I03U', 'I0F3', 'I07F')
+        setup_boss_rates(id, 'I03U', 'I0F3', 'I07F')
 
         id = FourCC('O01B') -- dragoon
         Rates[id] = 70
-        setup_rates(id, 'I0EX', 'I0EY', 'I074', 'I04N')
+        setup_boss_rates(id, 'I0EX', 'I0EY', 'I074', 'I04N')
 
         id = FourCC('E00B') -- goddess of hate
         Rates[id] = 100
-        setup_rates(id, 'I02Z')
+        setup_boss_rates(id, 'I02Z')
 
         id = FourCC('E00D') -- goddess of love
         Rates[id] = 100
-        setup_rates(id, 'I030')
+        setup_boss_rates(id, 'I030')
 
         id = FourCC('E00C') -- goddess of knowledge
         Rates[id] = 100
-        setup_rates(id, 'I031')
+        setup_boss_rates(id, 'I031')
 
         id = FourCC('H04Q') -- goddess of life
         Rates[id] = 100
-        setup_rates(id, 'I04I')
+        setup_boss_rates(id, 'I04I')
 
         id = FourCC('H00O') -- arkaden
         Rates[id] = 80
-        setup_rates(id, 'I02O', 'I02C', 'I02B', 'I036')
+        setup_boss_rates(id, 'I0O2', 'I0O3', 'I0O4', 'I036')
 
         id = FourCC('N038') -- demon prince
         Rates[id] = 100
-        setup_rates(id, 'I04Q')
+        setup_boss_rates(id, 'I04Q')
 
         id = FourCC('N017') -- absolute horror
         Rates[id] = 85
-        setup_rates(id, 'I0N7', 'I0N8', 'I0N9')
+        setup_boss_rates(id, 'I0N7', 'I0N8', 'I0N9')
+
+        id = FourCC('N00F') -- orsted
+        Rates[id] = 85
+        setup_boss_rates(id, 'I0O5', 'I0O6', 'I0O7', 'I0O8', 'I0O9')
 
         id = FourCC('O02B') -- slaughter
         Rates[id] = 85
-        setup_rates(id, 'I0AE', 'I04F', 'I0AF', 'I0AD', 'I0AG')
+        setup_boss_rates(id, 'I0AE', 'I04F', 'I0AF', 'I0AD', 'I0AG')
 
         id = FourCC('O02H') -- dark soul
         Rates[id] = 70
-        setup_rates(id, 'I05A', 'I0AH', 'I0AP', 'I0AI')
+        setup_boss_rates(id, 'I05A', 'I0AH', 'I0AP', 'I0AI')
 
         id = FourCC('O02I') -- satan
         Rates[id] = 65
-        setup_rates(id, 'I0BX', 'I05J')
+        setup_boss_rates(id, 'I0BX', 'I05J')
 
         id = FourCC('O02K') -- thanatos
         Rates[id] = 65
-        setup_rates(id, 'I04E', 'I0MR')
+        setup_boss_rates(id, 'I04E', 'I0MR')
 
         id = FourCC('H04R') -- legion
         Rates[id] = 60
-        setup_rates(id, 'I0B5', 'I0B7', 'I0B1', 'I0AU', 'I04L', 'I0AJ', 'I0AZ',
-                    'I0AS', 'I0AV', 'I0AX')
+        setup_boss_rates(id, 'I0B5', 'I0B7', 'I0B1', 'I0AU', 'I04L', 'I0AJ',
+                         'I0AZ', 'I0AS', 'I0AV', 'I0AX')
 
         id = FourCC('O02M') -- existence
         Rates[id] = 60
-        setup_rates(id, 'I018', 'I0BY')
+        setup_boss_rates(id, 'I018', 'I0BY')
 
         id = FourCC('O03G') -- xallarath
         Rates[id] = 30
-        setup_rates(id, 'I0OB', 'I0O1', 'I0CH')
+        setup_boss_rates(id, 'I0OB', 'I0O1', 'I0CH')
 
         id = FourCC('O02T') -- azazoth
         Rates[id] = 60
-        setup_rates(id, 'I0BS', 'I0BV', 'I0BK', 'I0BI', 'I0BB', 'I0BC', 'I0BE',
-                    'I0B9', 'I0BG', 'I06M')
+        setup_boss_rates(id, 'I0BS', 'I0BV', 'I0BK', 'I0BI', 'I0BB', 'I0BC',
+                         'I0BE', 'I0B9', 'I0BG', 'I06M')
     end
 end, Debug and Debug.getLine())

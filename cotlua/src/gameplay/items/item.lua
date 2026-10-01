@@ -922,11 +922,31 @@
             end
         end
 
+        ---Boss-pool membership covers pre-Chaos rewards whose numeric tier is
+        ---shared with ordinary equipment. Tier 23+ also includes boss-crafted
+        ---and other endgame boss-grade equipment.
+        ---@param itm Item
+        ---@return boolean
+        local function requires_unique_copy(itm)
+            local tier = item_data(itm)[ITEM_TIER] or 0
+            return itm.limit > 0 or tier >= 23 or
+                       (BossDropItems and BossDropItems[itm.id])
+        end
+
         ---@type fun(itm: Item, itm2: Item): boolean
         local function has_conflict(itm, itm2)
-            local same_limit = itm.limit == itm2.limit
-            return (same_limit and itm.id == itm2.id) or
-                       (same_limit and itm.limit ~= 1)
+            if itm.id == itm2.id and requires_unique_copy(itm) then return true end
+            return itm.limit > 1 and itm.limit == itm2.limit
+        end
+
+        -- Public read-only helpers keep architecture tests and future item
+        -- services on the same restriction policy as inventory validation.
+        ItemRuntime.requiresUniqueCopy = requires_unique_copy
+        ItemRuntime.itemsConflict = has_conflict
+
+        local function conflict_message(itm)
+            if itm.limit > 0 then return LIMIT_STRING[itm.limit] end
+            return "You can only equip one copy of boss-grade equipment."
         end
 
         ---@param itm Item
@@ -934,10 +954,10 @@
         ---@return boolean, string?
         local function is_item_limited(itm, ignore)
             local candidates = {itm}
-            local has_limit = itm.limit > 0
+            local has_limit = requires_unique_copy(itm)
             for _, socket in ipairs(itm.sockets or {}) do
                 candidates[#candidates + 1] = socket
-                has_limit = has_limit or socket.limit > 0
+                has_limit = has_limit or requires_unique_copy(socket)
             end
 
             if not has_limit then return false end
@@ -949,14 +969,14 @@
 
                 if itm2 and itm2 ~= ignore and itm ~= itm2 then
                     for _, candidate in ipairs(candidates) do
-                        if candidate.limit > 0 then
+                        if requires_unique_copy(candidate) then
                             if has_conflict(candidate, itm2) then
-                                return true, LIMIT_STRING[candidate.limit]
+                                return true, conflict_message(candidate)
                             end
 
                             for _, socket in ipairs(itm2.sockets or {}) do
                                 if has_conflict(candidate, socket) then
-                                    return true, LIMIT_STRING[candidate.limit]
+                                    return true, conflict_message(candidate)
                                 end
                             end
                         end

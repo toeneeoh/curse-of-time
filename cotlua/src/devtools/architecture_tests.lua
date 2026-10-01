@@ -761,7 +761,7 @@ OnInit.final("ArchitectureTests", function(Require)
     ArchitectureTests.register("boss item distributions are normalized",
                                function()
         local boss_ids = {
-            FourCC('H02H'), FourCC('O02H'), FourCC('H04R'),
+            FourCC('H02H'), FourCC('N00F'), FourCC('O02H'), FourCC('H04R'),
             FourCC('O02T')
         }
         for index = 1, #boss_ids do
@@ -785,8 +785,21 @@ OnInit.final("ArchitectureTests", function(Require)
             type(DropTable.registerBossDropSource) ~= "function" or
             type(DropTable.getBossDropEntries) ~= "function" or
             type(DropTable.getBossEquipmentChance) ~= "function" or
-            type(DropTable.rollBossDrops) ~= "function" then
+            type(DropTable.rollBossDrops) ~= "function" or
+            type(DropTable.isBossGradeItem) ~= "function" then
             return false, "boss drop chance helpers are unavailable"
+        end
+
+        if not DropTable:isBossGradeItem(FourCC('I0O2')) or
+            not DropTable:isBossGradeItem(FourCC('I0O5')) or
+            DropTable:isBossGradeItem(FourCC('I01Z')) then
+            return false, "boss equipment classification is incomplete"
+        end
+        for item_id = FourCC('I0O2'), FourCC('I0O9') do
+            local save_index = item_id - CUSTOM_ITEM_OFFSET
+            if save_index <= 0 or save_index > 0x1FFF then
+                return false, "new boss equipment falls outside the save range"
+            end
         end
 
         local preview = DropTable:getBossDropEntries({
@@ -817,6 +830,38 @@ OnInit.final("ArchitectureTests", function(Require)
             found_chaos or
             (CHAOS_MODE and (not found_donor or not found_legendary)) then
             return false, "boss drop registry preview is incomplete"
+        end
+        return true
+    end)
+
+    ArchitectureTests.register("boss-grade exact copies conflict",
+                               function()
+        if type(ItemRuntime.requiresUniqueCopy) ~= "function" or
+            type(ItemRuntime.itemsConflict) ~= "function" then
+            return false, "item uniqueness helpers are unavailable"
+        end
+
+        local function fake(id, tier, limit)
+            return {
+                id = FourCC(id),
+                limit = limit or 0,
+                data = {[ITEM_TIER] = tier or 0},
+            }
+        end
+
+        local boss_a = fake('I0O2', 9)
+        local boss_b = fake('I0O2', 9)
+        local crafted_a = fake('I0NB', 23)
+        local crafted_b = fake('I0NB', 23)
+        local basic_a = fake('I01Z', 1)
+        local basic_b = fake('I01Z', 1)
+        local different_boss = fake('I0O3', 9)
+
+        if not ItemRuntime.itemsConflict(boss_a, boss_b) or
+            not ItemRuntime.itemsConflict(crafted_a, crafted_b) or
+            ItemRuntime.itemsConflict(basic_a, basic_b) or
+            ItemRuntime.itemsConflict(boss_a, different_boss) then
+            return false, "exact-copy policy did not preserve its tier boundary"
         end
         return true
     end)

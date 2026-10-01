@@ -195,7 +195,7 @@ OnInit.final("Chaos", function(Require)
         5, 2000)
         -- Existence
         x, y = GetRandomXYInRect(gg_rct_Existence_Boss_Spawn)
-        Boss.create(BOSS_EXISTENCE, x, y, bj_UNIT_FACING, FourCC('O02M'), "Pure Existence", 320,
+        Boss.create(BOSS_EXISTENCE, x, y, bj_UNIT_FACING, FourCC('O02M'), "Pure Existence", 340,
         8, 2000)
         -- Azazoth
         Boss.create(BOSS_AZAZOTH, GetRectCenterX(gg_rct_Azazoth_Boss_Spawn), GetRectCenterY(gg_rct_Azazoth_Boss_Spawn), 270.00, FourCC('O02T'), "Azazoth", 380,
