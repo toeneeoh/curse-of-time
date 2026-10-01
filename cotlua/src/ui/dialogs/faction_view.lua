@@ -83,6 +83,31 @@ OnInit.final("FactionView", function(Require)
     BlzFrameSetAllPoints(rank_count, rank_charge)
     BlzFrameSetTextAlignment(rank_count, TEXT_JUSTIFY_CENTER, TEXT_JUSTIFY_MIDDLE)
 
+    local momentum_backdrop = BlzCreateFrame(
+        "EscMenuControlBackdropTemplate", main, 0, 0)
+    BlzFrameSetPoint(momentum_backdrop, FRAMEPOINT_TOP, main,
+                     FRAMEPOINT_TOP, 0., -0.212)
+    BlzFrameSetSize(momentum_backdrop, 0.19, 0.022)
+    BlzFrameSetEnable(momentum_backdrop, false)
+    local momentum_bar = BlzCreateFrameByType("SIMPLESTATUSBAR", "",
+                                              momentum_backdrop, "", 0)
+    BlzFrameSetPoint(momentum_bar, FRAMEPOINT_TOPLEFT, momentum_backdrop,
+                     FRAMEPOINT_TOPLEFT, 0.004, -0.004)
+    BlzFrameSetPoint(momentum_bar, FRAMEPOINT_BOTTOMRIGHT, momentum_backdrop,
+                     FRAMEPOINT_BOTTOMRIGHT, -0.004, 0.004)
+    BlzFrameSetTexture(momentum_bar,
+                       "ui\\feedback\\xpbar\\human-bigbar-fill", 0, true)
+    BlzFrameSetMinMaxValue(momentum_bar, 0., Faction.getMomentumGoal())
+    BlzFrameSetEnable(momentum_bar, false)
+    local momentum_text = BlzCreateFrameByType("TEXT", "", momentum_backdrop,
+                                               "", 0)
+    BlzFrameSetAllPoints(momentum_text, momentum_backdrop)
+    BlzFrameSetTextAlignment(momentum_text, TEXT_JUSTIFY_CENTER,
+                             TEXT_JUSTIFY_MIDDLE)
+    BlzFrameSetScale(momentum_text, 0.72)
+    BlzFrameSetEnable(momentum_text, false)
+    BlzFrameSetVisible(momentum_backdrop, false)
+
     local bounty_title = BlzCreateFrame("TitleText", main, 0, 0)
     BlzFrameSetPoint(bounty_title, FRAMEPOINT_TOP, main,
                      FRAMEPOINT_TOP, 0., -0.124)
@@ -417,6 +442,16 @@ OnInit.final("FactionView", function(Require)
             lifetime_line = lifetime_points .. " |cff80ff80(MAX)|r"
         end
         BlzFrameSetText(rank_count, "|cffffcc00" .. rank .. "|r")
+        local show_momentum = Faction.hasMomentumReward(faction.id)
+        if show_momentum then
+            local momentum = Faction.getMomentum(faction.id)
+            local goal = Faction.getMomentumGoal()
+            BlzFrameSetValue(momentum_bar, momentum)
+            BlzFrameSetText(momentum_text,
+                (faction.momentum_reward_name or "Faction Momentum") ..
+                    ": " .. momentum .. " / " .. goal)
+        end
+        BlzFrameSetVisible(momentum_backdrop, show_momentum)
         BlzFrameSetTexture(faction_icon, faction.icon, 0, true)
         local faction_bulletins = bulletins[faction.id]
         local current_bulletin = bulletin_index[pid] or 1

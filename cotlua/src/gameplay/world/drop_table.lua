@@ -326,6 +326,33 @@
             end,
         })
 
+        thistype:registerBossDropSource({
+            key = "chaos_flask",
+            available = function() return CHAOS_MODE end,
+            describe = function(boss, multiplier)
+                local _, _, chance = PotionService.getChaosBossDropChances(
+                                         boss.level, boss.difficulty)
+                if chance <= 0. then return {} end
+                local name, icon, tooltip =
+                    PotionService.getChaosFlaskPresentation()
+                return {{
+                    key = "chaos_flask",
+                    name = name,
+                    icon = icon,
+                    tooltip = tooltip,
+                    chance = chance * multiplier,
+                }}
+            end,
+            roll = function(boss, x, y, multiplier)
+                local _, _, chance = PotionService.getChaosBossDropChances(
+                                         boss.level, boss.difficulty)
+                if GetRandomReal(0., 1.) < chance * multiplier then
+                    PotionService.create(PotionService.CHAOS_FLASK_KEY,
+                                         x, y, 600.)
+                end
+            end,
+        })
+
         ---@type fun(id: integer, ...)
         local function setup_rates(id, ...)
             local t = table.pack(...)

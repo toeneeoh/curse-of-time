@@ -14,7 +14,7 @@ OnInit.final("PotionService", function(Require)
     PotionService = {}
 
     local TQ = TimerQueue
-    local DEFAULT_USE_COOLDOWN = 3.
+    local DEFAULT_USE_COOLDOWN = 5.
     local EQUIP_COOLDOWN = 10.
     local VAMPIRIC_DURATION = 12.
     local VAMPIRIC_LEECH = 0.05
@@ -77,6 +77,7 @@ OnInit.final("PotionService", function(Require)
     local TEMPEST_ID = 9
     local HUNTERS_ID = 10
     local LEGENDARY_CHAOS_ID = 11
+    local CHAOS_FLASK_ID = 29
     local FIRST_DONOR_ID = 12
     local BLOOD_FLASK_ICON =
         "ReplaceableTextures\\CommandButtons\\BTNPotionOfVampirism.blp"
@@ -118,6 +119,7 @@ OnInit.final("PotionService", function(Require)
     local TEMPEST_KEY = "tempest_flask"
     local HUNTERS_KEY = "hunters_flask"
     local LEGENDARY_CHAOS_KEY = "legendary_chaos_flask"
+    local CHAOS_FLASK_KEY = "chaos_flask"
     local cooldowns = {}
     local infusions = {}
     local catalysts = {}
@@ -299,6 +301,7 @@ OnInit.final("PotionService", function(Require)
     PotionService.TEMPEST_KEY = TEMPEST_KEY
     PotionService.HUNTERS_KEY = HUNTERS_KEY
     PotionService.LEGENDARY_CHAOS_KEY = LEGENDARY_CHAOS_KEY
+    PotionService.CHAOS_FLASK_KEY = CHAOS_FLASK_KEY
     PotionService.ROLLABLE_STATS = {
         ITEM_FLAT_HEAL, ITEM_PERCENT_HEAL, ITEM_FLAT_MANA, ITEM_PERCENT_MANA,
         ITEM_CHARGES
@@ -612,23 +615,28 @@ OnInit.final("PotionService", function(Require)
                           ITEM_PERCENT_MANA)
 
     local function prepare_chaos_flask(flat_health, percent_health, flat_mana,
-                                       percent_mana)
+                                       percent_mana, options)
+        options = options or {}
         return function(data, carrier_data)
-            data[ITEM_TIER] = 12
-            data[ITEM_LEVEL_REQUIREMENT] = 200
-            local function restoration(stat, maximum)
+            data[ITEM_TIER] = options.item_tier or 12
+            data[ITEM_LEVEL_REQUIREMENT] = options.level_requirement or 200
+            local function restoration(stat, maximum, minimum)
                 if maximum <= 0 then return end
-                data[stat] = math.max(1, math.floor(maximum * 0.5))
+                data[stat] = math.max(1, math.floor(minimum or maximum * 0.5))
                 data[stat .. "range"] = maximum
                 data[stat .. "fixed"] = 1
             end
-            restoration(ITEM_FLAT_HEAL, flat_health)
-            restoration(ITEM_PERCENT_HEAL, percent_health)
-            restoration(ITEM_FLAT_MANA, flat_mana)
-            restoration(ITEM_PERCENT_MANA, percent_mana)
-            data[ITEM_CHARGES] = math.max(CHAOS_CHARGE_MIN,
+            restoration(ITEM_FLAT_HEAL, flat_health, options.flat_min)
+            restoration(ITEM_PERCENT_HEAL, percent_health,
+                        options.percent_min)
+            restoration(ITEM_FLAT_MANA, flat_mana, options.flat_min)
+            restoration(ITEM_PERCENT_MANA, percent_mana,
+                        options.percent_min)
+            data[ITEM_CHARGES] = math.max(options.charge_min or
+                                              CHAOS_CHARGE_MIN,
                                           carrier_data[ITEM_CHARGES])
-            data[ITEM_CHARGES .. "range"] = CHAOS_CHARGE_MAX
+            data[ITEM_CHARGES .. "range"] = options.charge_max or
+                                                 CHAOS_CHARGE_MAX
             data[ITEM_CHARGES .. "fixed"] = 1
         end
     end
@@ -756,6 +764,31 @@ OnInit.final("PotionService", function(Require)
         prepare_data = prepare_chaos_flask(40000, 25, 40000, 25)
     }, {
         cooldown = DEFAULT_USE_COOLDOWN,
+        affix_capacity = 2
+    })
+
+    PotionService.define(CHAOS_FLASK_KEY, {
+        id = CHAOS_FLASK_ID,
+        carrier = HEALTH_FLASK_ID,
+        name = "Chaos Flask",
+        icon =
+            "ReplaceableTextures\\CommandButtons\\BTNSimpleHugePotion5_5.dds",
+        tooltip = "|cff808080The glass strains to contain a mixture that refuses every natural law.|r",
+        display_rarity = 5,
+        inherit_stats = chaos_inherited_stats,
+        prepare_data = prepare_chaos_flask(70000, 35, 70000, 35, {
+            level_requirement = 300,
+            flat_min = 35000,
+            percent_min = 20,
+            charge_min = 6,
+            charge_max = 10,
+        })
+    }, {
+        cooldown = DEFAULT_USE_COOLDOWN,
+        cooldown_min = 2.25,
+        cooldown_max = 4.,
+        infusion_min = 1.,
+        infusion_max = 1.20,
         affix_capacity = 2
     })
 
@@ -1255,9 +1288,15 @@ OnInit.final("PotionService", function(Require)
                "A legendary potion base with open Prefix and Suffix slots.|n|cff808080Two currents spiral through the glass without ever mingling.|r"
     end
 
+    function PotionService.getChaosFlaskPresentation()
+        return "Chaos Flask",
+               "ReplaceableTextures\\CommandButtons\\BTNSimpleHugePotion5_5.dds",
+               "A Chaos potion base with superior restoration, charges, cooldown, and Prefix rolls.|n|cff808080The glass strains to contain a mixture that refuses every natural law.|r"
+    end
+
     ---Returns independent Chaos-boss drop chances. Affix donors remain
-    ---obtainable enough to support brewing, while the two-affix legendary
-    ---base deliberately ranges from roughly 1:20,000 to 1:1,000 per kill.
+    ---obtainable enough to support brewing, while the two-affix Legendary and
+    ---stronger Chaos bases remain exceptionally rare boss-only finds.
     ---Both rewards improve with boss level and selected boss difficulty.
     function PotionService.getChaosBossDropChances(level, difficulty)
         local progress = math.max(0., math.min(1., ((level or 200) - 200.) /
@@ -1268,7 +1307,12 @@ OnInit.final("PotionService", function(Require)
         local legendary = math.min(0.0025,
             (0.00005 + 0.00045 * progress * progress) *
                 (1. + 0.25 * (challenge - 1)))
-        return donor, legendary
+        local chaos_progress = math.max(0., math.min(1.,
+            ((level or 200) - 300.) / 100.))
+        local chaos = level and level >= 300 and math.min(0.0005,
+            (0.00001 + 0.00009 * chaos_progress * chaos_progress) *
+                (1. + 0.25 * (challenge - 1))) or 0.
+        return donor, legendary, chaos
     end
 
     local function potion_at(pid, index)
@@ -1328,6 +1372,8 @@ OnInit.final("PotionService", function(Require)
                item.tooltip or BlzGetItemDescription(item.obj)
     end
 
+    local potion_behavior
+
     local function selected_customization(item, registry, quality_index)
         local id = item and item.quality and item.quality[quality_index] or 0
         return registry[id], id
@@ -1362,7 +1408,12 @@ OnInit.final("PotionService", function(Require)
     function PotionService.getInfusionMultiplier(item)
         local quality = PotionService.getInfusionQuality(item)
         if quality == nil then return 1. end
-        return rolled_value(INFUSION_ROLL_MIN, INFUSION_ROLL_MAX, quality)
+        local behavior = potion_behavior and potion_behavior(item)
+        local minimum = behavior and behavior.infusion_min or
+                            INFUSION_ROLL_MIN
+        local maximum = behavior and behavior.infusion_max or
+                            INFUSION_ROLL_MAX
+        return rolled_value(minimum, maximum, quality)
     end
 
     local function append_customization(item, definition, multiplier)
@@ -1370,9 +1421,14 @@ OnInit.final("PotionService", function(Require)
         local description = definition.describe and
                                 definition.describe(multiplier or 1.) or
                                 definition.description
+        local behavior = potion_behavior and potion_behavior(item)
+        local infusion_min = behavior and behavior.infusion_min or
+                                 INFUSION_ROLL_MIN
+        local infusion_max = behavior and behavior.infusion_max or
+                                 INFUSION_ROLL_MAX
         local alt_description = definition.describe and multiplier and
-                                    definition.describe(INFUSION_ROLL_MIN,
-                                                        INFUSION_ROLL_MAX) or
+                                    definition.describe(infusion_min,
+                                                        infusion_max) or
                                     description
         local line = "|n|cff0080c0" .. definition.name .. ":|r " ..
                          description
@@ -1646,7 +1702,7 @@ OnInit.final("PotionService", function(Require)
         return duration
     end
 
-    local function potion_behavior(item)
+    potion_behavior = function(item)
         local definition = item.runtime_definition
         local metadata = definition and definition.metadata or nil
         return metadata and metadata.potion or nil
@@ -1669,11 +1725,11 @@ OnInit.final("PotionService", function(Require)
 
         local cooldown_quality = PotionService.getCooldownQuality(item)
         if cooldown_quality ~= nil then
-            cooldown = cooldown *
-                           (rolled_value(CHAOS_COOLDOWN_MAX,
-                                         CHAOS_COOLDOWN_MIN,
-                                         cooldown_quality) /
-                               DEFAULT_USE_COOLDOWN)
+            local maximum = behavior and behavior.cooldown_max or
+                                CHAOS_COOLDOWN_MAX
+            local minimum = behavior and behavior.cooldown_min or
+                                CHAOS_COOLDOWN_MIN
+            cooldown = rolled_value(maximum, minimum, cooldown_quality)
         end
 
         local catalyst = selected_customization(item, catalysts,
@@ -1700,10 +1756,12 @@ OnInit.final("PotionService", function(Require)
             cooldown = math.max(0., cooldown * catalyst_multiplier)
             return cooldown, cooldown
         end
-        return math.max(0., cooldown * CHAOS_COOLDOWN_MIN /
-                            DEFAULT_USE_COOLDOWN * catalyst_multiplier),
-               math.max(0., cooldown * CHAOS_COOLDOWN_MAX /
-                            DEFAULT_USE_COOLDOWN * catalyst_multiplier)
+        local minimum = behavior and behavior.cooldown_min or
+                            CHAOS_COOLDOWN_MIN
+        local maximum = behavior and behavior.cooldown_max or
+                            CHAOS_COOLDOWN_MAX
+        return math.max(0., minimum * catalyst_multiplier),
+               math.max(0., maximum * catalyst_multiplier)
     end
 
     ---Returns the complete potion property set used by future refinement and
@@ -2027,8 +2085,12 @@ OnInit.final("PotionService", function(Require)
                 text = concise_number(rolled_value(upper, lower, quality)) ..
                            "s Cooldown"
             else
-                text = concise_number(rolled_value(INFUSION_ROLL_MIN,
-                                                   INFUSION_ROLL_MAX,
+                local behavior = potion_behavior(item)
+                local minimum = behavior and behavior.infusion_min or
+                                    INFUSION_ROLL_MIN
+                local maximum = behavior and behavior.infusion_max or
+                                    INFUSION_ROLL_MAX
+                text = concise_number(rolled_value(minimum, maximum,
                                                    quality) * 100.) ..
                            "% Prefix Potency"
             end

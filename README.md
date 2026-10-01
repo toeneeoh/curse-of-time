@@ -29,10 +29,6 @@ Flux: Buff System
 
 ModdieMads: Async Mouse Screen
 
-Darkfang: Lightning Speed Bottle icon
-
-Panda: Potion Vials icon pack
-
 ##
 
 Lua development made possible with the help of these tools:

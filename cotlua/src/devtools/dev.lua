@@ -58,8 +58,9 @@
         ["leavefaction"] = "Immediately leave your active faction while preserving its progress.",
         ["mining"] = "Spawn a common, rich, or rare deposit beside your hero. usage: -mining [common|rich|rare]",
         ["factionevent"] = "Immediately start the next hourly faction event.",
+        ["momentum"] = "Add lobby Faction Momentum to your active faction. usage: -momentum [#]",
         ["bounty"] = "Give yourself a Vanguard Bounty consumable.",
-        ["potion"] = "Spawn potion test drops. usage: -potion [all|legendary|donor|prefixes|suffixes|aegis|fury|arcane|swiftness|purity|omniscience|frenzy|phasing|potent|lingering|accelerant|bountiful|conserving|echoing]",
+        ["potion"] = "Spawn potion test drops. usage: -potion [all|legendary|chaos|donor|prefixes|suffixes|corrosive|voltaic|overflow|...]",
         ["lvl"] = "Set the selected hero's level to #. usage: -lvl [1-500]",
         ["str"] = "Set the selected hero's strength to #. usage: -str [#]",
         ["agi"] = "Set the selected hero's agility to #. usage: -agi [#]",
@@ -329,6 +330,14 @@ modifiers:
                 DisplayTextToPlayer(p, 0., 0., "You are not in a faction.")
             end
         end,
+        ["momentum"] = function(p, pid, args)
+            local faction = Faction.getFaction(pid)
+            if not faction or not Faction.addMomentum(
+                faction.id, S2I(args[2]) or 0) then
+                DisplayTextToPlayer(p, 0., 0.,
+                                    "Your active faction has no project yet.")
+            end
+        end,
         ["bounty"] = function(p, pid)
             if not FactionConsumables.create(
                 FactionConsumables.VANGUARD_BOUNTY_KEY, pid) then
@@ -349,6 +358,8 @@ modifiers:
 
             if choice == "legendary" then
                 spawn(PotionService.LEGENDARY_CHAOS_KEY, 0)
+            elseif choice == "chaos" then
+                spawn(PotionService.CHAOS_FLASK_KEY, 0)
             elseif choice == "donor" then
                 PotionService.createChaosDonor(x + 150., y, 600.)
             elseif choice == "prefixes" or choice == "suffixes" then
@@ -368,7 +379,8 @@ modifiers:
                     PotionService.STONEBLOOD_KEY,
                     PotionService.TEMPEST_KEY,
                     PotionService.HUNTERS_KEY,
-                    PotionService.LEGENDARY_CHAOS_KEY
+                    PotionService.LEGENDARY_CHAOS_KEY,
+                    PotionService.CHAOS_FLASK_KEY
                 }
                 for _, key in ipairs(keys) do catalog[#catalog + 1] = key end
                 for index, key in ipairs(catalog) do spawn(key, index - 1) end

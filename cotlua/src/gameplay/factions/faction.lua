@@ -47,6 +47,7 @@ OnInit.final("Faction", function(Require)
     ---@field icon string
     ---@field leader unit
     ---@field shop unit
+    ---@field momentum_reward_name? string
     Faction = {}
     Faction.__index = Faction
 
@@ -78,9 +79,14 @@ OnInit.final("Faction", function(Require)
     local reroll_used = {}
     local rotation_completed = {}
     local quest_completion_actions = {}
+    local faction_momentum = __jarray(0)
+    local momentum_rewards = {}
+    local momentum_reward_names = {}
     local QUEST_REFRESH_PERIOD = 1800.
     local QUEST_REROLL_COST = 5
     local FACTION_SWITCH_COOLDOWN = 600.
+    local FACTION_MOMENTUM_GOAL = 100
+    local QUEST_MOMENTUM_REWARD = 5
     local schedule_quest_refresh
 
     local FACTION_RANK_THRESHOLDS = { 0, 100, 250, 450, 700, 1000, 1400, 1900, 2500, 3200 }
@@ -143,6 +149,69 @@ OnInit.final("Faction", function(Require)
     ---@param action fun(pid: integer, faction: Faction, quest: Quest)
     function Faction.registerQuestCompletionAction(action)
         quest_completion_actions[#quest_completion_actions + 1] = action
+    end
+
+    ---Registers a lobby-only faction project. Momentum is deliberately not
+    ---saved so completing a project rewards groups that remain together.
+    ---@param faction_id integer
+    ---@param reward_name string
+    ---@param action fun(faction: Faction): boolean?
+    function Faction.registerMomentumReward(faction_id, reward_name, action)
+        if faction_id <= 0 or type(action) ~= "function" then return false end
+        momentum_rewards[faction_id] = action
+        momentum_reward_names[faction_id] = reward_name
+        if Faction[faction_id] then
+            Faction[faction_id].momentum_reward_name = reward_name
+        end
+        return true
+    end
+
+    function Faction.getMomentum(faction_id)
+        return faction_momentum[faction_id] or 0
+    end
+
+    function Faction.getMomentumGoal()
+        return FACTION_MOMENTUM_GOAL
+    end
+
+    function Faction.hasMomentumReward(faction_id)
+        return momentum_rewards[faction_id] ~= nil
+    end
+
+    ---@param faction_id integer
+    ---@param amount integer
+    ---@return boolean, boolean completed
+    function Faction.addMomentum(faction_id, amount)
+        local faction = Faction[faction_id]
+        local reward = momentum_rewards[faction_id]
+        amount = math.max(0, math.floor(amount or 0))
+        if not faction or not reward or amount <= 0 then return false, false end
+
+        local total = math.min(FACTION_MOMENTUM_GOAL,
+                               Faction.getMomentum(faction_id) + amount)
+        faction_momentum[faction_id] = total
+        local completed = false
+        if total >= FACTION_MOMENTUM_GOAL then
+            local applied = reward(faction)
+            if applied ~= false then
+                faction_momentum[faction_id] = 0
+                completed = true
+                DisplayTextToForce(FORCE_PLAYING,
+                    "|cff80ff80Faction project completed:|r " ..
+                        (faction.momentum_reward_name or faction.name))
+            end
+        end
+
+        if view then
+            local user = User.first
+            while user do
+                if player_faction[user.id] == faction then
+                    view.refreshFaction(faction, user.id)
+                end
+                user = user.next
+            end
+        end
+        return true, completed
     end
 
     ---Temporarily shares a faction's rank-scaled blessing with allied heroes
@@ -422,6 +491,7 @@ OnInit.final("Faction", function(Require)
             buff = buff,
             icon = icon or buff.ICON,
             desc = desc,
+            momentum_reward_name = momentum_reward_names[id],
         }, Faction)
 
         BlzSetUnitName(self.shop, name .. " Quartermaster")
@@ -600,6 +670,10 @@ OnInit.final("Faction", function(Require)
         end
         for index = 1, #quest_completion_actions do
             quest_completion_actions[index](pid, player_faction[pid], quest)
+        end
+        local faction = player_faction[pid]
+        if faction then
+            Faction.addMomentum(faction.id, QUEST_MOMENTUM_REWARD)
         end
     end
 

@@ -33,6 +33,7 @@ OnInit.final("FactionEvents", function(Require)
     local PRESENCE_REWARD_THRESHOLD = 30
     local POINT_REWARD = 30
     local REPUTATION_REWARD = 30
+    local MOMENTUM_REWARD = 40
     local MELEE_TEMPLATE = FourCC('n002')
     local RANGED_TEMPLATE = FourCC('n008')
     local CACHE_MODEL = "Objects\\InventoryItems\\TreasureChest\\treasurechest.mdl"
@@ -312,6 +313,9 @@ OnInit.final("FactionEvents", function(Require)
                     StartSoundForPlayerBJ(Player(pid - 1), bj_questCompletedSound)
                     rewarded = rewarded + 1
                 end
+            end
+            if rewarded > 0 then
+                Faction.addMomentum(CAVE_VOYAGERS_ID, MOMENTUM_REWARD)
             end
             announce("|cff80ff80Hold the Line complete!|r " .. rewarded
                 .. " participant" .. (rewarded == 1 and " was" or "s were") .. " rewarded.")

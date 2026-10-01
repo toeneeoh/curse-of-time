@@ -28,11 +28,15 @@ OnInit.final("FactionMining", function(Require)
     local GUARDIAN_SHARE_RANGE = 1800.
     local GUARDIAN_POINT_REWARD = 2
     local GUARDIAN_REPUTATION_REWARD = 2
+    local SURVEY_BOOM_DURATION = 900.
+    local SURVEY_YIELD_MULTIPLIER = 2
     local deposits = setmetatable({}, { __mode = 'k' })
     local active_mining = {}
     local pending_mining = {}
     local guardians = setmetatable({}, { __mode = 'k' })
     local active = false
+    local survey_boom_active = false
+    local survey_boom_callback ---@type integer?
     local warned_missing_data = false
 
     local deposit_types = {
@@ -264,21 +268,25 @@ OnInit.final("FactionMining", function(Require)
         if active_mining[state.pid] ~= state then return end
         local deposit = state.deposit
         local config = deposit.config
+        local yield_multiplier = survey_boom_active and
+                                     SURVEY_YIELD_MULTIPLIER or 1
+        local reputation = config.reputation * yield_multiplier
+        local ore = config.ore * yield_multiplier
         local x, y = GetUnitX(deposit.unit), GetUnitY(deposit.unit)
         finish_mining_state(state)
 
-        Faction.addReputation(state.pid, config.reputation)
+        Faction.addReputation(state.pid, reputation)
         Quest.progress(state.pid, "mine_any")
         Quest.progress(state.pid, "mine_" .. config.key)
-        Quest.progress(state.pid, "mine_ore", config.ore)
+        Quest.progress(state.pid, "mine_ore", ore)
         Quest.progressUnique(state.pid, "mining_region", deposit.region_index)
         if config.key == "rare" then
             Quest.progress(state.pid, "rare_extraction")
         end
 
         DisplayTextToPlayer(Player(state.pid - 1), 0., 0., "Mined " .. config.name
-            .. ": |cffffcc00+" .. config.reputation .. " Lifetime Faction Points|r and "
-            .. config.ore .. " ore sample" .. (config.ore == 1 and "." or "s."))
+            .. ": |cffffcc00+" .. reputation .. " Lifetime Faction Points|r and "
+            .. ore .. " ore sample" .. (ore == 1 and "." or "s."))
         DestroyEffect(AddSpecialEffect("Abilities\\Spells\\Other\\Transmute\\PileofGold.mdl", x, y))
 
         remove_deposit(deposit, true)
@@ -533,6 +541,38 @@ OnInit.final("FactionMining", function(Require)
         return refreshed > 0 and refreshed or false
     end
 
+    local function finish_survey_boom()
+        survey_boom_callback = nil
+        survey_boom_active = false
+        DisplayTextToForce(FORCE_PLAYING,
+            "|cffc0c0c0The Cave Voyagers' Survey Boom has ended.|r")
+    end
+
+    ---Refreshes the world's deposits and doubles mining yields temporarily.
+    ---The state is lobby-only and may be renewed by another completed project.
+    function FactionMining.startSurveyBoom()
+        if not active then FactionMining.activate() end
+        if survey_boom_callback then
+            TimerQueue:disableCallback(survey_boom_callback)
+        end
+        survey_boom_active = true
+        FactionMining.refreshDeposits()
+        survey_boom_callback = TimerQueue:callDelayed(SURVEY_BOOM_DURATION,
+                                                       finish_survey_boom)
+        DisplayTextToForce(FORCE_PLAYING,
+            "|cff80ff80Survey Boom:|r Deposits have shifted and yield double ore and reputation for 15 minutes.")
+        return true
+    end
+
+    function FactionMining.isSurveyBoomActive()
+        return survey_boom_active
+    end
+
+    function FactionMining.getSurveyBoomRemaining()
+        return survey_boom_callback and
+                   (TimerQueue:getRemaining(survey_boom_callback) or 0.) or 0.
+    end
+
     if DEV_ENABLED then
         ---Spawns a deposit immediately for object-data and interaction testing.
         ---@param kind "common"|"rich"|"rare"
@@ -542,6 +582,9 @@ OnInit.final("FactionMining", function(Require)
     end
 
     Unit.onIndex(setup_mining_orders)
+
+    Faction.registerMomentumReward(CAVE_VOYAGERS_ID, "Survey Boom",
+                                   FactionMining.startSurveyBoom)
 
     local user = User.first
     while user do

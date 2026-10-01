@@ -268,7 +268,7 @@ OnInit.final("ArchitectureTests", function(Require)
         PotionService.refreshItem(starter)
         local starter_valid = starter and starter.tooltip and
                                   starter.tooltip:find(
-                                      "+ |cffffcc003|r Cooldown", 1, true)
+                                      "+ |cffffcc005|r Cooldown", 1, true)
         if starter then starter:destroy() end
         if not starter_valid then
             return false, "starter flask tooltip is missing its cooldown"
@@ -491,6 +491,13 @@ OnInit.final("ArchitectureTests", function(Require)
                 return false, "a priced faction consumable offer is missing"
             end
             if type(FactionMining.refreshDeposits) ~= "function" or
+                type(FactionMining.startSurveyBoom) ~= "function" or
+                type(FactionMining.isSurveyBoomActive) ~= "function" or
+                type(Faction.getMomentum) ~= "function" or
+                type(Faction.addMomentum) ~= "function" or
+                type(Faction.registerMomentumReward) ~= "function" or
+                Faction.getMomentumGoal() ~= 100 or
+                not Faction.hasMomentumReward(1) or
                 type(CaveVoyagersServices.shareBlessing) ~= "function" or
                 type(AshenVanguardServices.shareBlessing) ~= "function" or
                 type(AshenVanguardServices.hasBossBounty) ~= "function" or
@@ -663,6 +670,34 @@ OnInit.final("ArchitectureTests", function(Require)
             return true
         end)
 
+    ArchitectureTests.register("Chaos Flask improves every rolled property",
+                               function()
+        local item = PotionService.create(PotionService.CHAOS_FLASK_KEY,
+                                           30000., 30000., nil, false)
+        if not item then return false, "could not create Chaos Flask" end
+        local properties = PotionService.getProperties(item)
+        local lower_cooldown, upper_cooldown =
+            PotionService.getUseCooldownRange(item)
+        local valid = properties and properties.level_requirement == 300 and
+                          properties.maximum_charges >= 6 and
+                          properties.maximum_charges <= 10 and
+                          item.cached_lower[ITEM_FLAT_HEAL] == 35000 and
+                          item.cached_upper[ITEM_FLAT_HEAL] == 70000 and
+                          item.cached_lower[ITEM_PERCENT_HEAL] == 20 and
+                          item.cached_upper[ITEM_PERCENT_HEAL] == 35 and
+                          math.abs(lower_cooldown - 2.25) < 0.001 and
+                          math.abs(upper_cooldown - 4.) < 0.001 and
+                          item.runtime_definition.data.display_rarity == 5 and
+                          PotionService.setPrefix(
+                              item, PotionService.INFUSION_VOLTAIC) and
+                          item.alt_tooltip:find("40-48%", 1, true)
+        item:destroy()
+        if not valid then
+            return false, "Chaos Flask base ranges are incomplete"
+        end
+        return true
+    end)
+
     ArchitectureTests.register("Bounty suffix increases restoration",
                                function()
         local item = PotionService.create(
@@ -699,20 +734,24 @@ OnInit.final("ArchitectureTests", function(Require)
 
     ArchitectureTests.register("Chaos potion boss odds scale upward",
                                function()
-        local low_donor, low_legendary =
+        local low_donor, low_legendary, low_chaos =
             PotionService.getChaosBossDropChances(200, 1)
-        local high_donor, high_legendary =
+        local high_donor, high_legendary, high_chaos =
             PotionService.getChaosBossDropChances(500, 1)
-        local challenge_donor, challenge_legendary =
+        local challenge_donor, challenge_legendary, challenge_chaos =
             PotionService.getChaosBossDropChances(500, 5)
         local valid = math.abs(low_donor - 0.08) < 0.000001 and
                           math.abs(low_legendary - 0.00005) < 0.000001 and
+                          low_chaos == 0. and
                           high_donor > low_donor and
                           high_legendary > low_legendary and
+                          high_chaos > low_chaos and
                           challenge_donor > high_donor and
                           challenge_legendary > high_legendary and
+                          challenge_chaos > high_chaos and
                           challenge_donor <= 0.40 and
-                          challenge_legendary <= 0.0025
+                          challenge_legendary <= 0.0025 and
+                          challenge_chaos <= 0.0005
         if not valid then
             return false, "Chaos boss potion odds are not level/difficulty scaled"
         end
@@ -752,12 +791,12 @@ OnInit.final("ArchitectureTests", function(Require)
 
         local preview = DropTable:getBossDropEntries({
             id = boss_ids[1],
-            level = 200,
+            level = 380,
             difficulty = 1,
             first_drop = false,
         }, 1.)
         local found_equipment, found_ticket = false, false
-        local found_donor, found_legendary = false, false
+        local found_donor, found_legendary, found_chaos = false, false, false
         for index = 1, #preview do
             local entry = preview[index]
             if entry.key:find("equipment_", 1, true) == 1 then
@@ -770,10 +809,14 @@ OnInit.final("ArchitectureTests", function(Require)
                                       "ReplaceableTextures\\CommandButtons\\BTNEditor-Random-Item.blp"
             elseif entry.key == "legendary_chaos_flask" then
                 found_legendary = entry.name ~= nil and entry.icon ~= nil
+            elseif entry.key == "chaos_flask" then
+                found_chaos = entry.name == "Chaos Flask" and
+                                  entry.icon ~= nil and entry.chance > 0.
             end
         end
         if not found_equipment or not found_ticket or
-            (CHAOS_MODE and (not found_donor or not found_legendary)) then
+            (CHAOS_MODE and (not found_donor or not found_legendary or
+                not found_chaos)) then
             return false, "boss drop registry preview is incomplete"
         end
         return true
@@ -791,6 +834,12 @@ OnInit.final("ArchitectureTests", function(Require)
                 PotionService.INFUSION_STONE,
                 PotionService.CATALYST_ACCELERANT,
                 "Stoneblood Flask of Acceleration"
+            },
+            {
+                PotionService.CHAOS_FLASK_KEY, 3, FourCC('phea'),
+                PotionService.INFUSION_VOLTAIC,
+                PotionService.CATALYST_OVERFLOW,
+                "Voltaic Flask of Overflow"
             }
         }
 
