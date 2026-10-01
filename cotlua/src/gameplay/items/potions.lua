@@ -1162,8 +1162,9 @@ OnInit.final("PotionService", function(Require)
     ---boss drop previews. The actual dropped flask is selected from the full
     ---prefix/suffix donor pool when the reward rolls successfully.
     function PotionService.getChaosDonorPresentation()
-        return "Affix Donor Flask", EMPTY_FLASK_ICON,
-               "Contains one transferable potion prefix or suffix.|n|cff808080Its contents refuse to settle into a recognizable color.|r"
+        return "Mystery Epic Flask",
+               "ReplaceableTextures\\CommandButtons\\BTNEditor-Random-Item.blp",
+               "Drops as one random Epic flask.|n|cff808080Neither color nor character can be discerned until it takes form.|r"
     end
 
     function PotionService.getLegendaryChaosPresentation()

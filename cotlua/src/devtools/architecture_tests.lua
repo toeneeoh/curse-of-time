@@ -741,7 +741,9 @@ OnInit.final("ArchitectureTests", function(Require)
             elseif entry.key == "colosseum_ticket" then
                 found_ticket = entry.item_id ~= nil and entry.chance > 0.
             elseif entry.key == "chaos_affix_donor" then
-                found_donor = entry.name ~= nil and entry.icon ~= nil
+                found_donor = entry.name == "Mystery Epic Flask" and
+                                  entry.icon ==
+                                      "ReplaceableTextures\\CommandButtons\\BTNEditor-Random-Item.blp"
             elseif entry.key == "legendary_chaos_flask" then
                 found_legendary = entry.name ~= nil and entry.icon ~= nil
             end
