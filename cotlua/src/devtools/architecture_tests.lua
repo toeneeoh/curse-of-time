@@ -690,7 +690,8 @@ OnInit.final("ArchitectureTests", function(Require)
             end
         end
         if type(Boss.getDropMultiplier) ~= "function" or
-            type(Boss.getEquipmentDropChance) ~= "function" then
+            type(Boss.getEquipmentDropChance) ~= "function" or
+            type(Boss.refreshDropUI) ~= "function" then
             return false, "boss drop chance helpers are unavailable"
         end
         return true

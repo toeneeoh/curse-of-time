@@ -53,6 +53,7 @@ OnInit.final("Boss", function(Require)
     ---@field reward function
     ---@field getDropMultiplier fun(self: Boss): number
     ---@field getEquipmentDropChance fun(self: Boss): number, number, number
+    ---@field refreshDropUI fun(self: Boss)
     ---@field trigger trigger
     ---@field setup_range_event function
     ---@field timer TimerQueue
@@ -475,6 +476,20 @@ OnInit.final("Boss", function(Require)
             local per_roll = min(1., max(0., base * multiplier * 0.01))
             local overall = 1. - (1. - per_roll) ^ self.difficulty
             return per_roll, overall, multiplier
+        end
+
+        ---Refreshes the drop presentation for every player currently viewing
+        ---this boss, including before its combat multiboard timer has started.
+        function thistype:refreshDropUI()
+            local mb = MULTIBOARD and MULTIBOARD.BOSS
+            if not mb or not mb.update_items then return end
+            local user = User.first
+            while user do
+                if mb.viewing[user.id] == self then
+                    mb.update_items(user.player)
+                end
+                user = user.next
+            end
         end
 
         function thistype:reward(x, y)

@@ -402,6 +402,7 @@ OnInit.final("AshenVanguard", function(Require)
             return false
         end
         VanguardBountyBuff:add(hero, target)
+        boss:refreshDropUI()
         DisplayTimedTextToForce(FORCE_PLAYING, 12.,
             User[pid - 1].nameColored .. " marked |cffffcc00" .. boss.name ..
                 "|r with a Vanguard Bounty.")
@@ -410,9 +411,12 @@ OnInit.final("AshenVanguard", function(Require)
 
     function AshenVanguardServices.clearBossBounty(boss, escaped)
         local target = type(boss) == "table" and boss.unit or boss
+        local boss_data = type(boss) == "table" and boss or
+                              (target and IsBoss(target))
         local buff = target and VanguardBountyBuff:get(nil, target)
         if not buff then return false end
         buff:remove()
+        if boss_data then boss_data:refreshDropUI() end
         if escaped and type(boss) == "table" then
             DisplayTimedTextToForce(FORCE_PLAYING, 12.,
                 "|cffff4040Vanguard Bounty lost:|r " .. boss.name ..
