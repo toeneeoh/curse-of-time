@@ -39,8 +39,10 @@ OnInit.final("ItemUse", function(Require)
 
     local function handler_for(item)
         local definition = item and item.runtime_definition
-        return definition and runtime_handlers[definition.key] or
-                   (item and handlers[item.id])
+        -- Runtime items may share a carrier rawcode with a completely
+        -- unrelated legacy item. Never inherit that carrier's Use handler.
+        if definition then return runtime_handlers[definition.key] end
+        return item and handlers[item.id]
     end
 
     ---@param item Item?

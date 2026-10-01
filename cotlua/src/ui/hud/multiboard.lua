@@ -711,15 +711,22 @@ OnInit.final("Multiboard", function(Require)
             BlzFrameSetPoint(item_drop_container, FRAMEPOINT_TOPLEFT, item_drops.frame, FRAMEPOINT_TOPLEFT, 0., 0.)
             BlzFrameSetVisible(item_drop_container, false)
             local items = {}
+            local item_chance_text = {}
             for i = 1, 10 do
                 items[i] = Button.create(item_drop_container, ICON_SIZE * 2 + 0.004, ICON_SIZE * 2 + 0.004, 0., -(ICON_SIZE * 2. + 0.004) * i, false)
                 items[i].tooltip:point(FRAMEPOINT_TOPRIGHT)
-                BlzFrameClearAllPoints(items[i].chargeFrame)
-                BlzFrameSetPoint(items[i].chargeFrame, FRAMEPOINT_BOTTOM,
-                                 items[i].iconFrame, FRAMEPOINT_BOTTOM, 0., 0.)
-                BlzFrameSetSize(items[i].chargeFrame,
-                                ICON_SIZE * 2 + 0.002, 0.009)
-                BlzFrameSetScale(items[i].chargeText, 0.72)
+                item_chance_text[i] = BlzCreateFrameByType(
+                                          "TEXT", "", items[i].iconFrame, "", 0)
+                BlzFrameSetPoint(item_chance_text[i], FRAMEPOINT_BOTTOM,
+                                 items[i].iconFrame, FRAMEPOINT_BOTTOM, 0.,
+                                 0.001)
+                BlzFrameSetSize(item_chance_text[i], ICON_SIZE * 2 + 0.002,
+                                0.009)
+                BlzFrameSetTextAlignment(item_chance_text[i],
+                                         TEXT_JUSTIFY_CENTER,
+                                         TEXT_JUSTIFY_MIDDLE)
+                BlzFrameSetScale(item_chance_text[i], 0.72)
+                BlzFrameSetEnable(item_chance_text[i], false)
             end
 
             local function percent_text(value)
@@ -780,10 +787,10 @@ OnInit.final("Multiboard", function(Require)
                                     boss_items[i].tooltip ..
                                         "|n|n|cffffcc00Current drop-pool share:|r " ..
                                         percent_text(share))
-                                BlzFrameSetText(items[i].chargeText,
-                                                percent_text(share))
-                                BlzFrameSetVisible(items[i].chargeFrame, true)
-                                BlzFrameSetVisible(items[i].chargeText, true)
+                                BlzFrameSetText(item_chance_text[i],
+                                                "|cffffcc00" ..
+                                                    percent_text(share) .. "|r")
+                                BlzFrameSetVisible(item_chance_text[i], true)
                             else
                                 items[i]:visible(false)
                             end

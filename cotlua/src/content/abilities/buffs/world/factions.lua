@@ -189,6 +189,10 @@ OnInit.final("BuffsWorldFactions", function(Require)
         thistype.CANNOT_PURGE = true
 
         function thistype:onRemove()
+            if self.effect then
+                DestroyEffect(self.effect)
+                self.effect = nil
+            end
             Unit[self.target].boss_drop_rate =
                 Unit[self.target].boss_drop_rate / self.mult
         end
@@ -197,6 +201,9 @@ OnInit.final("BuffsWorldFactions", function(Require)
             self.mult = 1.25
             Unit[self.target].boss_drop_rate =
                 Unit[self.target].boss_drop_rate * self.mult
+            self.effect = AddSpecialEffectTarget(
+                              "Abilities\\Spells\\Other\\TalkToMe\\TalkToMe.mdl",
+                              self.target, "overhead")
         end
     end
 
