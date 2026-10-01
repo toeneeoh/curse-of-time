@@ -7,6 +7,7 @@ OnInit.final("FactionEvents", function(Require)
     Require('Events')
     Require('MainMap')
     Require('Pathing')
+    Require('Regions')
     Require('TimerQueue')
     Require('UnitTable')
     Require('Users')
@@ -152,11 +153,31 @@ OnInit.final("FactionEvents", function(Require)
             local distance = GetRandomReal(SPAWN_MIN_RADIUS, SPAWN_MAX_RADIUS)
             local x = center_x + distance * math.cos(angle)
             local y = center_y + distance * math.sin(angle)
-            if RectContainsCoords(MAIN_MAP.rect, x, y) and IsTerrainWalkable(x, y) then
+            if RectContainsCoords(MAIN_MAP.rect, x, y) and
+                not IsProtectedArea(x, y) and IsTerrainWalkable(x, y) then
                 return x, y
             end
         end
-        return center_x - SPAWN_MIN_RADIUS, center_y
+
+        -- Keep the deterministic fallback out of town as well. This matters
+        -- when an event center is close enough to a protected-area edge that
+        -- unlucky random attempts all land inside it or on blocked terrain.
+        local offsets = {
+            {-SPAWN_MIN_RADIUS, 0.},
+            {SPAWN_MIN_RADIUS, 0.},
+            {0., -SPAWN_MIN_RADIUS},
+            {0., SPAWN_MIN_RADIUS},
+        }
+        for index = 1, #offsets do
+            local x = center_x + offsets[index][1]
+            local y = center_y + offsets[index][2]
+            if RectContainsCoords(MAIN_MAP.rect, x, y) and
+                not IsProtectedArea(x, y) and IsTerrainWalkable(x, y) then
+                return x, y
+            end
+        end
+
+        return center_x, center_y
     end
 
     local function record_kill(killer)
@@ -224,6 +245,17 @@ OnInit.final("FactionEvents", function(Require)
         enemies[unit] = true
         enemy_count = enemy_count + 1
         EVENT_ON_UNIT_DEATH:register_unit_action(unit, on_enemy_death)
+        EVENT_ON_ENTER_SAFE_AREA:register_unit_action(unit, function(target)
+            if not enemies[target] or not objective or not UnitAlive(objective) then
+                return
+            end
+            local return_x, return_y = spawn_location(
+                                           GetUnitX(objective),
+                                           GetUnitY(objective))
+            IssueImmediateOrderById(target, ORDER_ID_STOP)
+            SetUnitPosition(target, return_x, return_y)
+            IssueTargetOrder(target, "attack", objective)
+        end)
         IssueTargetOrder(unit, "attack", objective)
     end
 

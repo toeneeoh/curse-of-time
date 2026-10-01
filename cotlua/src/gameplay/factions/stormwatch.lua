@@ -137,6 +137,7 @@ OnInit.final("Stormwatch", function(Require)
     local STABILIZE_TIME = 12.
     local EVENT_TIMEOUT = 600.
     local AVATAR_TIMEOUT = 300.
+    local AVATAR_LEASH = EVENT_RADIUS
     local STRIKE_INTERVAL = 3
     local STRIKE_DELAY = 1.5
     local STRIKE_RADIUS = 225.
@@ -161,7 +162,18 @@ OnInit.final("Stormwatch", function(Require)
     local strike_generation = 0
     local strike_warnings = setmetatable({}, { __mode = 'k' })
 
-    local finish_event, track_avatar_damage
+    local finish_event, track_avatar_damage, nearby_members
+
+    local function return_avatar_home()
+        if not avatar or not UnitAlive(avatar) then return end
+        local x, y = event_center()
+        IssueImmediateOrderById(avatar, ORDER_ID_STOP)
+        SetUnitPosition(avatar, x, y + 650.)
+        local members = nearby_members(EVENT_RADIUS)
+        if members[1] then
+            IssueTargetOrder(avatar, "attack", Hero[members[1]])
+        end
+    end
 
     local function format_time(time)
         local total = math.max(0, math.ceil(time))
@@ -255,7 +267,7 @@ OnInit.final("Stormwatch", function(Require)
         end
     end
 
-    local function nearby_members(radius)
+    nearby_members = function(radius)
         local result = {}
         local x, y = event_center()
         local user = User.first
@@ -315,6 +327,8 @@ OnInit.final("Stormwatch", function(Require)
         EVENT_ON_UNIT_DEATH:register_unit_action(avatar, function()
             if active then finish_event(true) end
         end)
+        EVENT_ON_ENTER_SAFE_AREA:register_unit_action(avatar,
+                                                       return_avatar_home)
         announce("|cff80dfffEye of the Storm:|r The storm has taken form. Destroy its avatar!",
             bj_questUpdatedSound)
         if members[1] then
@@ -367,6 +381,12 @@ OnInit.final("Stormwatch", function(Require)
             end
             if stabilized >= #nodes then
                 spawn_avatar()
+            end
+        elseif phase == "avatar" and avatar and UnitAlive(avatar) then
+            local center_x, center_y = event_center()
+            if DistanceCoords(center_x, center_y, GetUnitX(avatar),
+                              GetUnitY(avatar)) > AVATAR_LEASH then
+                return_avatar_home()
             end
         end
         tick_callback = TimerQueue:callDelayed(1., event_tick)

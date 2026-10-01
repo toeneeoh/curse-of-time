@@ -78,6 +78,63 @@ OnInit.final("Regions", function(Require)
     REGION_DATA[gg_rct_Naga_Dungeon_Reward] = { vision = gg_rct_Naga_Dungeon_Reward_Vision, minimap = "war3mapImported\\minimap_nagadungeon.dds" }
     REGION_DATA[gg_rct_Naga_Dungeon] = { vision = gg_rct_Naga_Dungeon_Vision, minimap = "war3mapImported\\minimap_nagadungeon.dds" }
 
+    PROTECTED_AREAS = {
+        gg_rct_Town_Main,
+    }
+
+    ---Returns the protected area containing the coordinates, if any.
+    ---@param x number
+    ---@param y number
+    ---@return rect?
+    function GetProtectedAreaFromCoords(x, y)
+        for index = 1, #PROTECTED_AREAS do
+            local area = PROTECTED_AREAS[index]
+            if RectContainsCoords(area, x, y) then return area end
+        end
+        return nil
+    end
+
+    ---@param x number
+    ---@param y number
+    ---@return boolean
+    function IsProtectedArea(x, y)
+        return GetProtectedAreaFromCoords(x, y) ~= nil
+    end
+
+    ---Moves an otherwise-unhandled hostile unit just beyond the nearest edge
+    ---of a protected rectangle and clears the order that pulled it inside.
+    ---@param unit unit
+    ---@param area rect
+    local function eject_hostile(unit, area)
+        local owner = GetOwningPlayer(unit)
+        if (owner ~= PLAYER_CREEP and owner ~= PLAYER_BOSS) or
+            not UnitAlive(unit) or IsDummy(unit) or
+            GetUnitAbilityLevel(unit, ABIL_ALOC) > 0 or
+            GetUnitMoveSpeed(unit) <= 0. then return end
+
+        local x, y = GetUnitX(unit), GetUnitY(unit)
+        local min_x, max_x = GetRectMinX(area), GetRectMaxX(area)
+        local min_y, max_y = GetRectMinY(area), GetRectMaxY(area)
+        local padding = 192.
+        local left, right = x - min_x, max_x - x
+        local bottom, top = y - min_y, max_y - y
+        local nearest = math.min(left, right, bottom, top)
+
+        IssueImmediateOrderById(unit, ORDER_ID_STOP)
+        if nearest == left then
+            x = min_x - padding
+        elseif nearest == right then
+            x = max_x + padding
+        elseif nearest == bottom then
+            y = min_y - padding
+        else
+            y = max_y + padding
+        end
+        SetUnitXBounded(unit, x)
+        SetUnitYBounded(unit, y)
+        IssueImmediateOrderById(unit, ORDER_ID_STOP)
+    end
+
     RegionCount      = {} ---@type rect[] 
     RegionCount[25]  = gg_rct_Troll_Demon_1
     RegionCount[26]  = gg_rct_Troll_Demon_2
@@ -120,6 +177,7 @@ OnInit.final("Regions", function(Require)
     RegionCount[228] = gg_rct_Centaur_Nightmare_4
     RegionCount[229] = gg_rct_Centaur_Nightmare_5
     RegionCount[250] = gg_rct_Magnataur_Despair_1
+    RegionCount[251] = gg_rct_Magnataur_Despair_2
     RegionCount[275] = gg_rct_Hydra_Spawn
     RegionCount[300] = gg_rct_Dragon_Astral_1
     RegionCount[301] = gg_rct_Dragon_Astral_2
@@ -191,16 +249,16 @@ OnInit.final("Regions", function(Require)
 
     ---@return boolean
     local function SafeRegions()
-        local u    = GetFilterUnit()
-        local x    = GetUnitX(u)
-        local y    = GetUnitY(u)
-        local U    = User.first
+        local u = GetFilterUnit()
+        local area = GetProtectedAreaFromCoords(GetUnitX(u), GetUnitY(u))
+        local handled = EVENT_ON_ENTER_SAFE_AREA:has_unit_actions(u)
 
         EVENT_ON_ENTER_SAFE_AREA:trigger(u)
 
-        if IsUnitIllusion(u) then
-            return false
-        end
+        -- Existing overworld creeps and Boss instances retain their more
+        -- specific return-home behavior. Everything else hostile gets a safe,
+        -- centralized fallback instead of being allowed into town.
+        if area and not handled then eject_hostile(u, area) end
 
         return false
     end
@@ -278,7 +336,9 @@ OnInit.final("Regions", function(Require)
 
     TriggerAddCondition(enterTrigger, Condition(EnterArea))
 
-    RegionAddRect(safeRegion, gg_rct_Town_Main)
+    for index = 1, #PROTECTED_AREAS do
+        RegionAddRect(safeRegion, PROTECTED_AREAS[index])
+    end
     RegionAddRect(leaveRegion, gg_rct_Town_Boundry_2)
     RegionAddRect(leaveRegion, gg_rct_Town_boundry_4)
 

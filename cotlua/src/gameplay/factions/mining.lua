@@ -206,8 +206,22 @@ OnInit.final("FactionMining", function(Require)
         BlzSetUnitIntegerField(guardian, UNIT_IF_LEVEL, level)
         SetUnitColor(guardian, rare and PLAYER_COLOR_PURPLE or PLAYER_COLOR_YELLOW)
         SetUnitScale(guardian, rare and 1.35 or 1.1, rare and 1.35 or 1.1, rare and 1.35 or 1.1)
-        guardians[guardian] = { rare = rare == true }
+        guardians[guardian] = {
+            rare = rare == true,
+            home_x = x,
+            home_y = y,
+            target = Hero[pid],
+        }
         EVENT_ON_UNIT_DEATH:register_unit_action(guardian, guardian_death)
+        EVENT_ON_ENTER_SAFE_AREA:register_unit_action(guardian, function(unit)
+            local data = guardians[unit]
+            if not data then return end
+            IssueImmediateOrderById(unit, ORDER_ID_STOP)
+            SetUnitPosition(unit, data.home_x, data.home_y)
+            if data.target and UnitAlive(data.target) then
+                IssueTargetOrder(unit, "attack", data.target)
+            end
+        end)
         if Hero[pid] then
             IssueTargetOrder(guardian, "attack", Hero[pid])
         end

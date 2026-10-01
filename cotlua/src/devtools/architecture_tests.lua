@@ -42,6 +42,8 @@ OnInit.final("ArchitectureTests", function(Require)
     Require('HeroDefinitions')
     Require('BossSchema')
     Require('MainMap')
+    Require('Regions')
+    Require('WorldTransitions')
     Require('HelpText')
     Require('HintConfig')
     Require('CurrencyDisplay')
@@ -180,6 +182,31 @@ OnInit.final("ArchitectureTests", function(Require)
         end
         if #INFO_STRING ~= 6 or #HINT_TOOLTIP ~= 16 or not FORCE_HINT then
             return false, "help, hint, or progression compatibility changed"
+        end
+        return true
+    end)
+
+    ArchitectureTests.register("protected and grouped regions are complete",
+                               function()
+        local town_x = GetRectCenterX(gg_rct_Town_Main)
+        local town_y = GetRectCenterY(gg_rct_Town_Main)
+        if #PROTECTED_AREAS < 1 or
+            GetProtectedAreaFromCoords(town_x, town_y) ~= gg_rct_Town_Main or
+            not IsProtectedArea(town_x, town_y) then
+            return false, "town is not registered as a protected area"
+        end
+        if IsProtectedArea(MAIN_MAP.minX, MAIN_MAP.minY) then
+            return false, "protected-area lookup covers unrelated overworld coordinates"
+        end
+
+        for group = 1, 18 do
+            if not RegionCount[group * 25] then
+                return false, "missing grouped spawn region " .. group
+            end
+        end
+        if RegionCount[251] ~= gg_rct_Magnataur_Despair_2 or
+            type(SelectGroupedRegion) ~= "function" then
+            return false, "Magnataur or grouped-region selection is incomplete"
         end
         return true
     end)
