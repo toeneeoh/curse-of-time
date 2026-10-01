@@ -1,6 +1,7 @@
 OnInit.final("BuffsItems", function(Require)
     Require('BuffSystem')
     Require('CooldownAcceleration')
+    Require('Groups')
     Require('UnitTable')
     Require('SpellTools')
 
@@ -359,6 +360,112 @@ OnInit.final("BuffsItems", function(Require)
         end
 
         function thistype:onApply() self.evasion = 0. end
+    end
+
+    ---@class CorrosiveFlaskDebuff : Buff
+    CorrosiveFlaskDebuff = Buff.new()
+    do
+        local thistype = CorrosiveFlaskDebuff
+        thistype.NAME = "Corroded"
+        thistype.ICON =
+            "ReplaceableTextures\\CommandButtons\\BTNAcidFlask3.blp"
+        thistype.DESC = "This unit has -^$armor% armor"
+        thistype.DISPEL_TYPE = BUFF_NEGATIVE
+        thistype.STACK_TYPE = BUFF_STACK_PARTIAL
+
+        function thistype:onRemove()
+            Unit[self.target].armor_percent =
+                Unit[self.target].armor_percent + self.armor
+        end
+
+        function thistype:onApply() self.armor = 0. end
+    end
+
+    ---@class CorrosiveFlaskBuff : Buff
+    CorrosiveFlaskBuff = Buff.new()
+    do
+        local thistype = CorrosiveFlaskBuff
+        thistype.NAME = "Corrosive Infusion"
+        thistype.ICON =
+            "ReplaceableTextures\\CommandButtons\\BTNAcidFlask3.blp"
+        thistype.DESC = "Attacks reduce enemy armor by +^$armor%"
+        thistype.DISPEL_TYPE = BUFF_POSITIVE
+        thistype.STACK_TYPE = BUFF_STACK_NONE
+
+        local function on_hit(source, target, is_basic_attack)
+            local buff = thistype:get(nil, source)
+            if not buff or not is_basic_attack then return end
+
+            local debuff = CorrosiveFlaskDebuff:add(source, target)
+            local previous = debuff.armor or 0.
+            local armor = math.max(previous, buff.armor)
+            Unit[target].armor_percent = Unit[target].armor_percent +
+                                             previous - armor
+            debuff.armor = armor
+            debuff:duration(4.)
+            UnitRefreshBuff(target, debuff)
+        end
+
+        function thistype:onRemove()
+            EVENT_ON_HIT:unregister_unit_action(self.target, on_hit)
+        end
+
+        function thistype:onApply()
+            self.armor = 0.15
+            EVENT_ON_HIT:register_unit_action(self.target, on_hit)
+        end
+    end
+
+    ---@class VoltaicFlaskBuff : Buff
+    VoltaicFlaskBuff = Buff.new()
+    do
+        local thistype = VoltaicFlaskBuff
+        thistype.NAME = "Voltaic Infusion"
+        thistype.ICON =
+            "ReplaceableTextures\\CommandButtons\\BTNLightningSpeedBottle.blp"
+        thistype.DESC = "Attacks arc +^$damage% damage to nearby enemies"
+        thistype.DISPEL_TYPE = BUFF_POSITIVE
+        thistype.STACK_TYPE = BUFF_STACK_NONE
+
+        local function on_hit(source, primary, _amount, amount_after_reduction,
+                              _damage_type, attack_amount, is_basic_attack)
+            local buff = thistype:get(nil, source)
+            if not buff or not is_basic_attack or
+                amount_after_reduction <= 0. or not attack_amount or
+                attack_amount <= 0. then return end
+
+            local pid = GetPlayerId(GetOwningPlayer(source)) + 1
+            local group = CreateGroup()
+            MakeGroupInRange(pid, group, GetUnitX(primary), GetUnitY(primary),
+                             350., Condition(FilterEnemy))
+            local struck = 0
+            for target in each(group) do
+                if target ~= primary and struck < 4 then
+                    struck = struck + 1
+                    DamageTarget(source, target, attack_amount * buff.damage,
+                                 ATTACK_TYPE_NORMAL, MAGIC, "Voltaic Flask", {
+                            attack = false,
+                            pre_scaled_source = true,
+                            suppress_source_events = true,
+                        })
+                    DestroyEffect(AddSpecialEffectTarget(
+                        "Abilities\\Spells\\Other\\Monsoon\\MonsoonBoltTarget.mdl",
+                        target, "origin"))
+                end
+            end
+            DestroyGroup(group)
+        end
+
+        function thistype:onRemove()
+            EVENT_ON_HIT_AFTER_REDUCTIONS:unregister_unit_action(self.target,
+                                                                 on_hit)
+        end
+
+        function thistype:onApply()
+            self.damage = 0.40
+            EVENT_ON_HIT_AFTER_REDUCTIONS:register_unit_action(self.target,
+                                                               on_hit)
+        end
     end
 
     ---@class IntenseFocusBuff : Buff

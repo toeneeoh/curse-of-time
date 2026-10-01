@@ -30,6 +30,8 @@ OnInit.final("PotionService", function(Require)
     local INFUSION_OMNISCIENCE = 9
     local INFUSION_FRENZY = 10
     local INFUSION_PHASING = 11
+    local INFUSION_CORROSIVE = 12
+    local INFUSION_VOLTAIC = 13
     local CATALYST_NONE = 0
     local CATALYST_POTENT = 1
     local CATALYST_LINGERING = 2
@@ -37,6 +39,7 @@ OnInit.final("PotionService", function(Require)
     local CATALYST_BOUNTIFUL = 4
     local CATALYST_CONSERVING = 5
     local CATALYST_ECHOING = 6
+    local CATALYST_OVERFLOW = 7
     local RESTORATION_REROLL_STATE = 1
     local PREFIX_REROLL_STATE = 2
     local SUFFIX_REROLL_STATE = 3
@@ -95,6 +98,12 @@ OnInit.final("PotionService", function(Require)
         "ReplaceableTextures\\CommandButtons\\BTNyellowEApotionGS.blp"
     local EMPTY_FLASK_ICON =
         "ReplaceableTextures\\CommandButtons\\BTNnoEApotionGS.blp"
+    local CORROSIVE_FLASK_ICON =
+        "ReplaceableTextures\\CommandButtons\\BTNAcidFlask3.blp"
+    local VOLTAIC_FLASK_ICON =
+        "ReplaceableTextures\\CommandButtons\\BTNLightningSpeedBottle.blp"
+    local OVERFLOW_FLASK_ICON =
+        "ReplaceableTextures\\CommandButtons\\BTNManaVial.blp"
     local HEALTH_FLASK_ID = FourCC('I02F')
     local MANA_FLASK_ID = FourCC('I00E')
     local BASE_FLASK_CHARGES = 3
@@ -249,6 +258,8 @@ OnInit.final("PotionService", function(Require)
     PotionService.INFUSION_OMNISCIENCE = INFUSION_OMNISCIENCE
     PotionService.INFUSION_FRENZY = INFUSION_FRENZY
     PotionService.INFUSION_PHASING = INFUSION_PHASING
+    PotionService.INFUSION_CORROSIVE = INFUSION_CORROSIVE
+    PotionService.INFUSION_VOLTAIC = INFUSION_VOLTAIC
     PotionService.CATALYST_NONE = CATALYST_NONE
     PotionService.CATALYST_POTENT = CATALYST_POTENT
     PotionService.CATALYST_LINGERING = CATALYST_LINGERING
@@ -256,6 +267,7 @@ OnInit.final("PotionService", function(Require)
     PotionService.CATALYST_BOUNTIFUL = CATALYST_BOUNTIFUL
     PotionService.CATALYST_CONSERVING = CATALYST_CONSERVING
     PotionService.CATALYST_ECHOING = CATALYST_ECHOING
+    PotionService.CATALYST_OVERFLOW = CATALYST_OVERFLOW
     -- Compatibility names for callers written against the first prototype.
     -- Player-facing brewing now treats these as prefix and suffix pools.
     PotionService.PREFIX_NONE = INFUSION_NONE
@@ -996,6 +1008,54 @@ OnInit.final("PotionService", function(Require)
         end
     })
 
+    PotionService.registerInfusion({
+        id = INFUSION_CORROSIVE,
+        key = "corrosive",
+        name = "Corrosive Infusion",
+        affix_name = "Corrosive",
+        flavor = "The stopper is pitted wherever the luminous mixture touches it.",
+        icon = CORROSIVE_FLASK_ICON,
+        description = "Attacks reduce enemy Armor by |cffffcc0015%|r for " ..
+            "|cffffcc004 seconds|r. Lasts |cffffcc0010 seconds|r.",
+        describe = function(multiplier, maximum_multiplier)
+            return "Attacks reduce enemy Armor by |cffffcc00" ..
+                       effect_amount(15., multiplier, maximum_multiplier) ..
+                       "%|r for |cffffcc004 seconds|r. Lasts " ..
+                       "|cffffcc0010 seconds|r."
+        end,
+        on_use = function(context)
+            local buff = CorrosiveFlaskBuff:add(context.hero, context.hero)
+            buff.armor = 0.15 * context.potency_multiplier
+            buff:duration(10. * context.duration_multiplier)
+            UnitRefreshBuff(context.hero, buff)
+        end
+    })
+
+    PotionService.registerInfusion({
+        id = INFUSION_VOLTAIC,
+        key = "voltaic",
+        name = "Voltaic Infusion",
+        affix_name = "Voltaic",
+        flavor = "Thin arcs leap between the liquid and anything drawn near.",
+        icon = VOLTAIC_FLASK_ICON,
+        description = "Attacks arc |cffffcc0040%|r attack damage as Magic " ..
+            "damage to up to |cffffcc004|r nearby enemies for " ..
+            "|cffffcc0010 seconds|r.",
+        describe = function(multiplier, maximum_multiplier)
+            return "Attacks arc |cffffcc00" ..
+                       effect_amount(40., multiplier, maximum_multiplier) ..
+                       "%|r attack damage as Magic damage to up to " ..
+                       "|cffffcc004|r nearby enemies for " ..
+                       "|cffffcc0010 seconds|r."
+        end,
+        on_use = function(context)
+            local buff = VoltaicFlaskBuff:add(context.hero, context.hero)
+            buff.damage = 0.40 * context.potency_multiplier
+            buff:duration(10. * context.duration_multiplier)
+            UnitRefreshBuff(context.hero, buff)
+        end
+    })
+
     PotionService.registerCatalyst({
         id = CATALYST_POTENT,
         key = "potent",
@@ -1072,6 +1132,22 @@ OnInit.final("PotionService", function(Require)
         end
     })
 
+    PotionService.registerCatalyst({
+        id = CATALYST_OVERFLOW,
+        key = "overflow",
+        name = "Overflow Catalyst",
+        affix_name = "Overflow",
+        flavor = "Its surface rises above the rim without spilling a drop.",
+        icon = OVERFLOW_FLASK_ICON,
+        description = "Excess Health restored becomes a shield, up to " ..
+            "|cffffcc0020%|r of maximum Health, for |cffffcc008 seconds|r.",
+        on_use = function(context)
+            local maximum = context.unit.hp * 0.20
+            local amount = math.min(context.overheal or 0., maximum)
+            if amount > 0. then Shield.add(context.hero, amount, 8.) end
+        end
+    })
+
     local function define_affix_donor(id, key, icon, prefix, suffix)
         local effect = prefix and infusions[prefix] or catalysts[suffix]
         PotionService.define(key, {
@@ -1137,6 +1213,12 @@ OnInit.final("PotionService", function(Require)
     define_affix_donor(FIRST_DONOR_ID + 13, "phasing_donor_flask",
                        "ReplaceableTextures\\CommandButtons\\BTNInvulnerable.blp",
                        INFUSION_PHASING)
+    define_affix_donor(FIRST_DONOR_ID + 14, "corrosive_donor_flask",
+                       CORROSIVE_FLASK_ICON, INFUSION_CORROSIVE)
+    define_affix_donor(FIRST_DONOR_ID + 15, "voltaic_donor_flask",
+                       VOLTAIC_FLASK_ICON, INFUSION_VOLTAIC)
+    define_affix_donor(FIRST_DONOR_ID + 16, "overflow_donor_flask",
+                       OVERFLOW_FLASK_ICON, nil, CATALYST_OVERFLOW)
 
     ---Creates a non-faction affix donor from the Chaos boss drop pool.
     ---The optional kind remains useful for tests and future targeted rewards.
@@ -2209,11 +2291,17 @@ OnInit.final("PotionService", function(Require)
                                     GetRandomReal(0., 1.) <
                                         catalyst.preserve_charge_chance
         if not preserve_charge then item.charges = item.charges - 1 end
+        local health_before = GetWidgetLife(hero)
         if heal > 0 then
             local name = PotionService.describe(item)
             HP(hero, hero, heal, name)
         end
         if mana > 0 then MP(hero, mana) end
+        local effective_healing = math.max(0., GetWidgetLife(hero) -
+                                                   health_before)
+        local attempted_healing = not UndyingRageBuff:has(hero, hero) and
+                                      heal * math.max(
+                                          0., Unit[hero].regen_percent) or 0.
 
         local context = {
             pid = pid,
@@ -2225,7 +2313,8 @@ OnInit.final("PotionService", function(Require)
             duration_multiplier = catalyst and
                 catalyst.duration_multiplier or 1.,
             heal = heal,
-            mana = mana
+            mana = mana,
+            overheal = math.max(0., attempted_healing - effective_healing),
         }
         if behavior and behavior.on_use then
             behavior.on_use(context)

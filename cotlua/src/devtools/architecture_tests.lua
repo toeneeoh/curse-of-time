@@ -520,10 +520,28 @@ OnInit.final("ArchitectureTests", function(Require)
         local keys = PotionService.getChaosDonorKeys()
         local prefix_keys = PotionService.getChaosDonorKeys("prefix")
         local suffix_keys = PotionService.getChaosDonorKeys("suffix")
-        if #keys ~= 14 or #prefix_keys ~= 8 or #suffix_keys ~= 6 then
+        if #keys ~= 17 or #prefix_keys ~= 10 or #suffix_keys ~= 7 then
             return false, string.format(
                 "Chaos donor pools have %d/%d/%d total/prefix/suffix entries",
                 #keys, #prefix_keys, #suffix_keys)
+        end
+
+        local prefixes = PotionService.getPrefixes()
+        local suffixes = PotionService.getSuffixes()
+        local corrosive = prefixes[PotionService.INFUSION_CORROSIVE]
+        local voltaic = prefixes[PotionService.INFUSION_VOLTAIC]
+        local overflow = suffixes[PotionService.CATALYST_OVERFLOW]
+        if not corrosive or not voltaic or not overflow or
+            corrosive.icon ~=
+                "ReplaceableTextures\\CommandButtons\\BTNAcidFlask3.blp" or
+            voltaic.icon ~=
+                "ReplaceableTextures\\CommandButtons\\BTNLightningSpeedBottle.blp" or
+            overflow.icon ~=
+                "ReplaceableTextures\\CommandButtons\\BTNManaVial.blp" or
+            type(corrosive.on_use) ~= "function" or
+            type(voltaic.on_use) ~= "function" or
+            type(overflow.on_use) ~= "function" then
+            return false, "new potion affixes are unavailable"
         end
 
         for _, key in ipairs(keys) do
@@ -546,10 +564,16 @@ OnInit.final("ArchitectureTests", function(Require)
             local flavor_position = item and item.tooltip and
                                         item.tooltip:find("|cff808080", 1,
                                                           true)
-            local infusion_range_valid = key ~= "aegis_donor_flask" or
+            local expected_range = key == "aegis_donor_flask" and "18-22%" or
+                                       key == "corrosive_donor_flask" and
+                                           "13.5-16.5%" or
+                                       key == "voltaic_donor_flask" and
+                                           "36-44%" or nil
+            local infusion_range_valid = not expected_range or
                                                (item and item.alt_tooltip and
                                                    item.alt_tooltip:find(
-                                                       "18-22%", 1, true))
+                                                       expected_range, 1,
+                                                       true))
             local cooldown_range_valid = item and item.alt_tooltip and
                                              item.alt_tooltip:find(
                                                  "%d[%d%.]*%-%d[%d%.]*|r Cooldown")
