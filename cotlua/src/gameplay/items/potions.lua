@@ -1295,8 +1295,9 @@ OnInit.final("PotionService", function(Require)
     end
 
     ---Returns independent Chaos-boss drop chances. Affix donors remain
-    ---obtainable enough to support brewing, while the two-affix Legendary and
-    ---stronger Chaos bases remain exceptionally rare boss-only finds.
+    ---obtainable enough to support brewing, while the two-affix Legendary
+    ---base remains an exceptionally rare boss find. The stronger Chaos Flask
+    ---is reserved for the future Scarab dungeon.
     ---Both rewards improve with boss level and selected boss difficulty.
     function PotionService.getChaosBossDropChances(level, difficulty)
         local progress = math.max(0., math.min(1., ((level or 200) - 200.) /
@@ -1307,12 +1308,7 @@ OnInit.final("PotionService", function(Require)
         local legendary = math.min(0.0025,
             (0.00005 + 0.00045 * progress * progress) *
                 (1. + 0.25 * (challenge - 1)))
-        local chaos_progress = math.max(0., math.min(1.,
-            ((level or 200) - 300.) / 100.))
-        local chaos = level and level >= 300 and math.min(0.0005,
-            (0.00001 + 0.00009 * chaos_progress * chaos_progress) *
-                (1. + 0.25 * (challenge - 1))) or 0.
-        return donor, legendary, chaos
+        return donor, legendary
     end
 
     local function potion_at(pid, index)

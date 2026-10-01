@@ -493,11 +493,15 @@ OnInit.final("ArchitectureTests", function(Require)
             if type(FactionMining.refreshDeposits) ~= "function" or
                 type(FactionMining.startSurveyBoom) ~= "function" or
                 type(FactionMining.isSurveyBoomActive) ~= "function" or
+                type(Weather.rerollBeneficial) ~= "function" or
+                type(VanguardMobilizationBuff) ~= "table" or
                 type(Faction.getMomentum) ~= "function" or
                 type(Faction.addMomentum) ~= "function" or
                 type(Faction.registerMomentumReward) ~= "function" or
                 Faction.getMomentumGoal() ~= 100 or
                 not Faction.hasMomentumReward(1) or
+                not Faction.hasMomentumReward(2) or
+                not Faction.hasMomentumReward(3) or
                 type(CaveVoyagersServices.shareBlessing) ~= "function" or
                 type(AshenVanguardServices.shareBlessing) ~= "function" or
                 type(AshenVanguardServices.hasBossBounty) ~= "function" or
@@ -734,24 +738,20 @@ OnInit.final("ArchitectureTests", function(Require)
 
     ArchitectureTests.register("Chaos potion boss odds scale upward",
                                function()
-        local low_donor, low_legendary, low_chaos =
+        local low_donor, low_legendary =
             PotionService.getChaosBossDropChances(200, 1)
-        local high_donor, high_legendary, high_chaos =
+        local high_donor, high_legendary =
             PotionService.getChaosBossDropChances(500, 1)
-        local challenge_donor, challenge_legendary, challenge_chaos =
+        local challenge_donor, challenge_legendary =
             PotionService.getChaosBossDropChances(500, 5)
         local valid = math.abs(low_donor - 0.08) < 0.000001 and
                           math.abs(low_legendary - 0.00005) < 0.000001 and
-                          low_chaos == 0. and
                           high_donor > low_donor and
                           high_legendary > low_legendary and
-                          high_chaos > low_chaos and
                           challenge_donor > high_donor and
                           challenge_legendary > high_legendary and
-                          challenge_chaos > high_chaos and
                           challenge_donor <= 0.40 and
-                          challenge_legendary <= 0.0025 and
-                          challenge_chaos <= 0.0005
+                          challenge_legendary <= 0.0025
         if not valid then
             return false, "Chaos boss potion odds are not level/difficulty scaled"
         end
@@ -810,13 +810,12 @@ OnInit.final("ArchitectureTests", function(Require)
             elseif entry.key == "legendary_chaos_flask" then
                 found_legendary = entry.name ~= nil and entry.icon ~= nil
             elseif entry.key == "chaos_flask" then
-                found_chaos = entry.name == "Chaos Flask" and
-                                  entry.icon ~= nil and entry.chance > 0.
+                found_chaos = true
             end
         end
         if not found_equipment or not found_ticket or
-            (CHAOS_MODE and (not found_donor or not found_legendary or
-                not found_chaos)) then
+            found_chaos or
+            (CHAOS_MODE and (not found_donor or not found_legendary)) then
             return false, "boss drop registry preview is incomplete"
         end
         return true

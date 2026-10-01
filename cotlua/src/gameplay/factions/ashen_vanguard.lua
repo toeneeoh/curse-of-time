@@ -27,6 +27,8 @@ OnInit.final("AshenVanguard", function(Require)
     local EVENT_TIMEOUT = 600.
     local EVENT_REWARD = 30
     local EVENT_PRESENCE_REQUIRED = 30
+    local MOMENTUM_REWARD = 40
+    local MOBILIZATION_DURATION = 900.
     local SHARED_BLESSING_DURATION = 300.
 
     local ashen_vanguard = Faction.create(
@@ -526,6 +528,9 @@ OnInit.final("AshenVanguard", function(Require)
             end
         end
         if success then
+            if rewarded > 0 then
+                Faction.addMomentum(ASHEN_VANGUARD_ID, MOMENTUM_REWARD)
+            end
             announce("|cff80ff80Grand Hunt complete!|r " .. rewarded
                 .. " hunter" .. (rewarded == 1 and " was" or "s were") .. " rewarded.")
         else
@@ -606,6 +611,26 @@ OnInit.final("AshenVanguard", function(Require)
             return start_grand_hunt()
         end
     end
+
+    local function start_vanguard_mobilization()
+        local applied = 0
+        local user = User.first
+        while user do
+            local hero = Hero[user.id]
+            if hero and UnitAlive(hero) then
+                local buff = VanguardMobilizationBuff:add(hero, hero)
+                buff:duration(MOBILIZATION_DURATION)
+                UnitRefreshBuff(hero, buff)
+                applied = applied + 1
+            end
+            user = user.next
+        end
+        return applied > 0
+    end
+
+    Faction.registerMomentumReward(ASHEN_VANGUARD_ID,
+                                   "Vanguard Mobilization",
+                                   start_vanguard_mobilization)
 
     FactionEvents.register(ASHEN_VANGUARD_ID, {
         name = "Grand Hunt",

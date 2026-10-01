@@ -144,6 +144,7 @@ OnInit.final("Stormwatch", function(Require)
     local STRIKE_HEALTH_FRACTION = 0.12
     local POINT_REWARD = 30
     local REPUTATION_REWARD = 30
+    local MOMENTUM_REWARD = 40
     local AVATAR_TEMPLATE = FourCC('n002')
     -- O02M uses the built-in Lightning Revenant model in this map's object data.
     local AVATAR_SKIN = FourCC('O02M')
@@ -416,6 +417,9 @@ OnInit.final("Stormwatch", function(Require)
             end
         end
         if success then
+            if rewarded > 0 then
+                Faction.addMomentum(STORMWATCH_ID, MOMENTUM_REWARD)
+            end
             announce("|cff80ff80Eye of the Storm complete!|r " .. rewarded
                 .. " participant" .. (rewarded == 1 and " was" or "s were") .. " rewarded.")
         elseif damage_fraction > 0. then
@@ -502,6 +506,14 @@ OnInit.final("Stormwatch", function(Require)
             return start_event()
         end
     end
+
+    local function start_favorable_forecast()
+        Weather.rerollBeneficial()
+        return true
+    end
+
+    Faction.registerMomentumReward(STORMWATCH_ID, "Favorable Forecast",
+                                   start_favorable_forecast)
 
     FactionEvents.register(STORMWATCH_ID, {
         name = "Eye of the Storm",

@@ -176,6 +176,29 @@ OnInit.final("BuffsWorldFactions", function(Require)
         end
     end
 
+    ---@class VanguardMobilizationBuff : Buff
+    VanguardMobilizationBuff = Buff.new()
+    do
+        local thistype = VanguardMobilizationBuff
+        thistype.NAME = "Vanguard Mobilization"
+        thistype.ICON = "ReplaceableTextures\\CommandButtons\\BTNMarkOfFire.blp"
+        thistype.DESC = "This unit has +^#mult% Boss Drop Rate"
+        thistype.DISPEL_TYPE = BUFF_POSITIVE
+        thistype.STACK_TYPE = BUFF_STACK_NONE
+        thistype.CANNOT_PURGE = true
+
+        function thistype:onApply()
+            self.mult = 1.25
+            Unit[self.target].boss_drop_rate =
+                Unit[self.target].boss_drop_rate * self.mult
+        end
+
+        function thistype:onRemove()
+            Unit[self.target].boss_drop_rate =
+                Unit[self.target].boss_drop_rate / self.mult
+        end
+    end
+
     ---@class VanguardBountyBuff : Buff
     VanguardBountyBuff = Buff.new()
     do

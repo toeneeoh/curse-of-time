@@ -413,14 +413,15 @@ OnInit.final("Weather", function(Require)
         return w
     end
 
-    local function pick_weighted_weather(time, excluded)
+    local function pick_weighted_weather(time, excluded, predicate)
         local pool = {}
         local prefix = {}
         local total = 0
 
         -- build pool of valid weathers with cumulative weights
         for id = 1, #WeatherTable do
-            if id ~= excluded and is_valid_weather(id, time) then
+            if id ~= excluded and is_valid_weather(id, time) and
+                (not predicate or predicate(id, WeatherTable[id])) then
                 local w = weight_for_weather(id)
                 if w > 0 then
                     pool[#pool + 1] = id
@@ -434,7 +435,8 @@ OnInit.final("Weather", function(Require)
         if #pool == 0 or total <= 0 then
             local fallback = {}
             for id = 1, #WeatherTable do
-                if id ~= excluded and is_valid_weather(id, time) then
+                if id ~= excluded and is_valid_weather(id, time) and
+                    (not predicate or predicate(id, WeatherTable[id])) then
                     fallback[#fallback + 1] = id
                 end
             end
@@ -457,12 +459,12 @@ OnInit.final("Weather", function(Require)
         return pool[#pool]
     end
 
-    local function begin_weather_change(excluded)
+    local function begin_weather_change(excluded, predicate)
         TQ:disableCallback(callback)
         local time = GetTimeOfDay()
         weather_iterations = weather_iterations + 1
 
-        local choice = pick_weighted_weather(time, excluded)
+        local choice = pick_weighted_weather(time, excluded, predicate)
 
         if DEV_ENABLED and WEATHER_OVERRIDE > 0 then
             choice = WEATHER_OVERRIDE
@@ -505,6 +507,14 @@ OnInit.final("Weather", function(Require)
     ---@return boolean
     function Weather.reroll()
         return begin_weather_change(CURRENT_WEATHER)
+    end
+
+    ---Immediately begins a transition to a different beneficial weather.
+    ---Faction projects use this instead of repeatedly consuming random rolls.
+    ---@return boolean
+    function Weather.rerollBeneficial()
+        return begin_weather_change(CURRENT_WEATHER,
+            function(_id, definition) return definition.bad ~= 1 end)
     end
 
     ---@param action fun(weather: integer, definition: table)
