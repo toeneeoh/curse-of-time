@@ -1158,6 +1158,20 @@ OnInit.final("PotionService", function(Require)
         return result
     end
 
+    ---Returns a stable catalog entry for the random donor category used by
+    ---boss drop previews. The actual dropped flask is selected from the full
+    ---prefix/suffix donor pool when the reward rolls successfully.
+    function PotionService.getChaosDonorPresentation()
+        return "Affix Donor Flask", EMPTY_FLASK_ICON,
+               "Contains one transferable potion prefix or suffix.|n|cff808080Its contents refuse to settle into a recognizable color.|r"
+    end
+
+    function PotionService.getLegendaryChaosPresentation()
+        return "Legendary Flask",
+               "ReplaceableTextures\\CommandButtons\\BTNINV_Potion_16.blp",
+               "A legendary potion base with open Prefix and Suffix slots.|n|cff808080Two currents spiral through the glass without ever mingling.|r"
+    end
+
     ---Returns independent Chaos-boss drop chances. Affix donors remain
     ---obtainable enough to support brewing, while the two-affix legendary
     ---base deliberately ranges from roughly 1:20,000 to 1:1,000 per kill.

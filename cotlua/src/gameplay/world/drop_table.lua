@@ -19,11 +19,30 @@
     ---@field pickItem function
     ---@field getItemDistribution fun(self: DropTable, id: integer): number[], integer
     ---@field rollColosseumTicket fun(self: DropTable, x: number, y: number, chance: number): boolean
+    ---@field registerBossDropSource fun(self: DropTable, source: BossDropSource): boolean
+    ---@field getBossDropEntries fun(self: DropTable, boss: Boss, multiplier: number): BossDropEntry[]
+    ---@field rollBossDrops fun(self: DropTable, boss: Boss, x: number, y: number, multiplier: number)
     DropTable = {}
     do
         local thistype = DropTable
         local MAX_ITEM_COUNT = 100
         local ADJUST_RATE = 0.05
+        local boss_drop_sources = {}
+
+        ---@class BossDropEntry
+        ---@field key string
+        ---@field item_id? integer
+        ---@field name? string
+        ---@field icon? string
+        ---@field tooltip? string
+        ---@field chance number Unconditional chance of at least one copy.
+        ---@field pool_share? number Conditional equipment-pool share.
+
+        ---@class BossDropSource
+        ---@field key string
+        ---@field available? fun(boss: Boss): boolean
+        ---@field describe fun(boss: Boss, multiplier: number): BossDropEntry[]
+        ---@field roll fun(boss: Boss, x: number, y: number, multiplier: number)
 
         -- adjusts the drop rates of all items in a pool after a drop
         ---@type fun(id: integer, i: integer)
@@ -115,6 +134,62 @@
             return distribution, count
         end
 
+        local function clamp_chance(chance)
+            return math.min(1., math.max(0., chance or 0.))
+        end
+
+        ---Registers a self-contained boss reward provider. Both reward rolls
+        ---and multiboard entries are obtained from this same definition.
+        function thistype:registerBossDropSource(source)
+            if type(source) ~= "table" or type(source.key) ~= "string" or
+                type(source.describe) ~= "function" or
+                type(source.roll) ~= "function" then return false end
+            boss_drop_sources[#boss_drop_sources + 1] = source
+            return true
+        end
+
+        local function source_available(source, boss)
+            return not source.available or source.available(boss)
+        end
+
+        function thistype:getBossDropEntries(boss, multiplier)
+            local result = {}
+            multiplier = math.max(0., multiplier or 1.)
+            for source_index = 1, #boss_drop_sources do
+                local source = boss_drop_sources[source_index]
+                if source_available(source, boss) then
+                    local entries = source.describe(boss, multiplier) or {}
+                    for entry_index = 1, #entries do
+                        local entry = entries[entry_index]
+                        entry.chance = clamp_chance(entry.chance)
+                        result[#result + 1] = entry
+                    end
+                end
+            end
+            return result
+        end
+
+        function thistype:rollBossDrops(boss, x, y, multiplier)
+            multiplier = math.max(0., multiplier or 1.)
+            for index = 1, #boss_drop_sources do
+                local source = boss_drop_sources[index]
+                if source_available(source, boss) then
+                    source.roll(boss, x, y, multiplier)
+                end
+            end
+        end
+
+        ---Returns the chance for one equipment roll and at least one equipment
+        ---drop across the boss's configured difficulty rolls.
+        function thistype:getBossEquipmentChance(boss, multiplier)
+            local base = (Rates[boss.id] or 0) +
+                             (boss.first_drop and 25 or 0)
+            local per_roll = clamp_chance(base * math.max(0., multiplier or 1.) *
+                                              0.01)
+            local rolls = math.max(1, math.floor(boss.difficulty or 1))
+            return per_roll, 1. - (1. - per_roll) ^ rolls
+        end
+
         ---Rolls an explicit ticket chance. Callers define eligibility by invoking
         ---this only from permanent overworld creep and boss reward pathways.
         ---@param x number
@@ -145,6 +220,111 @@
             if not key then return false end
             return PotionService.create(key, x, y, 600.) ~= nil
         end
+
+        thistype:registerBossDropSource({
+            key = "equipment",
+            describe = function(boss, multiplier)
+                local distribution, count =
+                    thistype:getItemDistribution(boss.id)
+                local per_roll =
+                    thistype:getBossEquipmentChance(boss, multiplier)
+                local rolls = math.max(1, math.floor(boss.difficulty or 1))
+                local entries = {}
+                for index = 1, count do
+                    local share = distribution[index] or 0.
+                    entries[index] = {
+                        key = "equipment_" .. index,
+                        item_id = ItemDrops[boss.id][index],
+                        chance = 1. - (1. - per_roll * share) ^ rolls,
+                        pool_share = share,
+                    }
+                end
+                return entries
+            end,
+            roll = function(boss, x, y, multiplier)
+                local per_roll =
+                    thistype:getBossEquipmentChance(boss, multiplier)
+                local rolls = math.max(1, math.floor(boss.difficulty or 1))
+                for _ = 1, rolls do
+                    if GetRandomReal(0., 1.) < per_roll then
+                        local item = ItemRuntime.create(
+                                         thistype:pickItem(boss.id), x, y, 600.)
+                        if item then
+                            item:lvl(math.max(0,
+                                ItemData[item.id][ITEM_UPGRADE_MAX] -
+                                    math.random(ITEM_MIN_LEVEL_VARIANCE,
+                                                ITEM_MAX_LEVEL_VARIANCE)))
+                        end
+                    end
+                end
+                boss.first_drop = false
+            end,
+        })
+
+        thistype:registerBossDropSource({
+            key = "colosseum_ticket",
+            describe = function(_boss, multiplier)
+                return {{
+                    key = "colosseum_ticket",
+                    item_id = COLOSSEUM_TICKET,
+                    chance = 0.05 * multiplier,
+                }}
+            end,
+            roll = function(_boss, x, y, multiplier)
+                thistype:rollColosseumTicket(x, y, 0.05 * multiplier)
+            end,
+        })
+
+        thistype:registerBossDropSource({
+            key = "chaos_affix_donor",
+            available = function() return CHAOS_MODE end,
+            describe = function(boss, multiplier)
+                local donor = PotionService.getChaosBossDropChances(
+                                  boss.level, boss.difficulty)
+                local name, icon, tooltip =
+                    PotionService.getChaosDonorPresentation()
+                return {{
+                    key = "chaos_affix_donor",
+                    name = name,
+                    icon = icon,
+                    tooltip = tooltip,
+                    chance = donor * multiplier,
+                }}
+            end,
+            roll = function(boss, x, y, multiplier)
+                local donor = PotionService.getChaosBossDropChances(
+                                  boss.level, boss.difficulty)
+                if GetRandomReal(0., 1.) < donor * multiplier then
+                    PotionService.createChaosDonor(x, y, 600.)
+                end
+            end,
+        })
+
+        thistype:registerBossDropSource({
+            key = "legendary_chaos_flask",
+            available = function() return CHAOS_MODE end,
+            describe = function(boss, multiplier)
+                local _, legendary = PotionService.getChaosBossDropChances(
+                                          boss.level, boss.difficulty)
+                local name, icon, tooltip =
+                    PotionService.getLegendaryChaosPresentation()
+                return {{
+                    key = "legendary_chaos_flask",
+                    name = name,
+                    icon = icon,
+                    tooltip = tooltip,
+                    chance = legendary * multiplier,
+                }}
+            end,
+            roll = function(boss, x, y, multiplier)
+                local _, legendary = PotionService.getChaosBossDropChances(
+                                          boss.level, boss.difficulty)
+                if GetRandomReal(0., 1.) < legendary * multiplier then
+                    PotionService.create(PotionService.LEGENDARY_CHAOS_KEY,
+                                         x, y, 600.)
+                end
+            end,
+        })
 
         ---@type fun(id: integer, ...)
         local function setup_rates(id, ...)

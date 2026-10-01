@@ -691,8 +691,37 @@ OnInit.final("ArchitectureTests", function(Require)
         end
         if type(Boss.getDropMultiplier) ~= "function" or
             type(Boss.getEquipmentDropChance) ~= "function" or
-            type(Boss.refreshDropUI) ~= "function" then
+            type(Boss.refreshDropUI) ~= "function" or
+            type(DropTable.registerBossDropSource) ~= "function" or
+            type(DropTable.getBossDropEntries) ~= "function" or
+            type(DropTable.getBossEquipmentChance) ~= "function" or
+            type(DropTable.rollBossDrops) ~= "function" then
             return false, "boss drop chance helpers are unavailable"
+        end
+
+        local preview = DropTable:getBossDropEntries({
+            id = boss_ids[1],
+            level = 200,
+            difficulty = 1,
+            first_drop = false,
+        }, 1.)
+        local found_equipment, found_ticket = false, false
+        local found_donor, found_legendary = false, false
+        for index = 1, #preview do
+            local entry = preview[index]
+            if entry.key:find("equipment_", 1, true) == 1 then
+                found_equipment = entry.item_id ~= nil and entry.chance >= 0.
+            elseif entry.key == "colosseum_ticket" then
+                found_ticket = entry.item_id ~= nil and entry.chance > 0.
+            elseif entry.key == "chaos_affix_donor" then
+                found_donor = entry.name ~= nil and entry.icon ~= nil
+            elseif entry.key == "legendary_chaos_flask" then
+                found_legendary = entry.name ~= nil and entry.icon ~= nil
+            end
+        end
+        if not found_equipment or not found_ticket or
+            (CHAOS_MODE and (not found_donor or not found_legendary)) then
+            return false, "boss drop registry preview is incomplete"
         end
         return true
     end)

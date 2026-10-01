@@ -12,7 +12,6 @@ OnInit.final("Boss", function(Require)
     Require('TimerQueue')
     Require('Users')
     Require('DropTable')
-    Require('PotionService')
 
     local TQ = TimerQueue
     local dead_gods = 0
@@ -433,16 +432,6 @@ OnInit.final("Boss", function(Require)
             end
         end
 
-        ---@type fun(boss: table, chance: number, x: number, y: number)
-        local function boss_drop(boss, chance, x, y)
-            for _ = 1, boss.difficulty do
-                if GetRandomReal(0., 100.) < chance then
-                    local itm = ItemRuntime.create(DropTable:pickItem(boss.id), x, y, 600.)
-                    itm:lvl(max(0, ItemData[itm.id][ITEM_UPGRADE_MAX] - random(ITEM_MIN_LEVEL_VARIANCE, ITEM_MAX_LEVEL_VARIANCE)))
-                end
-            end
-        end
-
         local function boss_drop_multiplier(boss, x, y)
             local best = 1.
             local user = User.first
@@ -472,9 +461,8 @@ OnInit.final("Boss", function(Require)
         ---the effective nearby-player multiplier. Chances are normalized 0..1.
         function thistype:getEquipmentDropChance()
             local multiplier = self:getDropMultiplier()
-            local base = (Rates[self.id] or 0) + (self.first_drop and 25 or 0)
-            local per_roll = min(1., max(0., base * multiplier * 0.01))
-            local overall = 1. - (1. - per_roll) ^ self.difficulty
+            local per_roll, overall =
+                DropTable:getBossEquipmentChance(self, multiplier)
             return per_roll, overall, multiplier
         end
 
@@ -493,34 +481,8 @@ OnInit.final("Boss", function(Require)
         end
 
         function thistype:reward(x, y)
-            local base_chance = Rates[self.id] or 0
             local drop_multiplier = boss_drop_multiplier(self, x, y)
-            if self.first_drop then
-                self.first_drop = false
-                boss_drop(self, (base_chance + 25) * drop_multiplier, x, y)
-            else
-                boss_drop(self, base_chance * drop_multiplier, x, y)
-            end
-
-            DropTable:rollColosseumTicket(x, y, 0.05 * drop_multiplier)
-
-            -- Chaos bosses exclusively supply transferable generic affixes.
-            -- The legendary two-slot base uses a separate, Jah-like rare roll.
-            -- Higher-level bosses and higher difficulties improve both odds.
-            if CHAOS_MODE then
-                local donor_chance, legendary_chance =
-                    PotionService.getChaosBossDropChances(self.level,
-                                                          self.difficulty)
-                donor_chance = donor_chance * drop_multiplier
-                legendary_chance = legendary_chance * drop_multiplier
-                if GetRandomReal(0., 1.) < donor_chance then
-                    PotionService.createChaosDonor(x, y, 600.)
-                end
-                if GetRandomReal(0., 1.) < legendary_chance then
-                    PotionService.create(PotionService.LEGENDARY_CHAOS_KEY,
-                                         x, y, 600.)
-                end
-            end
+            DropTable:rollBossDrops(self, x, y, drop_multiplier)
 
             local count = self.crystal * self.difficulty ---@type integer 
 

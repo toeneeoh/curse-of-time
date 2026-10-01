@@ -710,9 +710,10 @@ OnInit.final("Multiboard", function(Require)
             BlzFrameSetEnable(item_drop_container, false)
             BlzFrameSetPoint(item_drop_container, FRAMEPOINT_TOPLEFT, item_drops.frame, FRAMEPOINT_TOPLEFT, 0., 0.)
             BlzFrameSetVisible(item_drop_container, false)
+            local MAX_BOSS_DROP_ENTRIES = 13
             local items = {}
             local item_chance_text = {}
-            for i = 1, 10 do
+            for i = 1, MAX_BOSS_DROP_ENTRIES do
                 items[i] = Button.create(item_drop_container, ICON_SIZE * 2 + 0.004, ICON_SIZE * 2 + 0.004, 0., -(ICON_SIZE * 2. + 0.004) * i, false)
                 items[i].tooltip:point(FRAMEPOINT_TOPRIGHT)
                 item_chance_text[i] = BlzCreateFrameByType(
@@ -731,7 +732,11 @@ OnInit.final("Multiboard", function(Require)
 
             local function percent_text(value)
                 local percent = value * 100.
-                if percent > 0. and percent < 0.1 then return "<0.1%" end
+                if percent > 0. and percent < 0.01 then
+                    return string.format("%.4f%%", percent)
+                end
+                if percent < 0.1 then return string.format("%.3f%%", percent) end
+                if percent < 1. then return string.format("%.2f%%", percent) end
                 if percent < 10. then return string.format("%.1f%%", percent) end
                 return string.format("%.0f%%", percent)
             end
@@ -745,20 +750,22 @@ OnInit.final("Multiboard", function(Require)
                 local b = boss.viewing[GetPlayerId(p) + 1]
 
                 if b then
-                    local boss_items = {}
-                    local distribution, item_count =
-                        DropTable:getItemDistribution(b.id)
                     local per_roll, overall, multiplier =
                         b:getEquipmentDropChance()
-
-                    for i = 1, 10 do
-                        local item = ItemDrops[b.id][i]
-
-                        if item ~= 0 then
-                            boss_items[i] = ShopItem.create(item, 0, true)
-                        else
-                            break
-                        end
+                    local drop_entries =
+                        DropTable:getBossDropEntries(b, multiplier)
+                    local drop_presentations = {}
+                    for i = 1, #drop_entries do
+                        local entry = drop_entries[i]
+                        local presentation = entry.item_id and
+                                                 ShopItem.create(entry.item_id,
+                                                                 0, true) or nil
+                        if presentation == 0 then presentation = nil end
+                        drop_presentations[i] = presentation or {
+                            name = entry.name,
+                            icon = entry.icon,
+                            tooltip = entry.tooltip or "",
+                        }
                     end
 
                     if GetLocalPlayer() == p then
@@ -774,22 +781,32 @@ OnInit.final("Multiboard", function(Require)
                                 percent_text(per_roll) .. " | Rolls: " ..
                                 b.difficulty .. "|nDrop multiplier: " ..
                                 percent_text(multiplier) .. first_kill)
-                        for i = 1, 10 do
-                            if boss_items[i] then
-                                local share = distribution[i] or
-                                                  (item_count > 0 and
-                                                      1. / item_count or 0.)
+                        for i = 1, MAX_BOSS_DROP_ENTRIES do
+                            local entry = drop_entries[i]
+                            if entry then
+                                local presentation = drop_presentations[i]
+                                local name = presentation.name
+                                local icon = presentation.icon
+                                local tooltip = presentation.tooltip
                                 items[i]:visible(true)
-                                items[i]:icon(boss_items[i].icon)
-                                items[i].tooltip:name(boss_items[i].name)
-                                items[i].tooltip:icon(boss_items[i].icon)
-                                items[i].tooltip:text(
-                                    boss_items[i].tooltip ..
-                                        "|n|n|cffffcc00Current drop-pool share:|r " ..
-                                        percent_text(share))
+                                items[i]:icon(icon)
+                                items[i].tooltip:name(name)
+                                items[i].tooltip:icon(icon)
+                                local details =
+                                    tooltip ..
+                                        "|n|n|cffffcc00Current drop chance:|r " ..
+                                        percent_text(entry.chance)
+                                if entry.pool_share then
+                                    details = details ..
+                                                  "|n|cff808080Drop-pool share: " ..
+                                                  percent_text(entry.pool_share) ..
+                                                  "|r"
+                                end
+                                items[i].tooltip:text(details)
                                 BlzFrameSetText(item_chance_text[i],
                                                 "|cffffcc00" ..
-                                                    percent_text(share) .. "|r")
+                                                    percent_text(entry.chance) ..
+                                                    "|r")
                                 BlzFrameSetVisible(item_chance_text[i], true)
                             else
                                 items[i]:visible(false)
