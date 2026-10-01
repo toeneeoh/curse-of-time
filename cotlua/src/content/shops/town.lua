@@ -68,7 +68,7 @@ OnInit.final("TownShops", function(Require)
     CreateShop(potion_master, 1000.)
     local potion_services = ShopAddCategory(potion_master,
         "ReplaceableTextures\\CommandButtons\\BTNPotionGreenSmall.blp",
-        "Potion Services")
+        "Potion Master")
     PotionMasterServices.addToShop(potion_master, potion_services)
 
     local master = CreateUnit(Player(PLAYER_NEUTRAL_PASSIVE), potion_master,

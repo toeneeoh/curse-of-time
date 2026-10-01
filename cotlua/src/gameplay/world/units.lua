@@ -191,13 +191,9 @@ OnInit.final("Units", function(Require)
         local uid = GetUnitTypeId(killed)
         local x, y = GetUnitX(killed), GetUnitY(killed)
 
-        -- Some creep death types leave an invisible corpse with collision.
-        -- Disable it now, then remove the handle after the current death event
-        -- so later synchronous reward and quest callbacks can still inspect it.
         SetUnitPathing(killed, false)
         RewardItem(killed, killer)
         RewardXPGold(killed, killer)
-        TimerQueue:callDelayed(0., RemoveUnit, killed)
         TimerQueue:callDelayed(20.0, on_respawn, uid, x, y, CHAOS_MODE, on_death)
     end
 

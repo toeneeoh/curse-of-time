@@ -187,7 +187,7 @@ OnInit.final("Chaos", function(Require)
         Boss.create(BOSS_DARK_SOUL, GetRectCenterX(gg_rct_Dark_Soul_Boss_Spawn), GetRectCenterY(gg_rct_Dark_Soul_Boss_Spawn), bj_UNIT_FACING, FourCC('O02H'), "Essence of Darkness", 300,
         3, 2000)
         -- Legion
-        Boss.create(BOSS_LEGION, GetRectCenterX(gg_rct_To_The_Forrest), GetRectCenterY(gg_rct_To_The_Forrest), bj_UNIT_FACING, FourCC('H04R'), "Legion", 340,
+        Boss.create(BOSS_LEGION, GetRectCenterX(gg_rct_Legion_Boss_Spawn), GetRectCenterY(gg_rct_Legion_Boss_Spawn), bj_UNIT_FACING, FourCC('H04R'), "Legion", 340,
         8, 2000)
         -- Thanatos
         x, y = GetRandomXYInRect(gg_rct_Thanatos_Boss_Spawn)

@@ -9,7 +9,6 @@ OnInit.final("AshenVanguard", function(Require)
     Require('Events')
     Require('Groups')
     Require('MainMap')
-    Require('Progression')
     Require('ShopActions')
     Require('TimerQueue')
     Require('UnitTable')
@@ -36,7 +35,7 @@ OnInit.final("AshenVanguard", function(Require)
         -8800.,
         -13124.,
         AshenVanguardBuff,
-        "The Ashen Vanguard hunt the most dangerous creatures unleashed by Chaos and reward those who seek varied, formidable quarry.|n|n|cffffcc00Membership, rank progress, and unspent Faction Points are saved with this character.|r",
+        "Join the Ashen Vanguard to hunt the deadliest creatures in Chaos.|n|n|cffffcc00Faction progress is saved with this character.|r",
         "ReplaceableTextures\\CommandButtons\\BTNHarbingerHelm.blp"
     )
 
@@ -114,7 +113,7 @@ OnInit.final("AshenVanguard", function(Require)
                 and IsUnitInRangeXY(hero, x, y, state.pulse_radius) then
                 DamageTarget(state.unit, hero,
                     BlzGetUnitMaxHP(hero) * state.pulse_damage,
-                    ATTACK_TYPE_NORMAL, PURE, "Rare Eruption")
+                    ATTACK_TYPE_NORMAL, PURE, "Eruption")
             end
             user = user.next
         end
@@ -190,6 +189,7 @@ OnInit.final("AshenVanguard", function(Require)
         local hero = pid and Hero[pid] or nil
         local hero_x = hero and GetUnitX(hero) or 0.
         local hero_y = hero and GetUnitY(hero) or 0.
+        desired_level = desired_level or (hero and GetHeroLevel(hero))
         local group = CreateGroup()
         GroupEnumUnitsInRect(group, MAIN_MAP.rect, nil)
         local unit = FirstOfGroup(group)
@@ -197,29 +197,23 @@ OnInit.final("AshenVanguard", function(Require)
             GroupRemoveUnit(group, unit)
             if OverworldCreeps.isRegular(unit) and not rare_by_unit[unit]
                 and not Unit[unit].target then
-                local valid = true
-                if pid then
-                    valid = Progression.getLevelDifferenceMultiplier(
-                        GetHeroLevel(hero), GetUnitLevel(unit)) >= 0.5
-                end
-                if valid then
-                    local entry = {
-                        unit = unit,
-                        difference = math.abs(GetUnitLevel(unit)
-                            - (desired_level or GetUnitLevel(unit))),
-                    }
-                    available[#available + 1] = entry
-                    if hero and DistanceCoords(hero_x, hero_y,
-                        GetUnitX(unit), GetUnitY(unit)) <= RARE_SEARCH_RADIUS then
-                        nearby[#nearby + 1] = entry
-                    end
+                local entry = {
+                    unit = unit,
+                    difference = math.abs(GetUnitLevel(unit)
+                        - (desired_level or GetUnitLevel(unit))),
+                }
+                available[#available + 1] = entry
+                if hero and DistanceCoords(hero_x, hero_y,
+                    GetUnitX(unit), GetUnitY(unit)) <= RARE_SEARCH_RADIUS then
+                    nearby[#nearby + 1] = entry
                 end
             end
             unit = FirstOfGroup(group)
         end
         DestroyGroup(group)
-        if pid and #nearby > 0 then return nearby end
+        table.sort(nearby, function(a, b) return a.difference < b.difference end)
         table.sort(available, function(a, b) return a.difference < b.difference end)
+        if pid and #nearby > 0 then return nearby end
         return available
     end
 
@@ -253,7 +247,7 @@ OnInit.final("AshenVanguard", function(Require)
             local variant = variants[math.random(1, #variants)]
             local state = promote(entry.unit, pid, "quest", variant)
             if state and GetLocalPlayer() == Player(pid - 1) then
-                PingMinimap(GetUnitX(entry.unit), GetUnitY(entry.unit), 3.)
+                PingMinimap(GetUnitX(entry.unit), GetUnitY(entry.unit), 8.)
             end
         end
         if active_rare_count(pid) < desired and not rare_retry[pid] then
@@ -294,7 +288,7 @@ OnInit.final("AshenVanguard", function(Require)
     local function begin_rare_hunt(pid)
         ensure_rare_targets(pid)
         DisplayTextToPlayer(Player(pid - 1), 0., 0.,
-            "|cffffcc00Ashen Vanguard:|r Rare quarry has been marked on your minimap.")
+            "|cffffcc00Ashen Vanguard:|r Rare targets have been marked on your minimap.")
     end
 
     Unit.onIndex(function(unit)
@@ -304,8 +298,8 @@ OnInit.final("AshenVanguard", function(Require)
     end)
 
     ashen_vanguard:addQuest(Quest.create(
-        "Varied Quarry",
-        "Defeat 4 different enemy types that grant at least 50% rewards.\n\n|cffffcc00Reward:|r 5 Faction Points",
+        "Varied Hunt",
+        "Defeat 4 different enemy types. Each unit type counts once.\n\n|cffffcc00Reward:|r 5 Faction Points",
         "ReplaceableTextures\\CommandButtons\\BTNSpy.blp",
         QUEST_DIFF_EASY,
         "distinct_enemy_types", 4, 5, 5
@@ -330,16 +324,16 @@ OnInit.final("AshenVanguard", function(Require)
         "distinct_bosses", 2, 10, 10
     ))
 
-    local legendary_quarry = Quest.create(
-        "Legendary Quarry",
+    local legendary_hunt = Quest.create(
+        "Legendary Hunt",
         "Hunt 4 empowered rare variants marked when this quest is accepted. Remain within 2500 range when each target dies.\n\n|cffffcc00Reward:|r 20 Faction Points",
         "ReplaceableTextures\\CommandButtons\\BTNCriticalStrike.blp",
         QUEST_DIFF_HARD,
         "rare_hunt", 4, 20, 20, 3
     )
-    legendary_quarry.accept_action = begin_rare_hunt
-    legendary_quarry.end_action = end_rare_hunt
-    ashen_vanguard:addQuest(legendary_quarry)
+    legendary_hunt.accept_action = begin_rare_hunt
+    legendary_hunt.end_action = end_rare_hunt
+    ashen_vanguard:addQuest(legendary_hunt)
 
     ashen_vanguard:addQuest(Quest.create(
         "Vanguard's Ledger",
@@ -554,7 +548,7 @@ OnInit.final("AshenVanguard", function(Require)
         if #candidates == 0 then return false end
         local entry = candidates[math.random(1, math.min(8, #candidates))]
         local config = {
-            prefix = "Grand Quarry:",
+            prefix = "Grand Hunt Target:",
             color = { 255, 80, 40 },
             health = 20.,
             damage = 2.75,
@@ -571,7 +565,7 @@ OnInit.final("AshenVanguard", function(Require)
         EVENT_ON_UNIT_DEATH:register_unit_action(grand_state.unit, grand_death)
         local x, y = GetUnitX(grand_state.unit), GetUnitY(grand_state.unit)
         ping_members(x, y)
-        announce("|cffffcc00Faction Event: Grand Hunt|r\nA legendary quarry has been marked. Track it down and deal as much damage as possible within 10 minutes.",
+        announce("|cffffcc00Faction Event: Grand Hunt|r\nA legendary target has been marked. Track it down and deal as much damage as possible within 10 minutes.",
             bj_questDiscoveredSound)
         grand_presence = TimerQueue:callDelayed(1., grand_presence_tick)
         grand_timeout = TimerQueue:callDelayed(EVENT_TIMEOUT, finish_grand_hunt, false)
@@ -612,7 +606,7 @@ OnInit.final("AshenVanguard", function(Require)
     FactionEvents.register(ASHEN_VANGUARD_ID, {
         name = "Grand Hunt",
         icon = "ReplaceableTextures\\CommandButtons\\BTNMarkOfFire.blp",
-        description = "Track an empowered rare creature somewhere in the Chaos world and defeat it within 10 minutes. Its location is marked when the event begins, and it periodically unleashes a telegraphed eruption. Remain near the quarry for at least 30 seconds or damage it to qualify.\n\nAll eligible hunters receive up to |cffffcc0030 Faction Points|r based on the percentage of its health removed.",
+        description = "Track an empowered rare creature somewhere in the Chaos world and defeat it within 10 minutes. Its location is marked when the event begins, and it periodically unleashes a telegraphed eruption. Remain near the target for at least 30 seconds or damage it to qualify.\n\nAll eligible hunters receive up to |cffffcc0030 Faction Points|r based on the percentage of its health removed.",
         activate = function() return true end,
         start = start_grand_hunt,
         warning = warn_grand_hunt,

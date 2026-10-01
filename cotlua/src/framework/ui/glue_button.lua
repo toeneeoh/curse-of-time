@@ -671,7 +671,7 @@ OnInit.final("Gluebutton", function(Require)
             BlzFrameSetEnable(self.cooldownFrame, false)
             BlzFrameSetEnable(self.cooldownText, false)
 
-            BlzFrameSetPoint(self.chargeFrame, FRAMEPOINT_BOTTOMRIGHT, self.iconFrame, FRAMEPOINT_BOTTOMRIGHT, -0.003, 0.003)
+            BlzFrameSetPoint(self.chargeFrame, FRAMEPOINT_BOTTOMRIGHT, self.iconFrame, FRAMEPOINT_BOTTOMRIGHT, -0.004, 0.003)
             BlzFrameSetSize(self.chargeFrame, width * 0.35, height * 0.35)
             BlzFrameSetPoint(self.chargeText, FRAMEPOINT_CENTER, self.chargeFrame, FRAMEPOINT_CENTER, 0., 0.)
             BlzFrameSetVisible(self.chargeText, false)

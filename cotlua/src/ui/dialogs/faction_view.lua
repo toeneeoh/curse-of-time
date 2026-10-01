@@ -190,7 +190,7 @@ OnInit.final("FactionView", function(Require)
     BlzFrameSetText(event_title, "|cffffcc00Event|r")
 
     local event_blurb = BlzCreateFrameByType("TEXT", "", event_frame, "", 0)
-    BlzFrameSetPoint(event_blurb, FRAMEPOINT_TOP, event_frame, FRAMEPOINT_TOP, -0.01, -0.13)
+    BlzFrameSetPoint(event_blurb, FRAMEPOINT_TOP, event_frame, FRAMEPOINT_TOP, -0.01, -0.115)
     BlzFrameSetSize(event_blurb, 0.2, 0.065)
     BlzFrameSetTextAlignment(event_blurb, TEXT_JUSTIFY_CENTER, TEXT_JUSTIFY_MIDDLE)
     BlzFrameSetEnable(event_blurb, false)
@@ -205,7 +205,7 @@ OnInit.final("FactionView", function(Require)
         FRAMEPOINT_TOP,
         FRAMEPOINT_TOP,
         -0.01,
-        -0.08
+        -0.085
     )
     event_icon:makeTooltip(FRAMEPOINT_TOPLEFT, 0.2)
     event_icon:setTooltipIcon(
@@ -313,7 +313,7 @@ OnInit.final("FactionView", function(Require)
     end)
 
     local rotation_text = BlzCreateFrameByType("TEXT", "", quest_frame, "", 0)
-    BlzFrameSetPoint(rotation_text, FRAMEPOINT_BOTTOM, quest_frame, FRAMEPOINT_BOTTOM, 0., 0.02)
+    BlzFrameSetPoint(rotation_text, FRAMEPOINT_BOTTOM, quest_frame, FRAMEPOINT_BOTTOM, 0., 0.09)
     BlzFrameSetTextAlignment(rotation_text, TEXT_JUSTIFY_CENTER, TEXT_JUSTIFY_MIDDLE)
     BlzFrameSetScale(rotation_text, 0.85)
     BlzFrameSetEnable(rotation_text, false)

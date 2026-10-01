@@ -138,6 +138,12 @@ OnInit.global("PlayerLifecycle", function(Require)
         DisableBackpackTeleports(pid, false)
         DisableItems(pid, false)
         ReviveHero(Hero[pid], x, y, true)
+        -- ReviveHero preserves pause state. A hero killed during a cast,
+        -- disable, or scripted transition would otherwise revive unable to
+        -- receive orders. Clear both native pause variants before listeners
+        -- apply any intentional post-revive control state.
+        PauseUnit(Hero[pid], false)
+        BlzPauseUnitEx(Hero[pid], false)
         SetWidgetLife(Hero[pid], BlzGetUnitMaxHP(Hero[pid]) * percenthp)
         SetUnitState(Hero[pid], UNIT_STATE_MANA,
             GetUnitState(Hero[pid], UNIT_STATE_MAX_MANA) * percentmana)

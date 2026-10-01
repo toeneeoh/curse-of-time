@@ -235,10 +235,6 @@ OnInit.global("CodeGen", function()
         out = CHAR:sub(encoded_checksum:len(), encoded_checksum:len()) ..
                   encoded_checksum .. out
 
-        if DEV_ENABLED then
-            print("Checksum: " .. cs .. " Encoded: " .. encode(cs))
-        end
-
         return scrambleString(compress(out))
     end
 
