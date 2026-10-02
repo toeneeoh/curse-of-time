@@ -29,6 +29,7 @@
     Require('CooldownAcceleration')
     Require('Perks')
     Require('FactionMining')
+    Require('MiningMaterials')
     Require('FactionEvents')
     Require('FactionConsumables')
     Require('AshenVanguard')
@@ -57,6 +58,7 @@
         ["factionrep"] = "Set the active faction's lifetime Faction Points to #. usage: -factionrep [#]",
         ["leavefaction"] = "Immediately leave your active faction while preserving its progress.",
         ["mining"] = "Spawn a common, rich, or rare deposit beside your hero. usage: -mining [common|rich|rare]",
+        ["minerals"] = "Give each mining material for recipe testing. usage: -minerals [amount]",
         ["factionevent"] = "Immediately start the next hourly faction event.",
         ["momentum"] = "Add lobby Faction Momentum to your active faction. usage: -momentum [#]",
         ["bounty"] = "Give yourself a Vanguard Bounty consumable.",
@@ -329,6 +331,13 @@ modifiers:
             else
                 DisplayTextToPlayer(p, 0., 0., "You are not in a faction.")
             end
+        end,
+        ["minerals"] = function(_p, pid, args)
+            local amount = math.max(1, args[2] and S2I(args[2]) or 25)
+            MiningMaterials.grant(pid, MiningMaterials.IRONSTONE, amount)
+            MiningMaterials.grant(pid, MiningMaterials.PRISMATIC_ORE, amount)
+            MiningMaterials.grant(pid, MiningMaterials.FORGOTTEN_CRYSTAL,
+                                  amount)
         end,
         ["momentum"] = function(p, pid, args)
             local faction = Faction.getFaction(pid)
