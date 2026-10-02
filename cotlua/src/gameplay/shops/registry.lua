@@ -108,8 +108,9 @@ OnInit.global("ShopRegistry", function(Require)
     ---@param id integer
     ---@param icon string
     ---@param description string
+    ---@param catalog_visible? fun(): boolean
     ---@return integer
-    function ShopRegistry.addCategory(id, icon, description)
+    function ShopRegistry.addCategory(id, icon, description, catalog_visible)
         local definition = ShopRegistry.definitions[id]
         if not definition then return 0 end
 
@@ -118,9 +119,11 @@ OnInit.global("ShopRegistry", function(Require)
             icon = icon,
             description = description,
             value = value,
+            catalog_visible = catalog_visible,
         }
         if ShopRegistry.adapter then
-            return ShopRegistry.adapter.addCategory(id, icon, description)
+            return ShopRegistry.adapter.addCategory(id, icon, description,
+                                                    catalog_visible)
         end
         return value
     end
@@ -128,7 +131,8 @@ OnInit.global("ShopRegistry", function(Require)
     ---@param id integer
     ---@param item_id string|integer
     ---@param categories integer
-    function ShopRegistry.addItem(id, item_id, categories)
+    ---@param catalog_visible? fun(): boolean
+    function ShopRegistry.addItem(id, item_id, categories, catalog_visible)
         local definition = ShopRegistry.definitions[id]
         if not definition then return end
 
@@ -139,12 +143,14 @@ OnInit.global("ShopRegistry", function(Require)
             id = item_id,
             key = key,
             categories = categories,
+            catalog_visible = catalog_visible,
         }
         definition.items[#definition.items + 1] = item
         definition.item_by_id[key] = item
         definition.stock_count[key] = -1
         if ShopRegistry.adapter then
-            ShopRegistry.adapter.addItem(id, item_id, categories)
+            ShopRegistry.adapter.addItem(id, item_id, categories,
+                                         catalog_visible)
         end
     end
 
@@ -222,6 +228,14 @@ OnInit.global("ShopRegistry", function(Require)
         return visible
     end
 
+    function ShopRegistry.refreshCatalog(id)
+        local definition = ShopRegistry.definitions[id]
+        if not definition or not ShopRegistry.adapter or
+            not ShopRegistry.adapter.refreshCatalog then return false end
+        ShopRegistry.adapter.refreshCatalog(definition)
+        return true
+    end
+
     ---@param adapter table
     function ShopRegistry.bind(adapter)
         ShopRegistry.adapter = adapter
@@ -231,11 +245,14 @@ OnInit.global("ShopRegistry", function(Require)
             adapter.setVisible(definition, definition.visibility)
             for category_index = 1, #definition.categories do
                 local category = definition.categories[category_index]
-                adapter.addCategory(definition.id, category.icon, category.description)
+                adapter.addCategory(definition.id, category.icon,
+                                    category.description,
+                                    category.catalog_visible)
             end
             for item_index = 1, #definition.items do
                 local item = definition.items[item_index]
-                adapter.addItem(definition.id, item.id, item.categories)
+                adapter.addItem(definition.id, item.id, item.categories,
+                                item.catalog_visible)
             end
             for offer_index = 1, #definition.offers do
                 adapter.addOffer(definition.id, definition.offers[offer_index])

@@ -382,7 +382,7 @@ OnInit.final("Shop", function(Require)
         }
 
         ---@type fun(S: Shop, i: ShopItem, row: integer, column: integer): ShopSlot
-        function ShopSlot.create(S, i, row, column)
+        function ShopSlot.create(S, i, row, column, catalog_visible)
             local self = Slot.create(S.main, i, ITEM_SIZE, ITEM_SIZE, INITIAL_X_OFFSET + ((SLOT_WIDTH + SLOT_GAP_X) * column), - (INITIAL_Y_OFFSET + ((SLOT_HEIGHT + SLOT_GAP_Y) * row)), FRAMEPOINT_TOPLEFT, false) ---@type ShopSlot
 
             --inherit from both Slot and ShopSlot
@@ -395,6 +395,7 @@ OnInit.final("Shop", function(Require)
             self.left = nil
             self.row = row
             self.column = column
+            self.catalog_visible = catalog_visible
             self.costicon = {}
             self.cost = {}
             self.status = BlzCreateFrameByType("TEXT", "", self.slot, "", 0)
@@ -1023,7 +1024,7 @@ OnInit.final("Shop", function(Require)
         end
 
         ---@type fun(self: Category, icon: string, description: string):integer
-        function thistype:add(icon, description)
+        function thistype:add(icon, description, catalog_visible)
             if self.count < CATEGORY_COUNT then
                 self.count = self.count + 1
                 self.value[self.count] = R2I(2 ^ self.count)
@@ -1032,6 +1033,7 @@ OnInit.final("Shop", function(Require)
                 self.button[self.count]:enabled(false)
                 self.button[self.count]:onClick(thistype.onClick)
                 self.button[self.count].tooltip:text(description)
+                self.catalog_visible[self.count] = catalog_visible
                 registry[(self.button[self.count].frame)][0] = self
                 registry[(self.button[self.count].frame)][1] = self.count
 
@@ -1055,6 +1057,7 @@ OnInit.final("Shop", function(Require)
             self.shop = shop
             self.value = __jarray(0)
             self.button = {}
+            self.catalog_visible = {}
 
             return self
         end
@@ -1166,6 +1169,7 @@ OnInit.final("Shop", function(Require)
                 self.isVisible = visibility
 
                 if visibility then
+                    self:refreshCatalog()
                     thistype.refresh(GetPlayerId(GetLocalPlayer()) + 1)
                 end
 
@@ -1173,6 +1177,17 @@ OnInit.final("Shop", function(Require)
             end
 
             return self.isVisible
+        end
+
+        function thistype:refreshCatalog()
+            self.category.active = 0
+            for index = 0, self.category.count do
+                local predicate = self.category.catalog_visible[index]
+                local visible = not predicate or predicate()
+                self.category.button[index]:enabled(false)
+                self.category.button[index]:visible(visible)
+            end
+            self:filter(0, self.category.andLogic)
         end
 
         ---@param i ShopItem
@@ -1256,10 +1271,12 @@ OnInit.final("Shop", function(Require)
             self.tail = nil
 
             while slot do
+                    process = not slot.catalog_visible or
+                                  slot.catalog_visible()
                     if andLogic then
-                        process = categories == 0 or BlzBitAnd(slot.item.categories, categories) >= categories
+                        process = process and (categories == 0 or BlzBitAnd(slot.item.categories, categories) >= categories)
                     else
-                        process = categories == 0 or BlzBitAnd(slot.item.categories, categories) > 0
+                        process = process and (categories == 0 or BlzBitAnd(slot.item.categories, categories) > 0)
                     end
 
                     if text ~= "" and text ~= nil then
@@ -1377,18 +1394,18 @@ OnInit.final("Shop", function(Require)
         end
 
         ---@type fun(id: integer, icon: string, description: string):integer
-        function thistype.addCategory(id, icon, description)
+        function thistype.addCategory(id, icon, description, catalog_visible)
             local self = registry[id][0] ---@type Shop
 
             if self then
-                return self.category:add(icon, description)
+                return self.category:add(icon, description, catalog_visible)
             end
 
             return 0
         end
 
         ---@type fun(id: integer, itemId: integer, categories: integer)
-        function thistype.addItem(id, itemId, categories)
+        function thistype.addItem(id, itemId, categories, catalog_visible)
             local self = registry[id][0] ---@type Shop
             local slot ---@type ShopSlot 
 
@@ -1400,7 +1417,10 @@ OnInit.final("Shop", function(Require)
                     if itm ~= 0 then
                         self.size = self.size + 1
                         self.index = self.index + 1
-                        slot = ShopSlot.create(self, itm, R2I(self.index//COLUMNS), ModuloInteger(self.index, COLUMNS))
+                        slot = ShopSlot.create(self, itm,
+                            R2I(self.index//COLUMNS),
+                            ModuloInteger(self.index, COLUMNS),
+                            catalog_visible)
                         slot:visible(slot.row >= 0 and slot.row <= ROWS - 1 and slot.column >= 0 and slot.column <= COLUMNS - 1)
                         self.stock[itemId] = -1
 
@@ -1449,7 +1469,10 @@ OnInit.final("Shop", function(Require)
             local self = registry[id][0] ---@type Shop
             if not self or registry[self][offer.id] then return end
 
-            local slot = ShopSlot.create(self, offer, R2I((self.index + 1)//COLUMNS), ModuloInteger(self.index + 1, COLUMNS))
+            local slot = ShopSlot.create(self, offer,
+                R2I((self.index + 1)//COLUMNS),
+                ModuloInteger(self.index + 1, COLUMNS),
+                offer.catalog_visible)
             self.size = self.size + 1
             self.index = self.index + 1
             slot:visible(slot.row >= 0 and slot.row <= ROWS - 1 and slot.column >= 0 and slot.column <= COLUMNS - 1)
@@ -1858,6 +1881,10 @@ OnInit.final("Shop", function(Require)
         return definition.view:visible(visible)
     end
 
+    local function refresh_shop_catalog(definition)
+        definition.view:refreshCatalog()
+    end
+
     ShopRegistry.bind({
         create = create_shop_view,
         setVisible = set_shop_view_visible,
@@ -1865,6 +1892,7 @@ OnInit.final("Shop", function(Require)
         addCategory = Shop.addCategory,
         addItem = Shop.addItem,
         addOffer = Shop.addOffer,
+        refreshCatalog = refresh_shop_catalog,
     })
 
 end, Debug and Debug.getLine())

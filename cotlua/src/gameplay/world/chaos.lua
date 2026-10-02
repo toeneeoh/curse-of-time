@@ -256,6 +256,7 @@ OnInit.final("Chaos", function(Require)
 
         CHAOS_LOADING = true
         CHAOS_MODE = true
+        RefreshEvilShopkeeperCatalog()
 
         if killed then
             RemoveUnit(killed)

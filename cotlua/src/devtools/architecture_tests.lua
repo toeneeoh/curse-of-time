@@ -1823,7 +1823,7 @@ OnInit.final("ArchitectureTests", function(Require)
                 {'n01A', 12, 40}, {'n01B', 0, 10}, {'n0P2', 1, 0},
                 {'n032', 2, 0},
                 {'n004', 2, 1}, {'n0P0', 2, 1}, {'n0P1', 2, 1},
-                {'n01F', 1, 0}, {'n02C', 12}, {'n09D', 11}
+                {'n01F', 11, 11}, {'n02C', 12}, {'n09D', 11}
             }
 
             for index = 1, #expected do
@@ -1877,7 +1877,12 @@ OnInit.final("ArchitectureTests", function(Require)
                     local price = offer:getPrice(1)
                     if offer.key ~= "evil_mystery_epic_flask" or
                         price[PLATINUM] ~= 30 or
-                        definition:getStock(offer.id) ~= 1 then
+                        definition:getStock(offer.id) ~=
+                            (CHAOS_MODE and 1 or 0) or
+                        not offer.catalog_visible or
+                        offer.catalog_visible() ~= CHAOS_MODE or
+                        not definition.items[1].catalog_visible or
+                        definition.items[1].catalog_visible() == CHAOS_MODE then
                         return false, "Evil Shopkeeper flask offer is invalid"
                     end
                 end

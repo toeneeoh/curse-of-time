@@ -16,6 +16,7 @@ OnInit.global("ShopOffers", function()
     ---@field availability? fun(pid: integer): boolean, string?
     ---@field purchase fun(pid: integer): boolean
     ---@field cooldown? fun(pid: integer): number, number?
+    ---@field catalog_visible? fun(): boolean
 
     ---@class ShopOffer : ShopOfferDefinition
     ---@field id string

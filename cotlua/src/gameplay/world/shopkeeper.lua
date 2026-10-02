@@ -33,7 +33,7 @@ OnInit.global("Shopkeeper", function(Require)
         SetUnitPosition(shop, x, y)
         BlzStartUnitAbilityCooldown(shop, FourCC('A017'), 300.)
 
-        ShopSetStock(shop_id, "offer:evil_mystery_epic_flask", 1)
+        RefreshEvilShopkeeperCatalog()
 
         local ghost = FourCC('Agho')
         UnitRemoveAbility(shop, ghost)
