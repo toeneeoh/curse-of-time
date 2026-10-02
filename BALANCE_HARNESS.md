@@ -74,8 +74,10 @@ destroys the items it replaces.
 
 Run `cotlua/tools/analyze_balance.ps1` after `-balance items` has produced fresh
 item and hero catalogs. It filters by acquisition path, level requirement,
-proficiency modifier, duplicate rawcodes, and shared item-limit groups, then
-uses a bounded deterministic search to produce six-item candidates. Example:
+proficiency modifier, boss-grade duplicate rules, and shared item-limit groups,
+then uses a bounded deterministic search to produce six-item candidates.
+Drop, shop, quest-reward, and runtime-defined acquisition paths are exported
+separately. Example:
 
 ```powershell
 ./cotlua/tools/analyze_balance.ps1 -Hero 'Vampire Lord' -Levels 400

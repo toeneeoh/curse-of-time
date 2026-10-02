@@ -56,6 +56,7 @@ OnInit.final("ArchitectureTests", function(Require)
     Require('Stormwatch')
     Require('AshenVanguard')
     Require('DropTable')
+    Require('Quests')
     Require('StruggleRewards')
     Require('Perks')
     Require('PotionService')
@@ -862,6 +863,21 @@ OnInit.final("ArchitectureTests", function(Require)
             ItemRuntime.itemsConflict(basic_a, basic_b) or
             ItemRuntime.itemsConflict(boss_a, different_boss) then
             return false, "exact-copy policy did not preserve its tier boundary"
+        end
+        return true
+    end)
+
+    ArchitectureTests.register("quest rewards are exported as acquisition",
+                               function()
+        local expected = {
+            FourCC('I03E'), FourCC('I043'), FourCC('I0B8'),
+            FourCC('I0BA'), FourCC('I0MC'), FourCC('I05Q'),
+            FourCC('I0F8'), FourCC('I04C'), FourCC('I03O'),
+        }
+        for _, item_id in ipairs(expected) do
+            if not QuestRewardItems[item_id] then
+                return false, "quest reward registry is incomplete"
+            end
         end
         return true
     end)

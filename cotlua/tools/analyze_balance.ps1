@@ -6,7 +6,7 @@ param(
     [string] $Objective = 'All',
     [ValidateSet('Both', 'Average', 'Perfect')]
     [string] $Quality = 'Both',
-    [ValidateSet('Any', 'Drop', 'Shop')]
+    [ValidateSet('Any', 'Drop', 'Shop', 'Quest')]
     [string] $Acquisition = 'Any',
     [switch] $RequireProficiency,
     [double] $StrengthWeight = 1.0,
@@ -87,7 +87,11 @@ function New-Candidate($Row, $HeroRow, [string] $Roll) {
         Name = $Row.name.Trim()
         Type = $type
         Requirement = [int](Get-Number $Row 'requirement')
+        Tier = [int](Get-Number $Row 'tier')
         Limit = [int](Get-Number $Row 'limit')
+        BossGrade = $Row.boss_grade -eq '1'
+        UniqueCopy = (Get-Number $Row 'limit') -gt 0 -or
+            (Get-Number $Row 'tier') -ge 23 -or $Row.boss_grade -eq '1'
         Proficient = $proficient
         Stats = $stats
         BatFactor = 1.0 + $stats[18] * 0.01
@@ -180,9 +184,9 @@ function Get-ObjectiveScore($Metrics, [string] $Name) {
 
 function Test-LimitConflict($State, $Candidate) {
     foreach ($item in $State.Items) {
-        # Benchmark builds model obtainable equipment rather than allowing the
-        # beam search to clone a unique object-data item into several slots.
-        if ($item.Rawcode -eq $Candidate.Rawcode) { return $true }
+        if ($item.Rawcode -eq $Candidate.Rawcode -and $Candidate.UniqueCopy) {
+            return $true
+        }
 
         if ($Candidate.Limit -le 0) { continue }
         if ($item.Limit -ne $Candidate.Limit) { continue }
@@ -285,7 +289,7 @@ $lines.Add('# Generated balance builds')
 $lines.Add('')
 $lines.Add('Generated from the in-engine `balance-items-player-1.pld` and')
 $lines.Add('`balance-heroes-player-1.pld` exports.')
-$lines.Add('Every loadout has six equipped items, honors level and item-limit rules,')
+$lines.Add('Every loadout has six equipped items, honors level, boss-grade uniqueness, and item-limit rules,')
 $lines.Add('and applies the live 75% penalty to proficiency-sensitive stats when needed.')
 $lines.Add('')
 $lines.Add('Attack is a formula estimate using primary attribute, item damage, crit, BAT,')
@@ -320,7 +324,9 @@ foreach ($heroRow in $selectedHeroes) {
                 $available = switch ($Acquisition) {
                     'Drop' { $row.drop_pool -eq '1' }
                     'Shop' { $row.shop_catalog -eq '1' }
-                    default { $row.drop_pool -eq '1' -or $row.shop_catalog -eq '1' -or $row.runtime_definition -eq '1' }
+                    'Quest' { $row.quest_reward -eq '1' }
+                    default { $row.drop_pool -eq '1' -or $row.shop_catalog -eq '1' -or
+                        $row.quest_reward -eq '1' -or $row.runtime_definition -eq '1' }
                 }
                 $proficient = Test-Proficiency $heroRow $type
                 $available -and $type -ge 0 -and $type -le 10 -and

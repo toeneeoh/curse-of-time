@@ -12,6 +12,13 @@ OnInit.final("Quests", function(Require)
     Require('Units')
     Require('RewardNotifications')
 
+    QuestRewardItems = __jarray(false)
+
+    local function register_quest_reward(id)
+        local item_id = type(id) == "string" and FourCC(id) or id
+        QuestRewardItems[item_id] = true
+    end
+
     -- Kill-quest turn-ins add half of the accumulated base XP from their
     -- required kills. Ordinary solo kills pay 1.2 times base XP, making the
     -- quest a substantial ~42% bonus to the combat XP rather than the former
@@ -68,6 +75,8 @@ OnInit.final("Quests", function(Require)
     -- the horde
     do
         local horde_complete
+
+        register_quest_reward('I041')
 
         HORDE_QUEST_MARKER = AddSpecialEffectTarget("Abilities\\Spells\\Other\\TalkToMe\\TalkToMe.mdl", gg_unit_n02Q_0382, "overhead")
 
@@ -178,6 +187,8 @@ OnInit.final("Quests", function(Require)
 
     -- evil shopkeeper necklace quest
     do
+        register_quest_reward('I03E')
+
         ITEM_LOOKUP[FourCC('I08L')] = function(p, pid, u, itm)
             if IsQuestDiscovered(Evil_Shopkeeper_Quest_1) == false then
                 if GetUnitLevel(Hero[pid]) >= 50 then
@@ -201,6 +212,8 @@ OnInit.final("Quests", function(Require)
 
     -- omega pick quest
     do
+        register_quest_reward('I043')
+
         ITEM_LOOKUP[FourCC('I09H')] = function(p, pid, u, itm)
             if IsQuestDiscovered(Evil_Shopkeeper_Quest_2) == false then
                 if GetUnitLevel(Hero[pid]) >= 75 then
@@ -317,6 +330,16 @@ OnInit.final("Quests", function(Require)
                 XP = 10000
             },
         }
+
+        for _, definition in pairs(REWARDS) do
+            if type(definition.Reward) == "table" then
+                for _, item_id in ipairs(definition.Reward) do
+                    register_quest_reward(item_id)
+                end
+            else
+                register_quest_reward(definition.Reward)
+            end
+        end
 
         local function reward_item()
             local pid   = GetPlayerId(GetTriggerPlayer()) + 1 ---@type integer 

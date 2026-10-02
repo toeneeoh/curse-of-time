@@ -170,6 +170,8 @@ visual cleanup are intentionally excluded.
   rechargeable resurrection items.
 - Exact duplicate boss items and endgame boss-grade equipment can no longer be
   equipped together; duplicate ordinary pre-Chaos items remain legal.
+- Dark Regeneration now requires level 300, matching Essence of Darkness and
+  its other rewards.
 
 ## Boss Changes
 

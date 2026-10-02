@@ -28,6 +28,8 @@ The high-confidence defects found in the first pass are now corrected:
 7. Exact duplicate boss-pool items and tier-23-or-higher equipment can no
    longer occupy equipped slots together. Ordinary pre-Chaos duplicates remain
    legal.
+8. Dark Regeneration now requires level 300, matching Essence of Darkness and
+   the other three rewards in its pool.
 
 ## Progression backbone
 
@@ -114,11 +116,6 @@ The displayed chance is the normal-difficulty chance for one equipment roll,
 before first-kill and Drop Rate modifiers. Hard difficulty performs additional
 rolls rather than replacing this percentage.
 
-### Remaining boss oddities
-
-- **Dark Regeneration requires level 308 while its boss is level 300.** This is
-  a small, unusual delay rather than a progression blocker.
-
 ### Findings that need a design decision
 
 - Xallarath's 30% total equipment chance is half of Legion, Pure Existence,
@@ -140,18 +137,17 @@ players from equipping duplicate ordinary pre-Chaos equipment. Existing
 `ITEM_LIMIT` groups continue to enforce broader mutually exclusive families
 such as crafted sets.
 
-The offline analyzer's exact-duplicate rule is therefore aligned for
-boss-grade equipment but remains stricter for ordinary items. Future analyzer
-runs should adopt the same acquisition/tier predicate if ordinary duplicate
-builds need to be modeled exactly.
+The offline analyzer now consumes the exported boss-grade classification and
+uses the same predicate. It permits repeated ordinary items while rejecting
+exact duplicate boss-pool, limited, and tier-23-or-higher equipment.
 
 ## Acquisition metadata limitations
 
-The runtime balance export marks drop pools, shops, and runtime definitions,
-but not direct quest-choice rewards. Spider armor and Polar quest equipment
-therefore appear unavailable in a naive export analysis even though they are
-awarded by the headhunter quests. Future exports should add a `quest_reward`
-column before using acquisition flags to identify orphaned items.
+The runtime balance export now marks drop pools, shops, direct quest rewards,
+runtime definitions, and boss-grade classification separately. Spider armor,
+Polar quest equipment, and the other direct quest rewards are consequently
+available to acquisition-aware analysis without pretending they are ordinary
+drops.
 
 Unbroken Bow (`I06X`, level 30) remains unavailable by design: a similar
 pre-Chaos Hell component already fills its role, while Unbroken enemies are
@@ -162,9 +158,7 @@ non-production.
 ## Recommended correction order
 
 1. Regenerate the item export after the object-data and pool corrections.
-2. Add quest rewards to the balance export.
-3. Decide whether Dark Regeneration's level-308 requirement is intentional.
-4. Review Orsted's new weapon values after live combat and upgrade testing.
+2. Review Orsted's new weapon values after live combat and upgrade testing.
 
 After those changes, rerun `-balance items` and the level
 50/100/200/300/400/500 build matrix. That regenerated catalog is necessary for

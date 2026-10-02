@@ -15,6 +15,7 @@ OnInit.final("BalanceHarness", function(Require)
     Require("ItemHelpers")
     Require("Items")
     Require("Profile")
+    Require("Quests")
     Require("ShopCatalog")
     Require("TimerQueue")
 
@@ -153,7 +154,9 @@ OnInit.final("BalanceHarness", function(Require)
             tostring(data[ITEM_RARITY]), tostring(data[ITEM_LIMIT]),
             availability[id] and availability[id].drop and "1" or "0",
             availability[id] and availability[id].shop and "1" or "0",
+            QuestRewardItems[id] and "1" or "0",
             ItemRuntime.definitions[id] and "1" or "0",
+            DropTable:isBossGradeItem(id) and "1" or "0",
         }
 
         for index = 1, #EXPORT_STATS do
@@ -249,7 +252,8 @@ OnInit.final("BalanceHarness", function(Require)
         local lines = {}
         local header = {
             "rawcode", "name", "type", "requirement", "max_upgrade", "tier", "rarity", "limit",
-            "drop_pool", "shop_catalog", "runtime_definition",
+            "drop_pool", "shop_catalog", "quest_reward", "runtime_definition",
+            "boss_grade",
         }
         for _, definition in ipairs(EXPORT_STATS) do
             header[#header + 1] = definition[2] .. "_average"
