@@ -89,6 +89,39 @@ foreach ($initializer in $initializers) {
     }
 }
 
+# TotalInitialization resolves named resources recursively. A same-phase cycle
+# therefore stalls map startup even when every individual requirement exists.
+$initializerByName = @{}
+foreach ($initializer in $initializers) {
+    $initializerByName[$initializer.Name] = $initializer
+}
+
+$visitState = @{}
+$visitPath = [System.Collections.Generic.List[string]]::new()
+function Test-InitializerCycle([string] $name) {
+    if ($visitState[$name] -eq 2) { return }
+    if ($visitState[$name] -eq 1) {
+        $cycleStart = $visitPath.IndexOf($name)
+        $cycle = @($visitPath.GetRange($cycleStart, $visitPath.Count - $cycleStart)) + $name
+        $failures.Add("Initializer dependency cycle: $($cycle -join ' -> ')")
+        return
+    }
+
+    $visitState[$name] = 1
+    $visitPath.Add($name)
+    foreach ($requirement in $initializerByName[$name].Requirements) {
+        if ($initializerByName.ContainsKey($requirement)) {
+            Test-InitializerCycle $requirement
+        }
+    }
+    $visitPath.RemoveAt($visitPath.Count - 1)
+    $visitState[$name] = 2
+}
+
+foreach ($initializer in $initializers) {
+    Test-InitializerCycle $initializer.Name
+}
+
 if ($manifest -match 'legacy_helpers\.lua') {
     $failures.Add('Legacy helper module is present in the bootstrap manifest')
 }

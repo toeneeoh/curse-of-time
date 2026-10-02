@@ -13,6 +13,7 @@ OnInit.final("FactionView", function(Require)
 
     local view = {}
     local boxes = {}
+    local view_open = false
 
     local main = BlzCreateFrameByType("FRAME", "", BlzGetFrameByName("ConsoleUIBackdrop", 0), "", 0)
     BlzFrameSetAbsPoint(main, FRAMEPOINT_TOP, 0.4, 0.53)
@@ -99,6 +100,7 @@ OnInit.final("FactionView", function(Require)
                        "ui\\feedback\\xpbar\\human-bigbar-fill", 0, true)
     BlzFrameSetMinMaxValue(momentum_bar, 0., Faction.getMomentumGoal())
     BlzFrameSetEnable(momentum_bar, false)
+    BlzFrameSetAlpha(momentum_bar, 0)
     local momentum_text = BlzCreateFrameByType("TEXT", "", momentum_backdrop,
                                                "", 0)
     BlzFrameSetAllPoints(momentum_text, momentum_backdrop)
@@ -109,16 +111,15 @@ OnInit.final("FactionView", function(Require)
     BlzFrameSetVisible(momentum_backdrop, false)
 
     local bounty_title = BlzCreateFrame("TitleText", main, 0, 0)
-    BlzFrameSetPoint(bounty_title, FRAMEPOINT_TOP, main,
-                     FRAMEPOINT_TOP, 0., -0.124)
+    BlzFrameSetPoint(bounty_title, FRAMEPOINT_TOP, faction_icon,
+                     FRAMEPOINT_BOTTOM, 0., -0.008)
+    BlzFrameSetSize(bounty_title, 0.2, 0.022)
     BlzFrameSetScale(bounty_title, 0.72)
     BlzFrameSetEnable(bounty_title, false)
     BlzFrameSetText(bounty_title, "|cffffcc00Vanguard Bounty|r")
 
     local bounty_bar_backdrop = BlzCreateFrame(
         "EscMenuControlBackdropTemplate", main, 0, 0)
-    BlzFrameSetPoint(bounty_bar_backdrop, FRAMEPOINT_TOP, main,
-                     FRAMEPOINT_TOP, 0., -0.145)
     BlzFrameSetSize(bounty_bar_backdrop, 0.19, 0.022)
     BlzFrameSetEnable(bounty_bar_backdrop, false)
     local bounty_bar = BlzCreateFrameByType("SIMPLESTATUSBAR", "",
@@ -132,6 +133,7 @@ OnInit.final("FactionView", function(Require)
                        "ui\\feedback\\xpbar\\human-bigbar-fill", 0, true)
     BlzFrameSetMinMaxValue(bounty_bar, 100., 125.)
     BlzFrameSetEnable(bounty_bar, false)
+    BlzFrameSetAlpha(bounty_bar, 0)
     local bounty_progress = BlzCreateFrameByType(
                                 "TEXT", "", bounty_bar_backdrop, "", 0)
     BlzFrameSetAllPoints(bounty_progress, bounty_bar_backdrop)
@@ -141,13 +143,15 @@ OnInit.final("FactionView", function(Require)
     BlzFrameSetEnable(bounty_progress, false)
 
     local bounty_status = BlzCreateFrameByType("TEXT", "", main, "", 0)
-    BlzFrameSetPoint(bounty_status, FRAMEPOINT_TOP, main,
-                     FRAMEPOINT_TOP, 0., -0.172)
+    BlzFrameSetPoint(bounty_status, FRAMEPOINT_TOP, bounty_title,
+                     FRAMEPOINT_BOTTOM, 0., -0.006)
     BlzFrameSetSize(bounty_status, 0.2, 0.018)
     BlzFrameSetTextAlignment(bounty_status, TEXT_JUSTIFY_CENTER,
                              TEXT_JUSTIFY_MIDDLE)
     BlzFrameSetScale(bounty_status, 0.75)
     BlzFrameSetEnable(bounty_status, false)
+    BlzFrameSetPoint(bounty_bar_backdrop, FRAMEPOINT_TOP, bounty_status,
+                     FRAMEPOINT_BOTTOM, 0., -0.006)
     BlzFrameSetVisible(bounty_title, false)
     BlzFrameSetVisible(bounty_bar_backdrop, false)
     BlzFrameSetVisible(bounty_status, false)
@@ -262,6 +266,10 @@ OnInit.final("FactionView", function(Require)
 
     local function close(pid)
         if GetLocalPlayer() == Player(pid - 1) then
+            view_open = false
+            -- SIMPLESTATUSBAR frames ignore hidden non-simple ancestors.
+            BlzFrameSetAlpha(momentum_bar, 0)
+            BlzFrameSetAlpha(bounty_bar, 0)
             BlzFrameSetVisible(main, false)
         end
     end
@@ -420,6 +428,7 @@ OnInit.final("FactionView", function(Require)
 
     function view.display(faction, pid)
         if GetLocalPlayer() == Player(pid - 1) then
+            view_open = true
             BlzFrameSetVisible(main, true)
         end
         PLAYER_SELECTED_UNIT[pid] = nil
@@ -452,6 +461,8 @@ OnInit.final("FactionView", function(Require)
                     ": " .. momentum .. " / " .. goal)
         end
         BlzFrameSetVisible(momentum_backdrop, show_momentum)
+        BlzFrameSetAlpha(momentum_bar,
+                         view_open and show_momentum and 255 or 0)
         BlzFrameSetTexture(faction_icon, faction.icon, 0, true)
         local faction_bulletins = bulletins[faction.id]
         local current_bulletin = bulletin_index[pid] or 1
@@ -472,6 +483,8 @@ OnInit.final("FactionView", function(Require)
         BlzFrameSetVisible(bounty_title, show_bounty)
         BlzFrameSetVisible(bounty_bar_backdrop, show_bounty)
         BlzFrameSetVisible(bounty_status, show_bounty)
+        BlzFrameSetAlpha(bounty_bar,
+                         view_open and show_bounty and 255 or 0)
         BlzFrameClearAllPoints(blurb)
         if show_bounty then
             local bounty_rate = 100.
