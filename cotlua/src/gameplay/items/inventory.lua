@@ -111,7 +111,7 @@ OnInit.final("InventoryService", function(Require)
 
         local stack_limit = source.cached_stats[ITEM_STACK]
         if target and target.alive and stack_limit > 1
-            and source.id == target.id
+            and RuntimeItemDefinitions.sameIdentity(source, target)
             and source.level == target.level
             and target.charges < stack_limit
         then

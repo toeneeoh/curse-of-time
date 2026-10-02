@@ -1279,7 +1279,7 @@ OnInit.final("PotionService", function(Require)
     function PotionService.getChaosDonorPresentation()
         return "Mystery Epic Flask",
                "ReplaceableTextures\\CommandButtons\\BTNEditor-Random-Item.blp",
-               "Drops as one random Epic flask.|n|cff808080Neither color nor character can be discerned until it takes form.|r"
+               "Reveals one random Epic flask.|n|cff808080Neither color nor character can be discerned until it takes form.|r"
     end
 
     function PotionService.getLegendaryChaosPresentation()

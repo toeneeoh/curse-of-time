@@ -9,6 +9,7 @@ OnInit.final("FactionMining", function(Require)
     Require('Currency')
     Require('UnitTable')
     Require('Damage')
+    Require('MiningMaterials')
 
     FactionMining = {}
 
@@ -46,6 +47,8 @@ OnInit.final("FactionMining", function(Require)
             duration = 4.,
             reputation = 1,
             ore = 1,
+            material = MiningMaterials.IRONSTONE,
+            material_name = "Ironstone",
             required_rank = 1,
             guardian_chance = 15,
             color = { 210, 210, 210 },
@@ -57,6 +60,8 @@ OnInit.final("FactionMining", function(Require)
             duration = 8.,
             reputation = 3,
             ore = 3,
+            material = MiningMaterials.PRISMATIC_ORE,
+            material_name = "Prismatic Ore",
             required_rank = 2,
             guardian_chance = 35,
             color = { 255, 210, 70 },
@@ -68,6 +73,8 @@ OnInit.final("FactionMining", function(Require)
             duration = 30.,
             reputation = 8,
             ore = 8,
+            material = MiningMaterials.FORGOTTEN_CRYSTAL,
+            material_name = "Forgotten Crystal",
             required_rank = 5,
             guardian_chance = 0,
             color = { 90, 160, 255 },
@@ -284,9 +291,12 @@ OnInit.final("FactionMining", function(Require)
             Quest.progress(state.pid, "rare_extraction")
         end
 
+        local material_yield = yield_multiplier
+        MiningMaterials.grant(state.pid, config.material, material_yield)
+
         DisplayTextToPlayer(Player(state.pid - 1), 0., 0., "Mined " .. config.name
             .. ": |cffffcc00+" .. reputation .. " Lifetime Faction Points|r and "
-            .. ore .. " ore sample" .. (ore == 1 and "." or "s."))
+            .. material_yield .. " " .. config.material_name .. ".")
         DestroyEffect(AddSpecialEffect("Abilities\\Spells\\Other\\Transmute\\PileofGold.mdl", x, y))
 
         remove_deposit(deposit, true)

@@ -156,6 +156,16 @@ OnInit.final("RuntimeItemDefinitions", function(Require)
                    definition
     end
 
+    ---Logical items may share a native carrier without being the same item.
+    ---Ordinary object-editor items retain their rawcode identity.
+    ---@param first Item?
+    ---@param second Item?
+    ---@return boolean
+    function RuntimeItemDefinitions.sameIdentity(first, second)
+        if not first or not second or first.id ~= second.id then return false end
+        return first.runtime_definition == second.runtime_definition
+    end
+
     ---@param key string|integer
     ---@param x number?
     ---@param y number?

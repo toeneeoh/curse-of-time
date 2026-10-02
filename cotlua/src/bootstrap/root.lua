@@ -198,6 +198,8 @@ dofile('gameplay/items/runtime_item_definitions.lua')
 dofile('gameplay/abilities/cooldown_acceleration.lua')
 dofile('gameplay/items/potions.lua')
 dofile('gameplay/items/faction_consumables.lua')
+dofile('gameplay/items/mining_materials.lua')
+dofile('gameplay/items/boss_equipment.lua')
 
 dofile('gameplay/combat/bonuses.lua')
 dofile('gameplay/combat/buffs/buff_system.lua')

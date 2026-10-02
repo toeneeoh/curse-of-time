@@ -4,6 +4,7 @@
     Defines item drop tables for units, adjusts rates to equalize drop chances
 ]] OnInit.final("DropTable", function(Require)
     Require('PotionService')
+    Require('BossEquipment')
     Require('UnitTable')
 
     ItemDrops = array2d(0)
@@ -226,6 +227,26 @@
         thistype:registerBossDropSource({
             key = "equipment",
             describe = function(boss, multiplier)
+                local runtime_pool = BossEquipment.getPool(boss.id)
+                if runtime_pool then
+                    local per_roll =
+                        thistype:getBossEquipmentChance(boss, multiplier)
+                    local rolls = math.max(1, math.floor(boss.difficulty or 1))
+                    local share = 1. / #runtime_pool
+                    local entries = {}
+                    for index, definition in ipairs(runtime_pool) do
+                        entries[index] = {
+                            key = "equipment_runtime_" .. definition.key,
+                            name = definition.name,
+                            icon = definition.icon,
+                            tooltip = definition.preview_tooltip or
+                                          definition.data.tooltip,
+                            chance = 1. - (1. - per_roll * share) ^ rolls,
+                            pool_share = share,
+                        }
+                    end
+                    return entries
+                end
                 local distribution, count =
                     thistype:getItemDistribution(boss.id)
                 local per_roll =
@@ -247,13 +268,22 @@
                 local per_roll =
                     thistype:getBossEquipmentChance(boss, multiplier)
                 local rolls = math.max(1, math.floor(boss.difficulty or 1))
+                local runtime_pool = BossEquipment.getPool(boss.id)
                 for _ = 1, rolls do
                     if GetRandomReal(0., 1.) < per_roll then
-                        local item = ItemRuntime.create(
-                                         thistype:pickItem(boss.id), x, y, 600.)
+                        local item
+                        if runtime_pool then
+                            item = BossEquipment.create(
+                                runtime_pool[GetRandomInt(1, #runtime_pool)],
+                                x, y, 600.)
+                        else
+                            item = ItemRuntime.create(
+                                thistype:pickItem(boss.id), x, y, 600.)
+                        end
                         if item then
+                            local data = item.data or ItemData[item.id]
                             item:lvl(math.max(0,
-                                ItemData[item.id][ITEM_UPGRADE_MAX] -
+                                data[ITEM_UPGRADE_MAX] -
                                     math.random(ITEM_MIN_LEVEL_VARIANCE,
                                                 ITEM_MAX_LEVEL_VARIANCE)))
                         end
@@ -581,7 +611,7 @@
 
         id = FourCC('H00O') -- arkaden
         Rates[id] = 80
-        setup_boss_rates(id, 'I0O2', 'I0O3', 'I0O4', 'I036')
+        setup_boss_rates(id, 'I02O', 'I02C', 'I02B', 'I036')
 
         id = FourCC('N038') -- demon prince
         Rates[id] = 100
@@ -590,10 +620,6 @@
         id = FourCC('N017') -- absolute horror
         Rates[id] = 85
         setup_boss_rates(id, 'I0N7', 'I0N8', 'I0N9')
-
-        id = FourCC('N00F') -- orsted
-        Rates[id] = 85
-        setup_boss_rates(id, 'I0O5', 'I0O6', 'I0O7', 'I0O8', 'I0O9')
 
         id = FourCC('O02B') -- slaughter
         Rates[id] = 85
@@ -620,9 +646,11 @@
         Rates[id] = 60
         setup_boss_rates(id, 'I018', 'I0BY')
 
+        id = FourCC('N00F') -- orsted
+        Rates[id] = 85
+
         id = FourCC('O03G') -- xallarath
         Rates[id] = 30
-        setup_boss_rates(id, 'I0OB', 'I0O1', 'I0CH')
 
         id = FourCC('O02T') -- azazoth
         Rates[id] = 60

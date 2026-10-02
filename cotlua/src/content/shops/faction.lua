@@ -3,6 +3,7 @@
 OnInit.final("FactionShop", function(Require)
     Require('ItemHelpers')
     Require('FactionConsumables')
+    Require('MiningMaterials')
     Require('PotionService')
     Require('Prices')
     Require('ShopRegistry')
@@ -68,6 +69,43 @@ OnInit.final("FactionShop", function(Require)
                 price = 150,
                 rank = 4,
             },
+        },
+    }
+
+    local socket_recipes = {
+        {
+            key = "craft_vigor_gem_socket",
+            item_id = FourCC('I0O1'),
+            name = "Vigor Gem",
+            icon = "ReplaceableTextures\\CommandButtons\\BTNRed.blp",
+            costs = {
+                [MiningMaterials.IRONSTONE] = 18,
+                [MiningMaterials.PRISMATIC_ORE] = 8,
+                [MiningMaterials.FORGOTTEN_CRYSTAL] = 2,
+            },
+            tooltip = "Forge a Vigor Gem socket.|n|n|cffffcc00Materials:|r 18 Ironstone, 8 Prismatic Ore, 2 Forgotten Crystals.|n|cff808080A setting for strength, endurance, and recovery.|r",
+        }, {
+            key = "craft_torture_jewel_socket",
+            item_id = FourCC('I0OB'),
+            name = "Torture Jewel",
+            icon = "ReplaceableTextures\\CommandButtons\\BTNGreen.blp",
+            costs = {
+                [MiningMaterials.IRONSTONE] = 8,
+                [MiningMaterials.PRISMATIC_ORE] = 18,
+                [MiningMaterials.FORGOTTEN_CRYSTAL] = 2,
+            },
+            tooltip = "Forge a Torture Jewel socket.|n|n|cffffcc00Materials:|r 8 Ironstone, 18 Prismatic Ore, 2 Forgotten Crystals.|n|cff808080A setting sharpened for speed and ruthless precision.|r",
+        }, {
+            key = "craft_lexium_crystal_socket",
+            item_id = FourCC('I0CH'),
+            name = "Lexium Crystal",
+            icon = "ReplaceableTextures\\CommandButtons\\BTNBlue.blp",
+            costs = {
+                [MiningMaterials.IRONSTONE] = 12,
+                [MiningMaterials.PRISMATIC_ORE] = 12,
+                [MiningMaterials.FORGOTTEN_CRYSTAL] = 3,
+            },
+            tooltip = "Forge a Lexium Crystal socket.|n|n|cffffcc00Materials:|r 12 Ironstone, 12 Prismatic Ore, 3 Forgotten Crystals.|n|cff808080A setting that channels sorcery through flawless facets.|r",
         },
     }
 
@@ -152,6 +190,32 @@ OnInit.final("FactionShop", function(Require)
                     return FactionConsumables.create(offer.item_key, pid)
                 end
             })
+        end
+
+
+        if shop.faction_id == 1 then
+            for recipe_index = 1, #socket_recipes do
+                local recipe = socket_recipes[recipe_index]
+                ShopAddOffer(shop.id, {
+                    key = recipe.key,
+                    name = recipe.name,
+                    icon = recipe.icon,
+                    tooltip = recipe.tooltip,
+                    categories = misc,
+                    availability = function(pid)
+                        local available, reason = availability(pid, 1, 5)
+                        if not available then return false, reason end
+                        return MiningMaterials.canAfford(pid, recipe.costs)
+                    end,
+                    purchase = function(pid)
+                        if not MiningMaterials.consume(pid, recipe.costs) then
+                            return false
+                        end
+                        PlayerAddItemById(pid, recipe.item_id)
+                        return true
+                    end,
+                })
+            end
         end
     end
 end, Debug and Debug.getLine())

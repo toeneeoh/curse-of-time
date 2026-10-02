@@ -526,7 +526,8 @@
             for i = 1, MAX_INVENTORY_SLOTS do
                 local match = Profile[pid].hero.items[i]
 
-                if match and match ~= self and match.id == self.id and
+                if match and match ~= self and
+                    RuntimeItemDefinitions.sameIdentity(match, self) and
                     match.charges < limit and match.level == self.level then
                     local total = match.charges + self.charges
                     local diff = limit - match.charges
@@ -935,7 +936,8 @@
 
         ---@type fun(itm: Item, itm2: Item): boolean
         local function has_conflict(itm, itm2)
-            if itm.id == itm2.id and requires_unique_copy(itm) then return true end
+            if RuntimeItemDefinitions.sameIdentity(itm, itm2) and
+                requires_unique_copy(itm) then return true end
             return itm.limit > 1 and itm.limit == itm2.limit
         end
 

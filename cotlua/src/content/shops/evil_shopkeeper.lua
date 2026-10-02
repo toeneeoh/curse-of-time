@@ -1,31 +1,31 @@
 -- Roaming evil shopkeeper inventory.
 
 OnInit.final("EvilShopkeeperShop", function(Require)
+    Require('PotionService')
     Require('ShopRegistry')
 
     local shop_id = FourCC('n01F')
     CreateShop(shop_id, 1000.)
 
-    local sword = ShopAddCategory(shop_id, "ReplaceableTextures\\CommandButtons\\BTNThoriumMelee.blp", "Sword")
-    local heavy = ShopAddCategory(shop_id, "ReplaceableTextures\\CommandButtons\\BTNImprovedStrengthOfTheMoon.tga", "Heavy")
-    local dagger = ShopAddCategory(shop_id, "ReplaceableTextures\\CommandButtons\\BTNDaggerOfEscape.blp", "Dagger")
-    local bow = ShopAddCategory(shop_id, "ReplaceableTextures\\CommandButtons\\BTNScoutsBow.blp", "Bow")
-    local staff = ShopAddCategory(shop_id, "ReplaceableTextures\\CommandButtons\\BTNWitchDoctorAdept.blp", "Staff")
-    local plate = ShopAddCategory(shop_id, "ReplaceableTextures\\CommandButtons\\BTNAdvancedMoonArmor.blp", "Plate")
-    ShopAddCategory(shop_id, "ReplaceableTextures\\CommandButtons\\BTNArmorGolem.blp", "Fullplate")
-    ShopAddCategory(shop_id, "ReplaceableTextures\\CommandButtons\\BTNLeatherUpgradeOne.blp", "Leather")
-    local cloth = ShopAddCategory(shop_id, "ReplaceableTextures\\CommandButtons\\BTNMantleOfIntelligence.blp", "Cloth")
-    local misc = ShopAddCategory(shop_id, "ReplaceableTextures\\CommandButtons\\BTNCrystalBall.blp", "Miscellaneous")
-
-    ShopAddItem(shop_id, 'I02B:0', sword)
-    ShopAddItem(shop_id, 'I02C:0', plate)
-    ShopAddItem(shop_id, 'I0EY:0', bow)
-    ShopAddItem(shop_id, 'I074:0', dagger)
-    ShopAddItem(shop_id, 'I03U:0', staff)
-    ShopAddItem(shop_id, 'I07F:0', cloth)
-    ShopAddItem(shop_id, 'I03P:0', heavy)
-    ShopAddItem(shop_id, 'I0F9:0', misc)
-    ShopAddItem(shop_id, 'I079:0', heavy)
-    ShopAddItem(shop_id, 'I0FC:0', heavy)
-    ShopAddItem(shop_id, 'I00A:0', misc)
+    local potions = ShopAddCategory(shop_id,
+        "ReplaceableTextures\\CommandButtons\\BTNPotionGreenSmall.blp", "Potions")
+    local name, icon, tooltip = PotionService.getChaosDonorPresentation()
+    ShopAddOffer(shop_id, {
+        key = "evil_mystery_epic_flask",
+        name = name,
+        icon = icon,
+        tooltip = tooltip,
+        categories = potions,
+        price = { platinum = 30 },
+        purchase = function(pid)
+            local hero = Hero[pid]
+            if not hero then return false end
+            local item = PotionService.createChaosDonor(
+                GetUnitX(hero), GetUnitY(hero))
+            if not item then return false end
+            PlayerAddItem(pid, item)
+            return true
+        end,
+    })
+    ShopSetStock(shop_id, "offer:evil_mystery_epic_flask", 1)
 end, Debug and Debug.getLine())

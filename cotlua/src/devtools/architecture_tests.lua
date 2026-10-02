@@ -762,7 +762,7 @@ OnInit.final("ArchitectureTests", function(Require)
     ArchitectureTests.register("boss item distributions are normalized",
                                function()
         local boss_ids = {
-            FourCC('H02H'), FourCC('N00F'), FourCC('O02H'), FourCC('H04R'),
+            FourCC('H02H'), FourCC('O02H'), FourCC('H04R'),
             FourCC('O02T')
         }
         for index = 1, #boss_ids do
@@ -791,16 +791,15 @@ OnInit.final("ArchitectureTests", function(Require)
             return false, "boss drop chance helpers are unavailable"
         end
 
-        if not DropTable:isBossGradeItem(FourCC('I0O2')) or
-            not DropTable:isBossGradeItem(FourCC('I0O5')) or
+        if not DropTable:isBossGradeItem(FourCC('I02O')) or
             DropTable:isBossGradeItem(FourCC('I01Z')) then
             return false, "boss equipment classification is incomplete"
         end
-        for item_id = FourCC('I0O2'), FourCC('I0O9') do
-            local save_index = item_id - CUSTOM_ITEM_OFFSET
-            if save_index <= 0 or save_index > 0x1FFF then
-                return false, "new boss equipment falls outside the save range"
-            end
+        local orsted_pool = BossEquipment.getPool(FourCC('N00F'))
+        local xallarath_pool = BossEquipment.getPool(FourCC('O03G'))
+        if not orsted_pool or #orsted_pool ~= 5 or
+            not xallarath_pool or #xallarath_pool ~= 5 then
+            return false, "runtime boss equipment pools are incomplete"
         end
 
         local preview = DropTable:getBossDropEntries({
@@ -831,6 +830,32 @@ OnInit.final("ArchitectureTests", function(Require)
             found_chaos or
             (CHAOS_MODE and (not found_donor or not found_legendary)) then
             return false, "boss drop registry preview is incomplete"
+        end
+
+        local runtime_preview = DropTable:getBossDropEntries({
+            id = FourCC('N00F'), level = 250, difficulty = 1,
+            first_drop = false,
+        }, 1.)
+        local runtime_equipment = 0
+        for index = 1, #runtime_preview do
+            local entry = runtime_preview[index]
+            if entry.key:find("equipment_runtime_", 1, true) == 1 and
+                entry.name and entry.icon and entry.tooltip and
+                entry.chance > 0. then
+                runtime_equipment = runtime_equipment + 1
+            end
+        end
+        if runtime_equipment ~= 5 then
+            return false, "Orsted runtime equipment is absent from preview"
+        end
+        for _, socket_id in ipairs({
+            FourCC('I0O1'), FourCC('I0OB'), FourCC('I0CH')
+        }) do
+            local data = ItemData[socket_id]
+            if data[ITEM_TYPE] ~= 12 or data[ITEM_LIMIT] ~= 0 or
+                data[ITEM_UPGRADE_MAX] ~= 0 then
+                return false, "Forgotten jewel is not a valid socket item"
+            end
         end
         return true
     end)
@@ -1798,7 +1823,7 @@ OnInit.final("ArchitectureTests", function(Require)
                 {'n01A', 12, 40}, {'n01B', 0, 10}, {'n0P2', 1, 0},
                 {'n032', 2, 0},
                 {'n004', 2, 1}, {'n0P0', 2, 1}, {'n0P1', 2, 1},
-                {'n01F', 10, 11}, {'n02C', 12}, {'n09D', 11}
+                {'n01F', 1, 0}, {'n02C', 12}, {'n09D', 11}
             }
 
             for index = 1, #expected do
@@ -1842,6 +1867,18 @@ OnInit.final("ArchitectureTests", function(Require)
                     if price[HONOR] ~= 5 then
                         return false,
                                "Prize Vendor reward does not use Honor pricing"
+                    end
+                end
+                if values[1] == 'n01F' then
+                    if #definition.offers ~= 1 then
+                        return false, "Evil Shopkeeper offer count changed"
+                    end
+                    local offer = definition.offers[1]
+                    local price = offer:getPrice(1)
+                    if offer.key ~= "evil_mystery_epic_flask" or
+                        price[PLATINUM] ~= 30 or
+                        definition:getStock(offer.id) ~= 1 then
+                        return false, "Evil Shopkeeper flask offer is invalid"
                     end
                 end
             end
