@@ -4,6 +4,7 @@ OnInit.final("ShopTransaction", function(Require)
     Require('Currency')
     Require('Profile')
     Require('Items')
+    Require('RuntimeItemDefinitions')
     Require('ShopQuote')
     Require('ShopActions')
     Require('ShopRegistry')
@@ -59,7 +60,7 @@ OnInit.final("ShopTransaction", function(Require)
         for slot = 1, MAX_INVENTORY_SLOTS do
             local owned = Profile[pid].hero.items[slot]
             if owned then
-                local id = GetItem(owned.id)
+                local id = RuntimeItemDefinitions.identityKey(owned)
                 local needed = quote.consume[id]
                 local count = math.min(math.max(1, owned.charges), needed)
                 for _ = 1, count do

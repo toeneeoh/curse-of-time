@@ -381,7 +381,7 @@ OnInit.final("Shop", function(Require)
             end
         }
 
-        ---@type fun(S: Shop, i: ShopItem, row: integer, column: integer): ShopSlot
+        ---@type fun(S: Shop, i: ShopItem, row: integer, column: integer, catalog_visible: boolean?): ShopSlot
         function ShopSlot.create(S, i, row, column, catalog_visible)
             local self = Slot.create(S.main, i, ITEM_SIZE, ITEM_SIZE, INITIAL_X_OFFSET + ((SLOT_WIDTH + SLOT_GAP_X) * column), - (INITIAL_Y_OFFSET + ((SLOT_HEIGHT + SLOT_GAP_Y) * row)), FRAMEPOINT_TOPLEFT, false) ---@type ShopSlot
 
@@ -697,7 +697,7 @@ OnInit.final("Shop", function(Require)
                 for k = 1, INVENTORY_COUNT do
                     local itm = Profile[pid].hero.items[k]
                     if itm and not itm.nocraft then
-                        local index = GetItem(itm.id)
+                        local index = RuntimeItemDefinitions.identityKey(itm)
                         counter[index] = counter[index] + math.max(1, itm.charges)
                     end
                 end

@@ -16,7 +16,7 @@ OnInit.final("MiningMaterials", function(Require)
             world_skin = 'I02Q',
             name = name,
             icon = icon,
-            tooltip = "[tier " .. tier .. "] [type 13] [charges 1] [stack 99] [nocraft*1]"
+            tooltip = "[tier " .. tier .. "] [type 13] [charges 1] [stack 99]"
                 .. "|n|n|cff808080" .. flavor .. "|r",
             item_type = TYPE_CONSUMABLE_INDEX,
             metadata = { mineral_key = key },
@@ -42,70 +42,6 @@ OnInit.final("MiningMaterials", function(Require)
     MiningMaterials.IRONSTONE = "ironstone"
     MiningMaterials.PRISMATIC_ORE = "prismatic_ore"
     MiningMaterials.FORGOTTEN_CRYSTAL = "forgotten_crystal"
-
-    local function is_material(item, key)
-        return item and definitions[key] and item.runtime_definition == definitions[key]
-    end
-
-    ---@param pid integer
-    ---@param key string
-    ---@return integer
-    function MiningMaterials.count(pid, key)
-        local total = 0
-        local profile = Profile[pid]
-        local items = profile and profile.hero and profile.hero.items
-        if not items then return 0 end
-        for slot = 1, MAX_INVENTORY_SLOTS do
-            local item = items[slot]
-            if is_material(item, key) then
-                total = total + math.max(1, item.charges)
-            end
-        end
-        return total
-    end
-
-    ---@param pid integer
-    ---@param costs table<string, integer>
-    ---@return boolean, string?
-    function MiningMaterials.canAfford(pid, costs)
-        for key, amount in pairs(costs) do
-            local owned = MiningMaterials.count(pid, key)
-            if owned < amount then
-                local definition = definitions[key]
-                return false, "REQUIRES " .. amount .. " " ..
-                                  (definition and definition.name:upper() or key:upper())
-            end
-        end
-        return true
-    end
-
-    ---Consumes a complete recipe atomically after validating every material.
-    ---@param pid integer
-    ---@param costs table<string, integer>
-    ---@return boolean
-    function MiningMaterials.consume(pid, costs)
-        if not MiningMaterials.canAfford(pid, costs) then return false end
-        local items = Profile[pid].hero.items
-        for key, amount in pairs(costs) do
-            local remaining = amount
-            for slot = MAX_INVENTORY_SLOTS, 1, -1 do
-                local item = items[slot]
-                if remaining > 0 and is_material(item, key) then
-                    local available = math.max(1, item.charges)
-                    local consumed = math.min(available, remaining)
-                    if consumed >= available then
-                        item:destroy()
-                    else
-                        item.charges = available - consumed
-                        SetItemCharges(item.obj, item.charges)
-                    end
-                    remaining = remaining - consumed
-                end
-            end
-        end
-        NotifyItemChanged(pid)
-        return true
-    end
 
     ---@param pid integer
     ---@param key string

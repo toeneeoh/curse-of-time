@@ -6,6 +6,7 @@ OnInit.final("ShopQuote", function(Require)
     Require('Profile')
     Require('ItemHelpers')
     Require('Items')
+    Require('RuntimeItemDefinitions')
     Require('ShopCatalog')
     Require('ShopOffers')
     Require('ShopActions')
@@ -34,7 +35,7 @@ OnInit.final("ShopQuote", function(Require)
         for slot = 1, MAX_INVENTORY_SLOTS do
             local owned = items[slot]
             if owned and not owned.nocraft then
-                local id = GetItem(owned.id)
+                local id = RuntimeItemDefinitions.identityKey(owned)
                 inventory[id] = inventory[id] + math.max(1, owned.charges)
             end
         end
@@ -54,7 +55,8 @@ OnInit.final("ShopQuote", function(Require)
                 if quote then
                     quote.consume[component.id] = quote.consume[component.id] + 1
                 end
-            elseif not shop:has(component.id) or not IsBuyable(component.id, pid) then
+            elseif component.runtime_definition or not shop:has(component.id) or
+                not IsBuyable(component.id, pid) then
                 return false
             elseif quote then
                 local component_price = GetItemPrice(component.id, pid)

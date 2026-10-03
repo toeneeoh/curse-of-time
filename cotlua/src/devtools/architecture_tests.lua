@@ -853,9 +853,16 @@ OnInit.final("ArchitectureTests", function(Require)
         }) do
             local data = ItemData[socket_id]
             if data[ITEM_TYPE] ~= 12 or data[ITEM_LIMIT] ~= 0 or
-                data[ITEM_UPGRADE_MAX] ~= 0 then
+                data[ITEM_UPGRADE_MAX] ~= 16 then
                 return false, "Forgotten jewel is not a valid socket item"
             end
+        end
+        local vigor_recipe = ShopItem.get(GetItem('I0O1:0'))
+        if vigor_recipe == 0 or vigor_recipe:components() ~= 6 or
+            vigor_recipe:count('@mineral_ironstone') ~= 3 or
+            vigor_recipe:count('@mineral_prismatic_ore') ~= 2 or
+            vigor_recipe:count('@mineral_forgotten_crystal') ~= 1 then
+            return false, "Forgotten jewel recipe components are incomplete"
         end
         return true
     end)
@@ -1823,7 +1830,7 @@ OnInit.final("ArchitectureTests", function(Require)
                 {'n01A', 12, 40}, {'n01B', 0, 10}, {'n0P2', 1, 0},
                 {'n032', 2, 0},
                 {'n004', 2, 1}, {'n0P0', 2, 1}, {'n0P1', 2, 1},
-                {'n01F', 11, 11}, {'n02C', 12}, {'n09D', 11}
+                {'n01F', 11, 11}, {'n02C', 12}, {'n09D', 14}
             }
 
             for index = 1, #expected do

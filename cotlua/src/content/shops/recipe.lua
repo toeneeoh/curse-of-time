@@ -10,6 +10,7 @@ OnInit.final("Recipe", function(Require)
     Require('ShopCatalog')
     Require('Prices')
     Require('Items')
+    Require('MiningMaterials')
 
     local sword, heavy, dagger, bow, staff, plate, fullplate, leather, cloth, Shield, misc, sets
     local id = FourCC('n02C')  ---@type integer -- town smith
@@ -757,4 +758,21 @@ OnInit.final("Recipe", function(Require)
     SetItemPrice('I0NH:0', 50000)
     ShopAddItem(id2, 'I0NH:0', leather)
     ItemAddComponents('I0NH:0', "I064 I0N9 I0N9")
+
+    -- Forgotten sockets. Mined logical items use @definition keys so the
+    -- normal recipe system distinguishes materials sharing a native carrier.
+    SetItemPrice('I0O1:0', {platinum = 75, crystal = 30})
+    ShopAddItem(id2, 'I0O1:0', misc)
+    ItemAddComponents('I0O1:0',
+                      "@mineral_ironstone @mineral_ironstone @mineral_ironstone @mineral_prismatic_ore @mineral_prismatic_ore @mineral_forgotten_crystal")
+
+    SetItemPrice('I0OB:0', {platinum = 75, crystal = 30})
+    ShopAddItem(id2, 'I0OB:0', misc)
+    ItemAddComponents('I0OB:0',
+                      "@mineral_ironstone @mineral_prismatic_ore @mineral_prismatic_ore @mineral_prismatic_ore @mineral_forgotten_crystal @mineral_forgotten_crystal")
+
+    SetItemPrice('I0CH:0', {platinum = 75, crystal = 30})
+    ShopAddItem(id2, 'I0CH:0', misc)
+    ItemAddComponents('I0CH:0',
+                      "@mineral_ironstone @mineral_ironstone @mineral_prismatic_ore @mineral_prismatic_ore @mineral_forgotten_crystal @mineral_forgotten_crystal")
 end, Debug and Debug.getLine())

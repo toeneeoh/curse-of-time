@@ -235,12 +235,16 @@
                     local share = 1. / #runtime_pool
                     local entries = {}
                     for index, definition in ipairs(runtime_pool) do
+                        local presentation =
+                            BossEquipment.getPresentation(definition)
                         entries[index] = {
                             key = "equipment_runtime_" .. definition.key,
-                            name = definition.name,
-                            icon = definition.icon,
-                            tooltip = definition.preview_tooltip or
-                                          definition.data.tooltip,
+                            name = presentation and presentation.name or
+                                definition.name,
+                            icon = presentation and presentation.icon or
+                                definition.icon,
+                            tooltip = presentation and presentation.tooltip or
+                                definition.data.tooltip,
                             chance = 1. - (1. - per_roll * share) ^ rolls,
                             pool_share = share,
                         }

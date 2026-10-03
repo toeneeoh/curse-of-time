@@ -46,6 +46,23 @@ OnInit.final("RuntimeItemDefinitions", function(Require)
         return by_key[key]
     end
 
+    ---Returns a registered logical definition without exposing the registries.
+    ---@param key string|integer|RuntimeLogicalItemDefinition
+    ---@return RuntimeLogicalItemDefinition?
+    function RuntimeItemDefinitions.get(key) return resolve(key) end
+
+    ---Returns the stable identity used by recipes and other item comparisons.
+    ---Native items retain their ordinary shop key; logical items use their
+    ---definition key so shared carrier rawcodes cannot satisfy one another.
+    ---@param item Item
+    ---@return string
+    function RuntimeItemDefinitions.identityKey(item)
+        if item.runtime_definition then
+            return "@" .. item.runtime_definition.key
+        end
+        return GetItem(item.id)
+    end
+
     ---Registers a logical item. Its tooltip uses the same parser, stat
     ---calculator, and formatter as an object-editor item description.
     ---@param key string

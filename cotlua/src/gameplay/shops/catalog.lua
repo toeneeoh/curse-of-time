@@ -3,6 +3,7 @@
 OnInit.final("ShopCatalog", function(Require)
     Require('ItemHelpers')
     Require('Items')
+    Require('RuntimeItemDefinitions')
     Require('Variables')
 
     ---@class ShopItem
@@ -90,6 +91,34 @@ OnInit.final("ShopCatalog", function(Require)
     ---@param max_level boolean?
     ---@return ShopItem|0
     function ShopItem.create(id, category, max_level)
+        if type(id) == "string" and id:sub(1, 1) == "@" then
+            local existing = ShopItem.itempool[id]
+            if existing ~= 0 then return existing end
+            local definition = RuntimeItemDefinitions.get(id:sub(2))
+            if not definition then return 0 end
+            local runtime_item = RuntimeItemDefinitions.create(definition,
+                30000., -30000.)
+            if not runtime_item then return 0 end
+            local self = setmetatable({
+                id = id,
+                categories = category,
+                lvl = 0,
+                name = GetItemName(runtime_item.obj),
+                icon = BlzGetItemIconPath(runtime_item.obj),
+                tooltip = runtime_item.alt_tooltip or runtime_item.tooltip or
+                    BlzGetItemExtendedTooltip(runtime_item.obj) or "",
+                charges = GetItemCharges(runtime_item.obj),
+                recharge = -1,
+                relation = __jarray(0),
+                counter = __jarray(0),
+                component = {},
+                componentCount = 0,
+                runtime_definition = definition,
+            }, mt)
+            ShopItem.itempool[id] = self
+            runtime_item:destroy()
+            return self
+        end
         local index, rawcode, level = GetItem(id)
         local existing = ShopItem.itempool[index]
 
