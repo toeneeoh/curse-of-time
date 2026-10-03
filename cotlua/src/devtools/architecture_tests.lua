@@ -395,7 +395,7 @@ OnInit.final("ArchitectureTests", function(Require)
                     "Shares your current Ashen Vanguard blessing"
                 }, {
                     FactionConsumables.VANGUARD_BOUNTY_KEY,
-                    "Vanguard Bounty", "Marked Quarry", 4,
+                    "Vanguard Bounty", "Marked Bounty", 4,
                     "Boss Drop Rate"
                 }
             }
@@ -882,8 +882,8 @@ OnInit.final("ArchitectureTests", function(Require)
             }
         end
 
-        local boss_a = fake('I0O2', 9)
-        local boss_b = fake('I0O2', 9)
+        local boss_a = fake('I02O', 9)
+        local boss_b = fake('I02O', 9)
         local crafted_a = fake('I0NB', 23)
         local crafted_b = fake('I0NB', 23)
         local basic_a = fake('I01Z', 1)
@@ -1836,7 +1836,7 @@ OnInit.final("ArchitectureTests", function(Require)
                 {'n01A', 12, 40}, {'n01B', 0, 10}, {'n0P2', 1, 0},
                 {'n032', 2, 0},
                 {'n004', 2, 1}, {'n0P0', 2, 1}, {'n0P1', 2, 1},
-                {'n01F', 11, 11}, {'n02C', 12}, {'n09D', 11, 14}
+                {'n01F', 11, 11}, {'n02C', 12}, {'n09D', 11}
             }
 
             for index = 1, #expected do

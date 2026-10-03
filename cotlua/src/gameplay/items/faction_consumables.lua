@@ -26,6 +26,11 @@ OnInit.final("FactionConsumables", function(Require)
 
     local function define(key, id, name, icon, world_skin, required_rank,
                           skill_name, description, flavor, ability_id)
+        if ability_id then
+            BlzSetAbilityExtendedTooltip(
+                ability_id,
+                "|cff0080c0" .. skill_name .. ":|r " .. description, 0)
+        end
         definitions[key] = RuntimeItemDefinitions.define(key, {
             id = id,
             carrier = FourCC('I00K'),
@@ -88,7 +93,7 @@ OnInit.final("FactionConsumables", function(Require)
     define(VANGUARD_BOUNTY_KEY, 105, "Vanguard Bounty",
            "ReplaceableTextures\\CommandButtons\\BTNMarkOfFire.blp",
            FourCC('flag'),
-           4, "Marked Quarry",
+           4, "Marked Bounty",
            "Marks a boss above |cffffcc0090% Health|r, increasing its |cffff8040Boss Drop Rate|r by |cffffcc0025%|r until it dies or retreats.",
            "The Vanguard's seal promises richer spoils to whoever claims its mark.",
            VANGUARD_BOUNTY_ABILITY_ID)
@@ -121,9 +126,9 @@ OnInit.final("FactionConsumables", function(Require)
         return AshenVanguardServices and
                    AshenVanguardServices.shareBlessing(pid)
     end)
-    local MARK_QUARRY = Spell.define('A1VB')
+    local MARK_BOUNTY = Spell.define('A1VB')
     do
-        local thistype = MARK_QUARRY
+        local thistype = MARK_BOUNTY
 
         local function find_bounty(pid)
             local profile = Profile[pid]

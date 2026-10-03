@@ -13,7 +13,7 @@ OnInit.global("Variables", function(Require)
     DEV_LOG_ENABLED = true -- Disable after the current in-engine verification pass.
     MAP_NAME = "CoT Nevermore"
     PROFILE_SAVE_VERSION = 1
-    CHARACTER_SAVE_VERSION = 3
+    CHARACTER_SAVE_VERSION = 4
     SAVE_SCRAMBLE_VERSION = 1
 
     DUMMY_UNIT = gg_unit_h05E_0717
