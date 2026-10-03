@@ -60,12 +60,16 @@ OnInit.final("Potion", function(Require)
     end
 
     potion_button[1] = Button.create(backdrop, icon_size, icon_size, 0, 0, false)
+    potion_button[1].tooltip:point(FRAMEPOINT_BOTTOMLEFT,
+                                   FRAMEPOINT_BOTTOMRIGHT, 0.005, 0.)
     potion_button[1]:onClick(on_click)
     potion_button[1]:use_cooldowns()
     potion_button[1]:visible(false)
     RegisterHotkeyToFunc('3', "Use Potion 1", use_potion, potion_button[1].tooltip.nameFrame)
 
     potion_button[2] = Button.create(backdrop, icon_size, icon_size, icon_size, 0, false)
+    potion_button[2].tooltip:point(FRAMEPOINT_BOTTOMLEFT,
+                                   FRAMEPOINT_BOTTOMRIGHT, 0.005, 0.)
     potion_button[2]:onClick(on_click)
     potion_button[2]:use_cooldowns()
     potion_button[2]:visible(false)
