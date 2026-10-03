@@ -5,6 +5,8 @@ OnInit.final("RuntimeItemDefinitions", function(Require)
 
     ---@class RuntimeLogicalItemSpec
     ---@field id integer Stable 16-bit save identifier.
+    ---@field code? string Optional four-character virtual display code. This
+    ---does not need or create a corresponding object-editor record.
     ---@field carrier string|integer Existing object-editor item used as the native handle.
     ---@field name string
     ---@field icon string
@@ -33,6 +35,8 @@ OnInit.final("RuntimeItemDefinitions", function(Require)
     local by_id = {}
     ---@type table<string, RuntimeLogicalItemDefinition>
     local by_key = {}
+    ---@type table<string, RuntimeLogicalItemDefinition>
+    local by_code = {}
     ---@type RuntimeLogicalItemDefinition[]
     local definitions = {}
     -- Runtime identity remains in extra[2]. Subsystem state now lives in the
@@ -48,7 +52,7 @@ OnInit.final("RuntimeItemDefinitions", function(Require)
     local function resolve(key)
         if type(key) == "table" then return key end
         if type(key) == "number" then return by_id[key] end
-        return by_key[key]
+        return by_key[key] or by_code[key]
     end
 
     ---Returns a registered logical definition without exposing the registries.
@@ -74,8 +78,11 @@ OnInit.final("RuntimeItemDefinitions", function(Require)
     ---@param spec RuntimeLogicalItemSpec
     ---@return RuntimeLogicalItemDefinition?
     function RuntimeItemDefinitions.define(key, spec)
+        local invalid_code = spec.code ~= nil and
+                                 (type(spec.code) ~= "string" or
+                                     spec.code:len() ~= 4 or by_code[spec.code])
         if type(key) ~= "string" or spec.id <= 0 or spec.id > DEFINITION_MASK or
-            by_key[key] or by_id[spec.id] then
+            by_key[key] or by_id[spec.id] or invalid_code then
             print("Invalid or duplicate runtime item definition: " ..
                       tostring(key))
             return nil
@@ -97,6 +104,7 @@ OnInit.final("RuntimeItemDefinitions", function(Require)
         end
         by_key[key] = definition
         by_id[spec.id] = definition
+        if spec.code then by_code[spec.code] = definition end
         definitions[#definitions + 1] = definition
         return definition
     end

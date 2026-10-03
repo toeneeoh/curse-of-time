@@ -2,32 +2,37 @@
 
 OnInit.final("MiningMaterials", function(Require)
     Require('ItemHelpers')
-    Require('Items')
+    Require('RuntimeItemDefinitions')
 
     MiningMaterials = {}
 
     local definitions = {}
     local order = { "ironstone", "prismatic_ore", "forgotten_crystal" }
 
-    local function define(key, id, name, icon, flavor)
-        local definition = {
-            id = FourCC(id),
+    local function define(key, id, code, name, icon, flavor)
+        local definition = RuntimeItemDefinitions.define("mineral_" .. key, {
+            id = id,
+            code = code,
+            carrier = 'I02Q',
+            world_skin = 'I02Q',
             name = name,
             icon = icon,
             tooltip = "[tier 2] [type 0] [stack 99]"
                 .. "|n|n|cff808080" .. flavor .. "|r",
-        }
+            item_type = 0,
+            metadata = {mineral_key = key},
+        })
         definitions[key] = definition
         return definition
     end
 
-    define("ironstone", 'I103', "Ironstone",
+    define("ironstone", 200, 'I103', "Ironstone",
            "ReplaceableTextures\\CommandButtons\\BTNRockGolem.blp",
            "Dense ore prized as a dependable foundation for delicate settings.")
-    define("prismatic_ore", 'I104', "Prismatic Ore",
+    define("prismatic_ore", 201, 'I104', "Prismatic Ore",
            "ReplaceableTextures\\CommandButtons\\BTNCrystalBall.blp",
            "Its shifting veins accept enchantments that ordinary metal rejects.")
-    define("forgotten_crystal", 'I105', "Forgotten Crystal",
+    define("forgotten_crystal", 202, 'I105', "Forgotten Crystal",
            "ReplaceableTextures\\CommandButtons\\BTN_CR_wGem.blp",
            "A mineral memory drawn from seams untouched since the world was young.")
 
@@ -43,8 +48,8 @@ OnInit.final("MiningMaterials", function(Require)
         local definition = definitions[key]
         local hero = Hero[pid]
         if not definition or not hero or amount < 1 then return nil end
-        local item = ItemRuntime.create(definition.id, GetUnitX(hero),
-                                        GetUnitY(hero))
+        local item = RuntimeItemDefinitions.create(definition, GetUnitX(hero),
+                                                   GetUnitY(hero))
         if not item then return nil end
         item.charges = amount
         SetItemCharges(item.obj, amount)
@@ -55,7 +60,7 @@ OnInit.final("MiningMaterials", function(Require)
     function MiningMaterials.getPresentation(key)
         local definition = definitions[key]
         if not definition then return nil end
-        return definition.name, definition.icon, definition.tooltip
+        return definition.name, definition.icon, definition.data.tooltip
     end
 
     function MiningMaterials.getAllKeys()

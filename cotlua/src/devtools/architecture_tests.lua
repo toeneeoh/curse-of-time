@@ -32,6 +32,7 @@ OnInit.final("ArchitectureTests", function(Require)
     Require('UnitAnimation')
     Require('UnitHelpers')
     Require('ItemHelpers')
+    Require('RuntimeItemDefinitions')
     Require('AbilityCasting')
     Require('PlayerLifecycle')
     Require('SummonHelpers')
@@ -859,15 +860,26 @@ OnInit.final("ArchitectureTests", function(Require)
         end
         local vigor_recipe = ShopItem.get(GetItem('I0O1:0'))
         if vigor_recipe == 0 or vigor_recipe:components() ~= 6 or
-            vigor_recipe:count(GetItem('I103:0')) ~= 3 or
-            vigor_recipe:count(GetItem('I104:0')) ~= 2 or
-            vigor_recipe:count(GetItem('I105:0')) ~= 1 then
+            vigor_recipe:count('@mineral_ironstone') ~= 3 or
+            vigor_recipe:count('@mineral_prismatic_ore') ~= 2 or
+            vigor_recipe:count('@mineral_forgotten_crystal') ~= 1 then
             return false, "Forgotten jewel recipe components are incomplete"
         end
-        for _, material_id in ipairs({
-            FourCC('I103'), FourCC('I104'), FourCC('I105')
+        for _, material_spec in ipairs({
+            {'mineral_ironstone', 'I103'},
+            {'mineral_prismatic_ore', 'I104'},
+            {'mineral_forgotten_crystal', 'I105'}
         }) do
-            local data = ItemData[material_id]
+            local material_key, virtual_code = table.unpack(material_spec)
+            local definition = RuntimeItemDefinitions.get(material_key)
+            local data = definition and definition.data
+            if not data then
+                return false, "Mining material definition is unavailable"
+            end
+            if definition.code ~= virtual_code or
+                RuntimeItemDefinitions.get(virtual_code) ~= definition then
+                return false, "Mining material virtual code is invalid"
+            end
             if data[ITEM_TIER] ~= 2 or data[ITEM_TYPE] ~= 0 or
                 data[ITEM_STACK] ~= 99 or data[ITEM_CHARGES] ~= 0 then
                 return false, "Mining material classification is invalid"

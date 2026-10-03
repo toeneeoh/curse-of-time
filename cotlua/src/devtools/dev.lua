@@ -1072,7 +1072,8 @@ modifiers:
         preload_items()
 
         for _, definition in ipairs(RuntimeItemDefinitions.getAll()) do
-            local runtime_item_code = pack(">I4", definition.carrier_id)
+            local runtime_item_code = definition.code or
+                                          ("@" .. definition.key)
             local searchable_name = lower(
                                         definition.name .. " " .. definition.key ..
                                             " " .. runtime_item_code)
