@@ -1073,13 +1073,17 @@ OnInit.final("PotionService", function(Require)
         flavor = "Thin arcs leap between the liquid and anything drawn near.",
         icon = VOLTAIC_FLASK_ICON,
         description = "Attacks arc |cffffcc0040%|r attack damage as Magic " ..
-            "damage to up to |cffffcc004|r nearby enemies for " ..
+            "damage through up to |cffffcc00" ..
+            VoltaicFlaskBuff.MAX_TARGETS .. "|r nearby enemies within " ..
+            "|cffffcc00" .. VoltaicFlaskBuff.AOE .. "|r AoE for " ..
             "|cffffcc0010 seconds|r.",
         describe = function(multiplier, maximum_multiplier)
             return "Attacks arc |cffffcc00" ..
                        effect_amount(40., multiplier, maximum_multiplier) ..
-                       "%|r attack damage as Magic damage to up to " ..
-                       "|cffffcc004|r nearby enemies for " ..
+                       "%|r attack damage as Magic damage through up to " ..
+                       "|cffffcc00" .. VoltaicFlaskBuff.MAX_TARGETS ..
+                       "|r nearby enemies within |cffffcc00" ..
+                       VoltaicFlaskBuff.AOE .. "|r AoE for " ..
                        "|cffffcc0010 seconds|r."
         end,
         on_use = function(context)

@@ -423,9 +423,17 @@ OnInit.final("BuffsItems", function(Require)
         thistype.NAME = "Voltaic Infusion"
         thistype.ICON =
             "ReplaceableTextures\\CommandButtons\\BTNLightningSpeedBottle.blp"
-        thistype.DESC = "Attacks arc +^$damage% damage to nearby enemies"
+        thistype.DESC =
+            "Attacks arc +^$damage% damage through up to 4 enemies within 350 AoE"
         thistype.DISPEL_TYPE = BUFF_POSITIVE
         thistype.STACK_TYPE = BUFF_STACK_NONE
+        thistype.AOE = 350
+        thistype.MAX_TARGETS = 4
+
+        ---@param bolts lightning[]
+        local function destroy_chain(bolts)
+            for index = 1, #bolts do DestroyLightning(bolts[index]) end
+        end
 
         local function on_hit(source, primary, _amount, amount_after_reduction,
                               _damage_type, attack_amount, is_basic_attack)
@@ -437,23 +445,52 @@ OnInit.final("BuffsItems", function(Require)
             local pid = GetPlayerId(GetOwningPlayer(source)) + 1
             local group = CreateGroup()
             MakeGroupInRange(pid, group, GetUnitX(primary), GetUnitY(primary),
-                             350., Condition(FilterEnemy))
-            local struck = 0
+                             thistype.AOE, Condition(FilterEnemy))
+            local candidates = {}
             for target in each(group) do
-                if target ~= primary and struck < 4 then
-                    struck = struck + 1
-                    DamageTarget(source, target, attack_amount * buff.damage,
-                                 ATTACK_TYPE_NORMAL, MAGIC, "Voltaic Flask", {
-                            attack = false,
-                            pre_scaled_source = true,
-                            suppress_source_events = true,
-                        })
-                    DestroyEffect(AddSpecialEffectTarget(
-                        "Abilities\\Spells\\Other\\Monsoon\\MonsoonBoltTarget.mdl",
-                        target, "origin"))
+                if target ~= primary then
+                    candidates[#candidates + 1] = target
                 end
             end
             DestroyGroup(group)
+
+            local bolts = {}
+            local from_x, from_y = GetUnitX(primary), GetUnitY(primary)
+            local from_z = BlzGetUnitZ(primary) + GetUnitFlyHeight(primary) +
+                               60.
+
+            for _ = 1, thistype.MAX_TARGETS do
+                local nearest_index = 0
+                local nearest_distance = math.huge
+                for index = 1, #candidates do
+                    local target = candidates[index]
+                    local dx = GetUnitX(target) - from_x
+                    local dy = GetUnitY(target) - from_y
+                    local distance = dx * dx + dy * dy
+                    if distance < nearest_distance then
+                        nearest_index = index
+                        nearest_distance = distance
+                    end
+                end
+                if nearest_index == 0 then break end
+
+                local target = table.remove(candidates, nearest_index)
+                local target_x, target_y = GetUnitX(target), GetUnitY(target)
+                local target_z = BlzGetUnitZ(target) +
+                                     GetUnitFlyHeight(target) + 60.
+                bolts[#bolts + 1] = AddLightningEx(
+                    "CLSB", true, from_x, from_y, from_z, target_x, target_y,
+                    target_z)
+                DamageTarget(source, target, attack_amount * buff.damage,
+                             ATTACK_TYPE_NORMAL, MAGIC, "Voltaic Flask", {
+                        attack = false,
+                        pre_scaled_source = true,
+                        suppress_source_events = true,
+                    })
+                from_x, from_y, from_z = target_x, target_y, target_z
+            end
+
+            if #bolts > 0 then TQ:callDelayed(0.3, destroy_chain, bolts) end
         end
 
         function thistype:onRemove()
