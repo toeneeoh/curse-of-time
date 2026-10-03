@@ -5,6 +5,7 @@ OnInit.final("StashService", function(Require)
     Require('Items')
     Require('ItemEventRegistry')
     Require('Audio')
+    Require('Town')
 
     StashService = {}
 
@@ -19,10 +20,6 @@ OnInit.final("StashService", function(Require)
     local function hero_data(pid)
         local profile = Profile[pid]
         return profile and profile.hero or nil
-    end
-
-    local function in_town(pid)
-        return Hero[pid] and RectContainsUnit(gg_rct_Town_Main, Hero[pid])
     end
 
     local function unlocked_slots(hero)
@@ -40,7 +37,7 @@ OnInit.final("StashService", function(Require)
     end
 
     function StashService.isInTown(pid)
-        return in_town(pid) == true
+        return Town.isPlayerInTown(pid)
     end
 
     function StashService.getUnlockedSlots(pid)
@@ -57,7 +54,9 @@ OnInit.final("StashService", function(Require)
     function StashService.quoteRow(pid)
         local hero = hero_data(pid)
         if not hero then return result(false, "invalid_player") end
-        if not in_town(pid) then return result(false, "not_in_town") end
+        if not Town.isPlayerInTown(pid) then
+            return result(false, "not_in_town")
+        end
         local current = math.max(1,
             math.min(STASH_MAX_ROWS, hero.stash_rows or 1))
         if current >= STASH_MAX_ROWS then return result(false, "maxed") end
@@ -118,7 +117,9 @@ OnInit.final("StashService", function(Require)
     function StashService.canDeposit(pid, inventory_slot)
         local hero = hero_data(pid)
         if not hero then return result(false, "invalid_player") end
-        if not in_town(pid) then return result(false, "not_in_town") end
+        if not Town.isPlayerInTown(pid) then
+            return result(false, "not_in_town")
+        end
         local item = hero.items[inventory_slot]
         if not item or not item.alive then
             return result(false, "missing_source")
@@ -151,7 +152,9 @@ OnInit.final("StashService", function(Require)
     function StashService.withdraw(pid, stash_slot, inventory_slot)
         local hero = hero_data(pid)
         if not hero then return result(false, "invalid_player") end
-        if not in_town(pid) then return result(false, "not_in_town") end
+        if not Town.isPlayerInTown(pid) then
+            return result(false, "not_in_town")
+        end
         if not valid_stash_slot(hero, stash_slot) then
             return result(false, "locked_slot")
         end
@@ -182,7 +185,9 @@ OnInit.final("StashService", function(Require)
     function StashService.transfer(pid, inventory_slot, stash_slot)
         local hero = hero_data(pid)
         if not hero then return result(false, "invalid_player") end
-        if not in_town(pid) then return result(false, "not_in_town") end
+        if not Town.isPlayerInTown(pid) then
+            return result(false, "not_in_town")
+        end
         if not valid_inventory_slot(inventory_slot) then
             return result(false, "invalid_target")
         end
@@ -223,7 +228,9 @@ OnInit.final("StashService", function(Require)
     function StashService.move(pid, from, to)
         local hero = hero_data(pid)
         if not hero then return result(false, "invalid_player") end
-        if not in_town(pid) then return result(false, "not_in_town") end
+        if not Town.isPlayerInTown(pid) then
+            return result(false, "not_in_town")
+        end
         if not valid_stash_slot(hero, from) or
             not valid_stash_slot(hero, to) then
             return result(false, "locked_slot")
@@ -245,7 +252,9 @@ OnInit.final("StashService", function(Require)
     function StashService.drop(pid, stash_slot)
         local hero = hero_data(pid)
         if not hero then return result(false, "invalid_player") end
-        if not in_town(pid) then return result(false, "not_in_town") end
+        if not Town.isPlayerInTown(pid) then
+            return result(false, "not_in_town")
+        end
         if not valid_stash_slot(hero, stash_slot) then
             return result(false, "locked_slot")
         end
@@ -267,7 +276,9 @@ OnInit.final("StashService", function(Require)
     function StashService.sell(pid, stash_slot)
         local hero = hero_data(pid)
         if not hero then return result(false, "invalid_player") end
-        if not in_town(pid) then return result(false, "not_in_town") end
+        if not Town.isPlayerInTown(pid) then
+            return result(false, "not_in_town")
+        end
         if not valid_stash_slot(hero, stash_slot) then
             return result(false, "locked_slot")
         end

@@ -10,6 +10,7 @@ OnInit.final("PotionService", function(Require)
     Require('RuntimeItemDefinitions')
     Require('Shield')
     Require('TimerQueue')
+    Require('Town')
 
     PotionService = {}
 
@@ -1685,8 +1686,9 @@ OnInit.final("PotionService", function(Require)
     ---@return number remaining
     function PotionService.applyEquipCooldown(pid, index, duration)
         if index ~= 1 and index ~= 2 then return 0. end
-        duration = math.max(0., duration or EQUIP_COOLDOWN)
         local current = PotionService.getCooldown(pid, index)
+        if Town.isPlayerInTown(pid) then return current end
+        duration = math.max(0., duration or EQUIP_COOLDOWN)
         if current >= duration then return current end
 
         local player_cooldowns = cooldown_table(pid)

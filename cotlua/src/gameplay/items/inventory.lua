@@ -12,6 +12,7 @@ OnInit.final("InventoryService", function(Require)
     Require('Currency')
     Require('ItemEventRegistry')
     Require('Items')
+    Require('Town')
 
     InventoryService = {}
 
@@ -285,7 +286,7 @@ OnInit.final("InventoryService", function(Require)
         if not item or not item.alive then
             return result(false, "missing_source")
         end
-        if not RectContainsUnit(gg_rct_Town_Main, Hero[pid]) then
+        if not Town.isPlayerInTown(pid) then
             return result(false, "not_in_town")
         end
 

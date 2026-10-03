@@ -10,6 +10,30 @@ OnInit.final("Town", function(Require)
     Require('ItemSchema')
     Require('Profile')
 
+    Town = {}
+
+    ---The canonical town check for player-owned services. Keep this as a live
+    ---query so teleports, hero replacement, and revival cannot leave a cached
+    ---region flag stale.
+    ---@param unit unit?
+    ---@return boolean
+    function Town.isUnitInTown(unit)
+        return unit ~= nil and RectContainsUnit(gg_rct_Town_Main, unit)
+    end
+
+    ---@param pid integer
+    ---@return boolean
+    function Town.isPlayerInTown(pid)
+        return Town.isUnitInTown(Hero[pid])
+    end
+
+    ---@param x number
+    ---@param y number
+    ---@return boolean
+    function Town.containsCoords(x, y)
+        return RectContainsCoords(gg_rct_Town_Main, x, y)
+    end
+
     local villagers = {
         {x = 181, y = 2353, model = "units\\critters\\VillagerMan\\VillagerMan"},
         {x = -80, y = 1938, model = "units\\critters\\VillagerKid\\VillagerKid"},
