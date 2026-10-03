@@ -10,6 +10,7 @@ OnInit.final("FactionMining", function(Require)
     Require('UnitTable')
     Require('Damage')
     Require('MiningMaterials')
+    Require('WorldAreas')
 
     FactionMining = {}
 
@@ -117,7 +118,7 @@ OnInit.final("FactionMining", function(Require)
 
     local function valid_spawn_point(x, y)
         return RectContainsCoords(MAIN_MAP.rect, x, y)
-            and not RectContainsCoords(gg_rct_Town_Main, x, y)
+            and not IsProtectedArea(x, y)
             and IsTerrainWalkable(x, y)
     end
 

@@ -8,6 +8,7 @@
 OnInit.final("Regions", function(Require)
     Require('MainMap')
     Require('WorldBounds')
+    Require('WorldAreas')
 
     AREAS          = { ---@type rect[]
         MAIN_MAP.rect,
@@ -77,29 +78,6 @@ OnInit.final("Regions", function(Require)
     REGION_DATA[gg_rct_Naga_Dungeon_Boss] = { vision = gg_rct_Naga_Dungeon_Boss_Vision, minimap = "war3mapImported\\minimap_nagadungeon_boss.dds" }
     REGION_DATA[gg_rct_Naga_Dungeon_Reward] = { vision = gg_rct_Naga_Dungeon_Reward_Vision, minimap = "war3mapImported\\minimap_nagadungeon.dds" }
     REGION_DATA[gg_rct_Naga_Dungeon] = { vision = gg_rct_Naga_Dungeon_Vision, minimap = "war3mapImported\\minimap_nagadungeon.dds" }
-
-    PROTECTED_AREAS = {
-        gg_rct_Town_Main,
-    }
-
-    ---Returns the protected area containing the coordinates, if any.
-    ---@param x number
-    ---@param y number
-    ---@return rect?
-    function GetProtectedAreaFromCoords(x, y)
-        for index = 1, #PROTECTED_AREAS do
-            local area = PROTECTED_AREAS[index]
-            if RectContainsCoords(area, x, y) then return area end
-        end
-        return nil
-    end
-
-    ---@param x number
-    ---@param y number
-    ---@return boolean
-    function IsProtectedArea(x, y)
-        return GetProtectedAreaFromCoords(x, y) ~= nil
-    end
 
     ---Moves an otherwise-unhandled hostile unit just beyond the nearest edge
     ---of a protected rectangle and clears the order that pulled it inside.

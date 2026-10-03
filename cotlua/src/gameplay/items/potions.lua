@@ -10,7 +10,7 @@ OnInit.final("PotionService", function(Require)
     Require('RuntimeItemDefinitions')
     Require('Shield')
     Require('TimerQueue')
-    Require('Town')
+    Require('WorldAreas')
 
     PotionService = {}
 

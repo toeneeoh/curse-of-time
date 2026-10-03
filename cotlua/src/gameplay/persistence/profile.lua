@@ -25,6 +25,7 @@
 OnInit.final("Profile", function(Require)
     Require('HeroDefinitions')
     Require('MainMap')
+    Require('WorldAreas')
     MAX_INVENTORY_SLOTS = 26 ---@type integer 
     BACKPACK_INDEX      = 9
     POTION_INDEX        = 7
@@ -290,8 +291,7 @@ OnInit.final("Profile", function(Require)
                 if IsUnitPaused(Hero[self.pid]) or not UnitAlive(Hero[self.pid]) then
                     DisplayTextToPlayer(p, 0, 0, "You can't repick right now.")
                     return
-                elseif RectContainsUnit(gg_rct_Tavern, Hero[self.pid]) or RectContainsUnit(gg_rct_Town_Main, Hero[self.pid]) or RectContainsUnit(gg_rct_Church, Hero[self.pid]) then
-                else
+                elseif not Town.isPlayerInServiceArea(self.pid) then
                     DisplayTextToPlayer(p, 0, 0, "You can only repick in church, town or tavern.")
                     return
                 end

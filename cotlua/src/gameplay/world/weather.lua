@@ -9,6 +9,7 @@ OnInit.final("Weather", function(Require)
     Require('Groups')
     Require('WorldDestructables')
     Require('Buffs')
+    Require('WorldAreas')
 
     local CURRENT_WEATHER
     local buff = WeatherBuff
@@ -319,7 +320,7 @@ OnInit.final("Weather", function(Require)
             repeat
                 x = GetRandomReal(MAIN_MAP.minX, MAIN_MAP.maxX)
                 y = GetRandomReal(MAIN_MAP.minY, MAIN_MAP.maxY)
-            until not RectContainsCoords(gg_rct_Town_Main, x, y)
+            until not IsProtectedArea(x, y)
 
             TQ:callDelayed(1.5, firestorm_damage, x, y)
             DestroyEffect(AddSpecialEffect("Units\\Demon\\Infernal\\InfernalBirth.mdl", x, y))

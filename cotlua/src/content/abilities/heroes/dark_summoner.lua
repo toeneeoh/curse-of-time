@@ -5,6 +5,7 @@ OnInit.final("DarkSummonerSpells", function(Require)
     Require('Profile')
     Require('SummonAbilities')
     Require('BuffsSummons')
+    Require('WorldAreas')
 
     local MAX_TIER = 5
     local ESSENCE_INFO = FourCC('A063')
@@ -137,10 +138,7 @@ OnInit.final("DarkSummonerSpells", function(Require)
     end
 
     local function unit_is_in_respec_area(target)
-        return target ~= nil and (
-            RectContainsUnit(gg_rct_Town_Main, target)
-            or RectContainsUnit(gg_rct_Church, target)
-            or RectContainsUnit(gg_rct_Tavern, target))
+        return Town.isUnitInServiceArea(target)
     end
 
     local function is_respec_area(pid, summon)

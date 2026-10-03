@@ -12,6 +12,7 @@ OnInit.final("Boss", function(Require)
     Require('TimerQueue')
     Require('Users')
     Require('DropTable')
+    Require('WorldAreas')
 
     local TQ = TimerQueue
     local dead_gods = 0
@@ -165,7 +166,8 @@ OnInit.final("Boss", function(Require)
                         repeat
                             x = GetRandomReal(MAIN_MAP.minX, MAIN_MAP.maxX)
                             y = GetRandomReal(MAIN_MAP.minY, MAIN_MAP.maxY)
-                        until IsTerrainWalkable(x, y) and RectContainsCoords(gg_rct_Town_Main, x, y) == false
+                        until IsTerrainWalkable(x, y) and
+                            not IsProtectedArea(x, y)
                         boss.loc_x = x
                         boss.loc_y = y
                     elseif boss.index == BOSS_AZAZOTH then
@@ -839,7 +841,8 @@ OnInit.final("Boss", function(Require)
                 if count > 150 then
                     j = j + 50
                 end
-            until IsTerrainWalkable(x2, y2) and RectContainsCoords(gg_rct_Town_Main, x2, y2) == false
+            until IsTerrainWalkable(x2, y2) and
+                not IsProtectedArea(x2, y2)
 
             SetUnitXBounded(Boss[BOSS_LEGION].unit, x2)
             SetUnitYBounded(Boss[BOSS_LEGION].unit, y2)

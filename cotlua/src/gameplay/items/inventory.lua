@@ -12,7 +12,7 @@ OnInit.final("InventoryService", function(Require)
     Require('Currency')
     Require('ItemEventRegistry')
     Require('Items')
-    Require('Town')
+    Require('WorldAreas')
 
     InventoryService = {}
 

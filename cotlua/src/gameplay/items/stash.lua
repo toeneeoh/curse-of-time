@@ -5,7 +5,7 @@ OnInit.final("StashService", function(Require)
     Require('Items')
     Require('ItemEventRegistry')
     Require('Audio')
-    Require('Town')
+    Require('WorldAreas')
 
     StashService = {}
 
