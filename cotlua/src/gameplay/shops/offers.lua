@@ -77,11 +77,17 @@ OnInit.global("ShopOffers", function()
     ---@param pid integer
     ---@return boolean, string?
     function ShopOffer:isAvailable(pid)
-        if not self.availability then
-            return true
+        if self.availability then
+            local available, reason = self.availability(pid)
+            if available == false then return false, reason end
         end
-        local available, reason = self.availability(pid)
-        return available ~= false, reason
+        if self.cooldown then
+            local remaining = self.cooldown(pid)
+            if remaining and remaining > 0. then
+                return false, "RESTOCKING"
+            end
+        end
+        return true
     end
 
     ---@param pid integer

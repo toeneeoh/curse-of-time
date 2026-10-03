@@ -30,6 +30,7 @@ OnInit.final("AshenVanguard", function(Require)
     local MOMENTUM_REWARD = 40
     local MOBILIZATION_DURATION = 900.
     local SHARED_BLESSING_DURATION = 300.
+    local BOUNTY_REQUISITION_COOLDOWN = 600.
 
     local ashen_vanguard = Faction.create(
         ASHEN_VANGUARD_ID,
@@ -44,6 +45,44 @@ OnInit.final("AshenVanguard", function(Require)
     local rare_by_unit = setmetatable({}, { __mode = 'k' })
     local rare_by_player = {}
     local rare_retry = {}
+    local bounty_requisition_timer
+    AshenVanguardServices = {}
+
+    local function notify_bounty_changed()
+        local user = User.first
+        while user do
+            NotifyShopActionChanged(user.id)
+            user = user.next
+        end
+    end
+
+    local function finish_bounty_requisition()
+        bounty_requisition_timer = nil
+        notify_bounty_changed()
+    end
+
+    ---The requisition is faction-wide and lobby-only. One purchased bounty
+    ---benefits the whole group, so separate per-player cooldowns would merely
+    ---encourage every member to buy one at once.
+    ---@return number remaining
+    ---@return number total
+    function AshenVanguardServices.getBountyRequisitionCooldown()
+        local remaining = bounty_requisition_timer and
+                              TimerQueue:getRemaining(
+                                  bounty_requisition_timer) or 0.
+        return math.max(0., remaining or 0.), BOUNTY_REQUISITION_COOLDOWN
+    end
+
+    ---@return boolean
+    function AshenVanguardServices.startBountyRequisitionCooldown()
+        local remaining =
+            AshenVanguardServices.getBountyRequisitionCooldown()
+        if remaining > 0. then return false end
+        bounty_requisition_timer = TimerQueue:callDelayed(
+            BOUNTY_REQUISITION_COOLDOWN, finish_bounty_requisition)
+        notify_bounty_changed()
+        return true
+    end
 
     local function is_member(pid)
         local faction = Faction.getFaction(pid)
@@ -359,8 +398,6 @@ OnInit.final("AshenVanguard", function(Require)
                                                      ASHEN_VANGUARD_ID)))
     end
     SharedAshenVanguardBuff.getRankDamage = rank_damage
-
-    AshenVanguardServices = {}
 
     function AshenVanguardServices.shareBlessing(pid)
         local success, shared = Faction.shareBlessing(

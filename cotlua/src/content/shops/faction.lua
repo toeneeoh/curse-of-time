@@ -136,6 +136,8 @@ OnInit.final("FactionShop", function(Require)
         local extras = faction_consumables[shop.faction_id]
         for offer_index = 1, #extras do
             local offer = extras[offer_index]
+            local is_bounty = offer.item_key ==
+                                  FactionConsumables.VANGUARD_BOUNTY_KEY
             local offer_name, offer_icon, offer_tooltip =
                 FactionConsumables.getCatalogPresentation(offer.item_key)
             ShopAddOffer(shop.id, {
@@ -146,10 +148,28 @@ OnInit.final("FactionShop", function(Require)
                 categories = misc,
                 price = {faction = offer.price},
                 availability = function(pid)
-                    return availability(pid, shop.faction_id, offer.rank)
+                    local available_now, reason =
+                        availability(pid, shop.faction_id, offer.rank)
+                    if not available_now then return false, reason end
+                    if is_bounty and FactionConsumables.has(
+                        pid, FactionConsumables.VANGUARD_BOUNTY_KEY) then
+                        return false, "ALREADY OWNED"
+                    end
+                    return true
                 end,
+                cooldown = is_bounty and function()
+                    if not AshenVanguardServices then return 0., 600. end
+                    return AshenVanguardServices
+                               .getBountyRequisitionCooldown()
+                end or nil,
                 purchase = function(pid)
-                    return FactionConsumables.create(offer.item_key, pid)
+                    local purchased =
+                        FactionConsumables.create(offer.item_key, pid)
+                    if purchased and is_bounty then
+                        AshenVanguardServices
+                            .startBountyRequisitionCooldown()
+                    end
+                    return purchased
                 end
             })
         end

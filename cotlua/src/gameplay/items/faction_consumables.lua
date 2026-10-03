@@ -167,6 +167,29 @@ OnInit.final("FactionConsumables", function(Require)
         return true
     end
 
+    ---Checks both carried inventory and stash so a unique faction tool cannot
+    ---be hidden in storage to bypass its purchase restriction.
+    ---@param pid integer
+    ---@param key string
+    ---@return boolean
+    function FactionConsumables.has(pid, key)
+        local profile = Profile[pid]
+        local hero = profile and profile.hero
+        if not hero then return false end
+        for slot = 1, MAX_INVENTORY_SLOTS do
+            if RuntimeItemDefinitions.is(hero.items[slot], key) then
+                return true
+            end
+        end
+        local stash = hero.stash
+        for slot = 1, MAX_STASH_SLOTS do
+            if stash and RuntimeItemDefinitions.is(stash[slot], key) then
+                return true
+            end
+        end
+        return false
+    end
+
     ---Returns the same name, icon, and base tooltip used by the actual item.
     function FactionConsumables.getCatalogPresentation(key)
         local definition = definitions[key]

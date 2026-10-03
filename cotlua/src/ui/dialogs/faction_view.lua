@@ -131,7 +131,7 @@ OnInit.final("FactionView", function(Require)
                      -0.004, 0.004)
     BlzFrameSetTexture(bounty_bar,
                        "ui\\feedback\\xpbar\\human-bigbar-fill", 0, true)
-    BlzFrameSetMinMaxValue(bounty_bar, 100., 125.)
+    BlzFrameSetMinMaxValue(bounty_bar, 0., 1.)
     BlzFrameSetEnable(bounty_bar, false)
     BlzFrameSetAlpha(bounty_bar, 0)
     local bounty_progress = BlzCreateFrameByType(
@@ -487,17 +487,26 @@ OnInit.final("FactionView", function(Require)
                          view_open and show_bounty and 255 or 0)
         BlzFrameClearAllPoints(blurb)
         if show_bounty then
-            local bounty_rate = 100.
-            local bounty_text = "Vanguard Bounty"
-            local bounty_state = "Unlocks at Rank 4"
+            local remaining, total =
+                AshenVanguardServices.getBountyRequisitionCooldown()
+            local bounty_value = 0.
+            local bounty_text = "Unlocks at Rank 4"
+            local bounty_state = "Complete Vanguard work to reach Rank 4"
+            BlzFrameSetMinMaxValue(bounty_bar, 0., total)
             if rank < 4 then
-                bounty_state = "Unlocks at Rank 4"
+                bounty_value = 0.
+            elseif remaining > 0. then
+                bounty_value = total - remaining
+                local seconds = math.ceil(remaining)
+                bounty_text = string.format("Next Bounty: %d:%02d",
+                                             seconds // 60, seconds % 60)
+                bounty_state = "Faction-wide requisition cooldown"
             else
-                bounty_rate = 125.
-                bounty_text = "Marked Boss Drop Rate: 125%"
-                bounty_state = "Use from Backpack | Boss above 90% Health"
+                bounty_value = total
+                bounty_text = "Bounty Requisition Ready"
+                bounty_state = "Available from the Faction Shop"
             end
-            BlzFrameSetValue(bounty_bar, bounty_rate)
+            BlzFrameSetValue(bounty_bar, bounty_value)
             BlzFrameSetText(bounty_progress, bounty_text)
             BlzFrameSetText(bounty_status, bounty_state)
         end

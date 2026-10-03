@@ -523,7 +523,10 @@ OnInit.final("ArchitectureTests", function(Require)
             end
             if not bounty_offer or bounty_offer:getPrice(1)[FACTION] ~= 150 or
                 bounty_offer:getName(1) ~= "Vanguard Bounty" or
-                not bounty_offer:getTooltip(1):find("Boss Drop Rate", 1, true) then
+                not bounty_offer:getTooltip(1):find("Boss Drop Rate", 1, true) or
+                type(bounty_offer.cooldown) ~= "function" or
+                type(AshenVanguardServices.getBountyRequisitionCooldown) ~=
+                    "function" then
                 return false, "Vanguard Bounty shop offer is invalid"
             end
             return true
