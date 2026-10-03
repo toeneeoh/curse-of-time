@@ -186,7 +186,11 @@ OnInit.final("RuntimeItemDefinitions", function(Require)
     ---@return boolean
     function RuntimeItemDefinitions.sameIdentity(first, second)
         if not first or not second or first.id ~= second.id then return false end
-        return first.runtime_definition == second.runtime_definition
+        local first_definition = first.runtime_definition
+        local second_definition = second.runtime_definition
+        if not first_definition and not second_definition then return true end
+        return first_definition ~= nil and
+                   first_definition == second_definition
     end
 
     ---@param key string|integer

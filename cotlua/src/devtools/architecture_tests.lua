@@ -692,7 +692,7 @@ OnInit.final("ArchitectureTests", function(Require)
                           item.cached_upper[ITEM_PERCENT_HEAL] == 35 and
                           math.abs(lower_cooldown - 2.25) < 0.001 and
                           math.abs(upper_cooldown - 4.) < 0.001 and
-                          item.runtime_definition.data.display_rarity == 5 and
+                          item.runtime_definition.display_rarity == 5 and
                           PotionService.setPrefix(
                               item, PotionService.INFUSION_VOLTAIC) and
                           item.alt_tooltip:find("40-48%", 1, true)
@@ -890,11 +890,17 @@ OnInit.final("ArchitectureTests", function(Require)
         local basic_b = fake('I01Z', 1)
         local different_boss = fake('I0O3', 9)
 
-        if not ItemRuntime.itemsConflict(boss_a, boss_b) or
-            not ItemRuntime.itemsConflict(crafted_a, crafted_b) or
-            ItemRuntime.itemsConflict(basic_a, basic_b) or
-            ItemRuntime.itemsConflict(boss_a, different_boss) then
-            return false, "exact-copy policy did not preserve its tier boundary"
+        if not ItemRuntime.itemsConflict(boss_a, boss_b) then
+            return false, "exact boss drops may be equipped twice"
+        end
+        if not ItemRuntime.itemsConflict(crafted_a, crafted_b) then
+            return false, "exact tier-23 crafts may be equipped twice"
+        end
+        if ItemRuntime.itemsConflict(basic_a, basic_b) then
+            return false, "ordinary low-tier duplicates were restricted"
+        end
+        if ItemRuntime.itemsConflict(boss_a, different_boss) then
+            return false, "different boss items were treated as exact copies"
         end
         return true
     end)
@@ -1830,7 +1836,7 @@ OnInit.final("ArchitectureTests", function(Require)
                 {'n01A', 12, 40}, {'n01B', 0, 10}, {'n0P2', 1, 0},
                 {'n032', 2, 0},
                 {'n004', 2, 1}, {'n0P0', 2, 1}, {'n0P1', 2, 1},
-                {'n01F', 11, 11}, {'n02C', 12}, {'n09D', 14}
+                {'n01F', 11, 11}, {'n02C', 12}, {'n09D', 11, 14}
             }
 
             for index = 1, #expected do
