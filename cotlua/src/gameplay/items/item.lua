@@ -607,7 +607,10 @@
             end
 
             if self.charges > 0 then
-                details[#details + 1] = "|n|cffffcc00Charges:|r " ..
+                local quantity = data[ITEM_STACK] > 1
+                details[#details + 1] = "|n|cffffcc00" ..
+                                            (quantity and "Quantity:" or
+                                                "Charges:") .. "|r " ..
                                             self.charges
             end
 

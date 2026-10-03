@@ -759,20 +759,19 @@ OnInit.final("Recipe", function(Require)
     ShopAddItem(id2, 'I0NH:0', leather)
     ItemAddComponents('I0NH:0', "I064 I0N9 I0N9")
 
-    -- Forgotten sockets. Mined logical items use @definition keys so the
-    -- normal recipe system distinguishes materials sharing a native carrier.
+    -- Forgotten sockets. Each mined material has a dedicated native rawcode.
     SetItemPrice('I0O1:0', {platinum = 75, crystal = 30})
     ShopAddItem(id2, 'I0O1:0', misc)
     ItemAddComponents('I0O1:0',
-                      "@mineral_ironstone @mineral_ironstone @mineral_ironstone @mineral_prismatic_ore @mineral_prismatic_ore @mineral_forgotten_crystal")
+                      "I103 I103 I103 I104 I104 I105")
 
     SetItemPrice('I0OB:0', {platinum = 75, crystal = 30})
     ShopAddItem(id2, 'I0OB:0', misc)
     ItemAddComponents('I0OB:0',
-                      "@mineral_ironstone @mineral_prismatic_ore @mineral_prismatic_ore @mineral_prismatic_ore @mineral_forgotten_crystal @mineral_forgotten_crystal")
+                      "I103 I104 I104 I104 I105 I105")
 
     SetItemPrice('I0CH:0', {platinum = 75, crystal = 30})
     ShopAddItem(id2, 'I0CH:0', misc)
     ItemAddComponents('I0CH:0',
-                      "@mineral_ironstone @mineral_ironstone @mineral_prismatic_ore @mineral_prismatic_ore @mineral_forgotten_crystal @mineral_forgotten_crystal")
+                      "I103 I103 I104 I104 I105 I105")
 end, Debug and Debug.getLine())
