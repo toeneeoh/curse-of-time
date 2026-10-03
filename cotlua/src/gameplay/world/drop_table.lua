@@ -17,13 +17,21 @@
     local PRECHAOS_FLASK_CHANCE = 0.002
     local PRECHAOS_ELITE_FLASK_CHANCE = 0.02
 
+    ---The reward registry deliberately depends on only this small boss view,
+    ---which also permits lightweight test fixtures.
+    ---@class BossDropContext
+    ---@field id integer
+    ---@field level number
+    ---@field difficulty number
+    ---@field first_drop boolean
+
     ---@class DropTable
     ---@field pickItem function
     ---@field getItemDistribution fun(self: DropTable, id: integer): number[], integer
     ---@field rollColosseumTicket fun(self: DropTable, x: number, y: number, chance: number): boolean
     ---@field registerBossDropSource fun(self: DropTable, source: BossDropSource): boolean
-    ---@field getBossDropEntries fun(self: DropTable, boss: Boss, multiplier: number): BossDropEntry[]
-    ---@field rollBossDrops fun(self: DropTable, boss: Boss, x: number, y: number, multiplier: number)
+    ---@field getBossDropEntries fun(self: DropTable, boss: BossDropContext, multiplier: number): BossDropEntry[]
+    ---@field rollBossDrops fun(self: DropTable, boss: BossDropContext, x: number, y: number, multiplier: number)
     ---@field isBossGradeItem fun(self: DropTable, item_id: integer): boolean
     DropTable = {}
     do
@@ -43,9 +51,9 @@
 
         ---@class BossDropSource
         ---@field key string
-        ---@field available? fun(boss: Boss): boolean
-        ---@field describe fun(boss: Boss, multiplier: number): BossDropEntry[]
-        ---@field roll fun(boss: Boss, x: number, y: number, multiplier: number)
+        ---@field available? fun(boss: BossDropContext): boolean
+        ---@field describe fun(boss: BossDropContext, multiplier: number): BossDropEntry[]
+        ---@field roll fun(boss: BossDropContext, x: number, y: number, multiplier: number)
 
         -- adjusts the drop rates of all items in a pool after a drop
         ---@type fun(id: integer, i: integer)

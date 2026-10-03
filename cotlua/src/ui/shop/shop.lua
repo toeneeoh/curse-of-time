@@ -1404,7 +1404,7 @@ OnInit.final("Shop", function(Require)
             return 0
         end
 
-        ---@type fun(id: integer, itemId: integer, categories: integer)
+        ---@type fun(id: integer, itemId: integer, categories: integer, catalog_visible: boolean?)
         function thistype.addItem(id, itemId, categories, catalog_visible)
             local self = registry[id][0] ---@type Shop
             local slot ---@type ShopSlot 

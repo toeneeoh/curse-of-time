@@ -29,8 +29,11 @@ OnInit.final("RuntimeItemDefinitions", function(Require)
 
     RuntimeItemDefinitions = {}
 
+    ---@type table<integer, RuntimeLogicalItemDefinition>
     local by_id = {}
+    ---@type table<string, RuntimeLogicalItemDefinition>
     local by_key = {}
+    ---@type RuntimeLogicalItemDefinition[]
     local definitions = {}
     -- Runtime identity remains in extra[2]. Subsystem state now lives in the
     -- extensible per-item persistence vector rather than sharing these bits.
@@ -40,6 +43,8 @@ OnInit.final("RuntimeItemDefinitions", function(Require)
         return (value or 0) & DEFINITION_MASK
     end
 
+    ---@param key string|integer|RuntimeLogicalItemDefinition
+    ---@return RuntimeLogicalItemDefinition?
     local function resolve(key)
         if type(key) == "table" then return key end
         if type(key) == "number" then return by_id[key] end
@@ -77,6 +82,7 @@ OnInit.final("RuntimeItemDefinitions", function(Require)
         end
 
         local definition = spec
+        ---@cast definition RuntimeLogicalItemDefinition
         definition.key = key
         definition.carrier_id = type(spec.carrier) == "string" and
                                     FourCC(spec.carrier) or spec.carrier
