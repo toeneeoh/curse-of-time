@@ -15,6 +15,10 @@ if (-not (Test-Path -LiteralPath $manifestPath)) {
 $manifest = Get-Content -LiteralPath $manifestPath -Raw
 $manifestEntries = [regex]::Matches($manifest, "dofile\('([^']+)'\)") |
     ForEach-Object { $_.Groups[1].Value }
+$manifestEntrySet = @{}
+foreach ($entry in $manifestEntries) {
+    $manifestEntrySet[$entry.Replace('\', '/')] = $true
+}
 
 foreach ($group in $manifestEntries | Group-Object) {
     if ($group.Count -gt 1) {
@@ -44,6 +48,11 @@ foreach ($file in $sourceFiles) {
         $phase = $match.Groups[1].Value
         $name = $match.Groups[2].Value
         $relativePath = [IO.Path]::GetRelativePath($sourcePath, $file.FullName)
+        $manifestRelativePath = $relativePath.Replace('\', '/')
+
+        if (-not $manifestEntrySet.ContainsKey($manifestRelativePath)) {
+            $failures.Add("Initializer '$name' is absent from the bootstrap manifest: $relativePath")
+        }
 
         if ($providers.ContainsKey($name)) {
             $failures.Add("Duplicate initializer '$name': $($providers[$name].File), $relativePath")
