@@ -17,6 +17,7 @@ OnInit.final("Multiboard", function(Require)
     Require("Shop")
     Require("Users")
     Require("DropTable")
+    Require("TextHelpers")
 
     ---@class MULTIBOARD
     ---@field lookingAt integer[]
@@ -601,46 +602,126 @@ OnInit.final("Multiboard", function(Require)
         -- boss mb / helper functions
         do
             boss.viewing = {}
+            local function compact_number(value)
+                value = math.max(0., value or 0.)
+                local suffixes = {
+                    {1.e12, "T"}, {1.e9, "B"}, {1.e6, "M"}, {1.e3, "K"},
+                }
+                for index = 1, #suffixes do
+                    local threshold, suffix = table.unpack(suffixes[index])
+                    if value >= threshold then
+                        local scaled = value / threshold
+                        return (scaled >= 100. and string.format("%.0f%s", scaled,
+                                                                 suffix) or
+                                   scaled >= 10. and string.format("%.1f%s", scaled,
+                                                                   suffix) or
+                                   string.format("%.2f%s", scaled, suffix))
+                    end
+                end
+                return tostring(math.floor(value + 0.5))
+            end
+
             -- init
             boss:addRows(3 + User.AmountPlaying)
-            boss:get(1, 1).bar =      {0.015, 0., ROW_WIDTH * 0.88, ROW_HEIGHT * 0.6}
-            local hp = boss:get(1, 1).bar_value
+            boss:get(1, 1).icon = {0.015, -0.001, 0.026, 0.026}
+            local boss_icon = boss:get(1, 1).icon
+            boss:get(1, 2).bar = {0.05, -0.003, 0.225, 0.018}
+            local hp = boss:get(1, 2).bar_value
+            boss:get(1, 3).text = {0.05, -0.003, 0.225, 0.018}
+            local hp_text = boss:get(1, 3).text
+            BlzFrameSetTextAlignment(hp_text, TEXT_JUSTIFY_CENTER,
+                                     TEXT_JUSTIFY_MIDDLE)
             BlzFrameSetValue(hp, 100)
-            BlzFrameSetVertexColor(hp, BlzConvertColor(255, 255, 0, 0))
-            boss:get(2, 1).bar =      {0.015, 0., ROW_WIDTH * 0.44, ROW_HEIGHT * 0.6}
+            BlzFrameSetVertexColor(hp, BlzConvertColor(255, 8, 200, 2))
+            boss:get(2, 1).bar = {0.015, -0.002, 0.115, 0.017}
             local threat = boss:get(2, 1).bar_value
+            boss:get(2, 2).text = {0.015, -0.002, 0.115, 0.017}
+            local threat_text = boss:get(2, 2).text
+            BlzFrameSetTextAlignment(threat_text, TEXT_JUSTIFY_CENTER,
+                                     TEXT_JUSTIFY_MIDDLE)
             BlzFrameSetValue(threat, 100)
             BlzFrameSetVertexColor(threat, BlzConvertColor(255, 200, 200, 0))
+
+            local function update_bars(b)
+                local percent = math.max(0., math.min(100.,
+                    GetWidgetLife(b.unit) / BlzGetUnitMaxHP(b.unit) * 100.))
+                local red, green, blue = HealthGradient(percent)
+                BlzFrameSetValue(hp, percent)
+                BlzFrameSetVertexColor(hp,
+                                       BlzConvertColor(255, red, green, blue))
+                BlzFrameSetText(hp_text,
+                                string.format("Health  %.1f%%", percent))
+                BlzFrameSetValue(threat, b.threat)
+                BlzFrameSetText(threat_text,
+                                string.format("Retarget  %.1fs",
+                                              math.max(0., b.threat) * 0.1))
+            end
+
             -- updates everything (1 sec)
             boss.update = function(self)
                 local b = boss.viewing[GetPlayerId(GetLocalPlayer()) + 1]
 
                 if b then
                     local diff = (b.difficulty == 1 and "Normal") or "Hard"
-                    self.title = b.name .. " [" .. diff .. "]"
+                    local diff_color = b.difficulty == 1 and "|cffaaaaaa" or
+                                           "|cffff5050"
+                    self.title = b.name .. " " .. diff_color .. "[" .. diff ..
+                                     "]|r"
 
                     BlzFrameSetText(MB.name, self.title)
-                    BlzFrameSetText(self:get(2, 2).text, "|cffffcc00Target:|r " .. ((b.target and User[b.target.owner].hex .. GetUnitName(b.target.unit) .. "|r") or ""))
-                    BlzFrameSetText(self:get(3, 1).text, "|cffffcc00Battle Time:|r " .. os.date("!%H:%M:%S", math.floor(b.time)))
+                    BlzFrameSetTexture(boss_icon, BlzGetAbilityIcon(b.id), 0,
+                                       true)
+                    BlzFrameSetText(self:get(2, 3).text,
+                                    "|cffffcc00Target:|r " ..
+                                        ((b.target and User[b.target.owner].hex ..
+                                            GetUnitName(b.target.unit) .. "|r") or
+                                            "None"))
+                    BlzFrameSetText(self:get(3, 1).text,
+                                    "|cffaaaaaaTime|r  " ..
+                                        os.date("!%M:%S", math.floor(b.time)))
 
-                    for i = 4, #self.rows do
-                        local pid = i - 3
+                    local contributors = {}
+                    for pid = 1, PLAYER_CAP do
+                        if User[pid - 1] and b.damage[pid] > 0 then
+                            contributors[#contributors + 1] = pid
+                        end
+                    end
+                    table.sort(contributors, function(first, second)
+                        if b.damage[first] == b.damage[second] then
+                            return first < second
+                        end
+                        return b.damage[first] > b.damage[second]
+                    end)
 
-                        if b.damage[pid] > 0 then
-                            BlzFrameSetTexture(self:get(i, 1).icon, BlzGetAbilityIcon(Profile[pid].hero.unit_id), 0, true)
-                            BlzFrameSetText(self:get(i, 2).text, User[pid - 1].nameColored)
-                            BlzFrameSetText(self:get(i, 3).text, "|cffFFA500" .. math.floor(b.damage[pid]) .. "|r")
-                            self:showRow(i, true)
+                    for row = 4, #self.rows do
+                        local pid = contributors[row - 3]
+                        local profile = pid and Profile[pid]
+                        if pid and profile and profile.hero then
+                            local damage = b.damage[pid]
+                            local share = b.total_damage > 0 and
+                                              damage / b.total_damage * 100. or 0.
+                            local dps = damage / math.max(0.1, b.time)
+                            BlzFrameSetTexture(self:get(row, 1).icon,
+                                               BlzGetAbilityIcon(
+                                                   profile.hero.unit_id), 0,
+                                               true)
+                            BlzFrameSetText(self:get(row, 2).text,
+                                            User[pid - 1].nameColored)
+                            BlzFrameSetText(self:get(row, 3).text,
+                                "|cffFFA500" .. compact_number(damage) ..
+                                    "|r |cff888888(" ..
+                                    string.format("%.0f%%", share) .. ")|r")
+                            BlzFrameSetText(self:get(row, 4).text,
+                                            "|cffcccccc" ..
+                                                compact_number(dps) .. "/s|r")
+                            self:showRow(row, true)
                         else
-                            self:showRow(i, false)
+                            self:showRow(row, false)
                         end
                     end
 
-                    local percent = GetWidgetLife(b.unit) / BlzGetUnitMaxHP(b.unit) * 100.
-
                     if boss.viewing[GetPlayerId(GetLocalPlayer()) + 1] == b then
-                        BlzFrameSetValue(hp, percent)
-                        BlzFrameSetValue(threat, b.threat)
+                        update_bars(b)
                     end
                 end
             end
@@ -648,11 +729,8 @@ OnInit.final("Multiboard", function(Require)
             boss.threat = function(self, b)
                 b.threat = b.threat - 1
                 b.time = b.time + 0.1
-                local percent = GetWidgetLife(b.unit) / BlzGetUnitMaxHP(b.unit) * 100.
-
                 if boss.viewing[GetPlayerId(GetLocalPlayer()) + 1] == b then
-                    BlzFrameSetValue(hp, percent)
-                    BlzFrameSetValue(threat, b.threat)
+                    update_bars(b)
                 end
 
                 if b.threat <= 0 then
@@ -676,18 +754,34 @@ OnInit.final("Multiboard", function(Require)
                 BlzFrameSetAlpha(threat, 0)
             end
             boss.close()
-            boss:get(2, 2).text =   {0.15, -0.005, ROW_WIDTH * 0.5, ROW_HEIGHT * 0.7}
-            boss:get(3, 1).text = {0.02, 0.006, 0.075, 0.025}
-            BlzFrameSetText(boss:get(3, 1).text, "|cffffcc00Battle Time:|r " .. os.date("!%H:%M:%S", 0))
-            boss:get(3, 3).icon = {0.13, 0., 0.015, 0.015}
-            boss:get(3, 4).text = {0.15, -0.002, 0.1, 0.015}
-            BlzFrameSetText(boss:get(3, 4).text, "|cffffcc00Damage|r")
-            BlzFrameSetTexture(boss:get(3, 3).icon, "ReplaceableTextures\\CommandButtons\\BTNHammer.blp", 0, true)
+            boss:get(2, 3).text = {0.14, -0.002, 0.14, 0.017}
+            boss:get(3, 1).text = {0.02, 0.004, 0.09, 0.018}
+            BlzFrameSetText(boss:get(3, 1).text,
+                            "|cffaaaaaaTime|r  " .. os.date("!%M:%S", 0))
+            boss:get(3, 2).icon = {0.108, 0.001, 0.015, 0.015}
+            boss:get(3, 3).text = {0.13, 0., 0.08, 0.017}
+            boss:get(3, 4).text = {0.22, 0., 0.06, 0.017}
+            BlzFrameSetText(boss:get(3, 3).text, "|cffffcc00Damage|r")
+            BlzFrameSetText(boss:get(3, 4).text, "|cffccccccDPS|r")
+            BlzFrameSetTextAlignment(boss:get(3, 3).text, TEXT_JUSTIFY_RIGHT,
+                                     TEXT_JUSTIFY_MIDDLE)
+            BlzFrameSetTextAlignment(boss:get(3, 4).text, TEXT_JUSTIFY_RIGHT,
+                                     TEXT_JUSTIFY_MIDDLE)
+            BlzFrameSetTexture(boss:get(3, 2).icon,
+                               "ReplaceableTextures\\CommandButtons\\BTNHammer.blp",
+                               0, true)
             -- initialize player rows, and then hide them
             for i = 4, #boss.rows do
                 boss:get(i, 1).icon = {0.02, 0.004, 0.015, 0.015}
-                boss:get(i, 2).text = {0.04, 0.002, 0.05, 0.0175}
-                boss:get(i, 3).text = {0.15, 0.002, 0.05, 0.0175}
+                boss:get(i, 2).text = {0.04, 0.002, 0.08, 0.0175}
+                boss:get(i, 3).text = {0.13, 0.002, 0.08, 0.0175}
+                boss:get(i, 4).text = {0.22, 0.002, 0.06, 0.0175}
+                BlzFrameSetTextAlignment(boss:get(i, 3).text,
+                                         TEXT_JUSTIFY_RIGHT,
+                                         TEXT_JUSTIFY_MIDDLE)
+                BlzFrameSetTextAlignment(boss:get(i, 4).text,
+                                         TEXT_JUSTIFY_RIGHT,
+                                         TEXT_JUSTIFY_MIDDLE)
                 boss:showRow(i, false)
             end
             -- item drop button
@@ -713,8 +807,14 @@ OnInit.final("Multiboard", function(Require)
             local MAX_BOSS_DROP_ENTRIES = 13
             local items = {}
             local item_chance_text = {}
+            local DROP_COLUMNS = 2
+            local DROP_CELL = ICON_SIZE * 2. + 0.004
             for i = 1, MAX_BOSS_DROP_ENTRIES do
-                items[i] = Button.create(item_drop_container, ICON_SIZE * 2 + 0.004, ICON_SIZE * 2 + 0.004, 0., -(ICON_SIZE * 2. + 0.004) * i, false)
+                local column = (i - 1) % DROP_COLUMNS
+                local row = (i - 1) // DROP_COLUMNS + 1
+                items[i] = Button.create(item_drop_container, DROP_CELL,
+                                         DROP_CELL, -DROP_CELL * column,
+                                         -DROP_CELL * row, false)
                 items[i].tooltip:point(FRAMEPOINT_TOPRIGHT)
                 item_chance_text[i] = BlzCreateFrameByType(
                                           "TEXT", "", items[i].iconFrame, "", 0)
