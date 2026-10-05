@@ -750,13 +750,13 @@ OnInit.final("ArchitectureTests", function(Require)
             PotionService.getChaosBossDropChances(500, 1)
         local challenge_donor, challenge_legendary =
             PotionService.getChaosBossDropChances(500, 5)
-        local valid = math.abs(low_donor - 0.08) < 0.000001 and
+        local valid = math.abs(low_donor - 0.035) < 0.000001 and
                           math.abs(low_legendary - 0.00005) < 0.000001 and
                           high_donor > low_donor and
                           high_legendary > low_legendary and
                           challenge_donor > high_donor and
                           challenge_legendary > high_legendary and
-                          challenge_donor <= 0.40 and
+                          challenge_donor <= 0.30 and
                           challenge_legendary <= 0.0025
         if not valid then
             return false, "Chaos boss potion odds are not level/difficulty scaled"
@@ -863,11 +863,32 @@ OnInit.final("ArchitectureTests", function(Require)
             end
         end
         local vigor_recipe = ShopItem.get(GetItem('I0O1:0'))
-        if vigor_recipe == 0 or vigor_recipe:components() ~= 6 or
+        if vigor_recipe == 0 or vigor_recipe:components() ~= 7 or
             vigor_recipe:count('@mineral_ironstone') ~= 3 or
             vigor_recipe:count('@mineral_prismatic_ore') ~= 2 or
-            vigor_recipe:count('@mineral_forgotten_crystal') ~= 1 then
+            vigor_recipe:count('@mineral_forgotten_crystal') ~= 1 or
+            vigor_recipe:count('@heart_of_the_forgotten:8') ~= 1 then
             return false, "Forgotten jewel recipe components are incomplete"
+        end
+        local heart_definition =
+            RuntimeItemDefinitions.get('heart_of_the_forgotten')
+        local heart = heart_definition and
+                          RuntimeItemDefinitions.create(heart_definition,
+                                                        30000., -30000.)
+        if not heart then
+            return false, "Heart of the Forgotten definition is unavailable"
+        end
+        heart:lvl(7)
+        local accepts_seven =
+            RuntimeItemDefinitions.matchesRecipeIdentity(
+                heart, '@heart_of_the_forgotten:8')
+        heart:lvl(8)
+        local accepts_eight =
+            RuntimeItemDefinitions.matchesRecipeIdentity(
+                heart, '@heart_of_the_forgotten:8')
+        heart:destroy()
+        if accepts_seven or not accepts_eight then
+            return false, "Logical recipe minimum upgrade level is invalid"
         end
         for _, material_spec in ipairs({
             {'mineral_ironstone', 'I103'},

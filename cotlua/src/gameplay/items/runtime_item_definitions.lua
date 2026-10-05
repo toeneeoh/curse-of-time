@@ -72,6 +72,24 @@ OnInit.final("RuntimeItemDefinitions", function(Require)
         return GetItem(item.id)
     end
 
+    ---Matches an inventory item against a recipe identity. Logical recipe
+    ---components may append `:level` to require that upgrade level or higher;
+    ---native recipe identities retain their existing exact-level behavior.
+    ---@param item Item
+    ---@param identity string
+    ---@return boolean
+    function RuntimeItemDefinitions.matchesRecipeIdentity(item, identity)
+        if type(identity) ~= "string" or identity:sub(1, 1) ~= "@" then
+            return RuntimeItemDefinitions.identityKey(item) == identity
+        end
+        local key, minimum = identity:match("^@([^:]+):?(%d*)$")
+        local definition = key and resolve(key) or nil
+        if not definition or item.runtime_definition ~= definition then
+            return false
+        end
+        return minimum == "" or item.level >= (tonumber(minimum) or 0)
+    end
+
     ---Registers a logical item. Its tooltip uses the same parser, stat
     ---calculator, and formatter as an object-editor item description.
     ---@param key string

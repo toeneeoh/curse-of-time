@@ -59,14 +59,13 @@ OnInit.final("ShopTransaction", function(Require)
 
         for slot = 1, MAX_INVENTORY_SLOTS do
             local owned = Profile[pid].hero.items[slot]
-            if owned then
-                local id = RuntimeItemDefinitions.identityKey(owned)
-                local needed = quote.consume[id]
+            local needed = quote.consume[slot] or 0
+            if owned and needed > 0 then
                 local count = math.min(math.max(1, owned.charges), needed)
                 for _ = 1, count do
                     owned:consumeCharge()
                 end
-                quote.consume[id] = needed - count
+                quote.consume[slot] = needed - count
             end
         end
 

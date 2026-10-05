@@ -671,8 +671,8 @@ OnInit.final("Shop", function(Require)
         function thistype:show(i, p)
             local component ---@type ShopItem 
             local slot ---@type Slot 
-                local pid = GetPlayerId(p) + 1
-            local counter = __jarray(0) ---@type table 
+            local pid = GetPlayerId(p) + 1
+            local inventory = {}
 
             if i ~= 0 then
                 local name = i.virtual and i:getName(pid) or i.name
@@ -693,12 +693,15 @@ OnInit.final("Shop", function(Require)
 
                 local componentCount = i:components()
 
-                -- count items
+                -- Keep individual entries so level-qualified logical recipe
+                -- components can be matched without counting one item twice.
                 for k = 1, INVENTORY_COUNT do
                     local itm = Profile[pid].hero.items[k]
                     if itm and not itm.nocraft then
-                        local index = RuntimeItemDefinitions.identityKey(itm)
-                        counter[index] = counter[index] + math.max(1, itm.charges)
+                        inventory[#inventory + 1] = {
+                            item = itm,
+                            count = math.max(1, itm.charges),
+                        }
                     end
                 end
 
@@ -724,8 +727,18 @@ OnInit.final("Shop", function(Require)
                         slot.button.tooltip:icon(component.icon)
                         slot.button:available(self.shop:has(component.id))
 
-                        if counter[component.id] > 0 then
-                            counter[component.id] = counter[component.id] - 1
+                        local matched
+                        for inventory_index = 1, #inventory do
+                            local entry = inventory[inventory_index]
+                            if entry.count > 0 and
+                                RuntimeItemDefinitions.matchesRecipeIdentity(
+                                    entry.item, component.id) then
+                                matched = entry
+                                break
+                            end
+                        end
+                        if matched then
+                            matched.count = matched.count - 1
                             slot.button:checked(true)
                         else
                             slot.button:checked(false)

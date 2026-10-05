@@ -1308,8 +1308,8 @@ OnInit.final("PotionService", function(Require)
         local progress = math.max(0., math.min(1., ((level or 200) - 200.) /
                                                       300.))
         local challenge = math.max(1, math.floor(difficulty or 1))
-        local donor = math.min(0.40, 0.08 + 0.12 * progress +
-                                   0.02 * (challenge - 1))
+        local donor = math.min(0.30, 0.035 + 0.165 * progress ^ 1.5 +
+                                   0.015 * (challenge - 1))
         local legendary = math.min(0.0025,
             (0.00005 + 0.00045 * progress * progress) *
                 (1. + 0.25 * (challenge - 1)))

@@ -11,6 +11,7 @@ OnInit.final("Recipe", function(Require)
     Require('Prices')
     Require('Items')
     Require('MiningMaterials')
+    Require('BossEquipment')
 
     local sword, heavy, dagger, bow, staff, plate, fullplate, leather, cloth, Shield, misc, sets
     local id = FourCC('n02C')  ---@type integer -- town smith
@@ -764,15 +765,15 @@ OnInit.final("Recipe", function(Require)
     SetItemPrice('I0O1:0', {platinum = 75, crystal = 30})
     ShopAddItem(id2, 'I0O1:0', misc)
     ItemAddComponents('I0O1:0',
-                      "@mineral_ironstone @mineral_ironstone @mineral_ironstone @mineral_prismatic_ore @mineral_prismatic_ore @mineral_forgotten_crystal")
+                      "@mineral_ironstone @mineral_ironstone @mineral_ironstone @mineral_prismatic_ore @mineral_prismatic_ore @mineral_forgotten_crystal @heart_of_the_forgotten:8")
 
     SetItemPrice('I0OB:0', {platinum = 75, crystal = 30})
     ShopAddItem(id2, 'I0OB:0', misc)
     ItemAddComponents('I0OB:0',
-                      "@mineral_ironstone @mineral_prismatic_ore @mineral_prismatic_ore @mineral_prismatic_ore @mineral_forgotten_crystal @mineral_forgotten_crystal")
+                      "@mineral_ironstone @mineral_prismatic_ore @mineral_prismatic_ore @mineral_prismatic_ore @mineral_forgotten_crystal @mineral_forgotten_crystal @heart_of_the_forgotten:8")
 
     SetItemPrice('I0CH:0', {platinum = 75, crystal = 30})
     ShopAddItem(id2, 'I0CH:0', misc)
     ItemAddComponents('I0CH:0',
-                      "@mineral_ironstone @mineral_ironstone @mineral_prismatic_ore @mineral_prismatic_ore @mineral_forgotten_crystal @mineral_forgotten_crystal")
+                      "@mineral_ironstone @mineral_ironstone @mineral_prismatic_ore @mineral_prismatic_ore @mineral_forgotten_crystal @mineral_forgotten_crystal @heart_of_the_forgotten:8")
 end, Debug and Debug.getLine())

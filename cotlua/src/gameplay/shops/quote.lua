@@ -27,7 +27,7 @@ OnInit.final("ShopQuote", function(Require)
     end
 
     local function inventory_components(pid)
-        local inventory = __jarray(0)
+        local inventory = {}
         local profile = Profile[pid]
         local items = profile and profile.hero and profile.hero.items
         if not items then return inventory end
@@ -35,8 +35,11 @@ OnInit.final("ShopQuote", function(Require)
         for slot = 1, MAX_INVENTORY_SLOTS do
             local owned = items[slot]
             if owned and not owned.nocraft then
-                local id = RuntimeItemDefinitions.identityKey(owned)
-                inventory[id] = inventory[id] + math.max(1, owned.charges)
+                inventory[#inventory + 1] = {
+                    item = owned,
+                    slot = slot,
+                    count = math.max(1, owned.charges),
+                }
             end
         end
         return inventory
@@ -44,16 +47,26 @@ OnInit.final("ShopQuote", function(Require)
 
     ---@param shop ShopDefinition
     local function evaluate_components(shop, item, pid, inventory, quote)
-        local remaining = __jarray(0)
-        for id, count in pairs(inventory) do
-            remaining[id] = count
+        local remaining = {}
+        for index = 1, #inventory do
+            remaining[index] = inventory[index].count
         end
         for index = 0, item:components() - 1 do
             local component = ShopItem.get(item.component[index])
-            if remaining[component.id] > 0 then
-                remaining[component.id] = remaining[component.id] - 1
+            local matched
+            for inventory_index = 1, #inventory do
+                if remaining[inventory_index] > 0 and
+                    RuntimeItemDefinitions.matchesRecipeIdentity(
+                        inventory[inventory_index].item, component.id) then
+                    matched = inventory_index
+                    break
+                end
+            end
+            if matched then
+                remaining[matched] = remaining[matched] - 1
                 if quote then
-                    quote.consume[component.id] = quote.consume[component.id] + 1
+                    local slot = inventory[matched].slot
+                    quote.consume[slot] = (quote.consume[slot] or 0) + 1
                 end
             elseif component.runtime_definition or not shop:has(component.id) or
                 not IsBuyable(component.id, pid) then

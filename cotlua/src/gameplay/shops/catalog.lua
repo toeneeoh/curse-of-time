@@ -94,15 +94,18 @@ OnInit.final("ShopCatalog", function(Require)
         if type(id) == "string" and id:sub(1, 1) == "@" then
             local existing = ShopItem.itempool[id]
             if existing ~= 0 then return existing end
-            local definition = RuntimeItemDefinitions.get(id:sub(2))
+            local key, required_level = id:match("^@([^:]+):?(%d*)$")
+            local definition = key and RuntimeItemDefinitions.get(key) or nil
             if not definition then return 0 end
             local runtime_item = RuntimeItemDefinitions.create(definition,
                 30000., -30000.)
             if not runtime_item then return 0 end
+            required_level = tonumber(required_level) or 0
+            if required_level > 0 then runtime_item:lvl(required_level) end
             local self = setmetatable({
                 id = id,
                 categories = category,
-                lvl = 0,
+                lvl = required_level,
                 name = GetItemName(runtime_item.obj),
                 icon = BlzGetItemIconPath(runtime_item.obj),
                 tooltip = runtime_item.alt_tooltip or runtime_item.tooltip or
@@ -114,6 +117,7 @@ OnInit.final("ShopCatalog", function(Require)
                 component = {},
                 componentCount = 0,
                 runtime_definition = definition,
+                minimum_level = required_level,
             }, mt)
             ShopItem.itempool[id] = self
             runtime_item:destroy()
