@@ -627,18 +627,27 @@ OnInit.final("Multiboard", function(Require)
             local boss_icon = boss:get(1, 1).icon
             boss:get(1, 2).bar = {0.05, -0.003, 0.225, 0.018}
             local hp = boss:get(1, 2).bar_value
-            boss:get(1, 3).text = {0.05, -0.003, 0.225, 0.018}
-            local hp_text = boss:get(1, 3).text
-            BlzFrameSetTextAlignment(hp_text, TEXT_JUSTIFY_CENTER,
-                                     TEXT_JUSTIFY_MIDDLE)
+
+            local function create_bar_label(bar, width, height)
+                local context = NextFrameCreateContext()
+                BlzCreateSimpleFrame("BossBarLabel", bar, context)
+                local label = BlzGetFrameByName("BossBarLabelText", context)
+                BlzFrameClearAllPoints(label)
+                BlzFrameSetPoint(label, FRAMEPOINT_CENTER, bar,
+                                 FRAMEPOINT_CENTER, 0., 0.)
+                BlzFrameSetSize(label, width, height)
+                BlzFrameSetEnable(label, false)
+                return label
+            end
+
+            local hp_text = create_bar_label(hp, 0.215, 0.016)
+            BlzFrameSetText(hp_text, "Health  100.0%")
             BlzFrameSetValue(hp, 100)
             BlzFrameSetVertexColor(hp, BlzConvertColor(255, 8, 200, 2))
             boss:get(2, 1).bar = {0.015, -0.002, 0.115, 0.017}
             local threat = boss:get(2, 1).bar_value
-            boss:get(2, 2).text = {0.015, -0.002, 0.115, 0.017}
-            local threat_text = boss:get(2, 2).text
-            BlzFrameSetTextAlignment(threat_text, TEXT_JUSTIFY_CENTER,
-                                     TEXT_JUSTIFY_MIDDLE)
+            local threat_text = create_bar_label(threat, 0.105, 0.015)
+            BlzFrameSetText(threat_text, "Retarget  10.0s")
             BlzFrameSetValue(threat, 100)
             BlzFrameSetVertexColor(threat, BlzConvertColor(255, 200, 200, 0))
 
@@ -748,10 +757,14 @@ OnInit.final("Multiboard", function(Require)
             boss.open = function()
                 BlzFrameSetAlpha(hp, 255)
                 BlzFrameSetAlpha(threat, 255)
+                BlzFrameSetAlpha(hp_text, 255)
+                BlzFrameSetAlpha(threat_text, 255)
             end
             boss.close = function()
                 BlzFrameSetAlpha(hp, 0)
                 BlzFrameSetAlpha(threat, 0)
+                BlzFrameSetAlpha(hp_text, 0)
+                BlzFrameSetAlpha(threat_text, 0)
             end
             boss.close()
             boss:get(2, 3).text = {0.14, -0.002, 0.14, 0.017}
@@ -763,10 +776,12 @@ OnInit.final("Multiboard", function(Require)
             boss:get(3, 4).text = {0.22, 0., 0.06, 0.017}
             BlzFrameSetText(boss:get(3, 3).text, "|cffffcc00Damage|r")
             BlzFrameSetText(boss:get(3, 4).text, "|cffccccccDPS|r")
-            BlzFrameSetTextAlignment(boss:get(3, 3).text, TEXT_JUSTIFY_RIGHT,
-                                     TEXT_JUSTIFY_MIDDLE)
-            BlzFrameSetTextAlignment(boss:get(3, 4).text, TEXT_JUSTIFY_RIGHT,
-                                     TEXT_JUSTIFY_MIDDLE)
+            BlzFrameSetTextAlignment(boss:get(3, 3).text,
+                                     TEXT_JUSTIFY_MIDDLE,
+                                     TEXT_JUSTIFY_RIGHT)
+            BlzFrameSetTextAlignment(boss:get(3, 4).text,
+                                     TEXT_JUSTIFY_MIDDLE,
+                                     TEXT_JUSTIFY_RIGHT)
             BlzFrameSetTexture(boss:get(3, 2).icon,
                                "ReplaceableTextures\\CommandButtons\\BTNHammer.blp",
                                0, true)
@@ -776,12 +791,15 @@ OnInit.final("Multiboard", function(Require)
                 boss:get(i, 2).text = {0.04, 0.002, 0.08, 0.0175}
                 boss:get(i, 3).text = {0.13, 0.002, 0.08, 0.0175}
                 boss:get(i, 4).text = {0.22, 0.002, 0.06, 0.0175}
+                BlzFrameSetTextAlignment(boss:get(i, 2).text,
+                                         TEXT_JUSTIFY_MIDDLE,
+                                         TEXT_JUSTIFY_LEFT)
                 BlzFrameSetTextAlignment(boss:get(i, 3).text,
-                                         TEXT_JUSTIFY_RIGHT,
-                                         TEXT_JUSTIFY_MIDDLE)
+                                         TEXT_JUSTIFY_MIDDLE,
+                                         TEXT_JUSTIFY_RIGHT)
                 BlzFrameSetTextAlignment(boss:get(i, 4).text,
-                                         TEXT_JUSTIFY_RIGHT,
-                                         TEXT_JUSTIFY_MIDDLE)
+                                         TEXT_JUSTIFY_MIDDLE,
+                                         TEXT_JUSTIFY_RIGHT)
                 boss:showRow(i, false)
             end
             -- item drop button
