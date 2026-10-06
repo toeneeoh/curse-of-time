@@ -117,20 +117,6 @@ OnInit.final("Multiboard", function(Require)
                     frame = BlzCreateFrame("EscMenuCheckBoxTemplate", column.parent.parent, 0, 0)
                 elseif key == "bar" then
                     frame = BlzCreateFrame("EscMenuControlBackdropTemplate", column.parent.parent, 0, 0)
-                    local context = NextFrameCreateContext()
-                    local bar = BlzCreateSimpleFrame(
-                                    "BossStatusBar",
-                                    BlzGetFrameByName("ConsoleUI", 0), context)
-                    local bar_text = BlzGetFrameByName("BossStatusBarText",
-                                                       context)
-                    BlzFrameClearAllPoints(bar)
-                    BlzFrameSetPoint(bar, FRAMEPOINT_TOPLEFT, frame,
-                                     FRAMEPOINT_TOPLEFT, 0.006, -0.006)
-                    BlzFrameSetPoint(bar, FRAMEPOINT_BOTTOMRIGHT, frame,
-                                     FRAMEPOINT_BOTTOMRIGHT, -0.006, 0.006)
-                    BlzFrameSetEnable(bar, false)
-                    rawset(column, "bar_value", bar)
-                    rawset(column, "bar_text", bar_text)
                 elseif key == "gluebutton" then
                     local gb = SimpleButton.create(column.parent.parent, "", width, height, FRAMEPOINT_TOPLEFT, FRAMEPOINT_TOPLEFT, x_offset, y_offset, nil, "View item drops", FRAMEPOINT_TOPRIGHT, FRAMEPOINT_BOTTOMLEFT)
                     rawset(column, key, gb)
@@ -635,19 +621,41 @@ OnInit.final("Multiboard", function(Require)
             boss:get(1, 1).icon = {0.015, -0.001, 0.026, 0.026}
             local boss_icon = boss:get(1, 1).icon
             boss:get(1, 2).bar = {0.05, -0.001, 0.225, 0.024}
-            local hp = boss:get(1, 2).bar_value
-            local hp_text = boss:get(1, 2).bar_text
-            BlzFrameSetText(hp_text, "Health  100.0%")
-            BlzFrameSetValue(hp, 100.)
-            BlzFrameSetVertexColor(hp, BlzConvertColor(255, 8, 200, 2))
             boss:get(2, 1).bar = {0.015, -0.001, 0.115, 0.022}
-            local threat = boss:get(2, 1).bar_value
-            local threat_text = boss:get(2, 1).bar_text
-            BlzFrameSetText(threat_text, "Retarget  10.0s")
-            BlzFrameSetValue(threat, 100.)
-            BlzFrameSetVertexColor(threat, BlzConvertColor(255, 200, 200, 0))
+            local hp, hp_text, threat, threat_text
+
+            local function create_boss_bar(column)
+                local context = NextFrameCreateContext()
+                local bar = BlzCreateSimpleFrame(
+                                "BossStatusBar",
+                                BlzGetFrameByName("ConsoleUI", 0), context)
+                local text_frame = BlzGetFrameByName("BossStatusBarText",
+                                                     context)
+                BlzFrameClearAllPoints(bar)
+                BlzFrameSetPoint(bar, FRAMEPOINT_TOPLEFT, column.frame,
+                                 FRAMEPOINT_TOPLEFT, 0.006, -0.006)
+                BlzFrameSetPoint(bar, FRAMEPOINT_BOTTOMRIGHT, column.frame,
+                                 FRAMEPOINT_BOTTOMRIGHT, -0.006, 0.006)
+                BlzFrameSetEnable(bar, false)
+                return bar, text_frame
+            end
+
+            TimerQueue:callDelayed(0., function()
+                hp, hp_text = create_boss_bar(boss:get(1, 2))
+                threat, threat_text = create_boss_bar(boss:get(2, 1))
+                BlzFrameSetText(hp_text, "Health  100.0%")
+                BlzFrameSetValue(hp, 100.)
+                BlzFrameSetVertexColor(hp,
+                                       BlzConvertColor(255, 8, 200, 2))
+                BlzFrameSetText(threat_text, "Retarget  10.0s")
+                BlzFrameSetValue(threat, 100.)
+                BlzFrameSetVertexColor(threat,
+                                       BlzConvertColor(255, 200, 200, 0))
+                boss.close()
+            end)
 
             local function update_bars(b)
+                if not hp then return end
                 local percent = math.max(0., math.min(100.,
                     GetWidgetLife(b.unit) / BlzGetUnitMaxHP(b.unit) * 100.))
                 local red, green, blue = HealthGradient(percent)
@@ -751,12 +759,14 @@ OnInit.final("Multiboard", function(Require)
             end
             -- Keep the bar state synchronized when switching multiboard pages.
             boss.open = function()
+                if not hp then return end
                 BlzFrameSetAlpha(hp, 255)
                 BlzFrameSetAlpha(threat, 255)
                 BlzFrameSetAlpha(hp_text, 255)
                 BlzFrameSetAlpha(threat_text, 255)
             end
             boss.close = function()
+                if not hp then return end
                 BlzFrameSetAlpha(hp, 0)
                 BlzFrameSetAlpha(threat, 0)
                 BlzFrameSetAlpha(hp_text, 0)
