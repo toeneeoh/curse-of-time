@@ -630,12 +630,29 @@ OnInit.final("Multiboard", function(Require)
 
             local function create_bar_label(bar, width, height)
                 local context = NextFrameCreateContext()
-                BlzCreateSimpleFrame("BossBarLabel", bar, context)
-                local label = BlzGetFrameByName("BossBarLabelText", context)
+                local holder = BlzCreateSimpleFrame("TasSpellViewButton", bar,
+                                                    context)
+                local backdrop = BlzGetFrameByName("TasSpellViewButtonBackdrop",
+                                                   context)
+                local charge_box = BlzGetFrameByName("TasSpellViewButtonChargeBox",
+                                                     context)
+                local charge_text = BlzGetFrameByName("TasSpellViewButtonChargeText",
+                                                      context)
+                local label = BlzGetFrameByName("TasSpellViewButtonTextOverLay",
+                                                context)
+                BlzFrameClearAllPoints(holder)
+                BlzFrameSetPoint(holder, FRAMEPOINT_CENTER, bar,
+                                 FRAMEPOINT_CENTER, 0., 0.)
+                BlzFrameSetSize(holder, width, height)
+                BlzFrameSetEnable(holder, false)
+                BlzFrameSetVisible(backdrop, false)
+                BlzFrameSetVisible(charge_box, false)
+                BlzFrameSetVisible(charge_text, false)
                 BlzFrameClearAllPoints(label)
-                BlzFrameSetPoint(label, FRAMEPOINT_CENTER, bar,
+                BlzFrameSetPoint(label, FRAMEPOINT_CENTER, holder,
                                  FRAMEPOINT_CENTER, 0., 0.)
                 BlzFrameSetSize(label, width, height)
+                BlzFrameSetScale(label, 0.425)
                 BlzFrameSetEnable(label, false)
                 return label
             end
