@@ -628,42 +628,19 @@ OnInit.final("Multiboard", function(Require)
             boss:get(1, 2).bar = {0.05, -0.003, 0.225, 0.018}
             local hp = boss:get(1, 2).bar_value
 
-            local function create_bar_label(bar, width, height)
-                local context = NextFrameCreateContext()
-                local holder = BlzCreateSimpleFrame("TasSpellViewButton", bar,
-                                                    context)
-                local backdrop = BlzGetFrameByName("TasSpellViewButtonBackdrop",
-                                                   context)
-                local charge_box = BlzGetFrameByName("TasSpellViewButtonChargeBox",
-                                                     context)
-                local charge_text = BlzGetFrameByName("TasSpellViewButtonChargeText",
-                                                      context)
-                local label = BlzGetFrameByName("TasSpellViewButtonTextOverLay",
-                                                context)
-                BlzFrameClearAllPoints(holder)
-                BlzFrameSetPoint(holder, FRAMEPOINT_CENTER, bar,
-                                 FRAMEPOINT_CENTER, 0., 0.)
-                BlzFrameSetSize(holder, width, height)
-                BlzFrameSetEnable(holder, false)
-                BlzFrameSetVisible(backdrop, false)
-                BlzFrameSetVisible(charge_box, false)
-                BlzFrameSetVisible(charge_text, false)
-                BlzFrameClearAllPoints(label)
-                BlzFrameSetPoint(label, FRAMEPOINT_CENTER, holder,
-                                 FRAMEPOINT_CENTER, 0., 0.)
-                BlzFrameSetSize(label, width, height)
-                BlzFrameSetScale(label, 0.425)
-                BlzFrameSetEnable(label, false)
-                return label
-            end
-
-            local hp_text = create_bar_label(hp, 0.215, 0.016)
+            boss:get(1, 3).text = {0.05, -0.003, 0.225, 0.018}
+            local hp_text = boss:get(1, 3).text
+            BlzFrameSetTextAlignment(hp_text, TEXT_JUSTIFY_MIDDLE,
+                                     TEXT_JUSTIFY_CENTER)
             BlzFrameSetText(hp_text, "Health  100.0%")
             BlzFrameSetValue(hp, 100)
             BlzFrameSetVertexColor(hp, BlzConvertColor(255, 8, 200, 2))
             boss:get(2, 1).bar = {0.015, -0.002, 0.115, 0.017}
             local threat = boss:get(2, 1).bar_value
-            local threat_text = create_bar_label(threat, 0.105, 0.015)
+            boss:get(2, 2).text = {0.015, -0.002, 0.115, 0.017}
+            local threat_text = boss:get(2, 2).text
+            BlzFrameSetTextAlignment(threat_text, TEXT_JUSTIFY_MIDDLE,
+                                     TEXT_JUSTIFY_CENTER)
             BlzFrameSetText(threat_text, "Retarget  10.0s")
             BlzFrameSetValue(threat, 100)
             BlzFrameSetVertexColor(threat, BlzConvertColor(255, 200, 200, 0))
