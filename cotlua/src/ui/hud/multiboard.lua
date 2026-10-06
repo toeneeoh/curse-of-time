@@ -117,11 +117,17 @@ OnInit.final("Multiboard", function(Require)
                     frame = BlzCreateFrame("EscMenuCheckBoxTemplate", column.parent.parent, 0, 0)
                 elseif key == "bar" then
                     frame = BlzCreateFrame("EscMenuControlBackdropTemplate", column.parent.parent, 0, 0)
-                    local bar = BlzCreateFrameByType("SIMPLESTATUSBAR", "", frame, "", 0)
-                    BlzFrameSetPoint(bar, FRAMEPOINT_TOPLEFT, frame, FRAMEPOINT_TOPLEFT, 0.006, -0.006)
-                    BlzFrameSetPoint(bar, FRAMEPOINT_BOTTOMRIGHT, frame, FRAMEPOINT_BOTTOMRIGHT, -0.006, 0.006)
+                    local bar = BlzCreateFrameByType("BACKDROP", "", frame, "", 0)
+                    local bar_width = width - 0.012
+                    local bar_height = height - 0.012
+                    BlzFrameSetPoint(bar, FRAMEPOINT_LEFT, frame,
+                                     FRAMEPOINT_LEFT, 0.006, 0.)
+                    BlzFrameSetSize(bar, bar_width, bar_height)
                     BlzFrameSetTexture(bar, "ui\\feedback\\xpbar\\human-bigbar-fill", 0, true)
+                    BlzFrameSetEnable(bar, false)
                     rawset(column, "bar_value", bar)
+                    rawset(column, "bar_width", bar_width)
+                    rawset(column, "bar_height", bar_height)
                 elseif key == "gluebutton" then
                     local gb = SimpleButton.create(column.parent.parent, "", width, height, FRAMEPOINT_TOPLEFT, FRAMEPOINT_TOPLEFT, x_offset, y_offset, nil, "View item drops", FRAMEPOINT_TOPRIGHT, FRAMEPOINT_BOTTOMLEFT)
                     rawset(column, key, gb)
@@ -627,34 +633,44 @@ OnInit.final("Multiboard", function(Require)
             local boss_icon = boss:get(1, 1).icon
             boss:get(1, 2).bar = {0.05, -0.003, 0.225, 0.018}
             local hp = boss:get(1, 2).bar_value
+            local hp_width = boss:get(1, 2).bar_width
+            local hp_height = boss:get(1, 2).bar_height
 
             boss:get(1, 3).text = {0.05, -0.003, 0.225, 0.018}
             local hp_text = boss:get(1, 3).text
             BlzFrameSetTextAlignment(hp_text, TEXT_JUSTIFY_MIDDLE,
                                      TEXT_JUSTIFY_CENTER)
             BlzFrameSetText(hp_text, "Health  100.0%")
-            BlzFrameSetValue(hp, 100)
             BlzFrameSetVertexColor(hp, BlzConvertColor(255, 8, 200, 2))
             boss:get(2, 1).bar = {0.015, -0.002, 0.115, 0.017}
             local threat = boss:get(2, 1).bar_value
+            local threat_width = boss:get(2, 1).bar_width
+            local threat_height = boss:get(2, 1).bar_height
             boss:get(2, 2).text = {0.015, -0.002, 0.115, 0.017}
             local threat_text = boss:get(2, 2).text
             BlzFrameSetTextAlignment(threat_text, TEXT_JUSTIFY_MIDDLE,
                                      TEXT_JUSTIFY_CENTER)
             BlzFrameSetText(threat_text, "Retarget  10.0s")
-            BlzFrameSetValue(threat, 100)
             BlzFrameSetVertexColor(threat, BlzConvertColor(255, 200, 200, 0))
+
+            local function set_bar_value(bar, max_width, height, value)
+                local percent = math.max(0., math.min(100., value))
+                BlzFrameSetVisible(bar, percent > 0.)
+                BlzFrameSetSize(bar,
+                                math.max(0.00001, max_width * percent * 0.01),
+                                height)
+            end
 
             local function update_bars(b)
                 local percent = math.max(0., math.min(100.,
                     GetWidgetLife(b.unit) / BlzGetUnitMaxHP(b.unit) * 100.))
                 local red, green, blue = HealthGradient(percent)
-                BlzFrameSetValue(hp, percent)
+                set_bar_value(hp, hp_width, hp_height, percent)
                 BlzFrameSetVertexColor(hp,
                                        BlzConvertColor(255, red, green, blue))
                 BlzFrameSetText(hp_text,
                                 string.format("Health  %.1f%%", percent))
-                BlzFrameSetValue(threat, b.threat)
+                set_bar_value(threat, threat_width, threat_height, b.threat)
                 BlzFrameSetText(threat_text,
                                 string.format("Retarget  %.1fs",
                                               math.max(0., b.threat) * 0.1))
@@ -747,7 +763,7 @@ OnInit.final("Multiboard", function(Require)
                     b.threat = 100
                 end
             end
-            -- open and close functions needed due to SIMPLESTATUSBAR shenanigans
+            -- Keep the bar state synchronized when switching multiboard pages.
             boss.open = function()
                 BlzFrameSetAlpha(hp, 255)
                 BlzFrameSetAlpha(threat, 255)
