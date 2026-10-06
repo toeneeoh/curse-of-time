@@ -117,17 +117,20 @@ OnInit.final("Multiboard", function(Require)
                     frame = BlzCreateFrame("EscMenuCheckBoxTemplate", column.parent.parent, 0, 0)
                 elseif key == "bar" then
                     frame = BlzCreateFrame("EscMenuControlBackdropTemplate", column.parent.parent, 0, 0)
-                    local bar = BlzCreateFrameByType("BACKDROP", "", frame, "", 0)
-                    local bar_width = width - 0.012
-                    local bar_height = height - 0.012
-                    BlzFrameSetPoint(bar, FRAMEPOINT_LEFT, frame,
-                                     FRAMEPOINT_LEFT, 0.006, 0.)
-                    BlzFrameSetSize(bar, bar_width, bar_height)
-                    BlzFrameSetTexture(bar, "ui\\feedback\\xpbar\\human-bigbar-fill", 0, true)
+                    local context = NextFrameCreateContext()
+                    local bar = BlzCreateSimpleFrame(
+                                    "BossStatusBar",
+                                    BlzGetFrameByName("ConsoleUI", 0), context)
+                    local bar_text = BlzGetFrameByName("BossStatusBarText",
+                                                       context)
+                    BlzFrameClearAllPoints(bar)
+                    BlzFrameSetPoint(bar, FRAMEPOINT_TOPLEFT, frame,
+                                     FRAMEPOINT_TOPLEFT, 0.006, -0.006)
+                    BlzFrameSetPoint(bar, FRAMEPOINT_BOTTOMRIGHT, frame,
+                                     FRAMEPOINT_BOTTOMRIGHT, -0.006, 0.006)
                     BlzFrameSetEnable(bar, false)
                     rawset(column, "bar_value", bar)
-                    rawset(column, "bar_width", bar_width)
-                    rawset(column, "bar_height", bar_height)
+                    rawset(column, "bar_text", bar_text)
                 elseif key == "gluebutton" then
                     local gb = SimpleButton.create(column.parent.parent, "", width, height, FRAMEPOINT_TOPLEFT, FRAMEPOINT_TOPLEFT, x_offset, y_offset, nil, "View item drops", FRAMEPOINT_TOPRIGHT, FRAMEPOINT_BOTTOMLEFT)
                     rawset(column, key, gb)
@@ -631,46 +634,29 @@ OnInit.final("Multiboard", function(Require)
             boss:addRows(3 + User.AmountPlaying)
             boss:get(1, 1).icon = {0.015, -0.001, 0.026, 0.026}
             local boss_icon = boss:get(1, 1).icon
-            boss:get(1, 2).bar = {0.05, -0.003, 0.225, 0.018}
+            boss:get(1, 2).bar = {0.05, -0.001, 0.225, 0.024}
             local hp = boss:get(1, 2).bar_value
-            local hp_width = boss:get(1, 2).bar_width
-            local hp_height = boss:get(1, 2).bar_height
-
-            boss:get(1, 3).text = {0.05, -0.003, 0.225, 0.018}
-            local hp_text = boss:get(1, 3).text
-            BlzFrameSetTextAlignment(hp_text, TEXT_JUSTIFY_MIDDLE,
-                                     TEXT_JUSTIFY_CENTER)
+            local hp_text = boss:get(1, 2).bar_text
             BlzFrameSetText(hp_text, "Health  100.0%")
+            BlzFrameSetValue(hp, 100.)
             BlzFrameSetVertexColor(hp, BlzConvertColor(255, 8, 200, 2))
-            boss:get(2, 1).bar = {0.015, -0.002, 0.115, 0.017}
+            boss:get(2, 1).bar = {0.015, -0.001, 0.115, 0.022}
             local threat = boss:get(2, 1).bar_value
-            local threat_width = boss:get(2, 1).bar_width
-            local threat_height = boss:get(2, 1).bar_height
-            boss:get(2, 2).text = {0.015, -0.002, 0.115, 0.017}
-            local threat_text = boss:get(2, 2).text
-            BlzFrameSetTextAlignment(threat_text, TEXT_JUSTIFY_MIDDLE,
-                                     TEXT_JUSTIFY_CENTER)
+            local threat_text = boss:get(2, 1).bar_text
             BlzFrameSetText(threat_text, "Retarget  10.0s")
+            BlzFrameSetValue(threat, 100.)
             BlzFrameSetVertexColor(threat, BlzConvertColor(255, 200, 200, 0))
-
-            local function set_bar_value(bar, max_width, height, value)
-                local percent = math.max(0., math.min(100., value))
-                BlzFrameSetVisible(bar, percent > 0.)
-                BlzFrameSetSize(bar,
-                                math.max(0.00001, max_width * percent * 0.01),
-                                height)
-            end
 
             local function update_bars(b)
                 local percent = math.max(0., math.min(100.,
                     GetWidgetLife(b.unit) / BlzGetUnitMaxHP(b.unit) * 100.))
                 local red, green, blue = HealthGradient(percent)
-                set_bar_value(hp, hp_width, hp_height, percent)
+                BlzFrameSetValue(hp, percent)
                 BlzFrameSetVertexColor(hp,
                                        BlzConvertColor(255, red, green, blue))
                 BlzFrameSetText(hp_text,
                                 string.format("Health  %.1f%%", percent))
-                set_bar_value(threat, threat_width, threat_height, b.threat)
+                BlzFrameSetValue(threat, b.threat)
                 BlzFrameSetText(threat_text,
                                 string.format("Retarget  %.1fs",
                                               math.max(0., b.threat) * 0.1))
@@ -781,7 +767,7 @@ OnInit.final("Multiboard", function(Require)
             boss:get(3, 1).text = {0.02, 0.004, 0.09, 0.018}
             BlzFrameSetText(boss:get(3, 1).text,
                             "|cffaaaaaaTime|r  " .. os.date("!%M:%S", 0))
-            boss:get(3, 2).icon = {0.108, 0.001, 0.015, 0.015}
+            boss:get(3, 2).icon = {0.113, -0.001, 0.015, 0.015}
             boss:get(3, 3).text = {0.13, 0., 0.08, 0.017}
             boss:get(3, 4).text = {0.22, 0., 0.06, 0.017}
             BlzFrameSetText(boss:get(3, 3).text, "|cffffcc00Damage|r")
@@ -797,7 +783,7 @@ OnInit.final("Multiboard", function(Require)
                                0, true)
             -- initialize player rows, and then hide them
             for i = 4, #boss.rows do
-                boss:get(i, 1).icon = {0.02, 0.004, 0.015, 0.015}
+                boss:get(i, 1).icon = {0.02, 0.001, 0.015, 0.015}
                 boss:get(i, 2).text = {0.04, 0.002, 0.08, 0.0175}
                 boss:get(i, 3).text = {0.13, 0.002, 0.08, 0.0175}
                 boss:get(i, 4).text = {0.22, 0.002, 0.06, 0.0175}
