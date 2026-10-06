@@ -158,7 +158,8 @@ OnInit.final("DialogWindow", function(Require)
 
         local function createRow(index, is_menu)
             local collection = is_menu and menu_rows or rows
-            local button = BlzCreateFrame("DialogWindowChoiceButton", main, 0, 0)
+            local button = BlzCreateFrameByType("GLUETEXTBUTTON", "", main,
+                                                "ScriptDialogButton", 0)
             local icon = BlzCreateFrameByType("BACKDROP", "", button, "", 0)
 
             BlzFrameSetSize(button, MAIN_WIDTH - SIDE_PADDING * 2.0, ROW_HEIGHT)
