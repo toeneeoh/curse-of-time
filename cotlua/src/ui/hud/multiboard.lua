@@ -626,17 +626,28 @@ OnInit.final("Multiboard", function(Require)
 
             local function create_boss_bar(column)
                 local context = NextFrameCreateContext()
-                local bar = BlzCreateSimpleFrame(
-                                "BossStatusBar",
-                                BlzGetFrameByName("ConsoleUI", 0), context)
-                local text_frame = BlzGetFrameByName("BossStatusBarText",
-                                                     context)
+                local simple_parent = BlzGetFrameByName("ConsoleUI", 0)
+                local bar = BlzCreateFrameByType("SIMPLESTATUSBAR", "",
+                                                 simple_parent, "", context)
+                BlzCreateSimpleFrame("SimpleInfoPanelDestructableDetail",
+                                     simple_parent, context)
+                local text_frame = BlzGetFrameByName(
+                                       "SimpleDestructableNameValue", context)
                 BlzFrameClearAllPoints(bar)
                 BlzFrameSetPoint(bar, FRAMEPOINT_TOPLEFT, column.frame,
                                  FRAMEPOINT_TOPLEFT, 0.006, -0.006)
                 BlzFrameSetPoint(bar, FRAMEPOINT_BOTTOMRIGHT, column.frame,
                                  FRAMEPOINT_BOTTOMRIGHT, -0.006, 0.006)
+                BlzFrameSetTexture(
+                    bar, "ui\\feedback\\progressbar\\human-statbar-color", 0,
+                    true)
                 BlzFrameSetEnable(bar, false)
+                BlzFrameClearAllPoints(text_frame)
+                BlzFrameSetAllPoints(text_frame, bar)
+                BlzFrameSetFont(text_frame, "MasterFont", 0.009, 0)
+                BlzFrameSetTextAlignment(text_frame, TEXT_JUSTIFY_MIDDLE,
+                                         TEXT_JUSTIFY_CENTER)
+                BlzFrameSetEnable(text_frame, false)
                 return bar, text_frame
             end
 
