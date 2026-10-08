@@ -23,21 +23,22 @@
     local STAT_LOOKUP = {
         str = {ITEM_STRENGTH, ITEM_HEALTH, ITEM_DAMAGE},
         bonus_str = {ITEM_STRENGTH, ITEM_HEALTH, ITEM_DAMAGE},
-        agi = {ITEM_AGILITY, ITEM_ARMOR, ITEM_DAMAGE},
-        bonus_agi = {ITEM_AGILITY, ITEM_ARMOR, ITEM_DAMAGE},
+        agi = {ITEM_AGILITY, ITEM_ARMOR, ITEM_DAMAGE, TOTAL_ATTACK_SPEED},
+        bonus_agi = {ITEM_AGILITY, ITEM_ARMOR, ITEM_DAMAGE, TOTAL_ATTACK_SPEED},
         int = {ITEM_INTELLIGENCE, ITEM_MANA_REGENERATION, ITEM_DAMAGE},
         bonus_int = {ITEM_INTELLIGENCE, ITEM_MANA_REGENERATION, ITEM_DAMAGE},
         bonus_mana = ITEM_MANA,
-        base_bat = ITEM_BASE_ATTACK_SPEED,
-        bonus_bat = ITEM_BASE_ATTACK_SPEED,
+        base_bat = {ITEM_BASE_ATTACK_SPEED, TOTAL_ATTACK_SPEED},
+        bonus_bat = {ITEM_BASE_ATTACK_SPEED, TOTAL_ATTACK_SPEED},
         bonus_damage = ITEM_DAMAGE,
         damage_percent = ITEM_DAMAGE,
         bonus_armor = ITEM_ARMOR,
         armor_percent = ITEM_ARMOR,
         bonus_hp = ITEM_HEALTH,
         cc = ITEM_CRIT_CHANCE,
+        cc_flat = ITEM_CRIT_CHANCE,
         cd_ = ITEM_CRIT_DAMAGE,
-        cc_percent = ITEM_CRIT_CHANCE_MULT,
+        cc_percent = ITEM_CRIT_CHANCE,
         cd_percent = ITEM_CRIT_DAMAGE_MULT,
         ms = ITEM_MOVESPEED,
         ms_percent = ITEM_MOVESPEED,
@@ -337,6 +338,17 @@
     local MILESTONES_PER_PAGE = 7
     local tab_ui = {} -- tab_ui[page] = { rows = { [1]=slot,... }, order = ..., entries = ... }
 
+    local function set_breakdown_visible(slot, visible)
+        BlzFrameSetVisible(slot.icon, visible)
+        BlzFrameSetVisible(slot.icon_frame, visible)
+        BlzFrameSetEnable(slot.icon_frame, visible)
+        slot.has_breakdown = visible
+        if not visible then
+            BlzFrameSetVisible(slot.tip.frame, false)
+            slot.last_tip = nil
+        end
+    end
+
     local function make_slot(parent, breakdown_parent, y)
         local tag_f = BlzCreateFrameByType("TEXT", "", parent, "", 0)
         local val_f = BlzCreateFrameByType("TEXT", "", parent, "", 0)
@@ -361,31 +373,33 @@
         -- breakdown icon (slot-based)
         local icon = BlzCreateFrameByType("BACKDROP", "", breakdown_parent, "",
                                           0)
-        local icon_frame = BlzCreateFrameByType("FRAME", "", breakdown_parent,
+        local icon_frame = BlzCreateFrameByType("FRAME", "", icon,
                                                 "", 0)
         BlzFrameSetTexture(icon, "war3mapImported\\question.blp", 0, true)
-        BlzFrameSetScale(icon, 0.6)
-        BlzFrameSetSize(icon, 0.016, 0.016)
+        -- Keep the same visual size without scaling its anchor offsets.
+        BlzFrameSetSize(icon, 0.0096, 0.0096)
+        BlzFrameSetPoint(icon, FRAMEPOINT_LEFT, val_f, FRAMEPOINT_RIGHT,
+                         0.004, 0.)
         BlzFrameSetAllPoints(icon_frame, icon)
 
         local tip = FrameAddSimpleTooltip(icon_frame, "", "", true,
                                           FRAMEPOINT_BOTTOMLEFT,
                                           FRAMEPOINT_TOPRIGHT, 0., 0.008, 0.01)
 
-        BlzFrameSetVisible(icon, false) -- hidden by default
-
-        return {
+        local slot = {
             tag = tag_f,
             val = val_f,
             separator = separator,
             icon = icon,
+            icon_frame = icon_frame,
             tip = tip,
             has_breakdown = false,
-            last_icon_x = nil,
             last_tag = nil,
             last_val = nil,
             last_tip = nil
         }
+        set_breakdown_visible(slot, false)
+        return slot
     end
 
     -- separate breakdowns per tab (if they exist)
@@ -769,12 +783,14 @@
         BlzFrameSetVisible(slot.tag, true)
         BlzFrameSetVisible(slot.val, true)
 
-        if tooltip and icon then
+        if tooltip and tooltip ~= "" and icon then
             set_tip_if_changed(slot, tooltip)
             BlzFrameSetTexture(slot.icon, icon, 0, true)
-            BlzFrameSetVisible(slot.icon, true)
+            set_breakdown_visible(slot, true)
             BlzFrameSetVisible(slot.separator, true)
-            slot.has_breakdown = true
+        else
+            set_breakdown_visible(slot, false)
+            BlzFrameSetVisible(slot.separator, false)
         end
     end
 
@@ -842,28 +858,14 @@
         BlzFrameSetVisible(slot.val, true)
 
         -- breakdown handling
-        if v.breakdown then
-            local b = v.breakdown(u)
+        local b = v.breakdown and v.breakdown(u)
+        if b and b ~= "" then
             set_tip_if_changed(slot, b)
 
-            -- position icon near the value text
-            local x = 0.01 + (v.suffix and 0.01 or 0) + num_s:len() * 0.0085
-            if slot.last_icon_x ~= x then
-                slot.last_icon_x = x
-                BlzFrameClearAllPoints(slot.icon)
-                BlzFrameSetPoint(slot.icon, FRAMEPOINT_TOPLEFT, slot.val,
-                                 FRAMEPOINT_TOPLEFT, x, 0.0)
-            end
-
-            BlzFrameSetVisible(slot.icon, true)
-            slot.has_breakdown = true
+            -- The icon follows the value's right edge as its text changes.
+            set_breakdown_visible(slot, true)
         else
-            if slot.has_breakdown then
-                slot.has_breakdown = false
-                BlzFrameSetVisible(slot.icon, false)
-                slot.last_tip = nil
-                slot.last_icon_x = nil
-            end
+            set_breakdown_visible(slot, false)
         end
     end
 
@@ -877,11 +879,8 @@
                         local slot = rows[l]
                         BlzFrameSetVisible(slot.tag, false)
                         BlzFrameSetVisible(slot.val, false)
-                        BlzFrameSetVisible(slot.icon, false)
+                        set_breakdown_visible(slot, false)
                         BlzFrameSetVisible(slot.separator, false)
-                        slot.has_breakdown = false
-                        slot.last_tip = nil
-                        slot.last_icon_x = nil
                     end
                 end
             end
@@ -1029,6 +1028,50 @@
     end
 
     local function on_cleanup(pid) close(pid) end
+
+    STAT_WINDOW.close = close
+    function STAT_WINDOW.isOpen(pid) return is_open[pid] end
+    function STAT_WINDOW.getTutorialFrame() return frame end
+    function STAT_WINDOW.previewTutorial(pid, visible, page)
+        if GetLocalPlayer() ~= Player(pid - 1) then return end
+        if visible then
+            page = page or 1
+            clear_all_rows()
+            BlzFrameSetText(title, "Tutorial")
+            BlzFrameSetVisible(manage_perks, false)
+            BlzFrameSetVisible(milestone_controls, false)
+            for i = 1, #breakdown_frames do BlzFrameSetVisible(breakdown_frames[i], i == page) end
+            for i = 1, #tabs do
+                tabs[i]:enable(i == page)
+                BlzFrameSetEnable(tabs[i].frame, false)
+            end
+            local T, line = tab_ui[page], 0
+            for priority = 1, 3 do
+                for _, idx in ipairs(T.order[priority] or {}) do
+                    line = line + 1
+                    if line > MAX_ROWS then break end
+                    local slot, entry = T.rows[line], T.entries[idx]
+                    set_if_changed(slot, "last_tag", slot.tag, entry.alternate or entry.tag or "")
+                    set_if_changed(slot, "last_val", slot.val, "--")
+                    BlzFrameSetVisible(slot.tag, true)
+                    BlzFrameSetVisible(slot.val, true)
+                end
+                if line >= MAX_ROWS then break end
+            end
+        end
+        if not visible then
+            for i = 1, #tabs do BlzFrameSetEnable(tabs[i].frame, true) end
+        end
+        BlzFrameSetVisible(frame, visible)
+    end
+    function STAT_WINDOW.showTutorial(pid, page)
+        local unit = Hero[pid]
+        if not unit then return end
+        -- Use the normal subscription and rendering paths, without toggling shut.
+        close(pid)
+        viewing[pid].page = page or 1
+        STAT_WINDOW.display(unit, pid)
+    end
 
     local U = User.first
     while U do

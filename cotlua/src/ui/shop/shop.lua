@@ -1036,7 +1036,7 @@ OnInit.final("Shop", function(Require)
             self.shop:filter(self.active, self.andLogic)
         end
 
-        ---@type fun(self: Category, icon: string, description: string):integer
+        ---@type fun(self: Category, icon: string, description: string, catalog_visible: boolean?):integer
         function thistype:add(icon, description, catalog_visible)
             if self.count < CATEGORY_COUNT then
                 self.count = self.count + 1
@@ -1406,7 +1406,7 @@ OnInit.final("Shop", function(Require)
             return source:find(target, 1, true) ~= nil
         end
 
-        ---@type fun(id: integer, icon: string, description: string):integer
+        ---@type fun(id: integer, icon: string, description: string, catalog_visible: boolean?):integer
         function thistype.addCategory(id, icon, description, catalog_visible)
             local self = registry[id][0] ---@type Shop
 

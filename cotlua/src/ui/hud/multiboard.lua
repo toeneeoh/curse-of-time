@@ -642,8 +642,10 @@ OnInit.final("Multiboard", function(Require)
             local hp_text = boss:get(1, 3).text
             BlzFrameSetTextAlignment(hp_text, TEXT_JUSTIFY_MIDDLE,
                                      TEXT_JUSTIFY_CENTER)
-            BlzFrameSetText(hp_text, "Health  100.0%")
-            BlzFrameSetVertexColor(hp, BlzConvertColor(255, 8, 200, 2))
+            BlzFrameSetText(hp_text, "100.0%")
+            BlzFrameSetTexture(
+                hp, "UI\\BossMeterGreen.tga", 0,
+                true)
             boss:get(2, 1).bar = {0.015, -0.001, 0.115, 0.022}
             local threat = boss:get(2, 1).bar_value
             local threat_width = boss:get(2, 1).bar_width
@@ -652,9 +654,10 @@ OnInit.final("Multiboard", function(Require)
             local threat_text = boss:get(2, 2).text
             BlzFrameSetTextAlignment(threat_text, TEXT_JUSTIFY_MIDDLE,
                                      TEXT_JUSTIFY_CENTER)
-            BlzFrameSetText(threat_text, "Retarget  10.0s")
-            BlzFrameSetVertexColor(threat,
-                                   BlzConvertColor(255, 200, 200, 0))
+            BlzFrameSetText(threat_text, "10.0s")
+            BlzFrameSetTexture(
+                threat, "UI\\BossMeterYellow.tga", 0,
+                true)
 
             local function set_bar_value(bar, max_width, height, value)
                 local percent = math.max(0., math.min(100., value))
@@ -667,15 +670,17 @@ OnInit.final("Multiboard", function(Require)
             local function update_bars(b)
                 local percent = math.max(0., math.min(100.,
                     GetWidgetLife(b.unit) / BlzGetUnitMaxHP(b.unit) * 100.))
-                local red, green, blue = HealthGradient(percent)
                 set_bar_value(hp, hp_width, hp_height, percent)
-                BlzFrameSetVertexColor(hp,
-                                       BlzConvertColor(255, red, green, blue))
-                BlzFrameSetText(hp_text,
-                                string.format("Health  %.1f%%", percent))
+                local health_texture = percent <= 30. and
+                                           "UI\\BossMeterRed.tga" or
+                                           percent <= 70. and
+                                           "UI\\BossMeterYellow.tga" or
+                                           "UI\\BossMeterGreen.tga"
+                BlzFrameSetTexture(hp, health_texture, 0, true)
+                BlzFrameSetText(hp_text, string.format("%.1f%%", percent))
                 set_bar_value(threat, threat_width, threat_height, b.threat)
                 BlzFrameSetText(threat_text,
-                                string.format("Retarget  %.1fs",
+                                string.format("%.1fs",
                                               math.max(0., b.threat) * 0.1))
             end
 
@@ -780,11 +785,11 @@ OnInit.final("Multiboard", function(Require)
                 BlzFrameSetAlpha(threat_text, 0)
             end
             boss.close()
-            boss:get(2, 3).text = {0.14, -0.002, 0.14, 0.017}
-            boss:get(3, 1).text = {0.02, 0.004, 0.09, 0.018}
+            boss:get(2, 3).text = {0.14, -0.007, 0.14, 0.017}
+            boss:get(3, 1).text = {0.02, -0.004, 0.09, 0.018}
             BlzFrameSetText(boss:get(3, 1).text,
                             "|cffaaaaaaTime|r  " .. os.date("!%M:%S", 0))
-            boss:get(3, 2).icon = {0.113, -0.001, 0.015, 0.015}
+            boss:get(3, 2).icon = {0.148, -0.002, 0.015, 0.015}
             boss:get(3, 3).text = {0.13, 0., 0.08, 0.017}
             boss:get(3, 4).text = {0.22, 0., 0.06, 0.017}
             BlzFrameSetText(boss:get(3, 3).text, "|cffffcc00Damage|r")
@@ -796,7 +801,7 @@ OnInit.final("Multiboard", function(Require)
                                      TEXT_JUSTIFY_MIDDLE,
                                      TEXT_JUSTIFY_RIGHT)
             BlzFrameSetTexture(boss:get(3, 2).icon,
-                               "ReplaceableTextures\\CommandButtons\\BTNHammer.blp",
+                               "ReplaceableTextures\\CommandButtons\\BTNSteelMelee.blp",
                                0, true)
             -- initialize player rows, and then hide them
             for i = 4, #boss.rows do
@@ -901,7 +906,7 @@ OnInit.final("Multiboard", function(Require)
 
                     if GetLocalPlayer() == p then
                         local first_kill = b.first_drop and
-                                               "|n|cff80ff80First kill: +25 percentage points|r" or
+                                               "|n|cff80ff80First kill: +25%|r" or
                                                ""
                         BlzFrameSetText(drop_chance_text,
                                         "|cffffcc00" .. percent_text(overall) ..

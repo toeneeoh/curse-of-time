@@ -122,6 +122,7 @@ OnInit.final("Inventory", function(Require)
         local ui_mode = __jarray(0) -- 0 = normal, 1 = context menu open
         local right_click_origin = __jarray(0)
         local skip_drag_release = __jarray(false)
+        local practice_context_action
 
         ---@param itm Item
         ---@return string
@@ -391,6 +392,9 @@ OnInit.final("Inventory", function(Require)
 
             local btn_index = frame_to_btn[f]
             if not btn_index then return false end
+            -- Practice menus must never reach profile reads, sync messages,
+            -- or the real inventory service (including Drop/Sell).
+            if practice_context_action and practice_context_action(pid, btn_index) then return false end
 
             open_context_menu(pid, false)
 
@@ -611,11 +615,245 @@ OnInit.final("Inventory", function(Require)
 
             if StashUI and viewing[pid] == pid then StashUI.display(pid) end
         end
-        SimpleButton.create(
+        local stash_button = SimpleButton.create(
             frame, "ReplaceableTextures\\CommandButtons\\BTNArcaneVault.blp",
             0.025, 0.025, FRAMEPOINT_TOPLEFT, FRAMEPOINT_TOPLEFT, 0.017,
             -0.015, toggle_stash, "Open Stash", FRAMEPOINT_BOTTOM,
             FRAMEPOINT_TOP, 0., 0.006)
+
+        function INVENTORY.getTutorialFrame(part)
+            if part == "equipment" then return inv[0] end
+            if part == "backpack" then return inv[1] end
+            if part == "potions" then return pot[1] end
+            if part == "stash" then return stash_button.frame end
+            return frame
+        end
+
+        function INVENTORY.isOpen(pid) return viewing[pid] ~= -1 end
+
+        -- Sample presentation is copied synchronously from real starter items;
+        -- the temporary handles are destroyed before any practice interaction.
+        -- Moving samples is UI-only, with no profile mutations or item orders.
+        local practice, practice_visible = {}, {}
+        local practice_templates
+        local function close_practice_menu(pid)
+            if GetLocalPlayer() ~= Player(pid - 1) then return end
+            if practice[pid] then practice[pid].menu = nil end
+            frame_set_visible(context_menu_backdrop, false)
+            for _, button in ipairs(slots) do button.tooltip:visible(true) end
+            if StashUI then StashUI.setTutorialTooltipsVisible(pid, true) end
+        end
+        function INVENTORY.prepareTutorialPractice()
+            if practice_templates then return end
+            practice_templates = {}
+            for _, spec in ipairs({{id = 'I01I', slot = 1}, {id = 'I02F', slot = 9, flask = true}}) do
+                local item = ItemRuntime.create(FourCC(spec.id))
+                SetItemVisible(item.obj, false)
+                if spec.flask then PotionService.refreshItem(item) end
+                practice_templates[spec.slot] = {
+                    name = GetItemName(item.obj), icon = BlzGetItemIconPath(item.obj),
+                    description = item.tooltip .. "|n|n|cff808080Tutorial item: cannot be used, dropped, or saved.|r",
+                    alt_description = item.alt_tooltip .. "|n|n|cff808080Tutorial item: cannot be used, dropped, or saved.|r",
+                    charges = item.charges, flask = spec.flask,
+                }
+                item:destroy()
+            end
+        end
+        function INVENTORY.renderTutorialItem(button, sample, hidden, pid)
+            thistype.renderItemButton(button, nil)
+            if sample then
+                button:icon(sample.icon)
+                button.tooltip:icon(sample.icon)
+                button.tooltip:name(sample.name)
+                button.tooltip:text(pid and alt_down[pid] and sample.alt_description or sample.description)
+                button:charge(sample.charges or 0)
+                button:visible(not hidden)
+            end
+        end
+        local function render_practice(pid)
+            for i = 1, MAX_INVENTORY_SLOTS do
+                local button, sample = slots[i], practice[pid].items[i]
+                INVENTORY.renderTutorialItem(button, sample, practice[pid].drag == i, pid)
+            end
+            if StashUI then StashUI.renderTutorialPractice(pid, practice[pid].items, practice[pid].drag) end
+        end
+        function INVENTORY.refreshTutorialPractice(pid)
+            if GetLocalPlayer() == Player(pid - 1) and practice[pid] then render_practice(pid) end
+        end
+        local function practice_hovered(pid)
+            if StashUI and StashUI.isTutorialPreviewOpen(pid) then
+                local slot = StashUI.getLocalHoveredSlot()
+                if slot > 0 and slot <= STASH_COLUMNS then return MAX_INVENTORY_SLOTS + slot end
+                if slot >= 0 then return 0 end
+            end
+            return get_inventory_hovered_slot()
+        end
+        local function practice_transfer(pid, from, first, last)
+            local items = practice[pid].items
+            for destination = first, last do
+                if not items[destination] then
+                    items[destination], items[from] = items[from], nil
+                    return
+                end
+            end
+        end
+        practice_context_action = function(pid, action)
+            if not practice_visible[pid] then return false end
+            if GetLocalPlayer() ~= Player(pid - 1) then return true end
+            local state = practice[pid]
+            local from = state and state.menu
+            local sample = from and state.items[from]
+            close_practice_menu(pid)
+            if not sample then return true end
+            if action == 1 then -- Equip / Take
+                if from > MAX_INVENTORY_SLOTS then
+                    practice_transfer(pid, from, 9, MAX_INVENTORY_SLOTS)
+                elseif sample.flask then
+                    practice_transfer(pid, from, 7, 8)
+                else
+                    practice_transfer(pid, from, 1, 6)
+                end
+            elseif action == 2 then -- Unequip
+                practice_transfer(pid, from, 9, MAX_INVENTORY_SLOTS)
+            elseif action == 5 then -- Details
+                state.details = true
+                ItemDetails.show(pid, sample.name, sample.icon, sample.description)
+            elseif action == 6 and StashUI and StashUI.isTutorialPreviewOpen(pid) then
+                practice_transfer(pid, from, MAX_INVENTORY_SLOTS + 1, MAX_INVENTORY_SLOTS + STASH_COLUMNS)
+            end
+            -- Drop, Sell, and Use deliberately do nothing in practice mode.
+            render_practice(pid)
+            return true
+        end
+        local function practice_right_down()
+            local pid = GetPlayerId(GetTriggerPlayer()) + 1
+            if GetLocalPlayer() ~= Player(pid - 1) or not practice_visible[pid] then return end
+            close_practice_menu(pid)
+            practice[pid].right_down = practice_hovered(pid)
+        end
+        local function practice_right_up()
+            local pid = GetPlayerId(GetTriggerPlayer()) + 1
+            if GetLocalPlayer() ~= Player(pid - 1) or not practice_visible[pid] then return end
+            local state = practice[pid]
+            local slot = practice_hovered(pid)
+            local pressed = state.right_down
+            state.right_down = nil
+            if pressed ~= slot or slot <= 0 or not state.items[slot] then return end
+            state.drag = nil
+            hide_tracker(pid)
+            render_practice(pid)
+            state.menu = slot
+            local in_stash = slot > MAX_INVENTORY_SLOTS
+            local anchor = in_stash and StashUI.getTutorialSlotFrame(slot - MAX_INVENTORY_SLOTS) or slots[slot].frame
+            local actions = in_stash and {1, 3, 4, 5} or slot <= 8 and {2, 3, 4, 5} or {1, 3, 4, 5}
+            if not in_stash and StashUI and StashUI.isTutorialPreviewOpen(pid) then actions[#actions + 1] = 6 end
+            context_buttons[1]:text(in_stash and "Take" or "Equip")
+            for _, button in ipairs(context_buttons) do button:visible(false) end
+            for i, action in ipairs(actions) do
+                local button = context_buttons[action]
+                frame_clear_all_points(button.frame)
+                if i == 1 then
+                    BlzFrameSetPoint(button.frame, FRAMEPOINT_TOPLEFT, context_menu_backdrop, FRAMEPOINT_TOPLEFT, 0., 0.)
+                else
+                    BlzFrameSetPoint(button.frame, FRAMEPOINT_TOPLEFT, context_buttons[actions[i - 1]].frame, FRAMEPOINT_BOTTOMLEFT, 0., 0.)
+                end
+                button:visible(true)
+            end
+            for _, button in ipairs(slots) do button.tooltip:visible(false) end
+            if StashUI then StashUI.setTutorialTooltipsVisible(pid, false) end
+            BlzFrameSetTooltip(context_buttons[4].frame, transparent_placeholder)
+            frame_clear_all_points(context_menu_backdrop)
+            BlzFrameSetPoint(context_menu_backdrop, FRAMEPOINT_TOPLEFT, anchor, FRAMEPOINT_TOPRIGHT, 0.005, 0.)
+            frame_set_visible(context_menu_backdrop, true)
+        end
+        local function practice_down()
+            local pid = GetPlayerId(GetTriggerPlayer()) + 1
+            if GetLocalPlayer() ~= Player(pid - 1) or not practice_visible[pid] then return end
+            local slot = practice_hovered(pid)
+            if practice[pid].menu then
+                if slot <= 0 or not practice[pid].items[slot] then return end
+                close_practice_menu(pid)
+            end
+            local sample = practice[pid].items[slot]
+            if sample and ctrl_down[pid] and StashUI and StashUI.isTutorialPreviewOpen(pid) then
+                local first, last = MAX_INVENTORY_SLOTS + 1, MAX_INVENTORY_SLOTS + STASH_COLUMNS
+                if slot > MAX_INVENTORY_SLOTS then first, last = 9, MAX_INVENTORY_SLOTS end
+                for destination = first, last do
+                    if not practice[pid].items[destination] then
+                        practice[pid].items[destination], practice[pid].items[slot] = sample, nil
+                        break
+                    end
+                end
+                practice[pid].drag = nil
+                render_practice(pid)
+                return
+            end
+            practice[pid].drag = sample and slot or nil
+            if sample then
+                show_tracker(pid, sample.icon)
+                render_practice(pid)
+            end
+        end
+        local function practice_up()
+            local pid = GetPlayerId(GetTriggerPlayer()) + 1
+            if GetLocalPlayer() ~= Player(pid - 1) or not practice_visible[pid] then return end
+            local state = practice[pid]
+            local from, to = state.drag, practice_hovered(pid)
+            state.drag = nil
+            hide_tracker(pid)
+            local maximum = MAX_INVENTORY_SLOTS
+            if StashUI and StashUI.isTutorialPreviewOpen(pid) then maximum = maximum + STASH_COLUMNS end
+            if not from or to < 1 or to > maximum then render_practice(pid); return end
+            local first, second = state.items[from], state.items[to]
+            local function allowed(sample, slot)
+                if not sample then return true end
+                if sample.flask then return slot > 6 end
+                return slot ~= 7 and slot ~= 8
+            end
+            if allowed(first, to) and allowed(second, from) then
+                state.items[from], state.items[to] = second, first
+            end
+            render_practice(pid)
+        end
+        function INVENTORY.previewTutorial(pid, visible)
+            practice_visible[pid] = visible
+            EVENT_ON_M1_DOWN:unregister_action(pid, practice_down)
+            EVENT_ON_M1_UP:unregister_action(pid, practice_up)
+            EVENT_ON_M2_DOWN:unregister_action(pid, practice_right_down)
+            EVENT_ON_M2_UP:unregister_action(pid, practice_right_up)
+            if visible then
+                EVENT_ON_M1_DOWN:register_action(pid, practice_down)
+                EVENT_ON_M1_UP:register_action(pid, practice_up)
+                EVENT_ON_M2_DOWN:register_action(pid, practice_right_down)
+                EVENT_ON_M2_UP:register_action(pid, practice_right_up)
+            end
+            if GetLocalPlayer() ~= Player(pid - 1) then return end
+            if visible then
+                if not practice[pid] then
+                    local items = {}
+                    for slot, sample in pairs(practice_templates) do items[slot] = sample end
+                    practice[pid] = {items = items}
+                end
+                BlzFrameSetText(title, "Inventory")
+                render_practice(pid)
+            else
+                close_practice_menu(pid)
+                if practice[pid] and practice[pid].details then
+                    ItemDetails.hide(pid)
+                    practice[pid].details = nil
+                end
+                context_buttons[1]:text("Equip")
+                BlzFrameSetTooltip(context_buttons[4].frame, cost_frame)
+                hide_tracker(pid)
+                if practice[pid] then practice[pid].drag = nil end
+                BlzFrameSetText(title, "Inventory")
+            end
+            frame_set_visible(frame, visible)
+        end
+
+        function INVENTORY.clearTutorialPractice(pid)
+            if GetLocalPlayer() == Player(pid - 1) then practice[pid] = nil end
+        end
 
         local function send_context(pid, slot)
             -- set context asynchronously
@@ -956,6 +1194,7 @@ OnInit.final("Inventory", function(Require)
         local function extended_item_tooltip(pid, is_down)
             if alt_down[pid] ~= is_down then
                 alt_down[pid] = is_down
+                if practice_visible[pid] then thistype.refreshTutorialPractice(pid); return end
 
                 local target_pid = viewing[pid]
                 if target_pid and target_pid > 0 then

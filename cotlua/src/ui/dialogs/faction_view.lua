@@ -176,7 +176,7 @@ OnInit.final("FactionView", function(Require)
             "A Vanguard hunter claims the beast was much larger before witnesses arrived.",
             "The quartermaster reminds recruits that trophies are not legal tender.",
             "Another bounty board has been damaged by an enthusiastic applicant.",
-            "Scouts report dangerous quarry. Morale has improved considerably.",
+            "Scouts report dangerous bounty. Morale has improved considerably.",
             "The Grand Hunt betting pool remains entirely unofficial.",
         },
     }

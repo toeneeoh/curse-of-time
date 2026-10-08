@@ -166,11 +166,22 @@ OnInit.final("StatValues", function(Require)
     STAT_TAG[ITEM_CRIT_CHANCE].getter = function(u)
         return format("%.2f", Unit[u].cc)
     end
+    STAT_TAG[ITEM_CRIT_CHANCE].breakdown = function(u)
+        local unit = Unit[u]
+        local base = HERO_STATS[GetType(u)].crit_chance
+        local cap = unit.cc > 100 and
+            "\n|cffffcc00Effective Roll Chance:|r 100.00% (cap)" or ""
+        return "|cffffcc00Base Chance:|r " .. format("%.2f", base) .. "%" ..
+            "\n|cffffcc00Spell/Item Flat Bonus:|r " .. format("%.2f", unit.cc_flat - base) .. "%" ..
+            "\n|cffffcc00Critical Chance Multiplier:|r x" .. format("%.2f", unit.cc_percent) ..
+            " (" .. format("%.2f", unit.cc_percent * 100.) .. "%)" ..
+            "\n|cffffcc00Total Critical Chance:|r " .. format("%.2f", unit.cc) .. "%" .. cap
+    end
     STAT_TAG[ITEM_CRIT_DAMAGE].getter = function(u)
         return format("%.2f", Unit[u].cd)
     end
     STAT_TAG[ITEM_CRIT_CHANCE_MULT].getter = function(u)
-        return format("%.2f", Unit[u].cc)
+        return format("%.2f", Unit[u].cc_percent * 100.)
     end
     STAT_TAG[ITEM_CRIT_DAMAGE_MULT].getter = function(u)
         return format("%.2f", Unit[u].cd * 100.)
@@ -196,6 +207,18 @@ OnInit.final("StatValues", function(Require)
                                  (1 + math.min(GetHeroAgi(u, true), 400) * 0.01) or
                                  0
         return format("%.2f", attack_speed) .. " attacks per second"
+    end
+    STAT_TAG[TOTAL_ATTACK_SPEED].breakdown = function(u)
+        local unit = Unit[u]
+        local agility_bonus = math.min(GetHeroAgi(u, true), 400)
+        local disabled = not BlzGetUnitWeaponBooleanField(u,
+            UNIT_WEAPON_BF_ATTACKS_ENABLED, 0) and
+            "\n|cffff8080Attacks are currently disabled.|r" or ""
+        return "|cffffcc00Base Attack Time:|r " .. format("%.3f", unit.base_bat) .. " seconds" ..
+            "\n|cffffcc00Attack Time Multiplier:|r x" .. format("%.3f", unit.bonus_bat) ..
+            "\n|cffffcc00Effective Attack Time:|r " .. format("%.3f", unit.bat) .. " seconds" ..
+            "\n|cffffcc00Agility Bonus:|r +" .. format("%.2f", agility_bonus) .. "% (cap +400%)" ..
+            "\n|cffffcc00Total Attack Speed:|r " .. STAT_TAG[TOTAL_ATTACK_SPEED].getter(u) .. disabled
     end
     STAT_TAG[XP_RATE].getter = function(u)
         return format("%.2f", Unit[u].xp_rate)

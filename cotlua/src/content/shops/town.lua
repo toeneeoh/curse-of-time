@@ -71,8 +71,4 @@ OnInit.final("TownShops", function(Require)
         "Potion Master")
     PotionMasterServices.addToShop(potion_master, potion_services)
 
-    local master = CreateUnit(Player(PLAYER_NEUTRAL_PASSIVE), potion_master,
-                              1260., 880., 240.)
-    BlzSetUnitName(master, "Potion Master")
-
 end, Debug and Debug.getLine())

@@ -645,6 +645,9 @@ Triggis
 Maiev|r]], "ReplaceableTextures\\CommandButtons\\BTNJaina.blp")
 
     CreateQuestBJ(bj_QUESTTYPE_REQ_DISCOVERED, "Commands", [[-info (displays information submenu)
+-new (offers the optional tutorial)
+-new profile / -newprofile (starts a new profile)
+-hotkeys (changes custom key bindings)
 -stats # (displays hero stats)
 -cam # (L to lock, i.e. -cam 3000L)
 -zm (L to lock, i.e. -zml will set your camera to 2500, locked distance)

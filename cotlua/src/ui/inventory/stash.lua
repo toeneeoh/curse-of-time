@@ -456,6 +456,46 @@ OnInit.final("StashUI", function(Require)
         if open_for[pid] then StashUI.close(pid) else StashUI.open(pid) end
     end
 
+    function StashUI.getTutorialFrame() return frame end
+
+    local tutorial_preview = {}
+    function StashUI.isTutorialPreviewOpen(pid) return tutorial_preview[pid] == true end
+    function StashUI.getTutorialSlotFrame(slot) return slots[slot].frame end
+    function StashUI.setTutorialTooltipsVisible(pid, visible)
+        if GetLocalPlayer() ~= Player(pid - 1) then return end
+        for _, button in ipairs(slots) do button.tooltip:visible(visible) end
+    end
+    function StashUI.renderTutorialPractice(pid, items, drag)
+        if GetLocalPlayer() ~= Player(pid - 1) or not tutorial_preview[pid] then return end
+        for slot = 1, MAX_STASH_SLOTS do
+            local index = MAX_INVENTORY_SLOTS + slot
+            INVENTORY.renderTutorialItem(slots[slot], items[index], drag == index, pid)
+        end
+    end
+    function StashUI.previewTutorial(pid, visible)
+        if GetLocalPlayer() ~= Player(pid - 1) then return end
+        tutorial_preview[pid] = visible
+        if visible then
+            BlzFrameSetText(title, "Stash")
+            for slot = 1, MAX_STASH_SLOTS do INVENTORY.renderItemButton(slots[slot], nil, pid) end
+            for row = 1, STASH_MAX_ROWS do
+                BlzFrameSetTexture(rows[row], row > 1 and LOCKED_ROW_TEXTURE or ROW_TEXTURE, 0, false)
+                BlzFrameSetVisible(locks[row], row > 1)
+                if row > 1 then
+                    plus_buttons[row]:visible(row == 2)
+                    -- SimpleButton:enable rewrites BTN paths to DISBTN paths;
+                    -- this UI texture has no disabled counterpart.
+                    BlzFrameSetEnable(plus_buttons[row].frame, false)
+                end
+            end
+        end
+        if not visible then
+            for row = 2, STASH_MAX_ROWS do BlzFrameSetEnable(plus_buttons[row].frame, true) end
+        end
+        BlzFrameSetVisible(frame, visible)
+        if visible then INVENTORY.refreshTutorialPractice(pid) end
+    end
+
     local function close_clicked()
         local clicked = BlzGetTriggerFrame()
         BlzFrameSetEnable(clicked, false)

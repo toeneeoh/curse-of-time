@@ -13,6 +13,7 @@ OnInit.final("PerkTree", function(Require)
     Require('Users')
 
     PerkTree = {}
+    local tutorial_preview = {}
 
     -- The fullscreen bounds span Stat View's left/bottom edges through the
     -- Inventory window's right/top edges.
@@ -188,6 +189,7 @@ OnInit.final("PerkTree", function(Require)
             FRAMEPOINT_CENTER, FRAMEPOINT_CENTER, 0., 0.,
             id > 1 and function()
                 local pid = GetPlayerId(GetTriggerPlayer()) + 1
+                if tutorial_preview[pid] then return end
                 -- A frame control-click may still arrive after the cursor was
                 -- used to pan away from a node. Treat that gesture only as UI
                 -- navigation, never as an allocation request.
@@ -268,6 +270,7 @@ OnInit.final("PerkTree", function(Require)
 
     local function toggle_fullscreen()
         local pid = GetPlayerId(GetTriggerPlayer()) + 1
+        if tutorial_preview[pid] then return end
         local clicked = BlzGetTriggerFrame()
         BlzFrameSetEnable(clicked, false)
         BlzFrameSetEnable(clicked, true)
@@ -425,6 +428,24 @@ OnInit.final("PerkTree", function(Require)
     end
 
     AddToEsc(close)
+    PerkTree.close = close
+    function PerkTree.isOpen(pid) return is_open[pid] end
+    function PerkTree.getTutorialFrame() return frame end
+    function PerkTree.previewTutorial(pid, visible)
+        tutorial_preview[pid] = visible
+        if visible then
+            is_open[pid] = true
+            apply_layout(pid)
+            render(pid)
+        else
+            close(pid)
+        end
+        if GetLocalPlayer() == Player(pid - 1) then
+            reset:visible(false)
+            BlzFrameSetText(reset_status, "")
+            BlzFrameSetVisible(frame, visible)
+        end
+    end
     Perks.registerChangedAction(function(changed_pid)
         for viewer_pid = 1, PLAYER_CAP do
             if is_open[viewer_pid]

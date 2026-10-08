@@ -515,6 +515,10 @@ OnInit.final("Hotkeys", function(Require)
     local U = User.first
 
     while U do
+        -- Window cleanup must work before profile creation as well as after
+        -- a developer-started character/repick. Do not wait for the profile dialog.
+        register_key_binding(U.id, 'ESC', close_all_windows)
+        register_key_binding(U.id, 'ESC', clear_text)
         -- immutable hotkeys
         for i = 0, 9 do
             register_key_binding(U.id, tostring(i), update_ui, true)

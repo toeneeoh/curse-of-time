@@ -215,6 +215,8 @@ OnInit.final("Frames", function(Require)
         BlzFrameSetScale(ShowHideMenuButton, 0.6)
         BlzFrameSetFont(ShowHideMenuButton, "MasterFont", 0.028, 0)
 
+        function GetTutorialMenuFrame() return ShowHideMenuButton end
+
         local t = CreateTrigger()
         BlzTriggerRegisterFrameEvent(t, ShowHideMenuButton, FRAMEEVENT_CONTROL_CLICK)
         TriggerAddAction(t, function()

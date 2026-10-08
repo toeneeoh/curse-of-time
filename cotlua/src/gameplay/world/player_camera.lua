@@ -4,6 +4,8 @@ OnInit.global("PlayerCamera", function(Require)
 
     local custom_lighting = __jarray(0)
     local is_camera_locked = {}
+    local preview_camera = {}
+    local minimap_texture
 
     ---@param pid integer
     local function apply_camera_lock(pid)
@@ -90,8 +92,53 @@ OnInit.global("PlayerCamera", function(Require)
     ---@type fun(pid: integer, texture: string)
     function SetMinimapTexture(pid, texture)
         if GetLocalPlayer() == Player(pid - 1) then
+            minimap_texture = texture
             BlzChangeMinimapTerrainTex(texture)
         end
+    end
+
+    -- Local presentation only; unlike SetCamera this does not touch a hero's
+    -- lighting abilities and therefore also works before a hero is selected.
+    function PreviewPlayerCamera(pid, region, x, y)
+        local saved, generation
+        if GetLocalPlayer() == Player(pid - 1) then
+            if not preview_camera[pid] then
+                preview_camera[pid] = {
+                    min_x = GetCameraBoundMinX(), min_y = GetCameraBoundMinY(),
+                    max_x = GetCameraBoundMaxX(), max_y = GetCameraBoundMaxY(),
+                    x = GetCameraTargetPositionX(), y = GetCameraTargetPositionY(),
+                    minimap = minimap_texture,
+                }
+            end
+            saved = preview_camera[pid]
+            saved.generation = (saved.generation or 0) + 1
+            generation = saved.generation
+            local data = REGION_DATA[region]
+            local rect = data.vision
+            SetCameraBounds(GetRectMinX(rect), GetRectMinY(rect), GetRectMinX(rect),
+                GetRectMaxY(rect), GetRectMaxX(rect), GetRectMaxY(rect), GetRectMaxX(rect), GetRectMinY(rect))
+            if data.minimap then SetMinimapTexture(pid, data.minimap) end
+        end
+        -- Bounds changes can clamp the old tavern position on the next update.
+        -- Start the timed pan afterwards so it uses that updated origin. Queue
+        -- this on every client; only the camera mutation itself is local.
+        TimerQueue:callDelayed(0.03, function()
+            if GetLocalPlayer() == Player(pid - 1) and preview_camera[pid] == saved
+                and saved and saved.generation == generation then
+                PanCameraToTimed(x, y, 0.35)
+            end
+        end)
+    end
+
+    function RestorePlayerCameraPreview(pid)
+        if GetLocalPlayer() ~= Player(pid - 1) then return end
+        local saved = preview_camera[pid]
+        if not saved then return end
+        preview_camera[pid] = nil
+        SetCameraBounds(saved.min_x, saved.min_y, saved.min_x, saved.max_y,
+            saved.max_x, saved.max_y, saved.max_x, saved.min_y)
+        if saved.minimap then SetMinimapTexture(pid, saved.minimap) end
+        PanCameraToTimed(saved.x, saved.y, 0.)
     end
 
     function SetCamera(pid, region)

@@ -4,6 +4,7 @@ OnInit.global("SimpleButton", function(Require)
     ---@class SimpleButton
     ---@field frame framehandle
     ---@field button framehandle
+    ---@field disabled_button framehandle
     ---@field tooltip framehandle|table
     ---@field text_frame framehandle
     ---@field text function
@@ -31,10 +32,12 @@ OnInit.global("SimpleButton", function(Require)
 
             self.frame = BlzCreateFrame("ContextFrameButton", frame, 0, context)
             self.button = BlzGetFrameByName("ContextFrameButtonIcon", context)
+            self.disabled_button = BlzGetFrameByName("ContextFrameButtonIconDisabled", context)
             self.text_frame = BlzGetFrameByName("ContextFrameText", context)
             BlzFrameSetPoint(self.frame, point1, frame, point2, x, y)
             BlzFrameSetSize(self.frame, width + inset * 2, height + inset * 2)
             BlzFrameSetTexture(self.button, texture, 0, true)
+            BlzFrameSetTexture(self.disabled_button, texture, 0, true)
             BlzFrameSetSize(self.frame, width, height)
             --BlzFrameSetPoint(self.frame, FRAMEPOINT_CENTER, frame, FRAMEPOINT_CENTER, 0, 0)
             self.texture = texture
@@ -115,6 +118,7 @@ OnInit.global("SimpleButton", function(Require)
             if path ~= nil then
                 self.texture = path
                 BlzFrameSetTexture(self.button, path, 0, false)
+                BlzFrameSetTexture(self.disabled_button, path, 0, false)
             end
 
             return self.texture
@@ -127,13 +131,14 @@ OnInit.global("SimpleButton", function(Require)
         function thistype:enable(flag)
             local t = self.texture ---@type string 
 
-            if flag == false then
+            if flag == false and t:sub(1, 35):lower() == "replaceabletextures\\commandbuttons\\" then
                 t = (t:sub(1, 34) .. "Disabled\\DIS" .. t:sub(36, t:len()))
             end
 
             self.enabled = flag
 
             BlzFrameSetTexture(self.button, t, 0, true)
+            BlzFrameSetTexture(self.disabled_button, t, 0, true)
         end
 
         function thistype:onClick(func)

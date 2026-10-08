@@ -9,6 +9,7 @@ OnInit.final("Commands", function(Require)
     Require('Profile')
     Require('Frames')
     Require('HelpText')
+    Require('Tutorial')
 
     local vote_yay  = 0
     local vote_nay  = 0
@@ -101,6 +102,7 @@ OnInit.final("Commands", function(Require)
                 end
             end
         end,
+        ["-hotkeys"] = function(p, pid, args) ChangeHotkeys(pid) end,
         ["-zml"] = function(p, pid, args, cmd)
             SetCameraZoom(pid, 2500)
             SetCameraLocked(pid, true)
@@ -112,7 +114,11 @@ OnInit.final("Commands", function(Require)
             SetCameraLocked(pid, false)
         end,
         ["-new"] = function(p, pid, args)
-            Profile.new(pid)
+            if args[2] and args[2]:lower() == "profile" then
+                Profile.new(pid)
+            else
+                Tutorial.prompt(pid)
+            end
         end,
         ["-info"] = function(p, pid, args)
             local index = (args[2] and S2I(args[2])) or 1
@@ -195,7 +201,8 @@ OnInit.final("Commands", function(Require)
 
     CMD_LIST["-zm"] = CMD_LIST["-zml"]
 
-    CMD_LIST["-newprofile"] = CMD_LIST["-new"]
+    CMD_LIST["-newprofile"] = function(p, pid, args) Profile.new(pid) end
+    CMD_LIST["-tutorial"] = function(p, pid, args) Tutorial.prompt(pid) end
 
     CMD_LIST["-savetime"] = CMD_LIST["-st"]
 
