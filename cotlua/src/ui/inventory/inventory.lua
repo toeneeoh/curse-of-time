@@ -1,0 +1,1283 @@
+--[[
+    inventory.lua
+
+    A library for recreating an inventory system using custom frames
+]]
+OnInit.final("Inventory", function(Require)
+    Require('InventoryService')
+    Require('StashService')
+    Require('ItemDetails')
+    Require('ItemEventRegistry')
+    Require('ItemUse')
+    Require('Users')
+    Require('Frames')
+    Require('Currency')
+    Require('PlayerSync')
+    Require('Items')
+
+    local INVENTORY_WIDTH   = 0.1981
+    local INVENTORY_HEIGHT  = 0.232
+    local INVENTORY_GAPY    = 0.0312
+    local INVENTORY_GAPX    = 0.0333
+    -- inventory_row.tga is six equally sized cells (672 / 6). Using the
+    -- rounded potion-column width here accumulated visible horizontal drift
+    -- by the sixth ordinary inventory slot.
+    local INVENTORY_COLUMN_PITCH = INVENTORY_WIDTH / 6.
+    local INVENTORY_TEXTURE = "inventory_row.tga"
+    local POTION_TEXTURE    = "war3mapImported\\PotionBackdrop2.dds"
+    local INVENTORY_MIN_X   = 0.612
+    local INVENTORY_MIN_Y   = 0.214
+    local INVENTORY_SLOT_SIZE = 0.0266
+    local TRACKER_FOLLOW    = 0.82
+    local DROP_ITEM_COMMAND = "robogoblin"
+
+    local concat = table.concat
+    local frame_set_visible, frame_clear_all_points = BlzFrameSetVisible, BlzFrameClearAllPoints
+    local setabspoint = BlzFrameSetAbsPoint
+
+    -- Screen coordinates are intentionally asynchronous. They are used only
+    -- for local presentation and tentative slot selection; the chosen slot is
+    -- synchronized before InventoryService mutates gameplay state.
+    ---@return number?, number?
+    local function get_mouse_frame_position()
+        local pixel_x = BlzGetMouseScreenPosX()
+        local pixel_y = BlzGetMouseScreenPosY()
+        local client_width = BlzGetLocalClientWidth()
+        local client_height = BlzGetLocalClientHeight()
+
+        -- The screen-position natives can report coordinates outside the
+        -- client while focus changes or the cursor leaves the window. Keep the
+        -- last valid tracker position instead of snapping the dragged icon.
+        if client_width <= 0 or client_height <= 0 or
+        pixel_x < 0 or pixel_x > client_width or pixel_y < 0 or pixel_y > client_height
+        then
+            return nil, nil
+        end
+
+        return BlzPixelToFrameX(pixel_x), BlzPixelToFrameY(pixel_y)
+    end
+
+    local CONTEXT_BUTTON_WIDTH = 0.055
+    local CONTEXT_BUTTON_HEIGHT = 0.016
+
+    -- slot atlas
+    -- fields: {x, y, kind}
+    local inventory_slots = {
+        {0.0000, 0.1248, "main"},
+        {INVENTORY_COLUMN_PITCH, 0.1248, "main"},
+        {INVENTORY_COLUMN_PITCH * 2, 0.1248, "main"},
+        {INVENTORY_COLUMN_PITCH * 3, 0.1248, "main", FRAMEPOINT_TOPRIGHT},
+        {INVENTORY_COLUMN_PITCH * 4, 0.1248, "main", FRAMEPOINT_TOPRIGHT},
+        {INVENTORY_COLUMN_PITCH * 5, 0.1248, "main", FRAMEPOINT_TOPRIGHT},
+
+        {0.2048, 0.1248, "potion1", FRAMEPOINT_TOPRIGHT},
+        {0.2048, 0.0936, "potion2", FRAMEPOINT_TOPRIGHT},
+
+        {0.0000, 0.0624, "unequip1"},
+        {INVENTORY_COLUMN_PITCH, 0.0624, "unequip1"},
+        {INVENTORY_COLUMN_PITCH * 2, 0.0624, "unequip1"},
+        {INVENTORY_COLUMN_PITCH * 3, 0.0624, "unequip1", FRAMEPOINT_TOPRIGHT},
+        {INVENTORY_COLUMN_PITCH * 4, 0.0624, "unequip1", FRAMEPOINT_TOPRIGHT},
+        {INVENTORY_COLUMN_PITCH * 5, 0.0624, "unequip1", FRAMEPOINT_TOPRIGHT},
+
+        {0.0000, 0.0312, "unequip2"},
+        {INVENTORY_COLUMN_PITCH, 0.0312, "unequip2"},
+        {INVENTORY_COLUMN_PITCH * 2, 0.0312, "unequip2"},
+        {INVENTORY_COLUMN_PITCH * 3, 0.0312, "unequip2", FRAMEPOINT_TOPRIGHT},
+        {INVENTORY_COLUMN_PITCH * 4, 0.0312, "unequip2", FRAMEPOINT_TOPRIGHT},
+        {INVENTORY_COLUMN_PITCH * 5, 0.0312, "unequip2", FRAMEPOINT_TOPRIGHT},
+
+        {0.0000, 0.0,    "unequip3"},
+        {INVENTORY_COLUMN_PITCH, 0.0, "unequip3"},
+        {INVENTORY_COLUMN_PITCH * 2, 0.0, "unequip3"},
+        {INVENTORY_COLUMN_PITCH * 3, 0.0, "unequip3", FRAMEPOINT_TOPRIGHT},
+        {INVENTORY_COLUMN_PITCH * 4, 0.0, "unequip3", FRAMEPOINT_TOPRIGHT},
+        {INVENTORY_COLUMN_PITCH * 5, 0.0, "unequip3", FRAMEPOINT_TOPRIGHT},
+    }
+
+    local disabled_for_player = {}
+    local alt_down = {} ---@type boolean[]
+    local ctrl_down = {} ---@type boolean[]
+
+    ---@param pid integer
+    ---@param disable boolean
+    function DisableItems(pid, disable)
+        disabled_for_player[pid] = disable
+
+        if disable then
+            INVENTORY.close(pid)
+        end
+    end
+
+    INVENTORY = {}
+    do
+        local thistype = INVENTORY
+        local context = __jarray(0) ---@type integer[]
+        local target = __jarray(0) ---@type integer[]
+        local slots = {} ---@type Button[]
+        local viewing, move_item_cooldown = __jarray(-1), {}
+        local on_m1_down, on_m2_down, on_m1_up, on_m2_up, open_context_menu
+        local target_thread = {} -- used to sync context and target acquisition
+        local synced_context, synced_target = {}, {}
+        local ui_mode = __jarray(0) -- 0 = normal, 1 = context menu open
+        local right_click_origin = __jarray(0)
+        local skip_drag_release = __jarray(false)
+        local practice_context_action
+
+        ---@param itm Item
+        ---@return string
+        local function get_rarity_border(itm)
+            local rarity_index = ItemRuntime.getRarityIndex(itm)
+            return SPRITE_RARITY[rarity_index] or SPRITE_RARITY[0]
+        end
+
+        ---@param slot Button
+        ---@param texture string?
+        local function set_rarity_border(slot, texture)
+            if texture then
+                BlzFrameSetTexture(slot.rarityBorder, texture, 0, true)
+                BlzFrameSetVisible(slot.rarityBorder, true)
+            else
+                BlzFrameSetVisible(slot.rarityBorder, false)
+            end
+        end
+
+        -- determines what item slot a user has their cursor over
+        ---@return integer
+        local get_inventory_hovered_slot = function()
+            local x, y = get_mouse_frame_position()
+
+            if not x or not y then
+                return -1
+            end
+
+            -- bail if mouse is outside inventory UI
+            if x < INVENTORY_MIN_X - 0.03 or x > INVENTORY_MIN_X + INVENTORY_WIDTH + 0.03 or
+            y < INVENTORY_MIN_Y - 0.03 or y > INVENTORY_MIN_Y + INVENTORY_HEIGHT - 0.03
+            then
+                return -1
+            end
+
+            local mouse_x = x - INVENTORY_MIN_X
+            local mouse_y = y - INVENTORY_MIN_Y
+            local half_slot = INVENTORY_SLOT_SIZE * 0.5
+
+            -- Test the actual square occupied by each slot. The previous nearest-
+            -- center radius also accepted gaps and points outside the icon bounds.
+            for i = 1, #inventory_slots do
+                local pos = inventory_slots[i]
+                if math.abs(mouse_x - pos[1]) <= half_slot and
+                math.abs(mouse_y - pos[2]) <= half_slot
+                then
+                    return i
+                end
+            end
+
+            return 0
+        end
+
+        local function get_hovered_slot()
+            local local_pid = GetPlayerId(GetLocalPlayer()) + 1
+            if StashUI and StashUI.getLocalHoveredSlot and
+                StashUI.isOpen(local_pid) then
+                local stash_slot = StashUI.getLocalHoveredSlot()
+                if stash_slot >= 0 then
+                    if StashUI.isReadOnly(local_pid) then return 0 end
+                    return stash_slot > 0 and
+                               MAX_INVENTORY_SLOTS + stash_slot or 0
+                end
+            end
+            return get_inventory_hovered_slot()
+        end
+
+        -- Screen coordinates are local-only. The resulting slot is synchronized
+        -- separately before it can cause an inventory mutation.
+        ---@param pid integer
+        ---@return integer
+        local function get_local_hovered_slot(pid)
+            if GetLocalPlayer() == Player(pid - 1) then
+                return get_hovered_slot()
+            end
+            return 0
+        end
+
+        ---@param pid integer
+        ---@return integer
+        local function get_local_item_slot(pid)
+            local slot = get_local_hovered_slot(pid)
+            local profile = Profile[viewing[pid]]
+
+            if slot > 0 and profile and profile.hero and profile.hero.items[slot] then
+                return slot
+            end
+            return 0
+        end
+
+        function thistype.getLocalInventoryHoveredSlot(pid)
+            if GetLocalPlayer() == Player(pid - 1) then
+                return get_inventory_hovered_slot()
+            end
+            return 0
+        end
+
+        --#region frame setup
+        local frame = BlzCreateFrame("ListBoxWar3", BlzGetFrameByName("ConsoleUIBackdrop", 0), 0, 0)
+        BlzFrameSetAbsPoint(frame, FRAMEPOINT_TOPLEFT, 0.575, 0.408)
+        BlzFrameSetSize(frame, INVENTORY_WIDTH + 0.072, INVENTORY_HEIGHT)
+        BlzFrameSetEnable(frame, false)
+        thistype.frame = frame
+
+        local title = BlzCreateFrame("TitleText", frame, 0, 0)
+        BlzFrameSetPoint(title, FRAMEPOINT_TOP, frame, FRAMEPOINT_TOP, 0., -0.013)
+        BlzFrameSetEnable(title, false)
+        BlzFrameSetText(title, "Inventory")
+
+        local inv = {}
+        local inv_main = BlzCreateFrameByType("BACKDROP", "", frame, "", 0)
+        BlzFrameSetPoint(inv_main, FRAMEPOINT_TOPLEFT, frame, FRAMEPOINT_TOPLEFT, 0.02, -0.06)
+        BlzFrameSetSize(inv_main, INVENTORY_WIDTH, INVENTORY_GAPY)
+        BlzFrameSetTexture(inv_main, INVENTORY_TEXTURE, 0, false)
+        BlzFrameSetEnable(inv_main, true)
+        inv[0] = inv_main
+
+        for i = 1, 3 do
+            inv[i] = BlzCreateFrameByType("BACKDROP", "", frame, "", 0)
+            BlzFrameSetPoint(inv[i], FRAMEPOINT_TOPLEFT, inv[i - 1], FRAMEPOINT_BOTTOMLEFT, 0., (i == 1 and -INVENTORY_SLOT_SIZE) or 0.)
+            BlzFrameSetSize(inv[i], INVENTORY_WIDTH, INVENTORY_GAPY)
+            BlzFrameSetTexture(inv[i], INVENTORY_TEXTURE, 0, false)
+            BlzFrameSetEnable(inv[i], true)
+        end
+
+        local pot = {}
+        for i = 1, 2 do
+            pot[i] = BlzCreateFrameByType("BACKDROP", "", frame, "", 0)
+            BlzFrameSetPoint(pot[i], FRAMEPOINT_TOPLEFT, inv_main, FRAMEPOINT_TOPRIGHT, 0.005, -INVENTORY_GAPY * (i - 1))
+            BlzFrameSetSize(pot[i], INVENTORY_GAPX, INVENTORY_GAPY)
+            BlzFrameSetTexture(pot[i], POTION_TEXTURE, 0, false)
+            BlzFrameSetEnable(pot[i], true)
+        end
+
+        frame_set_visible(frame, false)
+
+        -- context menu setup
+        local context_menu_backdrop = BlzCreateFrameByType("FRAME", "", frame, "", 0)
+        BlzFrameSetTexture(context_menu_backdrop, "trans32.blp", 0, true)
+        BlzFrameSetSize(context_menu_backdrop, 0.001, 0.001)
+        BlzFrameSetEnable(context_menu_backdrop, false)
+        frame_set_visible(context_menu_backdrop, false)
+        local context_buttons = {}
+        local CONTEXT_IDS = {
+            "Equip", "Unequip", "Drop", "Sell", "Details", "Stash", "Use"
+        }
+        for i, name in ipairs(CONTEXT_IDS) do
+            context_buttons[i] = SimpleButton.create(context_menu_backdrop, "inventorymenubuttons.dds", CONTEXT_BUTTON_WIDTH, CONTEXT_BUTTON_HEIGHT, FRAMEPOINT_TOPLEFT, FRAMEPOINT_TOPLEFT, 0, 0)
+            context_buttons[i]:text(name)
+        end
+        -- map frames to index
+        local frame_to_btn = {}
+        for i = 1, #context_buttons do
+            frame_to_btn[context_buttons[i].frame] = i
+        end
+        local cost_frame = BlzCreateFrameByType("FRAME", "", context_buttons[4].frame, "", 0)
+        BlzFrameSetSize(cost_frame, 0.001, 0.001)
+        BlzFrameSetEnable(cost_frame, false)
+        local transparent_placeholder = BlzCreateFrameByType("FRAME", "", context_buttons[1].frame, "", 0)
+        BlzFrameSetTexture(transparent_placeholder, "trans32.blp", 0, true)
+        BlzFrameSetSize(transparent_placeholder, 0.001, 0.001)
+        BlzFrameSetEnable(transparent_placeholder, false)
+        frame_set_visible(transparent_placeholder, false)
+        local cost_icon = BlzCreateFrameByType("BACKDROP", "", cost_frame, "", 0)
+        local cost_icon2 = BlzCreateFrameByType("BACKDROP", "", cost_frame, "", 0)
+        local cost_text = BlzCreateFrameByType("TEXT", "", cost_icon, "", 0)
+        local cost_text2 = BlzCreateFrameByType("TEXT", "", cost_icon2, "", 0)
+        BlzFrameSetPoint(cost_frame, FRAMEPOINT_TOPLEFT, context_buttons[4].frame, FRAMEPOINT_TOPRIGHT, 0., 0.)
+        BlzFrameSetPoint(cost_icon, FRAMEPOINT_TOPLEFT, cost_frame, FRAMEPOINT_TOPRIGHT, 0., 0.)
+        BlzFrameSetSize(cost_icon, 0.013, 0.013)
+        BlzFrameSetTexture(cost_icon, CURRENCY_ICON[GOLD + 1], 0, true)
+        BlzFrameSetPoint(cost_text, FRAMEPOINT_TOPLEFT, cost_icon, FRAMEPOINT_TOPRIGHT, 0.002, -0.002)
+        BlzFrameSetTextAlignment(cost_text, TEXT_JUSTIFY_CENTER, TEXT_JUSTIFY_LEFT)
+        BlzFrameSetPoint(cost_icon2, FRAMEPOINT_TOPLEFT, cost_icon, FRAMEPOINT_BOTTOMLEFT, 0., 0.)
+        BlzFrameSetSize(cost_icon2, 0.013, 0.013)
+        BlzFrameSetTexture(cost_icon2, CURRENCY_ICON[PLATINUM + 1], 0, true)
+        BlzFrameSetPoint(cost_text2, FRAMEPOINT_TOPLEFT, cost_icon2, FRAMEPOINT_TOPRIGHT, 0.002, -0.002)
+        BlzFrameSetTextAlignment(cost_text2, TEXT_JUSTIFY_CENTER, TEXT_JUSTIFY_LEFT)
+        frame_set_visible(cost_frame, false)
+        BlzFrameSetTooltip(context_buttons[1].frame, transparent_placeholder)
+        BlzFrameSetTooltip(context_buttons[2].frame, transparent_placeholder)
+        BlzFrameSetTooltip(context_buttons[3].frame, transparent_placeholder)
+        BlzFrameSetTooltip(context_buttons[4].frame, cost_frame)
+        BlzFrameSetTooltip(context_buttons[5].frame, transparent_placeholder)
+        BlzFrameSetTooltip(context_buttons[6].frame, transparent_placeholder)
+        BlzFrameSetTooltip(context_buttons[7].frame, transparent_placeholder)
+
+        local result_messages = {
+            invalid_slot = "That inventory slot is invalid.",
+            invalid_player = "Your inventory is not available.",
+            missing_source = "That item is no longer in the selected slot.",
+            missing_target = "The destination item is no longer available.",
+            invalid_target = "That item cannot be moved to the selected slot.",
+            invalid_source = "The destination item cannot move into the vacated slot.",
+            no_equip_slot = "There is no compatible empty equipment slot.",
+            no_backpack_slot = "There is no empty backpack slot.",
+            not_in_town = "Items can only be sold while in town.",
+            unsellable = "That item cannot be sold.",
+            stale = "Your inventory changed before the move completed.",
+            destroy_failed = "That item could not be removed.",
+            stash_full = "Your unlocked stash rows are full.",
+            locked_slot = "That stash row is locked.",
+            occupied = "That stash slot is occupied.",
+            not_usable = "That item cannot be used.",
+            use_failed = "That item could not be used.",
+        }
+
+        ---@param pid integer
+        ---@param response InventoryResult?
+        local function render_inventory_result(pid, response)
+            if response and not response.ok then
+                local message = response.message or result_messages[response.code]
+                if message then
+                    local p = Player(pid - 1)
+                    DisplayTimedTextToPlayer(p, 0, 0, 15., message)
+                    SoundHandler("Sound\\Interface\\Error.wav", false, p)
+                end
+            end
+        end
+
+        local context_functions = {
+            function(pid, slot) -- EQUIP
+                return InventoryService.equip(pid, slot)
+            end,
+            function(pid, slot) -- UNEQUIP
+                return InventoryService.unequip(pid, slot)
+            end,
+            function(pid, slot) -- DROP
+                return InventoryService.drop(pid, slot, GetUnitX(Hero[pid]), GetUnitY(Hero[pid]))
+            end,
+            function(pid, slot) -- SELL
+                local response = InventoryService.sell(pid, slot)
+                if response.ok then
+                    SoundHandler("Abilities\\Spells\\Items\\ResourceItems\\ReceiveGold.flac", true, Player(pid - 1), response.holder)
+                end
+                return response
+            end,
+            function(pid, slot) -- DETAILS
+                local itm = Profile[viewing[pid]].hero.items[slot]
+                if itm then
+                    local info = itm:info()
+                    ItemDetails.show(pid, info.name, info.icon, info.description)
+                end
+            end,
+            function(pid, slot) -- STASH
+                return StashService.deposit(pid, slot)
+            end,
+            function(pid, slot) -- USE
+                return ItemUse.use(pid, slot)
+            end,
+        }
+
+        local function clear_context(pid)
+            context[pid] = 0
+            target[pid] = 0
+            right_click_origin[pid] = 0
+            synced_context[pid] = false
+            synced_target[pid] = false
+        end
+
+        local on_context_push = function()
+            local pid = GetPlayerId(GetTriggerPlayer()) + 1
+            local f = BlzGetTriggerFrame()
+
+            BlzFrameSetEnable(f, false)
+            BlzFrameSetEnable(f, true)
+
+            local btn_index = frame_to_btn[f]
+            if not btn_index then return false end
+            -- Practice menus must never reach profile reads, sync messages,
+            -- or the real inventory service (including Drop/Sell).
+            if practice_context_action and practice_context_action(pid, btn_index) then return false end
+
+            open_context_menu(pid, false)
+
+            if btn_index == 5 then
+                context_functions[btn_index](pid, context[pid])
+                clear_context(pid)
+            elseif context[pid] > 0 and GetLocalPlayer() == GetTriggerPlayer() then
+                BlzSendSyncData("inventory_action", btn_index .. ":" .. context[pid])
+            end
+
+            return false
+        end
+
+        for i = 1, #context_buttons do
+            context_buttons[i]:onClick(on_context_push)
+        end
+
+        -- frame that follows the mouse (for item dragging)
+        local tracker = BlzCreateFrameByType("BACKDROP", "", BlzGetFrameByName("ConsoleUIBackdrop", 0), "", 0)
+        local tracker_timer = CreateTimer()
+        local tracker_x, tracker_y
+        BlzFrameSetEnable(tracker, false)
+        BlzFrameSetSize(tracker, INVENTORY_SLOT_SIZE, INVENTORY_SLOT_SIZE)
+        BlzFrameSetTexture(tracker, "trans32.blp", 0, true)
+        BlzFrameSetLevel(tracker, 25)
+
+        ---@param snap boolean?
+        local function update_tracker_position(snap)
+            local x, y = get_mouse_frame_position()
+            if x and y then
+                if snap or not tracker_x or not tracker_y then
+                    tracker_x, tracker_y = x, y
+                else
+                    tracker_x = tracker_x + (x - tracker_x) * TRACKER_FOLLOW
+                    tracker_y = tracker_y + (y - tracker_y) * TRACKER_FOLLOW
+                end
+                setabspoint(tracker, FRAMEPOINT_CENTER, tracker_x, tracker_y)
+            end
+        end
+
+        local hide_tracker = function(pid)
+            if GetLocalPlayer() == Player(pid - 1) then
+                PauseTimer(tracker_timer)
+                BlzFrameSetTexture(tracker, "trans32.blp", 0, true)
+                tracker_x, tracker_y = nil, nil
+            end
+        end
+
+        local show_tracker = function(pid, texture)
+            if GetLocalPlayer() == Player(pid - 1) then
+                update_tracker_position(true)
+                BlzFrameSetTexture(tracker, texture, 0, true)
+                TimerStart(tracker_timer, 1. / 128., true, update_tracker_position)
+            end
+        end
+
+        thistype.showDragTracker = show_tracker
+        thistype.hideDragTracker = hide_tracker
+
+        --#endregion
+
+        INVENTORY.open = function(pid, tpid)
+            if GetLocalPlayer() == Player(pid - 1) then
+                frame_set_visible(frame, true)
+            end
+
+            -- open may be called again without a close
+            EVENT_ON_M1_DOWN:unregister_action(pid, on_m1_down)
+            EVENT_ON_M1_UP:unregister_action(pid, on_m1_up)
+            EVENT_ON_M2_DOWN:unregister_action(pid, on_m2_down)
+            EVENT_ON_M2_UP:unregister_action(pid, on_m2_up)
+
+            viewing[pid] = tpid
+
+            if pid == tpid then -- only allow item movement if looking at your own inventory
+                EVENT_ON_M1_DOWN:register_action(pid, on_m1_down)
+                EVENT_ON_M1_UP:register_action(pid, on_m1_up)
+            end
+
+            EVENT_ON_M2_DOWN:register_action(pid, on_m2_down)
+            EVENT_ON_M2_UP:register_action(pid, on_m2_up)
+
+            thistype.refresh(tpid)
+
+        end
+
+        INVENTORY.close = function(pid)
+            if viewing[pid] ~= -1 then
+                if StashUI and StashUI.isOpen(pid) then StashUI.close(pid) end
+                if GetLocalPlayer() == Player(pid - 1) then
+                    frame_set_visible(frame, false)
+                end
+                viewing[pid] = -1
+                EVENT_ON_M1_DOWN:unregister_action(pid, on_m1_down)
+                EVENT_ON_M1_UP:unregister_action(pid, on_m1_up)
+                EVENT_ON_M2_DOWN:unregister_action(pid, on_m2_down)
+                EVENT_ON_M2_UP:unregister_action(pid, on_m2_up)
+
+                clear_context(pid)
+                hide_tracker(pid)
+            end
+        end
+        AddToEsc(INVENTORY.close) -- close window hotkey reference
+
+        INVENTORY.display = function(pid, tpid) -- display to, display target
+            if Profile[tpid] and Profile[tpid].playing then
+                if viewing[pid] == tpid then
+                    thistype.close(pid)
+                else
+                    thistype.open(pid, tpid)
+                end
+            end
+        end
+
+        local function get_socket_subtext(socket)
+            local data = ItemData[socket.id]
+            local text = {}
+
+            if socket.level > 0 then
+                text[#text + 1] = RARITY_NAME[(socket.level + 3) // socket.rarity]
+                text[#text + 1] = " +"
+                text[#text + 1] = socket.level
+                text[#text + 1] = "|n"
+            end
+
+            text[#text + 1] = TIER_NAME[data[ITEM_TIER]]
+            text[#text + 1] = " "
+            text[#text + 1] = TYPE_NAME[data[ITEM_TYPE]]
+
+            local level_requirement = data[ITEM_LEVEL_REQUIREMENT]
+            if level_requirement > 0 then
+                text[#text + 1] = "|n|cffff0000Level Requirement: |r"
+                text[#text + 1] = level_requirement
+            end
+
+            return concat(text)
+        end
+
+        local function update_socket_tooltips(tooltip, itm)
+            for i = 1, 3 do
+                local socket = itm and itm.sockets[i]
+
+                if socket then
+                    tooltip:attachment(
+                        i,
+                        GetItemName(socket.obj),
+                        get_socket_subtext(socket),
+                        BlzGetItemIconPath(socket.obj)
+                    )
+                else
+                    tooltip:attachment(i)
+                end
+            end
+        end
+
+        function thistype.renderItemButton(button, itm, pid)
+            if itm then
+                local icon = BlzGetItemIconPath(itm.obj)
+                button:icon(icon)
+                button.tooltip:icon(icon)
+                button.tooltip:name(GetItemName(itm.obj))
+                button.tooltip:text(alt_down[pid] and itm.alt_tooltip or
+                                        itm.tooltip)
+                update_socket_tooltips(button.tooltip, itm)
+                button:visible(true)
+                button:charge(itm.charges)
+                set_rarity_border(button, get_rarity_border(itm))
+            else
+                update_socket_tooltips(button.tooltip)
+                set_rarity_border(button)
+                button:visible(false)
+            end
+        end
+
+        INVENTORY.refresh = function(pid)
+            if not pid or pid < 1 or not Profile[pid] or not Profile[pid].hero then
+                return
+            end
+
+            POTION.refresh(pid)
+
+            local me = GetPlayerId(GetLocalPlayer()) + 1
+
+            if viewing[me] ~= pid then
+                return
+            end
+
+            -- local block for players viewing this inventory
+            local items = Profile[pid].hero.items
+            for i = 1, MAX_INVENTORY_SLOTS do
+                thistype.renderItemButton(slots[i], items[i], pid)
+            end
+        end
+
+        local onCloseButton = function()
+            local f = BlzGetTriggerFrame()
+            local pid = GetPlayerId(GetTriggerPlayer()) + 1
+
+            if GetLocalPlayer() == Player(pid - 1) then
+                BlzFrameSetEnable(f, false)
+                BlzFrameSetEnable(f, true)
+            end
+
+            thistype.close(pid)
+
+            return false
+        end
+
+        -- escape button
+        local esc_button = SimpleButton.create(frame, "ReplaceableTextures\\CommandButtons\\BTNCancel.blp", 0.018, 0.018, FRAMEPOINT_TOPRIGHT, FRAMEPOINT_TOPRIGHT, -0.02, -0.02, onCloseButton, "Close 'I'", FRAMEPOINT_BOTTOM, FRAMEPOINT_TOP, 0., 0.01)
+        RegisterHotkeyTooltip(esc_button, 5)
+
+        local function toggle_stash()
+            local pid = GetPlayerId(GetTriggerPlayer()) + 1
+            local f = BlzGetTriggerFrame()
+            BlzFrameSetEnable(f, false)
+            BlzFrameSetEnable(f, true)
+
+            if StashUI and viewing[pid] == pid then StashUI.display(pid) end
+        end
+        local stash_button = SimpleButton.create(
+            frame, "ReplaceableTextures\\CommandButtons\\BTNArcaneVault.blp",
+            0.025, 0.025, FRAMEPOINT_TOPLEFT, FRAMEPOINT_TOPLEFT, 0.017,
+            -0.015, toggle_stash, "Open Stash", FRAMEPOINT_BOTTOM,
+            FRAMEPOINT_TOP, 0., 0.006)
+
+        function INVENTORY.getTutorialFrame(part)
+            if part == "equipment" then return inv[0] end
+            if part == "backpack" then return inv[1] end
+            if part == "potions" then return pot[1] end
+            if part == "stash" then return stash_button.frame end
+            return frame
+        end
+
+        function INVENTORY.isOpen(pid) return viewing[pid] ~= -1 end
+
+        -- Sample presentation is copied synchronously from real starter items;
+        -- the temporary handles are destroyed before any practice interaction.
+        -- Moving samples is UI-only, with no profile mutations or item orders.
+        local practice, practice_visible = {}, {}
+        local practice_templates
+        local function close_practice_menu(pid)
+            if GetLocalPlayer() ~= Player(pid - 1) then return end
+            if practice[pid] then practice[pid].menu = nil end
+            frame_set_visible(context_menu_backdrop, false)
+            for _, button in ipairs(slots) do button.tooltip:visible(true) end
+            if StashUI then StashUI.setTutorialTooltipsVisible(pid, true) end
+        end
+        function INVENTORY.prepareTutorialPractice()
+            if practice_templates then return end
+            practice_templates = {}
+            for _, spec in ipairs({{id = 'I01I', slot = 1}, {id = 'I02F', slot = 9, flask = true}}) do
+                local item = ItemRuntime.create(FourCC(spec.id))
+                SetItemVisible(item.obj, false)
+                if spec.flask then PotionService.refreshItem(item) end
+                practice_templates[spec.slot] = {
+                    name = GetItemName(item.obj), icon = BlzGetItemIconPath(item.obj),
+                    description = item.tooltip .. "|n|n|cff808080Tutorial item: cannot be used, dropped, or saved.|r",
+                    alt_description = item.alt_tooltip .. "|n|n|cff808080Tutorial item: cannot be used, dropped, or saved.|r",
+                    charges = item.charges, flask = spec.flask,
+                }
+                item:destroy()
+            end
+        end
+        function INVENTORY.renderTutorialItem(button, sample, hidden, pid)
+            thistype.renderItemButton(button, nil)
+            if sample then
+                button:icon(sample.icon)
+                button.tooltip:icon(sample.icon)
+                button.tooltip:name(sample.name)
+                button.tooltip:text(pid and alt_down[pid] and sample.alt_description or sample.description)
+                button:charge(sample.charges or 0)
+                button:visible(not hidden)
+            end
+        end
+        local function render_practice(pid)
+            for i = 1, MAX_INVENTORY_SLOTS do
+                local button, sample = slots[i], practice[pid].items[i]
+                INVENTORY.renderTutorialItem(button, sample, practice[pid].drag == i, pid)
+            end
+            if StashUI then StashUI.renderTutorialPractice(pid, practice[pid].items, practice[pid].drag) end
+        end
+        function INVENTORY.refreshTutorialPractice(pid)
+            if GetLocalPlayer() == Player(pid - 1) and practice[pid] then render_practice(pid) end
+        end
+        local function practice_hovered(pid)
+            if StashUI and StashUI.isTutorialPreviewOpen(pid) then
+                local slot = StashUI.getLocalHoveredSlot()
+                if slot > 0 and slot <= STASH_COLUMNS then return MAX_INVENTORY_SLOTS + slot end
+                if slot >= 0 then return 0 end
+            end
+            return get_inventory_hovered_slot()
+        end
+        local function practice_transfer(pid, from, first, last)
+            local items = practice[pid].items
+            for destination = first, last do
+                if not items[destination] then
+                    items[destination], items[from] = items[from], nil
+                    return
+                end
+            end
+        end
+        practice_context_action = function(pid, action)
+            if not practice_visible[pid] then return false end
+            if GetLocalPlayer() ~= Player(pid - 1) then return true end
+            local state = practice[pid]
+            local from = state and state.menu
+            local sample = from and state.items[from]
+            close_practice_menu(pid)
+            if not sample then return true end
+            if action == 1 then -- Equip / Take
+                if from > MAX_INVENTORY_SLOTS then
+                    practice_transfer(pid, from, 9, MAX_INVENTORY_SLOTS)
+                elseif sample.flask then
+                    practice_transfer(pid, from, 7, 8)
+                else
+                    practice_transfer(pid, from, 1, 6)
+                end
+            elseif action == 2 then -- Unequip
+                practice_transfer(pid, from, 9, MAX_INVENTORY_SLOTS)
+            elseif action == 5 then -- Details
+                state.details = true
+                ItemDetails.show(pid, sample.name, sample.icon, sample.description)
+            elseif action == 6 and StashUI and StashUI.isTutorialPreviewOpen(pid) then
+                practice_transfer(pid, from, MAX_INVENTORY_SLOTS + 1, MAX_INVENTORY_SLOTS + STASH_COLUMNS)
+            end
+            -- Drop, Sell, and Use deliberately do nothing in practice mode.
+            render_practice(pid)
+            return true
+        end
+        local function practice_right_down()
+            local pid = GetPlayerId(GetTriggerPlayer()) + 1
+            if GetLocalPlayer() ~= Player(pid - 1) or not practice_visible[pid] then return end
+            close_practice_menu(pid)
+            practice[pid].right_down = practice_hovered(pid)
+        end
+        local function practice_right_up()
+            local pid = GetPlayerId(GetTriggerPlayer()) + 1
+            if GetLocalPlayer() ~= Player(pid - 1) or not practice_visible[pid] then return end
+            local state = practice[pid]
+            local slot = practice_hovered(pid)
+            local pressed = state.right_down
+            state.right_down = nil
+            if pressed ~= slot or slot <= 0 or not state.items[slot] then return end
+            state.drag = nil
+            hide_tracker(pid)
+            render_practice(pid)
+            state.menu = slot
+            local in_stash = slot > MAX_INVENTORY_SLOTS
+            local anchor = in_stash and StashUI.getTutorialSlotFrame(slot - MAX_INVENTORY_SLOTS) or slots[slot].frame
+            local actions = in_stash and {1, 3, 4, 5} or slot <= 8 and {2, 3, 4, 5} or {1, 3, 4, 5}
+            if not in_stash and StashUI and StashUI.isTutorialPreviewOpen(pid) then actions[#actions + 1] = 6 end
+            context_buttons[1]:text(in_stash and "Take" or "Equip")
+            for _, button in ipairs(context_buttons) do button:visible(false) end
+            for i, action in ipairs(actions) do
+                local button = context_buttons[action]
+                frame_clear_all_points(button.frame)
+                if i == 1 then
+                    BlzFrameSetPoint(button.frame, FRAMEPOINT_TOPLEFT, context_menu_backdrop, FRAMEPOINT_TOPLEFT, 0., 0.)
+                else
+                    BlzFrameSetPoint(button.frame, FRAMEPOINT_TOPLEFT, context_buttons[actions[i - 1]].frame, FRAMEPOINT_BOTTOMLEFT, 0., 0.)
+                end
+                button:visible(true)
+            end
+            for _, button in ipairs(slots) do button.tooltip:visible(false) end
+            if StashUI then StashUI.setTutorialTooltipsVisible(pid, false) end
+            BlzFrameSetTooltip(context_buttons[4].frame, transparent_placeholder)
+            frame_clear_all_points(context_menu_backdrop)
+            BlzFrameSetPoint(context_menu_backdrop, FRAMEPOINT_TOPLEFT, anchor, FRAMEPOINT_TOPRIGHT, 0.005, 0.)
+            frame_set_visible(context_menu_backdrop, true)
+        end
+        local function practice_down()
+            local pid = GetPlayerId(GetTriggerPlayer()) + 1
+            if GetLocalPlayer() ~= Player(pid - 1) or not practice_visible[pid] then return end
+            local slot = practice_hovered(pid)
+            if practice[pid].menu then
+                if slot <= 0 or not practice[pid].items[slot] then return end
+                close_practice_menu(pid)
+            end
+            local sample = practice[pid].items[slot]
+            if sample and ctrl_down[pid] and StashUI and StashUI.isTutorialPreviewOpen(pid) then
+                local first, last = MAX_INVENTORY_SLOTS + 1, MAX_INVENTORY_SLOTS + STASH_COLUMNS
+                if slot > MAX_INVENTORY_SLOTS then first, last = 9, MAX_INVENTORY_SLOTS end
+                for destination = first, last do
+                    if not practice[pid].items[destination] then
+                        practice[pid].items[destination], practice[pid].items[slot] = sample, nil
+                        break
+                    end
+                end
+                practice[pid].drag = nil
+                render_practice(pid)
+                return
+            end
+            practice[pid].drag = sample and slot or nil
+            if sample then
+                show_tracker(pid, sample.icon)
+                render_practice(pid)
+            end
+        end
+        local function practice_up()
+            local pid = GetPlayerId(GetTriggerPlayer()) + 1
+            if GetLocalPlayer() ~= Player(pid - 1) or not practice_visible[pid] then return end
+            local state = practice[pid]
+            local from, to = state.drag, practice_hovered(pid)
+            state.drag = nil
+            hide_tracker(pid)
+            local maximum = MAX_INVENTORY_SLOTS
+            if StashUI and StashUI.isTutorialPreviewOpen(pid) then maximum = maximum + STASH_COLUMNS end
+            if not from or to < 1 or to > maximum then render_practice(pid); return end
+            local first, second = state.items[from], state.items[to]
+            local function allowed(sample, slot)
+                if not sample then return true end
+                if sample.flask then return slot > 6 end
+                return slot ~= 7 and slot ~= 8
+            end
+            if allowed(first, to) and allowed(second, from) then
+                state.items[from], state.items[to] = second, first
+            end
+            render_practice(pid)
+        end
+        function INVENTORY.previewTutorial(pid, visible)
+            practice_visible[pid] = visible
+            EVENT_ON_M1_DOWN:unregister_action(pid, practice_down)
+            EVENT_ON_M1_UP:unregister_action(pid, practice_up)
+            EVENT_ON_M2_DOWN:unregister_action(pid, practice_right_down)
+            EVENT_ON_M2_UP:unregister_action(pid, practice_right_up)
+            if visible then
+                EVENT_ON_M1_DOWN:register_action(pid, practice_down)
+                EVENT_ON_M1_UP:register_action(pid, practice_up)
+                EVENT_ON_M2_DOWN:register_action(pid, practice_right_down)
+                EVENT_ON_M2_UP:register_action(pid, practice_right_up)
+            end
+            if GetLocalPlayer() ~= Player(pid - 1) then return end
+            if visible then
+                if not practice[pid] then
+                    local items = {}
+                    for slot, sample in pairs(practice_templates) do items[slot] = sample end
+                    practice[pid] = {items = items}
+                end
+                BlzFrameSetText(title, "Inventory")
+                render_practice(pid)
+            else
+                close_practice_menu(pid)
+                if practice[pid] and practice[pid].details then
+                    ItemDetails.hide(pid)
+                    practice[pid].details = nil
+                end
+                context_buttons[1]:text("Equip")
+                BlzFrameSetTooltip(context_buttons[4].frame, cost_frame)
+                hide_tracker(pid)
+                if practice[pid] then practice[pid].drag = nil end
+                BlzFrameSetText(title, "Inventory")
+            end
+            frame_set_visible(frame, visible)
+        end
+
+        function INVENTORY.clearTutorialPractice(pid)
+            if GetLocalPlayer() == Player(pid - 1) then practice[pid] = nil end
+        end
+
+        local function send_context(pid, slot)
+            -- set context asynchronously
+            context[pid] = slot
+            synced_context[pid] = false
+
+            -- send payload
+            if GetLocalPlayer() == Player(pid - 1) then
+                BlzSendSyncData("context", string.format("%d", slot))
+            end
+        end
+
+        local function send_target(pid, slot)
+            -- set target asynchronously
+            target[pid] = slot
+            synced_target[pid] = false
+
+            -- send payload
+            if GetLocalPlayer() == Player(pid - 1) then
+                BlzSendSyncData("target", tostring(slot))
+            end
+        end
+
+        local pick_item = function(pid)
+            local highlighted = get_local_item_slot(pid)
+
+            if highlighted > 0 then
+                local new_slot = slots[highlighted]
+
+                send_context(pid, highlighted)
+
+                if GetLocalPlayer() == Player(pid - 1) then
+                    new_slot:visible(false)
+                end
+                show_tracker(pid, new_slot.texture)
+
+            end
+        end
+
+        local reset_cooldown = function(pid)
+            move_item_cooldown[pid] = false
+        end
+
+        local function update_context_buttons(pid, slot)
+            local owner = viewing[pid]
+            local items = Profile[owner].hero.items -- safe for read only
+            local it = items[slot.index]
+
+            for i = 1, #context_buttons do
+                if GetLocalPlayer() == Player(pid - 1) then
+                    context_buttons[i]:visible(false)
+                end
+            end
+
+            -- determine which buttons should be shown
+            local visible_buttons = {}
+
+            -- buttons only shown to the owner
+            if pid == viewing[pid] then
+                if it and ItemUse.canUse(pid, it) then
+                    visible_buttons[#visible_buttons + 1] = 7 -- USE
+                end
+
+                -- unequip logic
+                if slot.index < BACKPACK_INDEX then
+                    if InventoryService.findUnequipTarget(pid, slot.index) then
+                        visible_buttons[#visible_buttons + 1] = 2 -- UNEQUIP
+                    end
+                else
+                -- equip logic
+                    if it and InventoryService.findEquipTarget(pid, slot.index) then
+                        visible_buttons[#visible_buttons + 1] = 1 -- EQUIP
+                    end
+                end
+
+                -- always allow dropping items
+                visible_buttons[#visible_buttons + 1] = 3
+
+                -- selling logic
+                if it then
+                    local quote = InventoryService.canSell(pid, slot.index)
+                    if quote.ok then
+                        local gold = quote.gold or 0
+                        local platinum = quote.platinum or 0
+                        visible_buttons[#visible_buttons + 1] = 4
+                        if GetLocalPlayer() == Player(pid - 1) then
+                            BlzFrameSetText(cost_text, string.format("%01d", gold))
+                            local show_plat = platinum > 0
+                            frame_set_visible(cost_icon2, show_plat)
+                            if show_plat then
+                                BlzFrameSetText(cost_text2, string.format("%01d", platinum))
+                            end
+                        end
+                    end
+                end
+
+                if it and StashService.canDeposit(pid, slot.index).ok then
+                    visible_buttons[#visible_buttons + 1] = 6 -- STASH
+                end
+            end
+
+            -- always allow viewing details
+            visible_buttons[#visible_buttons + 1] = 5
+
+            -- reattach and reposition visible buttons dynamically
+            local previous_button = nil
+            for i = 1, #visible_buttons do
+                local button_index = visible_buttons[i]
+                local button = context_buttons[button_index]
+
+                if GetLocalPlayer() == Player(pid - 1) then
+                    frame_clear_all_points(button.frame) -- Clear previous attachment
+                    button:visible(true)
+                    if previous_button then
+                        -- attach below the last visible button
+                        BlzFrameSetPoint(button.frame, FRAMEPOINT_TOPLEFT, previous_button.frame, FRAMEPOINT_BOTTOMLEFT, 0, 0)
+                    else
+                        -- first button, attach to the context menu frame
+                        BlzFrameSetPoint(button.frame, FRAMEPOINT_TOPLEFT, context_menu_backdrop, FRAMEPOINT_TOPLEFT, 0, 0)
+                    end
+                end
+
+                previous_button = button -- update the last attached button
+            end
+        end
+
+        open_context_menu = function(pid, open, highlighted)
+            -- toggle context menu mode
+            ui_mode[pid] = 1
+
+            highlighted = highlighted or get_local_item_slot(pid)
+
+            -- open context menu
+            if highlighted > 0 and open then
+                local new_slot = slots[highlighted]
+                update_context_buttons(pid, new_slot)
+
+                -- start context sync
+                send_context(pid, highlighted)
+
+                -- reposition and display context menu frame
+                if GetLocalPlayer() == Player(pid - 1) then
+                    frame_set_visible(context_menu_backdrop, true)
+                    frame_clear_all_points(context_menu_backdrop)
+                    BlzFrameSetPoint(context_menu_backdrop, FRAMEPOINT_TOPLEFT, new_slot.frame, FRAMEPOINT_TOPRIGHT, 0.005, 0.)
+                    for _, v in ipairs(slots) do
+                        v.tooltip:visible(false)
+                    end
+                end
+            else
+            -- close context menu
+                -- toggle normal mode
+                ui_mode[pid] = 0
+
+                -- hide context menu frame
+                if GetLocalPlayer() == Player(pid - 1) then
+                    frame_set_visible(context_menu_backdrop, false)
+                    for _, v in ipairs(slots) do
+                        v.tooltip:visible(true)
+                    end
+                end
+            end
+        end
+
+        local function on_context_sync()
+            local pid = GetPlayerId(GetTriggerPlayer()) + 1
+            local data = BlzGetTriggerSyncData()
+            local slot_s = string.match(data, "(%d+)")
+            local slot = tonumber(slot_s)
+            --print("context:",slot_s)
+
+            -- update context and flag as synced
+            context[pid] = slot
+            synced_context[pid] = true
+
+            return false
+        end
+
+        local function on_inventory_action_sync()
+            local pid = GetPlayerId(GetTriggerPlayer()) + 1
+            local action, slot = BlzGetTriggerSyncData():match("^(%d+):(%d+)$")
+            action = tonumber(action)
+            slot = tonumber(slot)
+
+            if action and action >= 1 and action <= 7 and action ~= 5 and slot then
+                local response = context_functions[action](pid, slot)
+                render_inventory_result(pid, response)
+            end
+
+            clear_context(pid)
+            return false
+        end
+
+        local function on_target_sync()
+            local pid = GetPlayerId(GetTriggerPlayer()) + 1
+            local data = BlzGetTriggerSyncData()
+            local slot_s = string.match(data, "(%-?%d+)")
+            local slot = tonumber(slot_s)
+            --print("target:", slot_s)
+
+            -- update target and flag as synced
+            target[pid] = slot
+            synced_target[pid] = true
+
+            -- resume any threads yielding for target
+            if target_thread[pid] then
+                coroutine.resume(target_thread[pid], slot)
+            end
+
+            return false
+        end
+
+        local confirm_item = function(pid)
+            target_thread[pid] = coroutine.create(function()
+                local hero = Profile[pid].hero
+                local slot = -1
+                if GetLocalPlayer() == Player(pid - 1) then
+                    slot = get_hovered_slot() -- intentionally asynchronous
+                end
+
+                hide_tracker(pid)
+
+                -- start target sync
+                send_target(pid, slot)
+
+                -- yield for target sync
+                slot = coroutine.yield()
+
+                -- check for syncs (extra safe)
+                if synced_context[pid] and synced_target[pid] then
+                    local itm = hero.items[context[pid]]
+
+                    if slot == -1 then -- negative indicates bailed out of menu
+                        if itm then
+                            hero.item_to_drop = itm
+                            IssuePointOrder(itm.holder, DROP_ITEM_COMMAND, GetMouseX(pid), GetMouseY(pid))
+                        end
+                    elseif slot > MAX_INVENTORY_SLOTS and itm then
+                        render_inventory_result(pid, StashService.transfer(
+                            pid, context[pid], slot - MAX_INVENTORY_SLOTS))
+                    elseif slot > 0 and itm then
+                        render_inventory_result(pid,
+                            InventoryService.move(pid, context[pid], slot))
+                    end
+                end
+
+                -- final cleanup
+                clear_context(pid)
+                thistype.refresh(pid)
+
+                -- short cooldown to prevent spam
+                move_item_cooldown[pid] = true
+                TimerQueue:callDelayed(0.05, reset_cooldown, pid)
+
+                target_thread[pid] = nil -- Clear coroutine reference
+            end)
+
+            coroutine.resume(target_thread[pid])
+        end
+
+        -- mouse events
+        on_m2_up = function()
+            local pid = GetPlayerId(GetTriggerPlayer()) + 1
+            local pressed_slot = right_click_origin[pid]
+            local released_slot = get_local_item_slot(pid)
+            right_click_origin[pid] = 0
+
+            if not disabled_for_player[pid] and pressed_slot > 0 and released_slot == pressed_slot then
+                open_context_menu(pid, true, pressed_slot)
+            end
+        end
+
+        on_m2_down = function()
+            local pid = GetPlayerId(GetTriggerPlayer()) + 1
+
+            if not disabled_for_player[pid] then
+                right_click_origin[pid] = get_local_item_slot(pid)
+            end
+        end
+
+        on_m1_down = function()
+            local pid = GetPlayerId(GetTriggerPlayer()) + 1
+
+            if ui_mode[pid] == 0 then
+                if not disabled_for_player[pid] and not move_item_cooldown[pid] then
+                    local highlighted = get_local_item_slot(pid)
+                    if ctrl_down[pid] and highlighted > 0 and StashUI and
+                        StashUI.isOpen(pid) and not StashUI.isReadOnly(pid) then
+                        skip_drag_release[pid] = true
+                        if GetLocalPlayer() == Player(pid - 1) then
+                            BlzSendSyncData("stash_action",
+                                            "deposit:" .. highlighted)
+                        end
+                    else
+                        skip_drag_release[pid] = false
+                        pick_item(pid)
+                    end
+                end
+            end
+
+            if ui_mode[pid] == 1 then
+                -- close context menu if either of these frames are not visible, because mouse is outside
+                if not BlzFrameIsVisible(cost_frame) and not BlzFrameIsVisible(transparent_placeholder) then
+                    open_context_menu(pid, false)
+                    clear_context(pid)
+                end
+            end
+        end
+
+        on_m1_up = function()
+            local pid = GetPlayerId(GetTriggerPlayer()) + 1
+
+            if skip_drag_release[pid] then
+                skip_drag_release[pid] = false
+            elseif ui_mode[pid] == 0 then
+                if not disabled_for_player[pid] then
+                    confirm_item(pid)
+                end
+            end
+        end
+
+        local function on_cleanup(pid)
+            thistype.close(pid)
+        end
+
+        -- assign a prefix and function for BlzSendSyncData calls
+        SyncCallback("context", on_context_sync)
+        SyncCallback("target", on_target_sync)
+        SyncCallback("inventory_action", on_inventory_action_sync)
+
+        local U = User.first
+        while U do
+            EVENT_ON_CLEANUP:register_action(U.id, on_cleanup)
+            U = U.next
+        end
+
+        -- hold alt for extended item tooltips
+        local function extended_item_tooltip(pid, is_down)
+            if alt_down[pid] ~= is_down then
+                alt_down[pid] = is_down
+                if practice_visible[pid] then thistype.refreshTutorialPractice(pid); return end
+
+                local target_pid = viewing[pid]
+                if target_pid and target_pid > 0 then
+                    thistype.refresh(target_pid)
+                end
+            end
+        end
+
+        RegisterHotkeyToFunc('ALT', nil, extended_item_tooltip, nil, true)
+        RegisterHotkeyToFunc('ALT+ALT', nil, extended_item_tooltip, nil, true)
+
+        local function control_state(pid, is_down)
+            ctrl_down[pid] = is_down
+        end
+        RegisterHotkeyToFunc('CTRL', nil, control_state, nil, true)
+        RegisterHotkeyToFunc('CTRL+CTRL', nil, control_state, nil, true)
+
+        -- slot initialization
+        do
+            local parent_table = {
+                ["main"] = inv[0],
+                ["potion1"] = pot[1],
+                ["potion2"] = pot[2],
+                -- unequip rows map to inv[1], inv[2], inv[3]
+                ["unequip1"] = inv[1],
+                ["unequip2"] = inv[2],
+                ["unequip3"] = inv[3],
+            }
+
+            local function y_offset(kind)
+                -- potions sit a hair higher in original code
+                if kind == "potion1" or kind == "potion2" then
+                    return -0.0032
+                end
+                return -0.0033
+            end
+
+            local function column_for(id, kind)
+                if kind == "main" then
+                    return id
+                elseif kind == "potion1" or kind == "potion2" then
+                    return 1
+                else
+                    -- flatten id to its position within the 18 unequip cells
+                    -- unequip cells start at global index 9
+                    local unequip_pos = id - 8 -- 1..18
+                    return ((unequip_pos - 1) % 6) + 1
+                end
+            end
+
+            for id, slot_meta in ipairs(inventory_slots) do
+                local kind = slot_meta[3]
+
+                local parent = parent_table[kind]
+                local col    = column_for(id, kind)
+                local offx = 0.0032 + INVENTORY_COLUMN_PITCH * (col - 1)
+                local offy   = y_offset(kind)
+
+                slots[id] = Button.create(parent, INVENTORY_SLOT_SIZE, INVENTORY_SLOT_SIZE, offx, offy, false)
+                slots[id].rarityBorder = BlzCreateFrameByType("BACKDROP", "", slots[id].iconFrame, "", 0)
+                local pixel_x = math.abs(BlzPixelToFrameX(1) -
+                                             BlzPixelToFrameX(0))
+                local pixel_y = math.abs(BlzPixelToFrameY(1) -
+                                             BlzPixelToFrameY(0))
+                BlzFrameSetPoint(slots[id].rarityBorder, FRAMEPOINT_TOPLEFT,
+                                 slots[id].iconFrame, FRAMEPOINT_TOPLEFT,
+                                 -pixel_x, pixel_y)
+                BlzFrameSetPoint(slots[id].rarityBorder,
+                                 FRAMEPOINT_BOTTOMRIGHT,
+                                 slots[id].iconFrame,
+                                 FRAMEPOINT_BOTTOMRIGHT, -pixel_x, pixel_y)
+                BlzFrameSetEnable(slots[id].rarityBorder, false)
+                BlzFrameSetLevel(slots[id].rarityBorder, 1)
+                BlzFrameSetLevel(slots[id].chargeFrame, 2)
+                BlzFrameSetVisible(slots[id].rarityBorder, false)
+                slots[id].tooltip:enableAttachments()
+                slots[id]:visible(false)
+                slots[id].index = id
+
+                slots[id].tooltip:point(FRAMEPOINT_TOPRIGHT)
+            end
+        end
+    end
+
+    RegisterItemChangedAction(INVENTORY.refresh)
+end, Debug and Debug.getLine())

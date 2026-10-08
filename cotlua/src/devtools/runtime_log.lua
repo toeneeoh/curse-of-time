@@ -1,0 +1,110 @@
+-- Development-only runtime log persisted through Warcraft's Preload FileIO.
+
+OnInit.global("DevRuntimeLog", function(Require)
+    Require('Variables')
+    Require('FileIO')
+    Require('TimerQueue')
+
+    DevLog = {
+        enabled = DEV_LOG_ENABLED and FileIO.enabled,
+        path = MAP_NAME .. "\\dev\\runtime-player-" .. (GetPlayerId(GetLocalPlayer()) + 1) .. ".pld",
+        entries = {},
+    }
+
+    local writing = false
+    local original_print = print
+
+    local function timestamp()
+        return string.format("%010.3f", os.clock())
+    end
+
+    local function join(...)
+        local values = {}
+        for index = 1, select('#', ...) do
+            values[index] = tostring(select(index, ...))
+        end
+        return table.concat(values, "    ")
+    end
+
+    local function active_time(metrics)
+        local total = metrics.active_time
+        if metrics.started_at then
+            total = total + os.clock() - metrics.started_at
+        end
+        return total
+    end
+
+    local function average_sample_microseconds(metrics)
+        if metrics.samples == 0 then return 0. end
+        return metrics.sample_time / metrics.samples * 1000000.
+    end
+
+    function DevLog.flush()
+        if DevLog.enabled and not writing then
+            writing = true
+            FileIO.Save(DevLog.path, table.concat(DevLog.entries, "\n") .. "\n")
+            writing = false
+        end
+    end
+
+    function DevLog.write(category, message, defer_flush)
+        if not DevLog.enabled then return end
+        DevLog.entries[#DevLog.entries + 1] = "[" .. timestamp() .. "] [" .. category .. "] " .. tostring(message)
+        if not defer_flush then
+            DevLog.flush()
+        end
+    end
+
+    function DevLog.snapshot(label)
+        if not DevLog.enabled then return end
+        local items = RuntimeMetrics.items
+        local initializers = RuntimeMetrics.initializers
+        local events = RuntimeMetrics.events
+        local enemy_ai = RuntimeMetrics.enemy_ai
+        local timers = RuntimeMetrics.timer_queue
+        local movespeed = RuntimeMetrics.movespeed
+        local leveling = RuntimeMetrics.leveling
+        DevLog.write("METRICS", string.format(
+            "%s init=%d/%d items=%d/%d/%d peak=%d events=%d callbacks=%d damage=%d ai=%d/%d timers=%d peak=%d movespeed=%d peak=%d ticks=%d updates=%d sessions=%d active_s=%.3f avg_us=%.2f max_us=%.2f period=%.5f level_events=%d level_avg_ms=%.2f level_max_ms=%.2f level_award_avg_ms=%.2f level_award_max_ms=%.2f level_stages_ms=%.2f/%.2f/%.2f/%.2f/%.2f/%.2f",
+            label or "snapshot",
+            initializers.completed, initializers.started,
+            items.live, items.created, items.destroyed, items.peak,
+            events.triggers, events.callbacks, RuntimeMetrics.damage.events,
+            enemy_ai.dispatches, enemy_ai.evaluations,
+            timers.active, timers.peak,
+            movespeed.active, movespeed.peak, movespeed.ticks, movespeed.unit_updates,
+            movespeed.sessions, active_time(movespeed), average_sample_microseconds(movespeed),
+            movespeed.max_sample_time * 1000000., movespeed.period,
+            leveling.events,
+            leveling.total_time / math.max(1, leveling.events) * 1000.,
+            leveling.max_time * 1000.,
+            leveling.leveling_award_time / math.max(1, leveling.leveling_awards) * 1000.,
+            leveling.max_leveling_award_time * 1000.,
+            leveling.hero_event_time / math.max(1, leveling.events) * 1000.,
+            leveling.backpack_time / math.max(1, leveling.events) * 1000.,
+            leveling.item_time / math.max(1, leveling.events) * 1000.,
+            leveling.stat_sync_time / math.max(1, leveling.events) * 1000.,
+            leveling.stat_event_time / math.max(1, leveling.events) * 1000.,
+            leveling.finish_time / math.max(1, leveling.events) * 1000.))
+    end
+
+    if not DevLog.enabled then return end
+
+    -- Start a fresh file for each map process. FileIO.Save replaces the file,
+    -- which also makes every subsequent entry visible before Warcraft exits.
+    DevLog.entries[1] = "[" .. timestamp() .. "] [RUN] start player="
+        .. (GetPlayerId(GetLocalPlayer()) + 1) .. " name=" .. GetPlayerName(GetLocalPlayer())
+    DevLog.flush()
+
+    print = function(...)
+        original_print(...)
+        if writing then return end
+        local message = join(...)
+        DevLog.write(message:find("ERROR at", 1, true) and "ERROR" or "PRINT", message)
+    end
+
+    -- Preserve an error raised before FileIO became available.
+    if Debug.data.firstError then
+        DevLog.write("EARLY_ERROR", Debug.data.firstError)
+    end
+end, Debug and Debug.getLine())

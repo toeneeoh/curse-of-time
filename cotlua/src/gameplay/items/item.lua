@@ -1,0 +1,1841 @@
+--[[
+    item.lua
+
+    A library that defines a custom item interface
+]] OnInit.final("Items", function(Require)
+    Require('Users')
+    Require('Variables')
+    Require('ItemEventRegistry')
+    Require('Hotkeys')
+    Require('ItemHelpers')
+    Require('Currency')
+    Require('Events')
+    Require('Prices')
+    Require('Profile')
+    Require('SaveSchema')
+    Require('Spells')
+    Require('TimerQueue')
+    Require('UnitTable')
+
+    CHURCH_DONATION = {} ---@type boolean[]
+    RECHARGE_COOLDOWN = __jarray(0) ---@type number[]
+    IS_ITEM_DROP = __jarray(true) ---@type boolean[]
+
+    local get_widget_life, get_unit_state, set_widget_life, set_unit_state =
+        GetWidgetLife, GetUnitState, SetWidgetLife, SetUnitState
+    local floor = math.floor
+    local concat = table.concat
+    local ItemData = ItemData
+    local TQ = TimerQueue
+    local Unit = Unit
+    local Spells = Spells
+    local ITEM_ABILITY, ITEM_ABILITY2 = ITEM_ABILITY, ITEM_ABILITY2
+    local TYPE_SOCKETABLE = 12
+    local DISPLAY_STATS = {}
+
+    for index = 1, ITEM_ABILITY2 do DISPLAY_STATS[#DISPLAY_STATS + 1] = index end
+    DISPLAY_STATS[#DISPLAY_STATS + 1] = STATUS_RESISTANCE
+
+    local function item_data(item) return item.data or ItemData[item.id] end
+
+    -- per-stat applicators
+    -- sig: applier(unit, mult, value, mod, self_item)
+    local STAT_APPLIERS = {}
+
+    STAT_APPLIERS[ITEM_ARMOR] = function(unit, mult, value, mod)
+        unit.bonus_armor = unit.bonus_armor + mult * floor(mod * value)
+    end
+
+    STAT_APPLIERS[ITEM_DAMAGE] = function(unit, mult, value, mod)
+        unit.bonus_damage = unit.bonus_damage + mult * floor(mod * value)
+    end
+
+    STAT_APPLIERS[ITEM_HEALTH] = function(unit, mult, value, mod)
+        unit.bonus_hp = unit.bonus_hp + mult * floor(mod * value)
+    end
+
+    STAT_APPLIERS[ITEM_MANA] = function(unit, mult, value, mod)
+        unit.bonus_mana = unit.bonus_mana + mult * floor(mod * value)
+    end
+
+    STAT_APPLIERS[ITEM_STRENGTH] = function(unit, mult, value, mod)
+        unit.bonus_str = unit.bonus_str + mult * floor(mod * value)
+    end
+
+    STAT_APPLIERS[ITEM_AGILITY] = function(unit, mult, value, mod)
+        unit.bonus_agi = unit.bonus_agi + mult * floor(mod * value)
+    end
+
+    STAT_APPLIERS[ITEM_INTELLIGENCE] = function(unit, mult, value, mod)
+        unit.bonus_int = unit.bonus_int + mult * floor(mod * value)
+    end
+
+    STAT_APPLIERS[ITEM_GOLD_GAIN] = function(unit, mult, value)
+        unit.gold_rate = unit.gold_rate + mult * value
+    end
+
+    STAT_APPLIERS[ITEM_SPELLBOOST] = function(unit, mult, value)
+        unit.spellboost = unit.spellboost + mult * value * 0.01
+    end
+
+    STAT_APPLIERS[ITEM_MOVESPEED] = function(unit, mult, value)
+        unit.ms_flat = unit.ms_flat + mult * value
+    end
+
+    STAT_APPLIERS[ITEM_REGENERATION] = function(unit, mult, value)
+        unit.regen_flat = unit.regen_flat + mult * value
+    end
+
+    STAT_APPLIERS[ITEM_EVASION] = function(unit, mult, value)
+        unit.evasion = unit.evasion + mult * value
+    end
+
+    STAT_APPLIERS[ITEM_CRIT_CHANCE] = function(unit, mult, value)
+        unit.cc_flat = unit.cc_flat + mult * value
+    end
+
+    STAT_APPLIERS[ITEM_CRIT_DAMAGE] = function(unit, mult, value)
+        unit.cd_flat = unit.cd_flat + mult * value
+    end
+
+    STAT_APPLIERS[STATUS_RESISTANCE] = function(unit, mult, value)
+        unit.status_resist_flat = unit.status_resist_flat + mult * value
+    end
+
+    -- multiplicative / special ones
+    STAT_APPLIERS[ITEM_MAGIC_RESIST] = function(unit, mult, value)
+        local factor = 1 - value * 0.01
+        if mult > 0 then
+            unit.mr = unit.mr * factor
+        else
+            unit.mr = unit.mr / factor
+        end
+    end
+
+    STAT_APPLIERS[ITEM_DAMAGE_RESIST] = function(unit, mult, value)
+        local factor = 1 - value * 0.01
+        if mult > 0 then
+            unit.dr = unit.dr * factor
+        else
+            unit.dr = unit.dr / factor
+        end
+    end
+
+    STAT_APPLIERS[ITEM_BASE_ATTACK_SPEED] =
+        function(unit, mult, value)
+            local factor = 1. + value * 0.01
+            if mult > 0 then
+                unit.bonus_bat = unit.bonus_bat / factor
+            else
+                unit.bonus_bat = unit.bonus_bat * factor
+            end
+        end
+
+    local slot_types = {
+        TYPE_EQUIPPABLE, TYPE_EQUIPPABLE, TYPE_EQUIPPABLE, TYPE_EQUIPPABLE,
+        TYPE_EQUIPPABLE, TYPE_EQUIPPABLE, TYPE_POTION, TYPE_POTION, TYPE_ALL,
+        TYPE_ALL, TYPE_ALL, TYPE_ALL, TYPE_ALL, TYPE_ALL, TYPE_ALL, TYPE_ALL,
+        TYPE_ALL, TYPE_ALL, TYPE_ALL, TYPE_ALL, TYPE_ALL, TYPE_ALL, TYPE_ALL,
+        TYPE_ALL, TYPE_ALL, TYPE_ALL
+    }
+
+    ---@type fun(itm: Item)
+    ---@return number total, number gold, number plat
+    function GetItemSellPrice(itm)
+        local total = itm.cached_stats[ITEM_COST] // 2
+
+        if total == 0 then
+            local price = GetItemPrice(itm.id, itm.pid)
+
+            if price then total = price[GOLD] // 2 end
+        end
+
+        local gold = math.fmod(total, 1000000)
+        local plat = total // 1000000
+
+        return total, gold, plat
+    end
+
+    ---@type fun(slot: integer, type: integer): boolean
+    function VerifySlotForType(slot, type)
+        -- convert to a bit format
+        if type == 0 then
+            type = TYPE_EQUIPPABLE
+        else
+            type = 1 << (type - 1)
+        end
+
+        -- if bitwise AND > 0 then valid
+        return ((slot_types[slot] & type) > 0)
+    end
+
+    ---@class ItemAbilityRuntime
+    ---@field obj item
+    ---@field id integer
+    ---@field callback? function
+    ---@field block_chance? number
+    ---@field damage_reduction? number
+    ---@field damage? number
+
+    ---@class Item
+    ---@field obj item
+    ---@field holder unit
+    ---@field trig trigger
+    ---@field lvl function
+    ---@field level integer
+    ---@field id integer
+    ---@field type integer
+    ---@field charges integer
+    ---@field x number
+    ---@field y number
+    ---@field quality integer[]
+    ---@field extra integer[]
+    ---@field persistent_state integer[] Extensible values serialized separately from packed item fields.
+    ---@field rarity integer
+    ---@field limit integer
+    ---@field eval conditionfunc
+    ---@field consumeCharge function
+    ---@field calculateValue function
+    ---@field equip function
+    ---@field drop function
+    ---@field update function
+    ---@field encode_id function
+    ---@field encode_stats function
+    ---@field decode function
+    ---@field expire function
+    ---@field onDeath function
+    ---@field name string
+    ---@field restricted boolean
+    ---@field create function
+    ---@field destroy function
+    ---@field onDestroy function
+    ---@field owner player
+    ---@field sfx effect
+    ---@field tooltip string
+    ---@field alt_tooltip string
+    ---@field stack function
+    ---@field equipped boolean
+    ---@field spawn integer
+    ---@field nocraft boolean
+    ---@field pid integer
+    ---@field index integer
+    ---@field validate_slot function
+    ---@field abil integer
+    ---@field info function
+    ---@field abilities ItemAbilityRuntime[]
+    ---@field native_display item? Locked native representation of equipped gear.
+    ---@field pending_abilities boolean?
+    ---@field getAbilityArgument fun(self: Item, index: integer, argument: integer): number
+    ---@field cache_stats function
+    ---@field sockets Item[]
+    ---@field alive boolean
+    ---@field data table Parsed data used by this item instance.
+    ---@field runtime_definition RuntimeLogicalItemDefinition?
+    Item = {} ---@type Item|Item[]
+    do
+        local thistype = Item
+        local hash = InitHashtable()
+
+        ---@param index integer
+        ---@param argument integer
+        ---@return number
+        function thistype:getAbilityArgument(index, argument)
+            return tonumber(item_data(self)[index .. "data" .. argument]) or 0
+        end
+
+        function thistype.onDeath()
+            -- typecast widget to item
+            SaveWidgetHandle(hash, 0, 0, GetTriggerWidget())
+            TQ:callDelayed(2., thistype.destroy,
+                           Item[LoadItemHandle(hash, 0, 0)])
+            RemoveSavedHandle(hash, 0, 0)
+            return false
+        end
+        thistype.eval = Condition(thistype.onDeath)
+
+        -- object inheritance and method operators
+        local mt = {
+            __index = function(tbl, key)
+                return (rawget(Item, key) or rawget(tbl.proxy, key))
+            end,
+            __newindex = function(tbl, key, value)
+                if key == "restricted" then
+                    tbl:restrict(value)
+                    rawset(tbl.proxy, key, value)
+                else
+                    rawset(tbl, key, value)
+                end
+            end
+        }
+
+        ---@class ItemRuntime
+        ---@field native_create function
+        ---@field definitions table<integer, RuntimeItemDefinition>
+        ---@field define fun(id: string|integer, definition: RuntimeItemDefinition)
+        ---@field applyData fun(item: Item, data: table, initialize_charges: boolean?)
+        ---@field create fun(id: string|integer|item, x: number?, y: number?, expire: number?): Item
+        ---@field wrap fun(handle: item): Item
+        ---@field commit_slot fun(self: Item, slot: integer, suppress_refresh: boolean?): boolean
+        ---@field syncAbilitySlots fun(pid: integer): boolean
+        ---@field guardNativeItem fun(dummy: item, carrier: unit): boolean
+        ---@field getRarityIndex fun(item: Item): integer
+        ---@field minimumResourceAfterMaxChange fun(current: number, old_maximum: number, new_maximum: number, minimum?: number): number
+        ---@class RuntimeItemDefinition
+        ---@field custom_level? boolean
+        ---@field prepare? fun(item: Item, data: table)
+        ---@field calculateValue? fun(item: Item, stat: integer, flag: integer?): number?
+        ---@field name? fun(item: Item): string
+        ---@field flavor? string
+        ---@field appendHeader? fun(item: Item, text: string[], alt_text: string[])
+
+        ItemRuntime = {definitions = {}}
+        local NativeCreateItem = CreateItem
+        ItemRuntime.native_create = NativeCreateItem
+
+        ---Returns the rarity used by item presentation. Logical items may opt
+        ---into the ordinary rarity header and inventory border without
+        ---pretending to have an upgrade level or changing their world skin.
+        ---@param item Item
+        ---@return integer
+        function ItemRuntime.getRarityIndex(item)
+            local logical_rarity = item.runtime_definition and
+                                       item.runtime_definition.display_rarity
+            if type(logical_rarity) == "number" then
+                return math.max(0, math.min(MAX_ITEM_RARITY_INDEX,
+                                             math.floor(logical_rarity)))
+            end
+
+            local definition = not item.runtime_definition and
+                                   ItemRuntime.definitions[item.id] or nil
+            if item.level > 0 and not (definition and definition.custom_level) then
+                return math.min(MAX_ITEM_RARITY_INDEX,
+                                (item.level + 3) // item.rarity)
+            end
+            return 0
+        end
+
+        ---Chooses the more punitive outcome between preserving an absolute
+        ---resource value and preserving its percentage when its maximum
+        ---changes. Raising a maximum grants no current resource; lowering a
+        ---maximum reduces the current value proportionally.
+        ---@param current number
+        ---@param old_maximum number
+        ---@param new_maximum number
+        ---@param minimum number?
+        ---@return number
+        function ItemRuntime.minimumResourceAfterMaxChange(current,
+                                                            old_maximum,
+                                                            new_maximum,
+                                                            minimum)
+            minimum = minimum or 0.
+            current = math.max(minimum, current or minimum)
+            old_maximum = math.max(0., old_maximum or 0.)
+            new_maximum = math.max(minimum, new_maximum or minimum)
+            local percentage_value = old_maximum > 0. and
+                                         current / old_maximum * new_maximum or
+                                         current
+            return math.max(minimum,
+                            math.min(current, new_maximum, percentage_value))
+        end
+
+        ---@param id string|integer
+        ---@param definition RuntimeItemDefinition
+        function ItemRuntime.define(id, definition)
+            local rawcode = type(id) == "string" and FourCC(id) or id
+            ItemRuntime.definitions[rawcode] = definition
+        end
+
+        ---Applies parsed data to one managed item. Runtime logical items use
+        ---this without mutating the shared object-editor ItemData entry.
+        ---@param item Item
+        ---@param data table
+        ---@param initialize_charges boolean?
+        function ItemRuntime.applyData(item, data, initialize_charges)
+            item.data = data
+
+            if not rawget(data, "quality_index") then
+                local quality_index = {}
+                local quality_count = 1
+
+                for stat = 1, TOTAL_STATS do
+                    if data[stat .. "range"] ~= 0 then
+                        quality_index[stat] = quality_count
+                        quality_count = quality_count + 1
+                    end
+                end
+
+                data.quality_index = quality_index
+            end
+
+            local rarity = data[ITEM_RARITY]
+            item.rarity = rarity == 0 and 4 or rarity
+            item.limit = data[ITEM_LIMIT]
+            item.type = data[ITEM_TYPE]
+            item.abil = data[ITEM_ABILITY .. "id"]
+            item.nocraft = data[ITEM_NOCRAFT] ~= 0
+
+            local charges = data[ITEM_CHARGES]
+            if initialize_charges and charges > 0 then
+                item.charges = charges
+            end
+
+            if initialize_charges then
+                for index = 1, QUALITY_SAVED do
+                    item.quality[index] = 0
+                end
+
+                local count = 1
+                for stat = 1, TOTAL_STATS do
+                    if data[stat .. "range"] ~= 0 then
+                        item.quality[count] = GetRandomInt(0, 63)
+                        count = count + 1
+                    end
+                    if count > QUALITY_SAVED then break end
+                end
+            end
+        end
+
+        ---@type fun(id: string|integer|item, x: number?, y: number?, expire: number?): Item
+        function ItemRuntime.create(id, x, y, expire)
+            local lvl = 0
+            local itm = id
+
+            -- parse "I000:00" notation, where level / variation is signified by numbers after a colon
+            if type(id) == "string" then
+                local item_string = id
+                id = FourCC(item_string:sub(1, 4))
+                lvl = tonumber(item_string:sub(6))
+            end
+
+            -- create the item if given an id rather than a handle
+            if type(id) ~= "userdata" then
+                itm = NativeCreateItem(id, x or 30000., y or 30000.)
+            elseif Item[itm] then
+                return Item[itm]
+            end
+
+            local item_id = GetItemTypeId(itm)
+            local self = setmetatable({ ---@type Item
+                obj = itm,
+                id = item_id,
+                level = lvl,
+                trig = CreateTrigger(),
+                x = GetItemX(itm),
+                y = GetItemY(itm),
+                quality = __jarray(0),
+                extra = __jarray(0),
+                persistent_state = {},
+                owner = nil,
+                holder = nil,
+                equipped = false,
+                alive = true,
+                charges = GetItemCharges(itm),
+                dummies = nil, -- stores item spells
+                sockets = {},
+                proxy = {restricted = false}
+            }, mt)
+
+            local tbl = ItemData[self.id]
+
+            -- first time setup
+            if tbl.tooltip == 0 then
+                -- if an item's description exists, use that for parsing (exception for default shops)
+                ParseItemTooltip(self.obj,
+                                 ((BlzGetItemDescription(self.obj):len()) > 1 and
+                                     BlzGetItemDescription(self.obj)) or "")
+                tbl = ItemData[self.id]
+            end
+
+            local definition = ItemRuntime.definitions[item_id]
+            if definition and definition.prepare then
+                definition.prepare(self, tbl)
+            end
+
+            ItemRuntime.applyData(self, tbl, true)
+
+            -- Any custom item that reaches the managed inventory must retain
+            -- its identity regardless of its object-editor item class. The old
+            -- type allowlist silently encoded Artifact equipment as an empty
+            -- slot. Powerups still never enter HeroData.items, so registering
+            -- their rawcode does not make consumed items persist.
+            local save_index = self.id - CUSTOM_ITEM_OFFSET
+            if save_index > 0 and save_index <= 0x1FFF then
+                SAVE_TABLE.KEY_ITEMS[self.id] = save_index
+
+                -- hide the item according to item drop settings
+                if not IS_ITEM_DROP[GetPlayerId(GetLocalPlayer()) + 1] then
+                    BlzSetItemSkin(self.obj, FourCC('rar0'))
+                end
+            end
+
+            -- handle item death
+            TriggerRegisterDeathEvent(self.trig, self.obj)
+            TriggerAddCondition(self.trig, thistype.eval)
+
+            -- timed life
+            if expire then
+                TQ:callDelayed(expire, thistype.expire, self)
+            end
+
+            if tbl[ITEM_TIER] ~= 0 then
+                self:update()
+            else
+                self:cache_stats()
+                -- Inventory frames render wrapper text rather than reading the
+                -- native handle every refresh. Tierless utility items never run
+                -- update(), so leaving these fields nil made their slot retain
+                -- whichever tooltip had previously occupied it.
+                local base_tooltip = (definition and definition.flavor) or
+                                         tbl.tooltip
+                self.tooltip = (base_tooltip ~= nil and base_tooltip ~= 0) and
+                                   base_tooltip or ""
+                self.alt_tooltip = self.tooltip
+            end
+
+            Item[self.obj] = self
+
+            if RuntimeMetrics then
+                RuntimeMetrics.items.created = RuntimeMetrics.items.created + 1
+                RuntimeMetrics.items.live = RuntimeMetrics.items.live + 1
+                RuntimeMetrics.items.peak =
+                    math.max(RuntimeMetrics.items.peak,
+                             RuntimeMetrics.items.live)
+            end
+
+            return self
+        end
+
+        ---@param handle item
+        ---@return Item
+        function ItemRuntime.wrap(handle)
+            return Item[handle] or ItemRuntime.create(handle)
+        end
+
+        local backpack_allowed = {
+            [FourCC('A0E2')] = 1, -- sea ward
+            [FourCC('A0D3')] = 1, -- jewel of the horde
+            [FourCC('A04I')] = 1, -- drum of war aura
+            [FourCC('A03G')] = 1, -- blood horn (unholy aura)
+            [FourCC('A03H')] = 1, -- blood shield
+            [FourCC('AIcd')] = 1, -- war drums
+            [FourCC('Adt1')] = 1, -- gem of true sight
+            [FourCC('A03F')] = 1, -- endurance aura
+            [FourCC('AIta')] = 1, -- crystal ball reveal
+            [FourCC('A1VB')] = 1 -- Vanguard Bounty boss mark
+        }
+
+        local add_item_abilities
+        local hero_item_cooldowns = {}
+
+        local function retained_cooldown(pid, id)
+            local pending = hero_item_cooldowns[pid]
+            return pending and pending[id] and TQ:getRemaining(pending[id]) or 0
+        end
+
+        local function retain_cooldown(pid, id, remaining)
+            if remaining <= retained_cooldown(pid, id) then return end
+            local pending = hero_item_cooldowns[pid] or {}
+            hero_item_cooldowns[pid] = pending
+            local callback
+            callback = TQ:callDelayed(remaining, function()
+                if pending[id] == callback then pending[id] = nil end
+            end)
+            pending[id] = callback
+        end
+
+        ---Keeps every equipped item represented in its native inventory slot.
+        ---Moves existing handles so cooldowns and proc state are preserved.
+        ---Backpack-side abilities keep their separate native inventory.
+        function ItemRuntime.syncAbilitySlots(pid)
+            local profile = Profile[pid]
+            local items = profile and profile.hero and profile.hero.items
+            local hero = Hero[pid]
+            if not items or not hero then return false end
+
+            -- Atomic inventory swaps defer attachment until both moves finish.
+            for slot = 1, MAX_INVENTORY_SLOTS do
+                local item = items[slot]
+                if item and item.pending_abilities then
+                    item.pending_abilities = nil
+                    add_item_abilities(item, true)
+                end
+            end
+            local desired = {}
+            local success = true
+            for slot = 1, 6 do
+                local equipped = items[slot]
+                if equipped and equipped.alive and equipped.holder == hero then
+                    equipped.native_display = equipped.native_display or MakeDummyCastItem(hero)
+                    local dummy = equipped.native_display
+                    desired[slot] = dummy
+                    if dummy then
+                        local active = false
+                        for index = ITEM_ABILITY, ITEM_ABILITY2 do
+                            local runtime = equipped.abilities and equipped.abilities[index]
+                            if runtime and runtime.obj == dummy and Spells[runtime.id].ACTIVE then
+                                active = true
+                            end
+                        end
+                        BlzSetItemBooleanField(dummy, ITEM_BF_ACTIVELY_USED, active)
+                        BlzSetItemIconPath(dummy, item_data(equipped).path)
+                        BlzSetItemName(dummy, equipped:name())
+                        BlzSetItemTooltip(dummy, equipped:name())
+                        BlzSetItemDescription(dummy, equipped.tooltip)
+                        BlzSetItemExtendedTooltip(dummy, equipped.tooltip)
+                        SetItemCharges(dummy, equipped.charges or 0)
+                        LockDummyCastItem(dummy)
+                    else
+                        success = false
+                    end
+                end
+            end
+
+            for slot = 1, 6 do
+                local dummy = desired[slot]
+                if dummy and UnitItemInSlot(hero, slot - 1) ~= dummy then
+                    local present = false
+                    for current = 0, 5 do
+                        if UnitItemInSlot(hero, current) == dummy then
+                            present = true
+                            break
+                        end
+                    end
+                    if present then
+                        -- Only this synchronous, inventory-to-inventory move
+                        -- is unlocked. Player orders never receive a droppable
+                        -- carrier, and no world drop or recreation is involved.
+                        SetItemDroppable(dummy, true)
+                        BlzSetItemBooleanField(dummy, ITEM_BF_CAN_BE_DROPPED, true)
+                        local moved = UnitDropItemSlot(hero, dummy, slot - 1)
+                        LockDummyCastItem(dummy)
+                        success = moved and success
+                    else
+                        success = false
+                    end
+                end
+            end
+            return success
+        end
+
+        RegisterItemChangedAction(ItemRuntime.syncAbilitySlots)
+
+        local pending_native_restore = {}
+
+        local function native_item_owner(dummy)
+            for pid = 1, PLAYER_CAP do
+                local profile = Profile[pid]
+                local items = profile and profile.hero and profile.hero.items
+                for slot = 1, items and MAX_INVENTORY_SLOTS or 0 do
+                    local item = items[slot]
+                    if item and item.alive and item.holder then
+                        if item.native_display == dummy then
+                            return item, pid, Hero[pid]
+                        end
+                        for index = ITEM_ABILITY, ITEM_ABILITY2 do
+                            local runtime = item.abilities and item.abilities[index]
+                            if runtime and runtime.obj == dummy then
+                                return item, pid, backpack_allowed[runtime.id] and
+                                                     Backpack[pid] or Hero[pid]
+                            end
+                        end
+                    end
+                end
+            end
+        end
+
+        -- Drop events run before the engine finishes removing/positioning an
+        -- item. Restore on the next timer turn, not inside that event.
+        function ItemRuntime.guardNativeItem(dummy, carrier)
+            local item, pid, owner = native_item_owner(dummy)
+            if not owner then return false end
+            LockDummyCastItem(dummy)
+            if pending_native_restore[dummy] then
+                pending_native_restore[dummy] = carrier
+                return true
+            end
+            pending_native_restore[dummy] = carrier
+            local cooldowns = {}
+            for index = ITEM_ABILITY, ITEM_ABILITY2 do
+                local runtime = item.abilities and item.abilities[index]
+                if runtime and runtime.obj == dummy then
+                    cooldowns[runtime.id] = BlzGetUnitAbilityCooldownRemaining(owner, runtime.id)
+                end
+            end
+            TQ:callDelayed(0., function()
+                local current, current_pid, current_owner = native_item_owner(dummy)
+                if current == item and current_pid == pid and current_owner == owner then
+                    local present = false
+                    for slot = 0, 5 do
+                        if UnitItemInSlot(owner, slot) == dummy then present = true break end
+                    end
+                    if not present then
+                        -- Also undo transfers to another unit. Nested pickup/
+                        -- drop callbacks are suppressed by the pending marker.
+                        local holder = pending_native_restore[dummy]
+                        if holder ~= owner then UnitRemoveItem(holder, dummy) end
+                        if UnitAddItem(owner, dummy) then
+                            for id, remaining in pairs(cooldowns) do
+                                if remaining > BlzGetUnitAbilityCooldownRemaining(owner, id) then
+                                    BlzStartUnitAbilityCooldown(owner, id, remaining)
+                                end
+                            end
+                        end
+                    end
+                    LockDummyCastItem(dummy)
+                    ItemRuntime.syncAbilitySlots(pid)
+                end
+                pending_native_restore[dummy] = nil
+            end)
+            return true
+        end
+
+        -- Called on equip to stack with an existing item if applicable
+        ---@type fun(self: Item, pid: integer, limit: integer): boolean
+        function thistype:stack(pid, limit)
+            for i = 1, MAX_INVENTORY_SLOTS do
+                local match = Profile[pid].hero.items[i]
+
+                if match and match ~= self and
+                    RuntimeItemDefinitions.sameIdentity(match, self) and
+                    match.charges < limit and match.level == self.level then
+                    local total = match.charges + self.charges
+                    local diff = limit - match.charges
+
+                    if total <= limit then
+                        match.charges = total
+                        self:destroy()
+                        self = match
+                    else
+                        match.charges = limit
+                        self.charges = self.charges - diff
+                    end
+                    return true
+                end
+            end
+
+            return false
+        end
+
+        -- Adjusts name in tooltip if an item is useable or not
+        ---@type fun(self: Item, flag: boolean)
+        function thistype:restrict(flag)
+            if flag then
+                BlzSetItemName(self.obj, self:name() ..
+                                   "\n|cffFFCC00You are too low level to use this item!|r")
+            else
+                BlzSetItemName(self.obj, self:name())
+            end
+        end
+
+        -- Generates a proper name string
+        ---@type fun(self: Item):string
+        function thistype:name()
+            local definition = not self.runtime_definition and
+                                   ItemRuntime.definitions[self.id] or nil
+            if definition and definition.name then
+                return definition.name(self)
+            end
+
+            local name = item_data(self).name
+
+            if self.level > 0 then
+                return concat({
+                    RARITY_NAME[(self.level + 3) // self.rarity], " ", name,
+                    " +", self.level
+                })
+            end
+
+            return name
+        end
+
+        function thistype:info()
+            local details = {
+                self.alt_tooltip or self.tooltip or
+                    BlzGetItemDescription(self.obj)
+            }
+            local data = item_data(self)
+            local maxlvl = data[ITEM_UPGRADE_MAX]
+            local total, gold, plat = GetItemSellPrice(self)
+
+            if maxlvl > 0 then
+                details[#details + 1] = "|n|cff999999Maximum Upgrade: +" ..
+                                            maxlvl .. "|r"
+            end
+
+            if total > 0 then
+                if plat > 0 then
+                    details[#details + 1] =
+                        "|n|cffffcc00Sells for:|r " .. plat ..
+                            " |cffe3e2e2Platinum|r and " .. gold ..
+                            " |cffffcc00Gold|r"
+                else
+                    details[#details + 1] =
+                        "|n|cffffcc00Sells for:|r " .. gold ..
+                            " |cffffcc00Gold|r"
+                end
+            end
+
+            if self.charges > 0 then
+                local quantity = data[ITEM_STACK] > 1
+                details[#details + 1] = "|n|cffffcc00" ..
+                                            (quantity and "Quantity:" or
+                                                "Charges:") .. "|r " ..
+                                            self.charges
+            end
+
+            if ItemToIndex(self.id) then
+                details[#details + 1] = "|n|cff00ff33Saveable|r"
+            end
+
+            if maxlvl > 0 and self.type ~= TYPE_SOCKETABLE then
+                details[#details + 1] = "|n|cff00ff00Socketable|r"
+            end
+
+            for i, socket in ipairs(self.sockets) do
+                details[#details + 1] =
+                    "|n|n|cffffcc00Socket " .. i .. ":|r " .. socket:name()
+                details[#details + 1] = "|n" ..
+                                            (socket.alt_tooltip or
+                                                socket.tooltip or
+                                                BlzGetItemDescription(socket.obj))
+            end
+
+            return {
+                name = self:name(),
+                icon = data.path,
+                description = concat(details)
+            }
+        end
+
+        local function apply_item_stats(self, mult, holder,
+                                        punish_resource_change)
+            holder = holder or self.holder
+
+            if not holder then return end
+
+            local u = Hero[self.pid]
+            local unit = Unit[u]
+            local hp = get_widget_life(u) ---@type number
+            local mana = get_unit_state(u, UNIT_STATE_MANA) ---@type number
+            local maximum_hp = BlzGetUnitMaxHP(u)
+            local maximum_mana = BlzGetUnitMaxMana(u)
+            local mod = ItemProfMod(self.id, self.pid) ---@type number
+            local cs = self.cached_stats
+
+            unit.suppress_stat_events = true
+
+            -- apply stats with cooresponding appliers
+            for i = 1, TOTAL_STATS do
+                local s = STAT_APPLIERS[i]
+
+                if s and cs[i] ~= 0 then
+                    s(unit, mult, cs[i], mod)
+                end
+            end
+
+            if punish_resource_change then
+                set_widget_life(u, ItemRuntime.minimumResourceAfterMaxChange(
+                                    hp, maximum_hp, BlzGetUnitMaxHP(u), 1.))
+                set_unit_state(u, UNIT_STATE_MANA,
+                               ItemRuntime.minimumResourceAfterMaxChange(
+                                   mana, maximum_mana, BlzGetUnitMaxMana(u),
+                                   0.))
+            else
+                set_widget_life(u, math.max(1, hp))
+                set_unit_state(u, UNIT_STATE_MANA, mana)
+            end
+
+            -- shield
+            if item_data(self)[ITEM_TYPE] == 5 then
+                unit.shield_count = unit.shield_count + mult
+            end
+
+            unit.suppress_stat_events = false
+
+            -- profiency warning
+            if GetHeroLevel(u) < 15 and mult > 0 and mod < 1 then
+                DisplayTimedTextToPlayer(self.owner, 0, 0, 10,
+                                         "You lack the proficiency (-pf) to use this item, therefore it only gives 75% of most stats.\n|cffFF0000You will stop getting this warning at level 15.|r")
+            end
+        end
+
+        ---@type fun(itm: Item, index: integer, value: integer): string
+        local function ParseItemAbilityTooltip(itm, index, value)
+            local definition_data = item_data(itm)
+            local data = definition_data[index .. "data"] ---@type string
+            local id = definition_data[index .. "id"] ---@type integer
+            local orig = BlzGetAbilityExtendedTooltip(id, 0) ---@type string
+            local count = 1
+            local values = {} ---@type integer[]
+
+            values[0] = value
+
+            -- parse ability data into array
+            for v in data:gmatch("(%-?%d+)") do
+                values[count] = v
+                definition_data[index .. "data" .. count] = v
+                count = count + 1
+            end
+
+            -- parse ability tooltip and fill capture groups
+            orig = orig:gsub("%$(%d+)", function(tag)
+                return tostring(values[tonumber(tag) - 1])
+            end)
+
+            return orig
+        end
+
+        ---@type fun(itm: Item)
+        add_item_abilities = function(itm, suppress_sync)
+            if not itm.holder then return end
+
+            if itm.holder == Hero[itm.pid] then
+                itm.native_display = itm.native_display or MakeDummyCastItem(itm.holder)
+            end
+
+            local prof = ItemProfMod(itm.id, itm.pid) >= 1
+
+            local data = item_data(itm)
+            for index = ITEM_ABILITY, ITEM_ABILITY2 do
+                local abilid = data[index .. "id"]
+                -- don't add ability if backpack is not allowed
+                if GetUnitTypeId(itm.holder) == BACKPACK and
+                    not backpack_allowed[abilid] then abilid = 0 end
+                -- ability exists and unlocked and has proficiency
+                if abilid ~= 0 and Spells[abilid] and itm.level >=
+                    data[index .. "unlock"] and prof then
+                    if not itm.abilities then
+                        itm.abilities = {}
+                    end
+
+                    local dummy
+                    local newly_attached = false
+                    local desc = ParseItemAbilityTooltip(itm, index,
+                                                         itm.cached_stats[index])
+
+                    -- if no item spell dummy, generate it
+                    if not itm.abilities[index] or not itm.abilities[index].obj then
+                        if backpack_allowed[abilid] then
+                            dummy = MakeDummyCastItem(Backpack[itm.pid])
+                        else
+                            dummy = itm.native_display
+                        end
+                        itm.abilities[index] = {obj = dummy, id = abilid}
+                        newly_attached = true
+                    else
+                        dummy = itm.abilities[index].obj
+                    end
+
+                    -- append tooltip if useable from backpack
+                    if backpack_allowed[abilid] then
+                        desc = desc ..
+                                   "\n|cffffcc00This ability may be used from your backpack.|r"
+                    end
+
+                    -- dummy may be nil if no spell inventory space remaining
+                    if dummy then
+                        -- Native auras/detection still need attachment even
+                        -- though they are passive and have no Use hint.
+                        if Spells[abilid].ACTIVE or
+                            Spells[abilid].ITEM_NATIVE_ABILITY then
+                            BlzItemAddAbility(dummy, abilid)
+                            if newly_attached and not backpack_allowed[abilid] then
+                                local remaining = retained_cooldown(itm.pid, abilid)
+                                if remaining > 0 and remaining >
+                                    BlzGetUnitAbilityCooldownRemaining(Hero[itm.pid], abilid) then
+                                    BlzStartUnitAbilityCooldown(Hero[itm.pid], abilid, remaining)
+                                end
+                            end
+                        end
+                        -- Slot carriers can display either kind of effect.
+                        -- Set this after attachment, on the instance rather
+                        -- than its shared dummy ID.
+                        BlzSetItemBooleanField(dummy, ITEM_BF_ACTIVELY_USED,
+                                               Spells[abilid].ACTIVE == true)
+                        BlzSetItemIconPath(dummy, BlzGetAbilityIcon(abilid))
+                        -- BlzSetItemDescription(dummy, desc)
+                        BlzSetItemExtendedTooltip(dummy, desc)
+                        BlzSetItemName(dummy, GetObjectName(abilid))
+
+                        Spells[abilid].onEquip(itm, abilid, index)
+                        LockDummyCastItem(dummy)
+                    end
+                end
+            end
+            if not suppress_sync then ItemRuntime.syncAbilitySlots(itm.pid) end
+        end
+
+        function thistype:lvl(lvl)
+            local definition = not self.runtime_definition and
+                                   ItemRuntime.definitions[self.id] or nil
+            if item_data(self)[ITEM_UPGRADE_MAX] > 0 or
+                (definition and definition.custom_level) then
+                local parent = self.socketed and self.parent or nil
+                local parent_equipped = parent and parent.equipped
+
+                if parent_equipped then
+                    apply_item_stats(parent, -1)
+                elseif self.equipped then
+                    apply_item_stats(self, -1)
+                end
+                self.level = lvl
+                self:update()
+
+                if parent then parent:update() end
+
+                if parent_equipped then
+                    apply_item_stats(parent, 1)
+                elseif self.equipped then
+                    apply_item_stats(self, 1)
+                end
+
+                -- required for spells unlocked by level
+                add_item_abilities(self)
+            end
+        end
+
+        function thistype:consumeCharge()
+            self.charges = self.charges - 1
+
+            if self.charges <= 0 then self:destroy() end
+        end
+
+        function Item:cache_stats()
+            self.cached_stats = self.cached_stats or {}
+            self.cached_base = self.cached_base or {}
+            self.cached_lower = self.cached_lower or {}
+            self.cached_upper = self.cached_upper or {}
+
+            for stat = 1, TOTAL_STATS do
+                local base = self:calculateValue(stat)
+                local value = base
+
+                self.cached_base[stat] = base
+                if item_data(self)[stat .. "range"] ~= 0 then
+                    self.cached_lower[stat] = self:calculateValue(stat, 1)
+                    self.cached_upper[stat] = self:calculateValue(stat, 2)
+                else
+                    self.cached_lower[stat] = base
+                    self.cached_upper[stat] = base
+                end
+
+                for _, socket in ipairs(self.sockets) do
+                    value = value + socket:calculateValue(stat)
+                end
+                self.cached_stats[stat] = value
+            end
+        end
+
+        -- Calculates the value of a stat given the formula in the tooltip
+        -- 1 = lower, 2 = upper
+        ---@type fun(self: Item, STAT: integer, flag: integer): number
+        function Item:calculateValue(STAT, flag)
+            local definition = not self.runtime_definition and
+                                   ItemRuntime.definitions[self.id] or nil
+            if definition and definition.calculateValue then
+                local value = definition.calculateValue(self, STAT, flag)
+                if value ~= nil then return value end
+            end
+
+            local tbl = item_data(self)
+            local unlockat = tbl[STAT .. "unlock"] ---@type number
+
+            if self.level < unlockat then return 0 end
+
+            local flatPerLevel = tbl[STAT .. "fpl"] ---@type number
+            local flatPerRarity = tbl[STAT .. "fpr"] ---@type number
+            local percent = tbl[STAT .. "percent"] ---@type number
+            local fixed = tbl[STAT .. "fixed"] ---@type number
+            local lower = tbl[STAT] ---@type number
+            local upper = tbl[STAT .. "range"] ---@type number
+            local hasVariance = (upper ~= 0) ---@type boolean
+            local pmult = (percent ~= 0 and percent * 0.01) or 1 ---@type number
+
+            -- calculate values after applying affixes
+            lower = lower + ((flatPerLevel * self.level + flatPerRarity *
+                        (math.max(self.level - 1, 0) // self.rarity)) * pmult)
+            upper = upper + ((flatPerLevel * self.level + flatPerRarity *
+                        (math.max(self.level - 1, 0) // self.rarity)) * pmult)
+
+            -- values are not fixed
+            if fixed == 0 then
+                lower = lower + lower * ITEM_STAT_MULTIPLIER[self.level] * pmult
+                upper = upper + upper * ITEM_STAT_MULTIPLIER[self.level] * pmult
+            end
+
+            if flag == 1 then
+                return (lower < 1 and lower) or floor(lower)
+            elseif flag == 2 then
+                return (upper < 1 and upper) or floor(upper)
+            else
+                local final = 0
+
+                if hasVariance then
+                    local count = tbl.quality_index[STAT] or 1
+
+                    final = lower + (upper - lower) * 0.015625 *
+                                (1 + self.quality[count])
+                else
+                    final = lower
+                end
+
+                -- round to nearest 10s
+                if final >= 1000 then
+                    final = (final + 5) // 10 * 10
+                end
+
+                return (final < 1 and final) or floor(final)
+            end
+        end
+
+        local function remove_item_ability(self, abil, index)
+            if self and (not self.holder or
+                (not backpack_allowed[abil.id] and self.holder ==
+                    Backpack[self.pid])) then
+                set_widget_life(abil.obj, 1.)
+                RemoveItem(abil.obj)
+                self.abilities[index] = nil
+            end
+        end
+
+        local function refresh_item_abilities(self, dropped, holder)
+            if self.abilities then
+                for i = ITEM_ABILITY, ITEM_ABILITY2 do
+                    local abil = self.abilities[i]
+
+                    if abil and (not backpack_allowed[abil.id] or dropped) then
+                        -- trigger unequip event
+                        Spells[abil.id].onUnequip(self, abil.id, i, holder)
+
+                        local orig_spell_owner =
+                            backpack_allowed[abil.id] and Backpack[self.pid] or
+                                Hero[self.pid]
+
+                        local remaining = BlzGetUnitAbilityCooldownRemaining(orig_spell_owner, abil.id)
+                        if not backpack_allowed[abil.id] then
+                            -- Preserve readiness without occupying an equipment
+                            -- slot with a ghost of an unequipped item.
+                            retain_cooldown(self.pid, abil.id, remaining)
+                            self.abilities[i] = nil
+                        else
+                            TQ:callDelayed(remaining, remove_item_ability, self, abil, i)
+                        end
+                    end
+                end
+            end
+            if self.native_display then
+                set_widget_life(self.native_display, 1.)
+                RemoveItem(self.native_display)
+                self.native_display = nil
+            end
+        end
+
+        ---Boss-pool membership covers pre-Chaos rewards whose numeric tier is
+        ---shared with ordinary equipment. Tier 23+ also includes boss-crafted
+        ---and other endgame boss-grade equipment.
+        ---@param itm Item
+        ---@return boolean
+        local function requires_unique_copy(itm)
+            local tier = item_data(itm)[ITEM_TIER] or 0
+            return itm.limit > 0 or tier >= 23 or
+                       (BossDropItems and BossDropItems[itm.id])
+        end
+
+        ---@type fun(itm: Item, itm2: Item): boolean
+        local function has_conflict(itm, itm2)
+            if RuntimeItemDefinitions.sameIdentity(itm, itm2) and
+                requires_unique_copy(itm) then return true end
+            return itm.limit > 1 and itm.limit == itm2.limit
+        end
+
+        -- Public read-only helpers keep architecture tests and future item
+        -- services on the same restriction policy as inventory validation.
+        ItemRuntime.requiresUniqueCopy = requires_unique_copy
+        ItemRuntime.itemsConflict = has_conflict
+
+        local function conflict_message(itm)
+            if itm.limit > 0 then return LIMIT_STRING[itm.limit] end
+            return "You can only equip one copy of boss-grade equipment."
+        end
+
+        ---@param itm Item
+        ---@param ignore Item?
+        ---@return boolean, string?
+        local function is_item_limited(itm, ignore)
+            local candidates = {itm}
+            local has_limit = requires_unique_copy(itm)
+            for _, socket in ipairs(itm.sockets or {}) do
+                candidates[#candidates + 1] = socket
+                has_limit = has_limit or requires_unique_copy(socket)
+            end
+
+            if not has_limit then return false end
+
+            local items = Profile[itm.pid].hero.items
+
+            for i = 1, 6 do
+                local itm2 = items[i]
+
+                if itm2 and itm2 ~= ignore and itm ~= itm2 then
+                    for _, candidate in ipairs(candidates) do
+                        if requires_unique_copy(candidate) then
+                            if has_conflict(candidate, itm2) then
+                                return true, conflict_message(candidate)
+                            end
+
+                            for _, socket in ipairs(itm2.sockets or {}) do
+                                if has_conflict(candidate, socket) then
+                                    return true, conflict_message(candidate)
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+
+            return false
+        end
+
+        ---Moves an inventory item into this item's socket list.
+        ---@param itm Item
+        ---@return boolean
+        function thistype:socket(itm)
+            if not itm or itm == self or itm.socketed or itm.type ~=
+                TYPE_SOCKETABLE or self.type == TYPE_SOCKETABLE or itm.pid ~=
+                self.pid or not itm.holder or not itm.index or #self.sockets >=
+                MAX_SOCKETS or is_item_limited(itm) then return false end
+
+            local was_equipped = self.equipped
+
+            -- Remove exactly the stats that are currently applied. The new
+            -- socket-inclusive cache is applied after the mutation.
+            if was_equipped then apply_item_stats(self, -1) end
+
+            -- drop() performs the complete inventory/ability removal. Keep
+            -- the backing item handle hidden because it now belongs to self.
+            itm:drop(30000., 30000., true)
+            SetItemVisible(itm.obj, false)
+
+            itm.parent = self
+            itm.socketed = true
+            self.sockets[#self.sockets + 1] = itm
+
+            self:update()
+
+            if was_equipped then apply_item_stats(self, 1) end
+
+            return true
+        end
+
+        ---Removes a socket and returns it to inventory, or drops it nearby
+        ---when no compatible inventory slot is available.
+        ---@param index integer
+        ---@return Item?
+        function thistype:unsocket(index)
+            local socket = self.sockets[index]
+
+            if not socket then return nil end
+
+            local was_equipped = self.equipped
+
+            if was_equipped then apply_item_stats(self, -1) end
+
+            self.sockets[index] = self.sockets[#self.sockets]
+            self.sockets[#self.sockets] = nil
+            socket.parent = nil
+            socket.socketed = false
+
+            self:update()
+
+            if was_equipped then apply_item_stats(self, 1) end
+
+            if not socket:equip() then
+                SetItemPosition(socket.obj, GetUnitX(Hero[self.pid]),
+                                GetUnitY(Hero[self.pid]))
+                SetItemVisible(socket.obj, true)
+            end
+
+            return socket
+        end
+
+        ---@type fun(itm: Item, pid: integer): boolean
+        local function is_item_bound(itm, pid)
+            return (itm.owner ~= Player(pid - 1) and itm.owner ~= nil)
+        end
+
+        ---@param self Item
+        ---@param slot integer
+        ---@param ignore Item?
+        ---@return boolean
+        ---@return string? err
+        function ValidateItemSlot(self, slot, ignore)
+            if is_item_bound(self, self.pid) and SAVE_TABLE.KEY_ITEMS[self.id] then
+                return false, "This item is bound to " ..
+                           User[self.owner].nameColored .. "."
+            end
+
+            local data = item_data(self)
+            local type = data[ITEM_TYPE]
+
+            -- restrict by slot type
+            if not VerifySlotForType(slot, type) then
+                return false, nil
+            end
+
+            local lvlreq = data[ITEM_LEVEL_REQUIREMENT] ---@type integer
+            local lvl = GetHeroLevel(Hero[self.pid])
+
+            if slot <= BACKPACK_INDEX - 1 then
+                local limited, err = is_item_limited(self, ignore)
+
+                if lvlreq > lvl then
+                    return false,
+                           "This item requires at least level |c00FF5555" ..
+                               (lvlreq) .. "|r to equip."
+                elseif limited then
+                    return false, err
+                end
+            elseif slot >= BACKPACK_INDEX and lvlreq > lvl + 20 then
+                return false,
+                       "This item requires at least level |c00FF5555" ..
+                           (lvlreq - 20) .. "|r to pick up."
+            end
+
+            return true
+        end
+
+        local function find_empty_slot(self)
+            -- set starting slot to backpack if fail limit check
+            local slot = (is_item_limited(self) and BACKPACK_INDEX) or 1
+            local items = Profile[self.pid].hero.items
+            local type = item_data(self)[ITEM_TYPE]
+
+            for i = slot, MAX_INVENTORY_SLOTS do
+                if not items[i] and VerifySlotForType(i, type) then
+                    return i
+                end
+            end
+
+            return nil
+        end
+
+        ---Applies a previously validated slot transition. This function does
+        ---not stack or perform validation and is reserved for domain services
+        ---that have prepared the complete final inventory state.
+        ---@param self Item
+        ---@param slot integer
+        ---@param suppress_refresh boolean?
+        ---@return boolean
+        function ItemRuntime.commit_slot(self, slot, suppress_refresh)
+            local items = Profile[self.pid].hero.items
+            local orig_holder = self.holder
+            local orig_index = self.index
+            local was_equipped = self.equipped
+            local new_holder = (slot <= 6 and Hero[self.pid]) or
+                                   Backpack[self.pid]
+
+            -- New holder needs to be set before applying stats and abilities.
+            self.holder = new_holder
+
+            if orig_index and items[orig_index] == self then
+                items[orig_index] = nil
+            end
+
+            -- From equipped to backpack.
+            if was_equipped and slot > 6 then
+                refresh_item_abilities(self, false, orig_holder)
+                apply_item_stats(self, -1, nil, true)
+                self.equipped = false
+            end
+
+            -- Newly equipped.
+            if not was_equipped and slot <= 6 then
+                self.equipped = true
+
+                if SAVE_TABLE.KEY_ITEMS[self.id] then
+                    self.owner = Player(self.pid - 1)
+                end
+
+                apply_item_stats(self, 1, nil, true)
+            end
+
+            items[slot] = self
+            self.index = slot
+
+            -- Potion cooldowns belong to their two use buttons. Whenever a
+            -- different flask enters either slot, impose a longer shared
+            -- readiness delay so backpack stockpiles cannot bypass normal
+            -- consumption pacing by continuously swapping fresh flasks in.
+            local potion_service = rawget(_G, "PotionService")
+            if self.type == TYPE_POTION_INDEX and orig_index ~= slot and
+                slot >= POTION_INDEX and slot <= POTION_INDEX + 1 and
+                potion_service then
+                potion_service.applyEquipCooldown(self.pid,
+                                                  slot - POTION_INDEX + 1)
+            end
+
+            -- A move within the same holder changes only the slot. Re-running
+            -- onEquip in that case can duplicate periodic item effects.
+            if orig_holder ~= new_holder then
+                if suppress_refresh then
+                    self.pending_abilities = true
+                else
+                    add_item_abilities(self)
+                end
+            end
+
+            SetItemPosition(self.obj, 30000., 30000.)
+            SetItemVisible(self.obj, false)
+
+            if not suppress_refresh then NotifyItemChanged(self.pid) end
+
+            return true
+        end
+
+        -- Main equip function with optional target slot
+        -- Returns true if successfully moves an item to the slot
+        ---@type fun(self: Item, slot: integer?, ignore: Item?, suppress_refresh: boolean?): boolean
+        function thistype:equip(slot, ignore, suppress_refresh)
+            -- determine the slot
+            slot = slot or find_empty_slot(self)
+
+            -- validate it (level check, limited check)
+            local valid, err = false, nil
+            if slot then
+                valid, err = ValidateItemSlot(self, slot, ignore)
+            end
+
+            if err then
+                DisplayTimedTextToPlayer(Player(self.pid - 1), 0, 0, 15., err)
+            end
+
+            -- cannot move item to new slot
+            if not valid then return false end
+
+            -- if item is stackable
+            local stack = self.cached_stats[ITEM_STACK]
+            if stack > 1 then
+                self:stack(self.pid, stack)
+
+                if not self.alive then return true end
+            end
+
+            return ItemRuntime.commit_slot(self, slot, suppress_refresh)
+        end
+
+        local parse_item_stat = {
+            [ITEM_ABILITY] = function(self, index, value, lower, upper,
+                                      valuestr, range)
+                local s = ParseItemAbilityTooltip(self, index, value)
+
+                return (s:len() > 0 and concat({"|n", s})) or ""
+            end,
+
+            default = function(self, index, value, lower, upper, valuestr,
+                               range, posneg)
+                local suffix = STAT_TAG[index].item_suffix or
+                                   STAT_TAG[index].suffix or "|r"
+
+                if range ~= 0 then
+                    return concat({
+                        "|n + |cffffcc00", lower, "-", upper, suffix, " ",
+                        STAT_TAG[index].tag
+                    })
+                else
+                    return concat({
+                        "|n ", posneg, valuestr, suffix, " ",
+                        STAT_TAG[index].tag
+                    })
+                end
+            end
+        }
+
+        parse_item_stat[ITEM_ABILITY2] = parse_item_stat[ITEM_ABILITY]
+
+        ---Rebuilds calculated stats and native-handle presentation.
+        ---Presentation subscribers must suppress the change broadcast to
+        ---avoid recursively refreshing themselves.
+        ---@param suppress_refresh boolean?
+        function thistype:update(suppress_refresh)
+            local definition = not self.runtime_definition and
+                                   ItemRuntime.definitions[self.id] or nil
+            local data = item_data(self)
+            local orig = (definition and definition.flavor) or data.tooltip ---@type string
+            local text = {}
+
+            -- first "header" lines: rarity, upg level, tier, type, req level
+            local rarity_index = ItemRuntime.getRarityIndex(self)
+            if self.level > 0 and not (definition and definition.custom_level) then
+                BlzSetItemSkin(self.obj, ITEM_MODEL[rarity_index])
+
+                text[#text + 1] = RARITY_NAME[rarity_index]
+                text[#text + 1] = " +"
+                text[#text + 1] = self.level
+                text[#text + 1] = "|n"
+            elseif rarity_index > 0 then
+                text[#text + 1] = RARITY_NAME[rarity_index]
+                text[#text + 1] = "|n"
+            end
+
+            text[#text + 1] = TIER_NAME[data[ITEM_TIER]]
+            text[#text + 1] = " "
+            text[#text + 1] = TYPE_NAME[data[ITEM_TYPE]]
+
+            local lvl = data[ITEM_LEVEL_REQUIREMENT]
+            if lvl > 0 then
+                text[#text + 1] = "|n|cffff0000Level Requirement: |r"
+                text[#text + 1] = lvl
+            end
+
+            local faction_rank = self.runtime_definition and
+                                     self.runtime_definition
+                                         .faction_rank_requirement or 0
+            if faction_rank > 0 then
+                text[#text + 1] =
+                    "|n|cffff0000Faction Rank Requirement: |r"
+                text[#text + 1] = faction_rank
+            end
+
+            text[#text + 1] = "|n"
+            local alt_text = {}
+            for i, v in ipairs(text) do alt_text[i] = v end
+
+            if definition and definition.appendHeader then
+                definition.appendHeader(self, text, alt_text)
+            end
+
+            -- cache stats
+            self:cache_stats()
+
+            -- Logical items may transform their calculated values before any
+            -- gameplay or presentation consumer reads them. The returned map
+            -- contains percent adjustments shown only in the Alt tooltip.
+            local stat_adjustments
+            if self.runtime_definition and
+                self.runtime_definition.adjust_cached_stats then
+                stat_adjustments =
+                    self.runtime_definition.adjust_cached_stats(self)
+            end
+
+            local cs = self.cached_stats
+
+            -- body stats
+            for _, index in ipairs(DISPLAY_STATS) do
+                local value = cs[index]
+
+                -- write non-zero stats
+                if value ~= 0 then
+                    local base_value = self.cached_base[index]
+                    local socket_value = value - base_value
+                    local socket_valuestr = tostring(floor(
+                                                         math.abs(socket_value) +
+                                                             0.5))
+                    local lower = self.cached_lower[index]
+                    local upper = self.cached_upper[index]
+                    local valuestr = tostring(floor(math.abs(value) + 0.5))
+                    local posneg = "+ |cffffcc00"
+
+                    -- handle negative values
+                    if value < 0 then posneg = "- |cffcc0000" end
+
+                    -- alt tooltip
+                    local range = data[index .. "range"]
+                    if parse_item_stat[index] then
+                        alt_text[#alt_text + 1] =
+                            parse_item_stat[index](self, index, value, lower,
+                                                   upper, valuestr, range)
+                    else
+                        alt_text[#alt_text + 1] =
+                            parse_item_stat.default(self, index, value, lower,
+                                                    upper, valuestr, range,
+                                                    posneg)
+
+                        if socket_value ~= 0 then
+                            alt_text[#alt_text + 1] = " |cff00ff00("
+                            alt_text[#alt_text + 1] =
+                                socket_value > 0 and "+" or "-"
+                            alt_text[#alt_text + 1] = socket_valuestr
+                            alt_text[#alt_text + 1] = STAT_TAG[index]
+                                                          .item_suffix or
+                                                          STAT_TAG[index].suffix or
+                                                          "|r"
+                            alt_text[#alt_text + 1] = "|cff00ff00)|r"
+                        end
+                    end
+
+                    if stat_adjustments and stat_adjustments[index] then
+                        alt_text[#alt_text + 1] = " |cffff5555(-"
+                        alt_text[#alt_text + 1] = stat_adjustments[index]
+                        alt_text[#alt_text + 1] = "%)|r"
+                    end
+
+                    -- normal tooltip
+                    if index == ITEM_ABILITY or index == ITEM_ABILITY2 then
+                        text[#text + 1] =
+                            parse_item_stat[index](self, index, value, 0, 0)
+                    else
+                        local suffix = STAT_TAG[index].item_suffix or
+                                           STAT_TAG[index].suffix or "|r"
+                        text[#text + 1] = "|n "
+
+                        if base_value ~= 0 then
+                            text[#text + 1] =
+                                base_value > 0 and "+ |cffffcc00" or
+                                    "- |cffcc0000"
+                            text[#text + 1] =
+                                tostring(math.abs(floor(base_value + 0.5)))
+                            text[#text + 1] = suffix
+                        end
+
+                        if socket_value ~= 0 then
+                            if base_value ~= 0 then
+                                text[#text + 1] = " "
+                            end
+
+                            text[#text + 1] =
+                                socket_value > 0 and "|cff00ff00+ " or
+                                    "|cff00ff00- "
+                            text[#text + 1] = socket_valuestr
+                            text[#text + 1] = suffix
+                            text[#text + 1] = "|r"
+                        end
+
+                        text[#text + 1] = " "
+                        text[#text + 1] = STAT_TAG[index].tag
+                    end
+                end
+            end
+
+            -- Runtime logical items can add calculated, non-core properties
+            -- directly after ordinary stats. This keeps values such as flask
+            -- cooldown beside Charges without inventing a global item stat.
+            if self.runtime_definition and
+                self.runtime_definition.append_stats then
+                self.runtime_definition.append_stats(self, text, alt_text)
+            end
+
+            -- flavor text
+            -- remove bracket pairs, extra spaces, and extra newlines
+            local flavor = orig:gsub("(%b[]%s*)", "")
+            if flavor:len() > 5 then
+                text[#text + 1] = "|n"
+                text[#text + 1] = flavor
+                alt_text[#alt_text + 1] = "|n"
+                alt_text[#alt_text + 1] = flavor
+            end
+
+            if self.limit > 0 then
+                text[#text + 1] = "|cff808080|nLimit: 1"
+                alt_text[#alt_text + 1] = "|cff808080|nLimit: 1"
+            end
+
+            local extra_info = ITEM_EXTRA_INFO[self.id]
+            if extra_info then
+                local extra_text = extra_info(self)
+                if extra_text then
+                    text[#text + 1] = extra_text
+                    alt_text[#alt_text + 1] = extra_text
+                end
+            end
+
+            self.tooltip = concat(text)
+            self.alt_tooltip = concat(alt_text)
+
+            if self.runtime_definition and
+                self.runtime_definition.world_skin_id then
+                -- Generic rarity presentation may select a world skin while
+                -- rebuilding the item. Logical items own their dropped model.
+                BlzSetItemSkin(self.obj,
+                               self.runtime_definition.world_skin_id)
+            end
+            BlzSetItemIconPath(self.obj, data.path)
+            BlzSetItemName(self.obj, definition and definition.name and
+                               definition.name(self) or data.name)
+            BlzSetItemTooltip(self.obj, data.name)
+            BlzSetItemDescription(self.obj, self.tooltip)
+            BlzSetItemExtendedTooltip(self.obj, self.tooltip)
+
+            -- update inventory frames
+            if self.pid and not suppress_refresh then
+                NotifyItemChanged(self.pid)
+            end
+        end
+
+        ---@type fun(id: integer, stats: integer, extra: integer, persistent_state: integer[]?): Item|nil
+        function thistype.decode(id, stats, extra, persistent_state)
+            if id == 0 then return nil end
+
+            local itemid = id & 0x1FFF
+            local itm = ItemRuntime.create(CUSTOM_ITEM_OFFSET + itemid, 30000.,
+                                           30000.)
+            local mask = 0xFE000
+            itm.level = (id & mask) >> 13
+
+            mask = 0x3F
+            itm.quality[1] = (id >> 20) & 0x3F
+            itm.quality[2] = (id >> 26) & 0x3F
+
+            local shift = 0
+            for i = 3, QUALITY_SAVED do
+                itm.quality[i] = (stats & mask) >> shift
+
+                mask = (mask << 6)
+                shift = shift + 6
+            end
+
+            mask = 0xFFFF
+            itm.extra[1] = (extra >> 16) & mask
+            itm.extra[2] = (extra & mask)
+            -- Decoded items own their state. In particular, two items restored
+            -- from the same snapshot must not advance one another's counters.
+            itm.persistent_state = {}
+            for index = 1, #(persistent_state or {}) do
+                itm.persistent_state[index] = persistent_state[index]
+            end
+
+            if RuntimeItemDefinitions then
+                RuntimeItemDefinitions.restore(itm)
+            end
+
+            itm:lvl(itm.level)
+
+            -- Managed item charges are persistent. The high bit distinguishes
+            -- the charge encoding from legacy uses of the extra field. Old
+            -- potion saves still load full because they predate persistent
+            -- flask charges; other legacy items retain their native defaults.
+            local encoded_charges = itm.extra[1]
+            if (encoded_charges & 0x8000) ~= 0 then
+                itm.charges = encoded_charges & 0x7FFF
+                itm.extra[1] = 0
+            elseif itm.type == TYPE_POTION_INDEX then
+                itm.charges = itm.cached_stats[ITEM_CHARGES]
+                itm.extra[1] = 0
+            end
+
+            -- Item:lvl performs the final generic tooltip rebuild. Logical
+            -- subsystems can now restore presentation that depends on saved
+            -- state (for example potion affix slots, names, and icons).
+            local runtime_definition = itm.runtime_definition
+            if runtime_definition and runtime_definition.restore_item then
+                runtime_definition.restore_item(itm)
+            end
+
+            return itm
+        end
+
+        ---Returns subsystem-owned item state that is stored as ordinary save
+        ---values rather than competing for bits in id/stats/extra.
+        ---@return integer[]
+        function thistype:encode_state()
+            return self.persistent_state or {}
+        end
+
+        -- save 5 more quality integers, 6 bits for each
+        ---@return integer
+        function thistype:encode_stats()
+            local id = 0
+
+            for i = 3, 7 do
+                id = id + (self.quality[i] << ((i - 3) * 6))
+            end
+
+            return id
+        end
+
+        -- extra item metadata
+        ---@type fun(self: Item): integer
+        function thistype:encode_extra()
+            local first = 0x8000 |
+                              math.max(0, math.min(0x7FFF, self.charges))
+            local extra = (first << 16) + self.extra[2]
+
+            return extra
+        end
+
+        -- from least to most significant: first 13 bits for id, next 7 for level, 6 for each quality
+        ---@type fun(self: Item): integer
+        function thistype:encode_id()
+            local id = ItemToIndex(self.id)
+
+            if id == nil then return 0 end
+
+            id = id + (self.level << 13)
+
+            for i = 1, 2 do
+                id = id + (self.quality[i] << (14 + i * 6))
+            end
+
+            return id
+        end
+
+        function thistype:drop(x, y, mute, suppress_refresh)
+            if self.holder == nil or self.index == nil then return end
+
+            refresh_item_abilities(self, true, self.holder)
+
+            if self.equipped then
+                self.equipped = false
+
+                apply_item_stats(self, -1, nil, true)
+            end
+
+            SetItemPosition(self.obj, x or GetUnitX(self.holder),
+                            y or GetUnitY(self.holder))
+            SetItemVisible(self.obj, true)
+
+            if not mute then
+                SoundHandler("Sound\\Interface\\HeroDropItem1.flac", true,
+                             self.owner, self.holder)
+            end
+
+            Profile[self.pid].hero.items[self.index] = nil
+            self.holder = nil
+            self.index = nil
+
+            if not suppress_refresh then NotifyItemChanged(self.pid) end
+        end
+
+        function thistype:onDestroy()
+            if not self.alive then return false end
+
+            self.alive = false
+
+            if self.sfx then
+                DestroyEffect(self.sfx)
+                self.sfx = nil
+            end
+
+            if self.pid then NotifyItemChanged(self.pid) end
+
+            -- Release the strong registry reference before invalidating the handle.
+            Item[self.obj] = nil
+            DestroyTrigger(self.trig)
+            set_widget_life(self.obj, 1.)
+            RemoveItem(self.obj)
+
+            self.trig = nil
+            self.obj = nil
+
+            if RuntimeMetrics then
+                RuntimeMetrics.items.destroyed =
+                    RuntimeMetrics.items.destroyed + 1
+                RuntimeMetrics.items.live = RuntimeMetrics.items.live - 1
+            end
+
+            return true
+        end
+
+        function thistype:destroy()
+            if not self.alive then return false end
+
+            self:drop(30000, 30000, true)
+            return self:onDestroy()
+        end
+
+        ---@type fun(itm: Item)
+        function thistype.expire(itm)
+            if not itm.holder and not itm.owner then itm:destroy() end
+        end
+    end
+
+end, Debug and Debug.getLine())

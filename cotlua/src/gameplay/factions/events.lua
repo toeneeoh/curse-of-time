@@ -1,0 +1,632 @@
+-- Shared scheduling and runtime for faction-wide hourly events.
+
+OnInit.final("FactionEvents", function(Require)
+    Require('Faction')
+    Require('FactionMining')
+    Require('Currency')
+    Require('Events')
+    Require('MainMap')
+    Require('Pathing')
+    Require('Regions')
+    Require('TimerQueue')
+    Require('UnitTable')
+    Require('Users')
+    Require('Variables')
+
+    FactionEvents = {}
+
+    local CAVE_VOYAGERS_ID = 1
+    local providers = {}
+    local service_activated = false
+    local last_faction_id = 0
+    local next_faction_id ---@type integer?
+    local next_event_callback ---@type integer?
+    local warning_callback ---@type integer?
+    local EVENT_INTERVAL = 3600.
+    local EVENT_WARNING = 300.
+    local EVENT_TIMEOUT = 720.
+    local EVENT_RADIUS = 2600.
+    local SPAWN_MIN_RADIUS = 1400.
+    local SPAWN_MAX_RADIUS = 1900.
+    local WAVE_INTERVAL = 60.
+    local TOTAL_WAVES = 5
+    local PRESENCE_REWARD_THRESHOLD = 30
+    local POINT_REWARD = 30
+    local REPUTATION_REWARD = 30
+    local MOMENTUM_REWARD = 40
+    local MELEE_TEMPLATE = FourCC('n002')
+    local RANGED_TEMPLATE = FourCC('n008')
+    local CACHE_MODEL = "Objects\\InventoryItems\\TreasureChest\\treasurechest.mdl"
+    local skins = {
+        melee = { FourCC('n03C'), FourCC('n033'), FourCC('n03E'), FourCC('n03A') },
+        ranged = { FourCC('n01W'), FourCC('n00W'), FourCC('n02J') },
+    }
+
+    local activated = false
+    local active = false
+    local wave = 0
+    local objective ---@type unit?
+    local objective_effect ---@type effect?
+    local enemies = setmetatable({}, { __mode = 'k' })
+    local enemy_count = 0
+    local contribution = {}
+    local wave_callback ---@type integer?
+    local timeout_callback ---@type integer?
+    local presence_callback ---@type integer?
+
+    local start_event, finish_event
+
+    local function format_time(time)
+        local total = math.max(0, math.ceil(time))
+        local hours = total // 3600
+        local minutes = (total % 3600) // 60
+        local seconds = total % 60
+        if hours > 0 then
+            return string.format("%d:%02d:%02d", hours, minutes, seconds)
+        end
+        return string.format("%d:%02d", minutes, seconds)
+    end
+
+    local function member_faction(pid)
+        local faction = Faction.getFaction(pid)
+        return faction and faction.id == CAVE_VOYAGERS_ID
+    end
+
+    local function announce(message, sound)
+        local user = User.first
+        while user do
+            if member_faction(user.id) then
+                DisplayTextToPlayer(user.player, 0., 0., message)
+                if sound then
+                    StartSoundForPlayerBJ(user.player, sound)
+                end
+            end
+            user = user.next
+        end
+    end
+
+    local function disable_callback(callback)
+        if callback then
+            TimerQueue:disableCallback(callback)
+        end
+    end
+
+    local function clear_runtime_callbacks()
+        disable_callback(wave_callback)
+        disable_callback(timeout_callback)
+        disable_callback(presence_callback)
+        wave_callback = nil
+        timeout_callback = nil
+        presence_callback = nil
+    end
+
+    local function cleanup_units()
+        for enemy in pairs(enemies) do
+            RemoveUnit(enemy)
+        end
+        enemies = setmetatable({}, { __mode = 'k' })
+        enemy_count = 0
+        if objective then
+            RemoveUnit(objective)
+            objective = nil
+        end
+        if objective_effect then
+            DestroyEffect(objective_effect)
+            objective_effect = nil
+        end
+    end
+
+    local function event_center()
+        local faction = Faction[CAVE_VOYAGERS_ID]
+        if not faction or not faction.leader then return nil end
+        return GetUnitX(faction.leader), GetUnitY(faction.leader)
+    end
+
+    local function event_members(nearby_only)
+        local members = {}
+        local x, y = event_center()
+        local user = User.first
+        while user do
+            local hero = Hero[user.id]
+            if member_faction(user.id) and hero and UnitAlive(hero)
+                and (not nearby_only
+                    or DistanceCoords(x, y, GetUnitX(hero), GetUnitY(hero)) <= EVENT_RADIUS) then
+                members[#members + 1] = user.id
+            end
+            user = user.next
+        end
+        return members
+    end
+
+    local function event_strength()
+        local members = event_members(true)
+        local total_level = 0
+        for index = 1, #members do
+            total_level = total_level + GetHeroLevel(Hero[members[index]])
+        end
+        return math.max(1, #members),
+            #members > 0 and math.max(1, math.floor(total_level / #members)) or 200
+    end
+
+    local function spawn_location(center_x, center_y)
+        for _ = 1, 24 do
+            local angle = math.random() * 2. * bj_PI
+            local distance = GetRandomReal(SPAWN_MIN_RADIUS, SPAWN_MAX_RADIUS)
+            local x = center_x + distance * math.cos(angle)
+            local y = center_y + distance * math.sin(angle)
+            if RectContainsCoords(MAIN_MAP.rect, x, y) and
+                not IsProtectedArea(x, y) and IsTerrainWalkable(x, y) then
+                return x, y
+            end
+        end
+
+        -- Keep the deterministic fallback out of town as well. This matters
+        -- when an event center is close enough to a protected-area edge that
+        -- unlucky random attempts all land inside it or on blocked terrain.
+        local offsets = {
+            {-SPAWN_MIN_RADIUS, 0.},
+            {SPAWN_MIN_RADIUS, 0.},
+            {0., -SPAWN_MIN_RADIUS},
+            {0., SPAWN_MIN_RADIUS},
+        }
+        for index = 1, #offsets do
+            local x = center_x + offsets[index][1]
+            local y = center_y + offsets[index][2]
+            if RectContainsCoords(MAIN_MAP.rect, x, y) and
+                not IsProtectedArea(x, y) and IsTerrainWalkable(x, y) then
+                return x, y
+            end
+        end
+
+        return center_x, center_y
+    end
+
+    local function record_kill(killer)
+        if not killer then return end
+        local pid = GetPlayerId(GetOwningPlayer(killer)) + 1
+        if pid <= PLAYER_CAP and member_faction(pid) then
+            local data = contribution[pid] or { presence = 0, kills = 0 }
+            contribution[pid] = data
+            data.kills = data.kills + 1
+        end
+    end
+
+    local function on_enemy_death(killed, killer)
+        if not enemies[killed] then return end
+        enemies[killed] = nil
+        enemy_count = math.max(0, enemy_count - 1)
+        record_kill(killer)
+        TimerQueue:callDelayed(3., RemoveUnit, killed)
+        if active and wave >= TOTAL_WAVES and enemy_count == 0 then
+            finish_event(true)
+        end
+    end
+
+    local function configure_enemy(unit, level, party_size, count, ranged)
+        local extra_players = math.max(0, party_size - 1)
+        local wave_multiplier = 0.8 + wave * 0.2
+        local count_multiplier = math.max(0.6, math.sqrt(10. / math.max(1, count)))
+        -- Twenty times less health than the first prototype. A level-400 solo
+        -- wave now starts near 2.2 million health per enemy instead of 44m;
+        -- party size, wave pressure, and enemy count still scale separately.
+        local hp = (15000. + level * level * 15.)
+            * (1. + extra_players * 0.55) * wave_multiplier * count_multiplier
+        local damage = (250. + level * level * 0.45)
+            * (1. + extra_players * 0.18) * wave_multiplier * count_multiplier
+        local armor = level * (0.55 + wave * 0.08)
+
+        BlzSetUnitMaxHP(unit, math.floor(math.min(2000000000., hp)))
+        SetWidgetLife(unit, BlzGetUnitMaxHP(unit))
+        BlzSetUnitBaseDamage(unit, math.max(1,
+            math.floor(damage / CHAOS_ATTACK_DAMAGE_MULTIPLIER)), 0)
+        BlzSetUnitArmor(unit, armor)
+        BlzSetUnitIntegerField(unit, UNIT_IF_DEFENSE_TYPE, ARMOR_CHAOS)
+        BlzSetUnitWeaponIntegerField(unit,
+            UNIT_WEAPON_IF_ATTACK_ATTACK_TYPE, 0, ATTACK_CHAOS)
+        BlzSetUnitIntegerField(unit, UNIT_IF_LEVEL, level)
+        Unit[unit].ms_percent = Unit[unit].ms_percent + 0.08 + wave * 0.02
+        if ranged then
+            SetUnitVertexColor(unit, 130, 170, 255, 255)
+            SetUnitScale(unit, 1.12, 1.12, 1.12)
+        end
+    end
+
+    local function spawn_enemy(center_x, center_y, level, party_size, count, index)
+        local ranged = index % 4 == 0
+        local pool = ranged and skins.ranged or skins.melee
+        local skin = pool[math.random(1, #pool)]
+        local x, y = spawn_location(center_x, center_y)
+        local unit = BlzCreateUnitWithSkin(PLAYER_BOSS,
+            ranged and RANGED_TEMPLATE or MELEE_TEMPLATE,
+            x, y, bj_RADTODEG * Atan2(center_y - y, center_x - x), skin)
+        BlzSetUnitSkin(unit, skin)
+        BlzSetUnitName(unit, GetObjectName(skin))
+        BlzSetHeroProperName(unit, GetObjectName(skin))
+        configure_enemy(unit, level, party_size, count, ranged)
+        enemies[unit] = true
+        enemy_count = enemy_count + 1
+        EVENT_ON_UNIT_DEATH:register_unit_action(unit, on_enemy_death)
+        EVENT_ON_ENTER_SAFE_AREA:register_unit_action(unit, function(target)
+            if not enemies[target] or not objective or not UnitAlive(objective) then
+                return
+            end
+            local return_x, return_y = spawn_location(
+                                           GetUnitX(objective),
+                                           GetUnitY(objective))
+            IssueImmediateOrderById(target, ORDER_ID_STOP)
+            SetUnitPosition(target, return_x, return_y)
+            IssueTargetOrder(target, "attack", objective)
+        end)
+        IssueTargetOrder(unit, "attack", objective)
+    end
+
+    local function spawn_wave()
+        wave_callback = nil
+        if not active or not objective or not UnitAlive(objective) then return end
+        wave = wave + 1
+        local party_size, level = event_strength()
+        local count = 7 + wave * 2 + party_size * 3
+        local x, y = GetUnitX(objective), GetUnitY(objective)
+        announce("|cffffcc00Hold the Line:|r Wave " .. wave .. " / " .. TOTAL_WAVES)
+        for index = 1, count do
+            spawn_enemy(x, y, level, party_size, count, index)
+        end
+        if wave < TOTAL_WAVES then
+            wave_callback = TimerQueue:callDelayed(WAVE_INTERVAL, spawn_wave)
+        elseif enemy_count == 0 then
+            finish_event(true)
+        end
+    end
+
+    local function presence_tick()
+        presence_callback = nil
+        if not active then return end
+        local members = event_members(true)
+        for index = 1, #members do
+            local pid = members[index]
+            local data = contribution[pid] or { presence = 0, kills = 0 }
+            contribution[pid] = data
+            data.presence = data.presence + 1
+        end
+        presence_callback = TimerQueue:callDelayed(1., presence_tick)
+    end
+
+    local function on_objective_death()
+        if active then
+            finish_event(false)
+        end
+    end
+
+    finish_event = function(success)
+        if not active then return false end
+        active = false
+        clear_runtime_callbacks()
+
+        if success then
+            local rewarded = 0
+            for pid, data in pairs(contribution) do
+                if member_faction(pid)
+                    and (data.presence >= PRESENCE_REWARD_THRESHOLD or data.kills > 0) then
+                    AddCurrency(pid, FACTION, POINT_REWARD)
+                    Faction.addReputation(pid, REPUTATION_REWARD)
+                    Quest.progress(pid, "faction_event")
+                    StartSoundForPlayerBJ(Player(pid - 1), bj_questCompletedSound)
+                    rewarded = rewarded + 1
+                end
+            end
+            if rewarded > 0 then
+                Faction.addMomentum(CAVE_VOYAGERS_ID, MOMENTUM_REWARD)
+            end
+            announce("|cff80ff80Hold the Line complete!|r " .. rewarded
+                .. " participant" .. (rewarded == 1 and " was" or "s were") .. " rewarded.")
+        else
+            announce("|cffff4040Hold the Line failed.|r The Cave Voyagers' supply cache was destroyed.",
+                bj_questFailedSound)
+        end
+
+        cleanup_units()
+        contribution = {}
+        wave = 0
+        return true
+    end
+
+    start_event = function()
+        if active or not CHAOS_MODE then
+            return false
+        end
+
+        local faction = Faction[CAVE_VOYAGERS_ID]
+        local center_x, center_y = event_center()
+        if not faction or not center_x then
+            return false
+        end
+
+        active = true
+        wave = 0
+        contribution = {}
+        local party_size, level = event_strength()
+        objective = CreateUnit(Player(PLAYER_NEUTRAL_PASSIVE),
+            FactionMining.RAWCODES.deposit, center_x + 250., center_y, 270.)
+        BlzSetUnitName(objective, "Cave Voyagers Supply Cache")
+        SetUnitPathing(objective, false)
+        PauseUnit(objective, true)
+        SetUnitInvulnerable(objective, false)
+        BlzSetUnitWeaponBooleanField(objective, UNIT_WEAPON_BF_ATTACKS_ENABLED, 0, false)
+        SetUnitVertexColor(objective, 255, 255, 255, 0)
+        objective_effect = AddSpecialEffect(CACHE_MODEL,
+            GetUnitX(objective), GetUnitY(objective))
+        BlzSetSpecialEffectScale(objective_effect, 1.75)
+        BlzSetSpecialEffectYaw(objective_effect, 105)
+        local max_health = math.min(2000000000.,
+            (100000. + level * level * 800.) * (1. + math.max(0, party_size - 1) * 0.4))
+        BlzSetUnitMaxHP(objective, math.floor(max_health))
+        SetWidgetLife(objective, max_health)
+        EVENT_ON_UNIT_DEATH:register_unit_action(objective, on_objective_death)
+
+        announce("|cffffcc00Faction Event: Hold the Line|r\nDefend the Cave Voyagers' supply cache against five assault waves.",
+            bj_questDiscoveredSound)
+        presence_tick()
+        timeout_callback = TimerQueue:callDelayed(EVENT_TIMEOUT, finish_event, false)
+        wave_callback = TimerQueue:callDelayed(10., spawn_wave)
+        return true
+    end
+
+    local function activate_cave_event()
+        if activated then return false end
+        activated = true
+        return true
+    end
+
+    ---@param pid integer
+    ---@return string
+    local function get_cave_event_status(pid, _remaining)
+        if not activated then
+            return "|cff808080Events become available after Chaos.|r"
+        end
+        if active then
+            return "|cffffcc00Hold the Line|r\n\nDefend the supply cache through five waves.\n|cff80ff80Event in progress.|r"
+        end
+        return "|cffffcc00Hold the Line|r\n\nDefend the supply cache through five waves."
+    end
+
+    ---@param pid integer
+    ---@return string?
+    local function get_cave_event_hud_status(pid)
+        if not active or not member_faction(pid) then return nil end
+        local health = objective and GetWidgetLife(objective) or 0.
+        local max_health = objective and BlzGetUnitMaxHP(objective) or 1.
+        local remaining = timeout_callback and TimerQueue:getRemaining(timeout_callback) or 0.
+        local progress = wave > 0 and ("Wave " .. wave .. " / " .. TOTAL_WAVES)
+            or "First wave incoming"
+        return "|cffffcc00Hold the Line|r  |  " .. progress
+            .. "\nSupply Cache: " .. math.max(0, math.floor(health / max_health * 100.)) .. "%"
+            .. "  |  " .. format_time(remaining or 0.)
+    end
+
+    local start_cave_event_now
+    if DEV_ENABLED then
+        start_cave_event_now = function()
+            if active then
+                finish_event(false)
+            end
+            return start_event()
+        end
+    end
+
+    local function warn_cave_event()
+        announce("|cffffcc00Faction Event:|r Hold the Line begins in 5 minutes.",
+            bj_questWarningSound)
+    end
+
+    ---@class FactionEventProvider
+    ---@field activate fun(): boolean
+    ---@field start fun(): boolean
+    ---@field warning fun()
+    ---@field isActive fun(): boolean
+    ---@field getStatus fun(pid: integer, remaining: number): string
+    ---@field getHudStatus fun(pid: integer): string?
+    ---@field startNow? fun(): boolean
+    ---@field name string
+    ---@field icon string
+    ---@field description string
+
+    local function represented_factions()
+        local represented = {}
+        local user = User.first
+        while user do
+            local faction = Faction.getFaction(user.id)
+            if faction and providers[faction.id] then
+                represented[faction.id] = true
+            end
+            user = user.next
+        end
+
+        local ids = {}
+        for faction_id in pairs(represented) do
+            ids[#ids + 1] = faction_id
+        end
+        table.sort(ids)
+        return ids
+    end
+
+    local function select_next_faction()
+        local ids = represented_factions()
+        -- Only one hourly world event may run. Rotate through factions which
+        -- currently have members; with a single represented faction, wrapping
+        -- naturally selects it again for the following hour.
+        for index = 1, #ids do
+            if ids[index] > last_faction_id then
+                return ids[index]
+            end
+        end
+        return ids[1]
+    end
+
+    local function is_represented(faction_id)
+        local ids = represented_factions()
+        for index = 1, #ids do
+            if ids[index] == faction_id then return true end
+        end
+        return false
+    end
+
+    local schedule_next_event
+
+    local function warn_next_event()
+        warning_callback = nil
+        if not next_faction_id or not is_represented(next_faction_id) then
+            next_faction_id = select_next_faction()
+        end
+        local provider = next_faction_id and providers[next_faction_id]
+        if provider then
+            provider.warning()
+        end
+    end
+
+    local function start_next_event()
+        next_event_callback = nil
+        disable_callback(warning_callback)
+        warning_callback = nil
+        if not next_faction_id or not is_represented(next_faction_id) then
+            next_faction_id = select_next_faction()
+        end
+
+        local faction_id = next_faction_id
+        local provider = faction_id and providers[faction_id]
+        if provider and provider.start() then
+            last_faction_id = faction_id
+        end
+        next_faction_id = nil
+        schedule_next_event()
+    end
+
+    schedule_next_event = function()
+        disable_callback(next_event_callback)
+        disable_callback(warning_callback)
+        next_faction_id = select_next_faction()
+        next_event_callback = TimerQueue:callDelayed(EVENT_INTERVAL, start_next_event)
+        warning_callback = TimerQueue:callDelayed(
+            EVENT_INTERVAL - EVENT_WARNING, warn_next_event)
+    end
+
+    local function time_until_faction(faction_id)
+        local remaining = next_event_callback
+            and (TimerQueue:getRemaining(next_event_callback) or EVENT_INTERVAL)
+            or EVENT_INTERVAL
+        if not next_faction_id then
+            next_faction_id = select_next_faction()
+        end
+        if not next_faction_id or faction_id == next_faction_id then
+            return remaining
+        end
+
+        local ids = represented_factions()
+        local next_index, faction_index
+        for index = 1, #ids do
+            if ids[index] == next_faction_id then next_index = index end
+            if ids[index] == faction_id then faction_index = index end
+        end
+        if not next_index or not faction_index then
+            return remaining
+        end
+        local distance = (faction_index - next_index) % #ids
+        return remaining + distance * EVENT_INTERVAL
+    end
+
+    ---Registers one faction's signature event with the shared hourly rotation.
+    ---@param faction_id integer
+    ---@param provider FactionEventProvider
+    function FactionEvents.register(faction_id, provider)
+        providers[faction_id] = provider
+        if service_activated then
+            provider.activate()
+            if not next_faction_id then
+                next_faction_id = select_next_faction()
+            end
+        end
+    end
+
+    function FactionEvents.activate()
+        if service_activated then return false end
+        service_activated = true
+        for _, provider in pairs(providers) do
+            provider.activate()
+        end
+        schedule_next_event()
+        return true
+    end
+
+    local function provider_for(pid)
+        local faction = Faction.getFaction(pid)
+        return faction and providers[faction.id] or nil
+    end
+
+    ---@param pid integer
+    ---@return string
+    function FactionEvents.getStatus(pid)
+        if not service_activated then
+            return "|cff808080Events become available after Chaos.|r"
+        end
+        local faction = Faction.getFaction(pid)
+        local provider = provider_for(pid)
+        if not provider then
+            return "|cff808080This faction's hourly event is not yet available.|r"
+        end
+        return provider.getStatus(pid, time_until_faction(faction.id))
+    end
+
+    ---Returns a fixed-position countdown separately from the variable-height
+    ---event description used by the faction view.
+    ---@param pid integer
+    ---@return string?
+    function FactionEvents.getCountdown(pid)
+        if not service_activated then return nil end
+        local faction = Faction.getFaction(pid)
+        local provider = provider_for(pid)
+        if not faction or not provider or provider.isActive() then return nil end
+        return "|cffffcc00Begins in:|r " .. format_time(time_until_faction(faction.id))
+    end
+
+    ---@param pid integer
+    ---@return FactionEventProvider?
+    function FactionEvents.getPresentation(pid)
+        return provider_for(pid)
+    end
+
+    ---@param pid integer
+    ---@return string?
+    function FactionEvents.getHudStatus(pid)
+        local provider = provider_for(pid)
+        return provider and provider.getHudStatus(pid) or nil
+    end
+
+    if DEV_ENABLED then
+        ---@param pid integer
+        function FactionEvents.startNow(pid)
+            local provider = provider_for(pid)
+            for _, current in pairs(providers) do
+                if current ~= provider and current.isActive() then
+                    return false
+                end
+            end
+            return provider and provider.startNow and provider.startNow() or false
+        end
+    end
+
+    FactionEvents.register(CAVE_VOYAGERS_ID, {
+        name = "Hold the Line",
+        icon = "ReplaceableTextures\\CommandButtons\\BTNChestOfGold.blp",
+        description = "Defend the Cave Voyagers' supply cache against five assault waves. Remain nearby for at least 30 seconds to qualify.\n\n|cffffcc00Reward:|r 30 Faction Points",
+        activate = activate_cave_event,
+        start = start_event,
+        warning = warn_cave_event,
+        isActive = function() return active end,
+        getStatus = get_cave_event_status,
+        getHudStatus = get_cave_event_hud_status,
+        startNow = DEV_ENABLED and start_cave_event_now or nil,
+    })
+
+    if CHAOS_MODE then
+        FactionEvents.activate()
+    end
+end, Debug and Debug.getLine())

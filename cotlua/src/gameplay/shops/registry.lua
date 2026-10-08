@@ -1,0 +1,274 @@
+-- Synchronized shop definitions. Catalog content can register shops without
+-- constructing or depending on local frame state.
+
+OnInit.global("ShopRegistry", function(Require)
+    Require('ItemHelpers')
+    Require('ShopOffers')
+
+    ---@class ShopDefinition
+    ---@field id integer
+    ---@field aoe number
+    ---@field categories table[]
+    ---@field items table[]
+    ---@field offers ShopOffer[]
+    ---@field stock table[]
+    ---@field stock_by_key table<string, table>
+    ---@field stock_count table<string, integer>
+    ---@field item_by_id table<string, table>
+    ---@field current unit[]
+    ---@field visibility boolean
+    ---@field access? fun(pid: integer): boolean, string?
+    ---@field view Shop?
+    local ShopDefinition = {}
+    ShopDefinition.__index = ShopDefinition
+
+    local function entry_key(id)
+        if type(id) == "string" and id:sub(1, 6) == "offer:" then
+            return id
+        end
+        return GetItem(id)
+    end
+
+    ShopRegistry = {
+        definitions = {},
+        order = {},
+        adapter = nil,
+    }
+
+    ---@param item_id string|integer
+    ---@return boolean
+    function ShopDefinition:has(item_id)
+        local key = entry_key(item_id)
+        return self.item_by_id[key] ~= nil
+    end
+
+    ---@param item_id string|integer
+    ---@return integer?
+    function ShopDefinition:getStock(item_id)
+        return self.stock_count[entry_key(item_id)]
+    end
+
+    ---@param pid integer
+    ---@param shop_unit unit?
+    function ShopDefinition:setCurrent(pid, shop_unit)
+        self.current[pid] = shop_unit
+    end
+
+    ---@param pid integer
+    ---@return boolean
+    function ShopDefinition:isInRange(pid)
+        local shop_unit = self.current[pid]
+        return shop_unit ~= nil and IsUnitInRange(Hero[pid], shop_unit, self.aoe)
+    end
+
+    ---@param pid integer
+    ---@return boolean, string?
+    function ShopDefinition:canOpen(pid)
+        if not self.access then return true end
+        local allowed, reason = self.access(pid)
+        return allowed ~= false, reason
+    end
+
+    ---@param id integer
+    ---@return ShopDefinition?
+    function ShopRegistry.get(id)
+        return ShopRegistry.definitions[id]
+    end
+
+    ---@param id integer
+    ---@param aoe number
+    ---@return ShopDefinition
+    function ShopRegistry.create(id, aoe)
+        local definition = ShopRegistry.definitions[id]
+        if definition then return definition end
+
+        definition = setmetatable({
+            id = id,
+            aoe = aoe,
+            categories = {},
+            items = {},
+            offers = {},
+            item_by_id = {},
+            stock = {},
+            stock_by_key = {},
+            stock_count = {},
+            current = {},
+            visibility = false,
+        }, ShopDefinition)
+        ShopRegistry.definitions[id] = definition
+        ShopRegistry.order[#ShopRegistry.order + 1] = definition
+
+        if ShopRegistry.adapter then
+            definition.view = ShopRegistry.adapter.create(id, aoe, definition)
+            ShopRegistry.adapter.setVisible(definition, definition.visibility)
+        end
+        return definition
+    end
+
+    ---@param id integer
+    ---@param icon string
+    ---@param description string
+    ---@param catalog_visible? fun(): boolean
+    ---@return integer
+    function ShopRegistry.addCategory(id, icon, description, catalog_visible)
+        local definition = ShopRegistry.definitions[id]
+        if not definition then return 0 end
+
+        local value = 2 ^ #definition.categories
+        definition.categories[#definition.categories + 1] = {
+            icon = icon,
+            description = description,
+            value = value,
+            catalog_visible = catalog_visible,
+        }
+        if ShopRegistry.adapter then
+            return ShopRegistry.adapter.addCategory(id, icon, description,
+                                                    catalog_visible)
+        end
+        return value
+    end
+
+    ---@param id integer
+    ---@param item_id string|integer
+    ---@param categories integer
+    ---@param catalog_visible? fun(): boolean
+    function ShopRegistry.addItem(id, item_id, categories, catalog_visible)
+        local definition = ShopRegistry.definitions[id]
+        if not definition then return end
+
+        local key = entry_key(item_id)
+        if definition.item_by_id[key] then return end
+
+        local item = {
+            id = item_id,
+            key = key,
+            categories = categories,
+            catalog_visible = catalog_visible,
+        }
+        definition.items[#definition.items + 1] = item
+        definition.item_by_id[key] = item
+        definition.stock_count[key] = -1
+        if ShopRegistry.adapter then
+            ShopRegistry.adapter.addItem(id, item_id, categories,
+                                         catalog_visible)
+        end
+    end
+
+    ---@param id integer
+    ---@param offer_definition ShopOfferDefinition
+    ---@return ShopOffer?
+    function ShopRegistry.addOffer(id, offer_definition)
+        local definition = ShopRegistry.definitions[id]
+        if not definition then return nil end
+
+        local offer = ShopOffer.create(offer_definition)
+        if not offer or definition.item_by_id[offer.id] then return nil end
+
+        definition.offers[#definition.offers + 1] = offer
+        definition.item_by_id[offer.id] = offer
+        definition.stock_count[offer.id] = -1
+        if ShopRegistry.adapter then
+            ShopRegistry.adapter.addOffer(id, offer)
+        end
+        return offer
+    end
+
+    ---@param id integer
+    ---@param access fun(pid: integer): boolean, string?
+    ---@return boolean
+    function ShopRegistry.setAccess(id, access)
+        local definition = ShopRegistry.definitions[id]
+        if not definition or type(access) ~= "function" then return false end
+        definition.access = access
+        return true
+    end
+
+    ---@param id integer
+    ---@param item_id string|integer
+    ---@param count integer
+    function ShopRegistry.setStock(id, item_id, count)
+        local definition = ShopRegistry.definitions[id]
+        if not definition then return end
+
+        local key = entry_key(item_id)
+        definition.stock_count[key] = count
+        local stock = definition.stock_by_key[key]
+        if stock then
+            stock.count = count
+        else
+            stock = { id = item_id, count = count }
+            definition.stock_by_key[key] = stock
+            definition.stock[#definition.stock + 1] = stock
+        end
+        if ShopRegistry.adapter then
+            ShopRegistry.adapter.setStock(id, item_id, count)
+        end
+    end
+
+    ---@param definition ShopDefinition
+    ---@param item_id string|integer
+    function ShopRegistry.consumeStock(definition, item_id)
+        local count = definition:getStock(item_id)
+        if count and count ~= -1 then
+            ShopRegistry.setStock(definition.id, item_id, count - 1)
+        end
+    end
+
+    ---@param id integer
+    ---@param visible boolean
+    ---@return boolean
+    function ShopRegistry.setVisible(id, visible)
+        local definition = ShopRegistry.definitions[id]
+        if not definition then return false end
+
+        definition.visibility = visible
+        if ShopRegistry.adapter then
+            ShopRegistry.adapter.setVisible(definition, visible)
+        end
+        return visible
+    end
+
+    function ShopRegistry.refreshCatalog(id)
+        local definition = ShopRegistry.definitions[id]
+        if not definition or not ShopRegistry.adapter or
+            not ShopRegistry.adapter.refreshCatalog then return false end
+        ShopRegistry.adapter.refreshCatalog(definition)
+        return true
+    end
+
+    ---@param adapter table
+    function ShopRegistry.bind(adapter)
+        ShopRegistry.adapter = adapter
+        for index = 1, #ShopRegistry.order do
+            local definition = ShopRegistry.order[index]
+            definition.view = adapter.create(definition.id, definition.aoe, definition)
+            adapter.setVisible(definition, definition.visibility)
+            for category_index = 1, #definition.categories do
+                local category = definition.categories[category_index]
+                adapter.addCategory(definition.id, category.icon,
+                                    category.description,
+                                    category.catalog_visible)
+            end
+            for item_index = 1, #definition.items do
+                local item = definition.items[item_index]
+                adapter.addItem(definition.id, item.id, item.categories,
+                                item.catalog_visible)
+            end
+            for offer_index = 1, #definition.offers do
+                adapter.addOffer(definition.id, definition.offers[offer_index])
+            end
+            for stock_index = 1, #definition.stock do
+                local stock = definition.stock[stock_index]
+                adapter.setStock(definition.id, stock.id, stock.count)
+            end
+        end
+    end
+
+    -- Compatibility registration API retained for existing map content.
+    CreateShop = ShopRegistry.create
+    ShopAddCategory = ShopRegistry.addCategory
+    ShopAddItem = ShopRegistry.addItem
+    ShopAddOffer = ShopRegistry.addOffer
+    ShopSetAccess = ShopRegistry.setAccess
+    ShopSetStock = ShopRegistry.setStock
+end, Debug and Debug.getLine())

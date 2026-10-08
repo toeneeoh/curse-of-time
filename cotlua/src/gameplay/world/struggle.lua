@@ -1,0 +1,815 @@
+--[[
+    struggle.lua
+
+    Struggle is an endless pressure mode.
+    Its waves arrive in 25-40 unit trickles with only a five-second reset and use
+    mixed battlefield roles. Wave number is the entire difficulty rating: entering
+    with stronger or weaker equipment cannot alter enemy stats, and a capable hero
+    is expected to approach a wave matching their level.
+
+    Health and damage grow linearly through the pre-Chaos game. Beginning at wave
+    200, the same linear baseline gains 2.25% health and 2% damage per additional
+    wave to follow late-game item growth. Enemies also adopt Chaos defense and
+    attacks at wave 200; written attack damage is divided by the matching damage-
+    system multiplier so the type change itself does not create a 350x spike.
+    Armor remains linear so physical and magical durability do not diverge without
+    bound. Each additional entrant adds 80% health, 30% damage, and one special
+    enemy conversion. Entrants must remain within 50 levels of the challenger.
+
+    A new character always starts at wave 1. Later runs begin at the first wave of
+    the 25-wave window containing the lowest entrant's secured best wave. This
+    preserves a meaningful retry window without deriving difficulty from current
+    level, equipment, or temporary buffs.
+]]
+
+OnInit.final("Struggle", function(Require)
+    Require('Variables')
+    Require('UnitTable')
+    Require('Users')
+    Require('Events')
+    Require('TimerQueue')
+    Require('SimpleButton')
+    Require('DialogWindow')
+    Require('ItemEventRegistry')
+    Require('PlayerLifecycle')
+    Require('Profile')
+    Require('BuffsWorldStruggle')
+    Require('StruggleSpecials')
+    Require('Faction')
+
+    ---@class StruggleService
+    Struggle = {}
+
+    local ENTRY_ACTION_ITEM = FourCC('I0EW')
+    local ENTRY_DURATION = 45.
+    local ENTRY_LEVEL_RANGE = 50
+    local FIRST_WAVE_DELAY = 5.
+    local BETWEEN_WAVE_DELAY = 5.
+    local CHECKPOINT_INTERVAL = 5
+    local STARTING_WAVE_WINDOW = 25
+    local CHECKPOINT_DECISION_TIME = 30.
+    local MAX_SAVED_WAVE = 0xFFFF
+    local TRICKLE_INTERVAL = 1.25
+    local TRICKLE_SIZE = 3
+    local MIN_WAVE_UNITS = 25
+    local MAX_WAVE_UNITS = 40
+    local MELEE_ENEMY_TEMPLATE = FourCC('n002')
+    local RANGED_ENEMY_TEMPLATE = FourCC('n008')
+    local FURY_SWIPES_ABILITY = FourCC('A036')
+    local FURY_DAMAGE_PER_STACK = 0.15
+    local FURY_MAX_STACKS = 20
+    local FURY_RESET_TIME = 6.
+    local CHAOS_WAVE = 200
+    local BASE_HP_PER_WAVE = 80.
+    local BASE_DAMAGE_PER_WAVE = 5.
+    local BASE_ARMOR_PER_WAVE = 0.75
+    local CHAOS_HP_GROWTH = 1.0225
+    local CHAOS_DAMAGE_GROWTH = 1.02
+    local MAX_ENEMY_HP = 2000000000
+    local MAX_ENEMY_DAMAGE = 2000000000
+
+    local center_x = STRUGGLE_CENTER_X
+    local center_y = STRUGGLE_CENTER_Y
+    local spawn_rects = {
+        gg_rct_InfiniteStruggleSpawn1,
+        gg_rct_InfiniteStruggleSpawn2,
+        gg_rct_InfiniteStruggleSpawn3,
+        gg_rct_InfiniteStruggleSpawn4,
+    }
+
+    local prechaos_skins = {
+        fodder = { FourCC('n0tb'), FourCC('n0ss'), FourCC('n0hh') },
+        blocker = { FourCC('n0dm'), FourCC('n01G'), FourCC('n01M') },
+        ranged = { FourCC('n024'), FourCC('n028'), FourCC('n0us') },
+        disruptor = { FourCC('n0ut'), FourCC('n028'), FourCC('n0tc') },
+    }
+    local chaos_skins = {
+        fodder = { FourCC('n03C'), FourCC('n033'), FourCC('n03E') },
+        blocker = { FourCC('n03A'), FourCC('n08N'), FourCC('n031') },
+        ranged = { FourCC('n01W'), FourCC('n00W'), FourCC('n02J') },
+        disruptor = { FourCC('n034'), FourCC('n02Z'), FourCC('n03T') },
+    }
+
+    local formations = {
+        {
+            name = "The Crush",
+            roles = {
+                { type = "fodder", weight = 0.75, hp = 0.7, damage = 0.75, armor = 0.7, speed = 0.12 },
+                { type = "ranged", weight = 0.25, hp = 0.65, damage = 1.35, armor = 0.65, speed = 0.05 },
+            },
+        },
+        {
+            name = "Shield Wall",
+            roles = {
+                { type = "blocker", weight = 0.5, hp = 1.65, damage = 0.7, armor = 1.5, speed = -0.08 },
+                { type = "ranged", weight = 0.5, hp = 0.6, damage = 1.5, armor = 0.6, speed = 0.08 },
+            },
+        },
+        {
+            name = "Hunting Pack",
+            roles = {
+                { type = "fodder", weight = 0.58, hp = 0.8, damage = 0.9, armor = 0.75, speed = 0.18 },
+                { type = "disruptor", weight = 0.25, hp = 0.9, damage = 1.15, armor = 0.9, speed = 0.12 },
+                { type = "ranged", weight = 0.17, hp = 0.55, damage = 1.65, armor = 0.55, speed = 0.05 },
+            },
+        },
+        {
+            name = "Pressure Line",
+            roles = {
+                { type = "blocker", weight = 0.27, hp = 1.8, damage = 0.75, armor = 1.6, speed = -0.1 },
+                { type = "disruptor", weight = 0.36, hp = 0.85, damage = 1.2, armor = 0.85, speed = 0.1 },
+                { type = "ranged", weight = 0.37, hp = 0.6, damage = 1.55, armor = 0.6, speed = 0.05 },
+            },
+        },
+    }
+
+    local special_roles = {
+        { type = "harpooner", skin_type = "ranged", ranged = true, special = "hook",
+            hp = 0.75, damage = 1.1, armor = 0.7, speed = 0.08,
+            color = { 100, 100, 255 }, scale = 1.2 },
+        { type = "burster", skin_type = "disruptor", special = "rupture",
+            hp = 0.6, damage = 1., armor = 0.55, speed = 0.35,
+            color = { 255, 100, 50 }, scale = 1.2 },
+        { type = "blightcaster", skin_type = "disruptor", ranged = true, special = "miasma",
+            hp = 0.7, damage = 0.9, armor = 0.65, speed = 0.05,
+            color = { 100, 100, 255 }, scale = 1.2 },
+    }
+
+    local players = {} ---@type integer[]
+    local enemies = {} ---@type unit[]
+    local active_count = 0
+    local wave = 0
+    local completed_wave = 0
+    local party_health_multiplier = 1.
+    local party_damage_multiplier = 1.
+    local party_size = 0
+    local entry_open = false
+    local active = false
+    local challenger_pid = 0
+    local challenger_level = 0
+    local entry_callback ---@type integer?
+    local wave_callback ---@type integer?
+    local trickle_callback ---@type integer?
+    local checkpoint_callback ---@type integer?
+    local spawn_queue = {}
+    local spawn_total = 0
+    local exit_button ---@type SimpleButton?
+    local fury_state = setmetatable({}, { __mode = 'k' })
+    local fury_targets = setmetatable({}, { __mode = 'k' })
+    local checkpoint_active = false
+    local checkpoint_waiting = 0
+    local checkpoint_pending = {} ---@type boolean[]
+    local checkpoint_dialogs = {} ---@type DialogWindow[]
+
+    local begin_run, begin_checkpoint, end_run, remove_player, schedule_wave
+    local on_grave_death, on_cleanup, on_struggle_fury_hit
+
+    local function set_exit_visible(pid, visible)
+        if GetLocalPlayer() == Player(pid - 1) and exit_button then
+            exit_button:visible(visible)
+        end
+    end
+
+    local function random_player_hero()
+        if #players == 0 then
+            return nil
+        end
+
+        local first = math.random(1, #players)
+        for offset = 0, #players - 1 do
+            local hero = Hero[players[(first + offset - 1) % #players + 1]]
+            if hero and UnitAlive(hero) then
+                return hero
+            end
+        end
+
+        return nil
+    end
+
+    ---Returns the first wave of the saved-best bracket. An entrant without a
+    ---previous secured checkpoint starts at wave 1.
+    ---@param best_wave integer
+    ---@return integer
+    local function recommended_start_wave(best_wave)
+        if best_wave <= 0 then
+            return 1
+        end
+        return math.max(1,
+            ((best_wave - 1) // STARTING_WAVE_WINDOW) * STARTING_WAVE_WINDOW + 1)
+    end
+
+    local function spawn_xy(rect)
+        return GetRandomReal(GetRectMinX(rect), GetRectMaxX(rect)), GetRandomReal(GetRectMinY(rect), GetRectMaxY(rect))
+    end
+
+    local function configure_enemy(u, role, total_spawned)
+        local count_multiplier = math.max(0.55, math.min(0.8, math.sqrt(12. / total_spawned)))
+        local base_hp = wave * BASE_HP_PER_WAVE
+        local base_damage = wave * BASE_DAMAGE_PER_WAVE
+        local chaos_progress = math.max(0, wave - CHAOS_WAVE)
+
+        if chaos_progress > 0 then
+            base_hp = base_hp * CHAOS_HP_GROWTH ^ chaos_progress
+            base_damage = base_damage * CHAOS_DAMAGE_GROWTH ^ chaos_progress
+        end
+
+        local hp = base_hp * party_health_multiplier * role.hp * count_multiplier
+        local damage = base_damage * party_damage_multiplier * role.damage * count_multiplier
+        local armor = wave * BASE_ARMOR_PER_WAVE * role.armor
+
+        if wave >= CHAOS_WAVE then
+            BlzSetUnitIntegerField(u, UNIT_IF_DEFENSE_TYPE, ARMOR_CHAOS)
+            BlzSetUnitWeaponIntegerField(u, UNIT_WEAPON_IF_ATTACK_ATTACK_TYPE, 0, ATTACK_CHAOS)
+            damage = damage / CHAOS_ATTACK_DAMAGE_MULTIPLIER
+        end
+
+        BlzSetUnitMaxHP(u, math.floor(math.min(MAX_ENEMY_HP, math.max(1., hp))))
+        BlzSetUnitBaseDamage(u, math.floor(math.min(MAX_ENEMY_DAMAGE, math.max(1., damage))), 0)
+        BlzSetUnitArmor(u, armor)
+        SetWidgetLife(u, BlzGetUnitMaxHP(u))
+        Unit[u].ms_percent = Unit[u].ms_percent + role.speed + math.min(0.35, wave * 0.005)
+
+        local target = random_player_hero()
+        if target then
+            IssueTargetOrder(u, "attack", target)
+        else
+            IssuePointOrder(u, "attack", center_x, center_y)
+        end
+    end
+
+    local function refresh_fury_debuff(target)
+        local sources = fury_targets[target]
+        local highest = 0
+        local remaining = 0.
+
+        if sources then
+            for _, state in pairs(sources) do
+                if state.stacks > highest then
+                    highest = state.stacks
+                    remaining = state.callback and TimerQueue:getRemaining(state.callback) or FURY_RESET_TIME
+                end
+            end
+        end
+
+        if highest > 0 then
+            StruggleFuryDebuff:add(target, target):update(
+                highest,
+                highest * FURY_DAMAGE_PER_STACK,
+                math.max(FPS_32, remaining or FURY_RESET_TIME)
+            )
+        else
+            local buff = StruggleFuryDebuff:get(nil, target)
+            if buff then
+                buff:remove()
+            end
+            fury_targets[target] = nil
+        end
+    end
+
+    local function detach_fury_source(source, state)
+        if not state or not state.target then
+            return
+        end
+
+        local target = state.target
+        local sources = fury_targets[target]
+        if sources then
+            sources[source] = nil
+        end
+        refresh_fury_debuff(target)
+    end
+
+    local function expire_fury(source, target)
+        local state = fury_state[source]
+        if state and state.target == target then
+            detach_fury_source(source, state)
+            fury_state[source] = nil
+        end
+    end
+
+    local function clear_fury(source)
+        local state = fury_state[source]
+        if state then
+            if state.callback then
+                TimerQueue:disableCallback(state.callback)
+            end
+            detach_fury_source(source, state)
+            fury_state[source] = nil
+        end
+        EVENT_ON_HIT_MULTIPLIER:unregister_unit_action(source, on_struggle_fury_hit)
+    end
+
+    on_struggle_fury_hit = function(source, target, amount)
+        local state = fury_state[source]
+        if not state then
+            state = { target = target, stacks = 0 }
+            fury_state[source] = state
+        elseif state.target ~= target then
+            if state.callback then
+                TimerQueue:disableCallback(state.callback)
+            end
+            detach_fury_source(source, state)
+            state.target = target
+            state.stacks = 0
+        end
+
+        if state.stacks > 0 then
+            amount.value = amount.value * (1. + FURY_DAMAGE_PER_STACK * state.stacks)
+        end
+        state.stacks = math.min(FURY_MAX_STACKS, state.stacks + 1)
+
+        if state.callback then
+            TimerQueue:disableCallback(state.callback)
+        end
+        state.callback = TimerQueue:callDelayed(FURY_RESET_TIME, expire_fury, source, target)
+
+        local sources = fury_targets[target]
+        if not sources then
+            sources = setmetatable({}, { __mode = 'k' })
+            fury_targets[target] = sources
+        end
+        sources[source] = state
+        refresh_fury_debuff(target)
+    end
+
+    local function complete_wave()
+        if not active or active_count ~= 0 or #spawn_queue ~= 0 or trickle_callback then
+            return
+        end
+
+        completed_wave = wave
+        for index = 1, #players do
+            Quest.progress(players[index], "struggle_wave")
+        end
+        if wave % CHECKPOINT_INTERVAL == 0 then
+            begin_checkpoint()
+        else
+            schedule_wave(BETWEEN_WAVE_DELAY)
+        end
+    end
+
+    local function remove_enemy(killed)
+        clear_fury(killed)
+        StruggleSpecials.cleanup(killed)
+        TableRemove(enemies, killed)
+        active_count = math.max(0, active_count - 1)
+        TimerQueue:callDelayed(3., RemoveUnit, killed)
+
+        complete_wave()
+    end
+
+    local function spawn_enemy(role)
+        local skins = wave >= CHAOS_WAVE and chaos_skins or prechaos_skins
+        local pool = skins[role.skin_type or role.type]
+        local rect = spawn_rects[math.random(1, #spawn_rects)]
+        local x, y = spawn_xy(rect)
+        local skin = pool[math.random(1, #pool)]
+        local is_ranged = role.ranged or role.type == "ranged"
+        local template = is_ranged and RANGED_ENEMY_TEMPLATE or MELEE_ENEMY_TEMPLATE
+        -- important to spawn the unit at center to establish return point
+        local u = BlzCreateUnitWithSkin(PLAYER_BOSS, template, center_x, center_y, GetRandomReal(0., 360.), skin)
+
+        SetUnitX(u, x)
+        SetUnitY(u, y)
+
+        BlzSetUnitSkin(u, skin)
+        BlzSetUnitName(u, GetObjectName(skin))
+        BlzSetHeroProperName(u, GetObjectName(skin))
+        if role.special then
+            SetUnitVertexColor(u, role.color[1], role.color[2], role.color[3], 255)
+            SetUnitScale(u, role.scale, role.scale, role.scale)
+        else
+            SetUnitVertexColor(u, 255, 255, 255, 255)
+            SetUnitScale(u, 1., 1., 1.)
+        end
+        if role.type == "ranged" then
+            UnitAddAbility(u, FURY_SWIPES_ABILITY)
+            EVENT_ON_HIT_MULTIPLIER:register_unit_action(u, on_struggle_fury_hit)
+        end
+        enemies[#enemies + 1] = u
+        active_count = active_count + 1
+        configure_enemy(u, role, spawn_total)
+        if role.special then
+            StruggleSpecials.setup(u, role.special, random_player_hero)
+        end
+        EVENT_ON_UNIT_DEATH:register_unit_action(u, remove_enemy)
+    end
+
+    local function spawn_batch()
+        trickle_callback = nil
+        if not active then
+            return
+        end
+
+        for _ = 1, math.min(TRICKLE_SIZE, #spawn_queue) do
+            spawn_enemy(table.remove(spawn_queue))
+        end
+
+        if #spawn_queue > 0 then
+            trickle_callback = TimerQueue:callDelayed(TRICKLE_INTERVAL, spawn_batch)
+        elseif active_count == 0 then
+            complete_wave()
+        end
+    end
+
+    local function spawn_wave()
+        wave_callback = nil
+        if not active or #players == 0 then
+            return
+        end
+
+        wave = wave + 1
+        local formation = formations[math.random(1, #formations)]
+        spawn_total = math.random(MIN_WAVE_UNITS, MAX_WAVE_UNITS)
+        spawn_queue = {}
+        local assigned = 0
+
+        for index, role in ipairs(formation.roles) do
+            local count = index == #formation.roles
+                and (spawn_total - assigned)
+                or math.floor(spawn_total * role.weight)
+            assigned = assigned + count
+            for _ = 1, count do
+                spawn_queue[#spawn_queue + 1] = role
+            end
+        end
+
+        if wave >= 2 then
+            local special_count = math.min(8, #spawn_queue,
+                1 + (wave - 1) // 10 + math.max(0, party_size - 1))
+            for index = 1, special_count do
+                local queue_index = math.random(index, #spawn_queue)
+                spawn_queue[index], spawn_queue[queue_index] = spawn_queue[queue_index], spawn_queue[index]
+                spawn_queue[index] = special_roles[math.random(1, #special_roles)]
+            end
+        end
+
+        for index = #spawn_queue, 2, -1 do
+            local swap = math.random(1, index)
+            spawn_queue[index], spawn_queue[swap] = spawn_queue[swap], spawn_queue[index]
+        end
+
+        DisplayTextToTable(players, "|cffffcc00Struggle Wave " .. wave .. ":|r " .. formation.name .. " (" .. spawn_total .. " enemies)")
+        spawn_batch()
+    end
+
+    schedule_wave = function(delay)
+        if wave_callback then
+            TimerQueue:disableCallback(wave_callback)
+        end
+        wave_callback = TimerQueue:callDelayed(delay, spawn_wave)
+    end
+
+    local function record_claim(pid, checkpoint_wave)
+        local profile = Profile[pid]
+        local hero_data = profile and profile.hero
+        if not hero_data then
+            return false
+        end
+
+        checkpoint_wave = math.min(MAX_SAVED_WAVE, checkpoint_wave)
+        hero_data.struggle_best_wave = math.max(hero_data.struggle_best_wave or 0, checkpoint_wave)
+        hero_data.struggle_claim_wave = math.max(hero_data.struggle_claim_wave or 0, checkpoint_wave)
+        DisplayTextToPlayer(Player(pid - 1), 0., 0.,
+            "Wave |cffffcc00" .. checkpoint_wave .. "|r Struggle reward secured. Visit the Prize Vendor to redeem it.")
+        return true
+    end
+
+    local function clear_checkpoint_player(pid)
+        if checkpoint_pending[pid] then
+            checkpoint_pending[pid] = nil
+            checkpoint_waiting = math.max(0, checkpoint_waiting - 1)
+        end
+
+        local dialog = checkpoint_dialogs[pid]
+        if dialog then
+            checkpoint_dialogs[pid] = nil
+            dialog:destroy()
+        end
+    end
+
+    local function resume_after_checkpoint()
+        if not checkpoint_active or checkpoint_waiting > 0 then
+            return
+        end
+
+        checkpoint_active = false
+        if checkpoint_callback then
+            TimerQueue:disableCallback(checkpoint_callback)
+            checkpoint_callback = nil
+        end
+
+        if active and #players > 0 then
+            DisplayTextToTable(players, "|cffffcc00The Struggle continues.|r The next reward is at wave "
+                .. (wave + CHECKPOINT_INTERVAL) .. ".")
+            schedule_wave(BETWEEN_WAVE_DELAY)
+        end
+    end
+
+    local function resolve_checkpoint(pid, claim)
+        if not checkpoint_active or not checkpoint_pending[pid] then
+            return
+        end
+
+        clear_checkpoint_player(pid)
+        if claim then
+            record_claim(pid, completed_wave)
+            remove_player(pid, false, true)
+        end
+        resume_after_checkpoint()
+    end
+
+    local function on_checkpoint_choice(dialog, _, claim)
+        resolve_checkpoint(dialog.pid, claim == true)
+    end
+
+    local function checkpoint_timeout()
+        checkpoint_callback = nil
+        local pending = {}
+        for pid in pairs(checkpoint_pending) do
+            pending[#pending + 1] = pid
+        end
+        for index = 1, #pending do
+            resolve_checkpoint(pending[index], true)
+        end
+    end
+
+    begin_checkpoint = function()
+        checkpoint_active = true
+        checkpoint_waiting = #players
+        checkpoint_pending = {}
+        checkpoint_dialogs = {}
+
+        DisplayTextToTable(players, "|cffffcc00Wave " .. completed_wave
+            .. " checkpoint reached.|r Claim the reward or risk it by continuing.")
+
+        for index = 1, #players do
+            local pid = players[index]
+            checkpoint_pending[pid] = true
+            local dialog = DialogWindow.create(pid,
+                "Struggle Wave " .. completed_wave .. " Cleared", on_checkpoint_choice, "struggle-checkpoint")
+            dialog.cancellable = false
+            dialog:addButton("Claim Wave " .. completed_wave .. " Reward and Leave", true,
+                "ReplaceableTextures\\CommandButtons\\BTNChestOfGold.blp")
+            dialog:addButton("Continue and Risk Reward", false,
+                "ReplaceableTextures\\CommandButtons\\BTNReplay-Play.blp")
+            checkpoint_dialogs[pid] = dialog
+            dialog:display()
+        end
+
+        checkpoint_callback = TimerQueue:callDelayed(CHECKPOINT_DECISION_TIME, checkpoint_timeout)
+    end
+
+    remove_player = function(pid, defeated, claimed)
+        if not TableHas(players, pid) then
+            return
+        end
+
+        clear_checkpoint_player(pid)
+        TableRemove(players, pid)
+        set_exit_visible(pid, false)
+        EVENT_ON_CLEANUP:unregister_action(pid, on_cleanup)
+        EVENT_GRAVE_DEATH:unregister_unit_action(Hero[pid], on_grave_death)
+
+        DisableBackpackTeleports(pid, false)
+        DisableItems(pid, false)
+        -- Defeat is a normal death. The shared death pipeline handles the
+        -- softcore penalty/revival or permanent hardcore character loss.
+        if not defeated and UnitAlive(Hero[pid]) then
+            MoveHero(pid, TOWN_CENTER_X, TOWN_CENTER_Y)
+            SetCamera(pid, MAIN_MAP.rect)
+        end
+
+        if active and not claimed then
+            local message = defeated
+                and "You were defeated and lost this Struggle's unclaimed reward."
+                or "You fled the Struggle without claiming a reward."
+            DisplayTextToPlayer(Player(pid - 1), 0., 0., message)
+        end
+
+        if #players == 0 then
+            end_run()
+        else
+            resume_after_checkpoint()
+        end
+    end
+
+    on_grave_death = function(killed)
+        local pid = GetPlayerId(GetOwningPlayer(killed)) + 1
+        remove_player(pid, true)
+    end
+
+    on_cleanup = function(pid)
+        remove_player(pid, false)
+    end
+
+    local function enter(pid)
+        if TableHas(players, pid) or not Hero[pid] or not UnitAlive(Hero[pid]) then
+            return false
+        end
+
+        local level = GetUnitLevel(Hero[pid])
+        if challenger_pid > 0 and math.abs(level - challenger_level) > ENTRY_LEVEL_RANGE then
+            DisplayTextToPlayer(Player(pid - 1), 0., 0.,
+                "You must be within |cffffcc00" .. ENTRY_LEVEL_RANGE
+                .. " levels|r of the Struggle challenger.")
+            return false
+        end
+
+        players[#players + 1] = pid
+        DisableItems(pid, true)
+        DisableBackpackTeleports(pid, true)
+        MoveHero(pid, center_x, center_y)
+        set_exit_visible(pid, true)
+        EVENT_ON_CLEANUP:register_action(pid, on_cleanup)
+        EVENT_GRAVE_DEATH:register_unit_action(Hero[pid], on_grave_death)
+
+        if entry_open and #players >= User.AmountPlaying then
+            begin_run()
+        end
+
+        return true
+    end
+
+    begin_run = function()
+        if entry_callback then
+            TimerQueue:disableCallback(entry_callback)
+            entry_callback = nil
+        end
+        if #players == 0 then
+            end_run()
+            return
+        end
+
+        local lowest_best_wave = MAX_SAVED_WAVE
+        for _, pid in ipairs(players) do
+            lowest_best_wave = math.min(lowest_best_wave, Struggle.getBestWave(pid))
+        end
+
+        local first_wave = recommended_start_wave(lowest_best_wave)
+        wave = first_wave - 1
+        completed_wave = wave
+        party_size = #players
+        party_health_multiplier = 1. + 0.8 * (party_size - 1)
+        party_damage_multiplier = 1. + 0.3 * (party_size - 1)
+        entry_open = false
+        active = true
+        DisplayTextToTable(players, "|cffffcc00The Infinite Struggle begins at wave " .. first_wave
+            .. ".|r The starting point is based on the lowest entrant's previous best. Rewards may be claimed every five waves; emergency fleeing forfeits the run.")
+        SoundHandler("Sound\\Interface\\BattleNetDoorsStereo2.flac", false)
+        schedule_wave(FIRST_WAVE_DELAY)
+    end
+
+    end_run = function()
+        if entry_callback then
+            TimerQueue:disableCallback(entry_callback)
+            entry_callback = nil
+        end
+        if wave_callback then
+            TimerQueue:disableCallback(wave_callback)
+            wave_callback = nil
+        end
+        if trickle_callback then
+            TimerQueue:disableCallback(trickle_callback)
+            trickle_callback = nil
+        end
+        if checkpoint_callback then
+            TimerQueue:disableCallback(checkpoint_callback)
+            checkpoint_callback = nil
+        end
+
+        for pid, dialog in pairs(checkpoint_dialogs) do
+            checkpoint_dialogs[pid] = nil
+            dialog:destroy()
+        end
+
+        entry_open = false
+        active = false
+        checkpoint_active = false
+        checkpoint_waiting = 0
+        checkpoint_pending = {}
+        for _, u in ipairs(enemies) do
+            clear_fury(u)
+            StruggleSpecials.cleanup(u)
+            RemoveUnit(u)
+        end
+        enemies = {}
+        active_count = 0
+        spawn_queue = {}
+        spawn_total = 0
+        players = {}
+        wave = 0
+        completed_wave = 0
+        party_health_multiplier = 1.
+        party_damage_multiplier = 1.
+        party_size = 0
+        challenger_pid = 0
+        challenger_level = 0
+        fury_targets = setmetatable({}, { __mode = 'k' })
+        checkpoint_dialogs = {}
+    end
+
+    local function on_exit_click()
+        local player = GetTriggerPlayer()
+        local pid = GetPlayerId(player) + 1
+        if GetLocalPlayer() == player then
+            local frame = BlzGetTriggerFrame()
+            BlzFrameSetEnable(frame, false)
+            BlzFrameSetEnable(frame, true)
+        end
+        remove_player(pid, false)
+        return false
+    end
+
+    exit_button = SimpleButton.create(
+        BlzGetOriginFrame(ORIGIN_FRAME_WORLD_FRAME, 0),
+        "war3mapImported\\ExitButton.blp",
+        0.03,
+        0.015,
+        FRAMEPOINT_TOP,
+        FRAMEPOINT_TOP,
+        0.,
+        0.015,
+        on_exit_click,
+        "Flee the Infinite Struggle. Leaving outside a checkpoint forfeits the current reward."
+    )
+    BlzFrameClearAllPoints(exit_button.frame)
+    BlzFrameSetPoint(
+        exit_button.frame,
+        FRAMEPOINT_CENTER,
+        BlzGetOriginFrame(ORIGIN_FRAME_WORLD_FRAME, 0),
+        FRAMEPOINT_CENTER,
+        0.,
+        -0.154
+    )
+    exit_button:visible(false)
+
+    ITEM_LOOKUP[ENTRY_ACTION_ITEM] = function(player, pid, _, item)
+        if item and item.alive then
+            item:destroy()
+        end
+
+        if active then
+            DisplayTextToPlayer(player, 0., 0., "The Infinite Struggle is already active.")
+            return
+        end
+        if entry_open then
+            enter(pid)
+            return
+        end
+
+        wave = 0
+        completed_wave = 0
+        players = {}
+        if not Hero[pid] or not UnitAlive(Hero[pid]) then
+            DisplayTextToPlayer(player, 0., 0., "A living hero is required to challenge the Infinite Struggle.")
+            return
+        end
+        challenger_pid = pid
+        challenger_level = GetUnitLevel(Hero[pid])
+        entry_open = true
+        DisplayTextToForce(FORCE_PLAYING, User[pid - 1].nameColored .. " has opened the Infinite Struggle for 45 seconds.")
+        entry_callback = TimerQueue:callDelayed(ENTRY_DURATION, begin_run)
+        enter(pid)
+    end
+
+    function Struggle.isActive()
+        return active
+    end
+
+    function Struggle.getWave()
+        return wave
+    end
+
+    function Struggle.getCompletedWave()
+        return completed_wave
+    end
+
+    ---@param best_wave integer
+    ---@return integer
+    function Struggle.getRecommendedStartWave(best_wave)
+        return recommended_start_wave(best_wave)
+    end
+
+    function Struggle.getBestWave(pid)
+        local profile = Profile[pid]
+        return profile and profile.hero and (profile.hero.struggle_best_wave or 0) or 0
+    end
+
+    function Struggle.getClaimWave(pid)
+        local profile = Profile[pid]
+        return profile and profile.hero and (profile.hero.struggle_claim_wave or 0) or 0
+    end
+
+    function Struggle.consumeClaim(pid, expected_wave)
+        local profile = Profile[pid]
+        local hero_data = profile and profile.hero
+        local claim_wave = hero_data and (hero_data.struggle_claim_wave or 0) or 0
+        if claim_wave <= 0 or (expected_wave and claim_wave ~= expected_wave) then
+            return false
+        end
+
+        hero_data.struggle_claim_wave = 0
+        return true
+    end
+end, Debug and Debug.getLine())

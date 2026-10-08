@@ -1,0 +1,203 @@
+-- Authoritative, read-only shop purchase evaluation.
+
+OnInit.final("ShopQuote", function(Require)
+    Require('Currency')
+    Require('Prices')
+    Require('Profile')
+    Require('ItemHelpers')
+    Require('Items')
+    Require('RuntimeItemDefinitions')
+    Require('ShopCatalog')
+    Require('ShopOffers')
+    Require('ShopActions')
+    Require('ShopRegistry')
+
+    ShopQuote = {}
+
+    ---@type fun(id: string|integer, pid: integer): boolean
+    function IsBuyable(id, pid)
+        local available = GetItemAvailability(id, pid)
+        if not available then
+            return false
+        end
+        if ShopAction.get(id) then
+            return ShopAction.evaluate(id, pid)
+        end
+        return GetItemPrice(id, pid) ~= nil
+    end
+
+    local function inventory_components(pid)
+        local inventory = {}
+        local profile = Profile[pid]
+        local items = profile and profile.hero and profile.hero.items
+        if not items then return inventory end
+
+        for slot = 1, MAX_INVENTORY_SLOTS do
+            local owned = items[slot]
+            if owned and not owned.nocraft then
+                inventory[#inventory + 1] = {
+                    item = owned,
+                    slot = slot,
+                    count = math.max(1, owned.charges),
+                }
+            end
+        end
+        return inventory
+    end
+
+    ---@param shop ShopDefinition
+    local function evaluate_components(shop, item, pid, inventory, quote)
+        local remaining = {}
+        for index = 1, #inventory do
+            remaining[index] = inventory[index].count
+        end
+        for index = 0, item:components() - 1 do
+            local component = ShopItem.get(item.component[index])
+            local matched
+            for inventory_index = 1, #inventory do
+                if remaining[inventory_index] > 0 and
+                    RuntimeItemDefinitions.matchesRecipeIdentity(
+                        inventory[inventory_index].item, component.id) then
+                    matched = inventory_index
+                    break
+                end
+            end
+            if matched then
+                remaining[matched] = remaining[matched] - 1
+                if quote then
+                    local slot = inventory[matched].slot
+                    quote.consume[slot] = (quote.consume[slot] or 0) + 1
+                end
+            elseif component.runtime_definition or not shop:has(component.id) or
+                not IsBuyable(component.id, pid) then
+                return false
+            elseif quote then
+                local component_price = GetItemPrice(component.id, pid)
+                for currency = 0, CURRENCY_COUNT - 1 do
+                    quote.cost[currency] = quote.cost[currency] + component_price[currency]
+                end
+            end
+        end
+        return true
+    end
+
+    ---@param shop ShopDefinition
+    ---@param item ShopItem
+    ---@param pid integer
+    function ShopQuote.isCraftable(shop, item, pid)
+        if item.virtual then return true end
+        return evaluate_components(shop, item, pid, inventory_components(pid))
+    end
+
+    ---@class PurchaseQuote
+    ---@field can_buy boolean
+    ---@field reason string?
+    ---@field label string?
+    ---@field cost PriceQuote
+    ---@field inventory table
+    ---@field consume table
+    ---@field action ShopActionDefinition?
+    ---@field offer ShopOffer?
+
+    ---@return PurchaseQuote
+    ---@param shop ShopDefinition
+    ---@param item ShopItem|ShopOffer
+    ---@param pid integer
+    function ShopQuote.evaluate(shop, item, pid)
+        local quote = {
+            can_buy = false,
+            reason = "invalid",
+            cost = __jarray(0),
+            inventory = __jarray(0),
+            consume = __jarray(0),
+        }
+        if item == 0 or not item then return quote end
+        if not shop:isInRange(pid) then
+            quote.reason = "range"
+            return quote
+        end
+        quote.inventory = inventory_components(pid)
+
+        if item.virtual then
+            local stock = shop:getStock(item.id)
+            if stock == nil or stock == 0 then
+                quote.reason = "stock"
+                return quote
+            end
+
+            local available, reason = item:isAvailable(pid)
+            if not available then
+                quote.reason = "unavailable"
+                quote.label = reason
+                return quote
+            end
+
+            quote.cost = item:getPrice(pid)
+            for currency = 0, CURRENCY_COUNT - 1 do
+                if GetCurrency(pid, currency) < quote.cost[currency] then
+                    quote.reason = "currency"
+                    return quote
+                end
+            end
+
+            quote.can_buy = true
+            quote.reason = nil
+            quote.offer = item
+            return quote
+        end
+        local stock = shop:getStock(item.id)
+        if stock == nil or stock == 0 then
+            quote.reason = "stock"
+            return quote
+        end
+        local available, label = GetItemAvailability(item.id, pid)
+        if not available then
+            quote.reason = "unavailable"
+            quote.label = label
+            return quote
+        end
+        local price = GetItemPrice(item.id, pid)
+        local action = ShopAction.get(item.id)
+        if action then
+            local action_available, action_reason = ShopAction.evaluate(item.id, pid)
+            if not action_available then
+                quote.reason = "unavailable"
+                quote.label = action_reason
+                return quote
+            end
+            if price then
+                for currency = 0, CURRENCY_COUNT - 1 do
+                    quote.cost[currency] = price[currency]
+                    if GetCurrency(pid, currency) < quote.cost[currency] then
+                        quote.reason = "currency"
+                        return quote
+                    end
+                end
+            end
+            quote.can_buy = true
+            quote.reason = nil
+            quote.action = action
+            return quote
+        end
+        if not price then
+            quote.reason = "unpriced"
+            return quote
+        end
+        for currency = 0, CURRENCY_COUNT - 1 do
+            quote.cost[currency] = price[currency]
+        end
+        if not evaluate_components(shop, item, pid, quote.inventory, quote) then
+            quote.reason = "components"
+            return quote
+        end
+        for currency = 0, CURRENCY_COUNT - 1 do
+            if GetCurrency(pid, currency) < quote.cost[currency] then
+                quote.reason = "currency"
+                return quote
+            end
+        end
+        quote.can_buy = true
+        quote.reason = nil
+        return quote
+    end
+end, Debug and Debug.getLine())
