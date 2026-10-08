@@ -80,6 +80,7 @@
     ---@field onLearn function
     ---@field TOOLTIPS string[][]
     ---@field ACTIVE boolean
+    ---@field ITEM_NATIVE_ABILITY? boolean Attach a native item ability even when passive.
     ---@field cooldown number
     Spell = {}
     do
@@ -143,7 +144,7 @@
 
             self.id = FourCC(id)
             self.tag = GetObjectName(self.id) -- lazy tag generation
-            self.ACTIVE = true -- determines if ability is given to dummy item
+            self.ACTIVE = true -- player-activated; item modules classify explicitly
 
             setmetatable(self, mt)
 

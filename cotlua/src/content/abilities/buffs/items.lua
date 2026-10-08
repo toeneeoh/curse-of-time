@@ -388,7 +388,7 @@ OnInit.final("BuffsItems", function(Require)
         thistype.NAME = "Corrosive Infusion"
         thistype.ICON =
             "ReplaceableTextures\\CommandButtons\\BTNAcidFlask3.blp"
-        thistype.DESC = "Attacks reduce enemy armor by +^$armor%"
+        thistype.DESC = "Attacks reduce enemy armor by ^$armor%"
         thistype.DISPEL_TYPE = BUFF_POSITIVE
         thistype.STACK_TYPE = BUFF_STACK_NONE
 

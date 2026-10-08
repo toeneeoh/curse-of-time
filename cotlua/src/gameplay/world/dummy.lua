@@ -222,7 +222,7 @@ OnInit.final("Dummy", function(Require)
             BlzSetUnitFacingEx(self.unit, bj_RADTODEG * atan(GetUnitY(enemy) - GetUnitY(self.unit), GetUnitX(enemy) - GetUnitX(self.unit)))
             UnitDisableAbility(self.unit, FourCC('Amov'), true)
             self.source = source or self.unit
-            SetUnitOwner(self.unit, GetOwningPlayer(source), false)
+            SetUnitOwner(self.unit, GetOwningPlayer(self.source), false)
             if func then
                 EVENT_DUMMY_ON_HIT:register_unit_action(source, func)
             end

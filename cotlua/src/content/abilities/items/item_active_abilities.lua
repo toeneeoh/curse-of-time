@@ -3,6 +3,7 @@ OnInit.final("ItemActiveAbilities", function(Require)
     Require("Spells")
 
     local PALADIN_BOOK = Spell.define('A083')
+    PALADIN_BOOK.ACTIVE = true
     do
         local thistype = PALADIN_BOOK
 
@@ -17,6 +18,7 @@ OnInit.final("ItemActiveAbilities", function(Require)
     end
 
     local INSTILL_FEAR = Spell.define('A02A')
+    INSTILL_FEAR.ACTIVE = true
     do
         local thistype = INSTILL_FEAR
 
@@ -56,6 +58,7 @@ OnInit.final("ItemActiveAbilities", function(Require)
     end
 
     local DARKEST_OF_DARKNESS = Spell.define('A055')
+    DARKEST_OF_DARKNESS.ACTIVE = true
     do
         local thistype = DARKEST_OF_DARKNESS
 
@@ -65,6 +68,7 @@ OnInit.final("ItemActiveAbilities", function(Require)
     end
 
     local ASTRAL_FREEZE_ITEM = Spell.define('A0SX')
+    ASTRAL_FREEZE_ITEM.ACTIVE = true
     do
         local thistype = ASTRAL_FREEZE_ITEM
 
@@ -79,6 +83,7 @@ OnInit.final("ItemActiveAbilities", function(Require)
     end
 
     local FINAL_BLAST = Spell.define('A00E')
+    FINAL_BLAST.ACTIVE = true
     do
         local thistype = FINAL_BLAST
 
@@ -110,6 +115,7 @@ OnInit.final("ItemActiveAbilities", function(Require)
     end
 
     local BANISH_DEMON = Spell.define('A00Q')
+    BANISH_DEMON.ACTIVE = true
     do
         local thistype = BANISH_DEMON
 
@@ -135,6 +141,7 @@ OnInit.final("ItemActiveAbilities", function(Require)
     end
 
     local INTENSE_FOCUS = Spell.define('A0B9')
+    INTENSE_FOCUS.ACTIVE = false
     do
         local thistype = INTENSE_FOCUS
 

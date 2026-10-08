@@ -217,12 +217,6 @@ OnInit.final("HighPriestessSpells", function(Require)
             end
         }
 
-        local function on_hit(source, target)
-            local pid = GetPlayerId(GetOwningPlayer(source)) + 1
-
-            DamageTarget(source, target, thistype.dmg(pid) * BOOST[pid],
-                         ATTACK_TYPE_NORMAL, MAGIC, thistype.tag)
-        end
         function thistype:onCast()
             local ug = CreateGroup()
 
@@ -236,15 +230,24 @@ OnInit.final("HighPriestessSpells", function(Require)
                              self.aoe * LBOOST[self.pid], Condition(isalive))
 
             for target in each(ug) do
-                local dummy = Dummy.create(self.x, self.y, FourCC('A09Q'), 1)
+                -- A visual ray must not depend on a native dummy attack landing.
+                -- Match A09Q's skin art and Lit2 graphic duration.
+                local ray = AddLightningEx("YENL", true,
+                    self.x, self.y, GetUnitZ(self.caster) + 75.,
+                    GetUnitX(target), GetUnitY(target), GetUnitZ(target) + 75.)
+                TimerQueue:callDelayed(1., DestroyLightning, ray)
+                DestroyEffect(AddSpecialEffectTarget(
+                    "Abilities\\Spells\\Human\\HolyBolt\\HolyBoltSpecialArt.mdl",
+                    target, "origin"))
                 if IsUnitAlly(target, Player(self.pid - 1)) then
-                    dummy:attack(target)
                     HP(self.caster, target, self.heal * BOOST[self.pid],
                        thistype.tag)
                 else
-                    dummy:attack(target, self.caster, on_hit)
+                    DamageTarget(self.caster, target, self.dmg * BOOST[self.pid],
+                                 ATTACK_TYPE_NORMAL, MAGIC, thistype.tag)
                 end
             end
+            DestroyGroup(ug)
         end
 
         local manacost = function(u, key)

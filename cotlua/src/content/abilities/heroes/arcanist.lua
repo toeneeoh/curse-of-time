@@ -400,12 +400,23 @@ OnInit.final("ArcanistSpells", function(Require)
                     DamageTarget(pt.source, target, pt.dmg, ATTACK_TYPE_NORMAL, MAGIC, thistype.tag)
                 end
 
-                BlzStartUnitAbilityCooldown(pt.source, thistype.id, pt.cooldown - pt.time)
-
-                return true
+                pt.released = true
+                return false
             end
 
-            return false
+            return true
+        end
+
+        local function on_remove(pt)
+            -- A cancelled shift must not leave units suspended in the air.
+            -- Normal release already places and damages the targets once.
+            if not pt.released then
+                for target in each(pt.ug) do
+                    SetUnitFlyHeight(target, 0., 0.)
+                end
+            end
+            BlzStartUnitAbilityCooldown(pt.source, thistype.id,
+                                       math.max(0., pt.cooldown - pt.time))
         end
 
         function thistype:onCast()
@@ -429,6 +440,7 @@ OnInit.final("ArcanistSpells", function(Require)
                     pt.cooldown = BlzGetUnitAbilityCooldown(self.caster, self.sid, self.ablev - 1)
                     pt.source = self.caster
                     pt.tag = thistype.id
+                    pt.onRemove = on_remove
                     pt.x = self.targetX
                     pt.y = self.targetY
 
@@ -442,7 +454,12 @@ OnInit.final("ArcanistSpells", function(Require)
                         SetUnitFlyHeight(target, 500.00, 0.00)
                     end
 
-                    TQ:callDelayed(FPS_32, BlzEndUnitAbilityCooldown, pt.source, thistype.id)
+                    TQ:callDelayed(FPS_32, function()
+                        -- A cancelled timer may already have restored cooldown.
+                        if not pt._destroyed then
+                            BlzEndUnitAbilityCooldown(pt.source, thistype.id)
+                        end
+                    end)
                     pt:startLoop(FPS_32, periodic)
                 end
 

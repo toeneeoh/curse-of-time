@@ -30,7 +30,8 @@ OnInit.final("EnemyAI", function(Require)
 
         unit_data = unit_data or Unit[u]
         local now = clock:getElapsed()
-        if not unit_data or unit_data._casting or now < (ready_at[u] or 0.) or not UnitAlive(u) then
+        if not unit_data or unit_data._casting or now < (ready_at[u] or 0.) or not UnitAlive(u) or
+            (opponent and not IsUnitVisible(opponent, GetOwningPlayer(u))) then
             return false
         end
 

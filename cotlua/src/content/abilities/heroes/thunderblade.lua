@@ -316,14 +316,12 @@ OnInit.final("ThunderbladeSpells", function(Require)
                     end
                 until BlzGroupGetSize(pt.ug) > 0 or dist >= thistype.range
 
-                --laser shot
-                local dummy = Dummy.create(x, y, 0, 0).unit
-                SetUnitFlyHeight(dummy, 135., 0.)
-                UnitRemoveAbility(dummy, ABIL_AVUL)
-                UnitRemoveAbility(dummy, ABIL_ALOC)
-                local dummy2 = Dummy.create(GetUnitX(pt.target), GetUnitY(pt.target), FourCC('A010'), 1)
-                SetUnitFlyHeight(dummy2.unit, 135., 0.)
-                dummy2:attack(dummy)
+                -- A visual-only beam needs no attack dummy or native hit.
+                local start_x, start_y = GetUnitX(pt.target), GetUnitY(pt.target)
+                local beam = AddLightningEx("RAIL", true, start_x, start_y,
+                                            GetTerrainZ(start_x, start_y) + 135.,
+                                            x, y, GetTerrainZ(x, y) + 135.)
+                if beam then TQ:callDelayed(0.35, DestroyLightning, beam) end
 
                 SetUnitScale(pt.target, 1., 1., 1.)
                 SetUnitAnimation(pt.target, "death")

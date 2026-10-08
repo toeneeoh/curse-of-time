@@ -223,6 +223,8 @@
     ---@field abil integer
     ---@field info function
     ---@field abilities ItemAbilityRuntime[]
+    ---@field native_display item? Locked native representation of equipped gear.
+    ---@field pending_abilities boolean?
     ---@field getAbilityArgument fun(self: Item, index: integer, argument: integer): number
     ---@field cache_stats function
     ---@field sockets Item[]
@@ -274,6 +276,8 @@
         ---@field create fun(id: string|integer|item, x: number?, y: number?, expire: number?): Item
         ---@field wrap fun(handle: item): Item
         ---@field commit_slot fun(self: Item, slot: integer, suppress_refresh: boolean?): boolean
+        ---@field syncAbilitySlots fun(pid: integer): boolean
+        ---@field guardNativeItem fun(dummy: item, carrier: unit): boolean
         ---@field getRarityIndex fun(item: Item): integer
         ---@field minimumResourceAfterMaxChange fun(current: number, old_maximum: number, new_maximum: number, minimum?: number): number
         ---@class RuntimeItemDefinition
@@ -520,6 +524,171 @@
             [FourCC('A1VB')] = 1 -- Vanguard Bounty boss mark
         }
 
+        local add_item_abilities
+        local hero_item_cooldowns = {}
+
+        local function retained_cooldown(pid, id)
+            local pending = hero_item_cooldowns[pid]
+            return pending and pending[id] and TQ:getRemaining(pending[id]) or 0
+        end
+
+        local function retain_cooldown(pid, id, remaining)
+            if remaining <= retained_cooldown(pid, id) then return end
+            local pending = hero_item_cooldowns[pid] or {}
+            hero_item_cooldowns[pid] = pending
+            local callback
+            callback = TQ:callDelayed(remaining, function()
+                if pending[id] == callback then pending[id] = nil end
+            end)
+            pending[id] = callback
+        end
+
+        ---Keeps every equipped item represented in its native inventory slot.
+        ---Moves existing handles so cooldowns and proc state are preserved.
+        ---Backpack-side abilities keep their separate native inventory.
+        function ItemRuntime.syncAbilitySlots(pid)
+            local profile = Profile[pid]
+            local items = profile and profile.hero and profile.hero.items
+            local hero = Hero[pid]
+            if not items or not hero then return false end
+
+            -- Atomic inventory swaps defer attachment until both moves finish.
+            for slot = 1, MAX_INVENTORY_SLOTS do
+                local item = items[slot]
+                if item and item.pending_abilities then
+                    item.pending_abilities = nil
+                    add_item_abilities(item, true)
+                end
+            end
+            local desired = {}
+            local success = true
+            for slot = 1, 6 do
+                local equipped = items[slot]
+                if equipped and equipped.alive and equipped.holder == hero then
+                    equipped.native_display = equipped.native_display or MakeDummyCastItem(hero)
+                    local dummy = equipped.native_display
+                    desired[slot] = dummy
+                    if dummy then
+                        local active = false
+                        for index = ITEM_ABILITY, ITEM_ABILITY2 do
+                            local runtime = equipped.abilities and equipped.abilities[index]
+                            if runtime and runtime.obj == dummy and Spells[runtime.id].ACTIVE then
+                                active = true
+                            end
+                        end
+                        BlzSetItemBooleanField(dummy, ITEM_BF_ACTIVELY_USED, active)
+                        BlzSetItemIconPath(dummy, item_data(equipped).path)
+                        BlzSetItemName(dummy, equipped:name())
+                        BlzSetItemTooltip(dummy, equipped:name())
+                        BlzSetItemDescription(dummy, equipped.tooltip)
+                        BlzSetItemExtendedTooltip(dummy, equipped.tooltip)
+                        SetItemCharges(dummy, equipped.charges or 0)
+                        LockDummyCastItem(dummy)
+                    else
+                        success = false
+                    end
+                end
+            end
+
+            for slot = 1, 6 do
+                local dummy = desired[slot]
+                if dummy and UnitItemInSlot(hero, slot - 1) ~= dummy then
+                    local present = false
+                    for current = 0, 5 do
+                        if UnitItemInSlot(hero, current) == dummy then
+                            present = true
+                            break
+                        end
+                    end
+                    if present then
+                        -- Only this synchronous, inventory-to-inventory move
+                        -- is unlocked. Player orders never receive a droppable
+                        -- carrier, and no world drop or recreation is involved.
+                        SetItemDroppable(dummy, true)
+                        BlzSetItemBooleanField(dummy, ITEM_BF_CAN_BE_DROPPED, true)
+                        local moved = UnitDropItemSlot(hero, dummy, slot - 1)
+                        LockDummyCastItem(dummy)
+                        success = moved and success
+                    else
+                        success = false
+                    end
+                end
+            end
+            return success
+        end
+
+        RegisterItemChangedAction(ItemRuntime.syncAbilitySlots)
+
+        local pending_native_restore = {}
+
+        local function native_item_owner(dummy)
+            for pid = 1, PLAYER_CAP do
+                local profile = Profile[pid]
+                local items = profile and profile.hero and profile.hero.items
+                for slot = 1, items and MAX_INVENTORY_SLOTS or 0 do
+                    local item = items[slot]
+                    if item and item.alive and item.holder then
+                        if item.native_display == dummy then
+                            return item, pid, Hero[pid]
+                        end
+                        for index = ITEM_ABILITY, ITEM_ABILITY2 do
+                            local runtime = item.abilities and item.abilities[index]
+                            if runtime and runtime.obj == dummy then
+                                return item, pid, backpack_allowed[runtime.id] and
+                                                     Backpack[pid] or Hero[pid]
+                            end
+                        end
+                    end
+                end
+            end
+        end
+
+        -- Drop events run before the engine finishes removing/positioning an
+        -- item. Restore on the next timer turn, not inside that event.
+        function ItemRuntime.guardNativeItem(dummy, carrier)
+            local item, pid, owner = native_item_owner(dummy)
+            if not owner then return false end
+            LockDummyCastItem(dummy)
+            if pending_native_restore[dummy] then
+                pending_native_restore[dummy] = carrier
+                return true
+            end
+            pending_native_restore[dummy] = carrier
+            local cooldowns = {}
+            for index = ITEM_ABILITY, ITEM_ABILITY2 do
+                local runtime = item.abilities and item.abilities[index]
+                if runtime and runtime.obj == dummy then
+                    cooldowns[runtime.id] = BlzGetUnitAbilityCooldownRemaining(owner, runtime.id)
+                end
+            end
+            TQ:callDelayed(0., function()
+                local current, current_pid, current_owner = native_item_owner(dummy)
+                if current == item and current_pid == pid and current_owner == owner then
+                    local present = false
+                    for slot = 0, 5 do
+                        if UnitItemInSlot(owner, slot) == dummy then present = true break end
+                    end
+                    if not present then
+                        -- Also undo transfers to another unit. Nested pickup/
+                        -- drop callbacks are suppressed by the pending marker.
+                        local holder = pending_native_restore[dummy]
+                        if holder ~= owner then UnitRemoveItem(holder, dummy) end
+                        if UnitAddItem(owner, dummy) then
+                            for id, remaining in pairs(cooldowns) do
+                                if remaining > BlzGetUnitAbilityCooldownRemaining(owner, id) then
+                                    BlzStartUnitAbilityCooldown(owner, id, remaining)
+                                end
+                            end
+                        end
+                    end
+                    LockDummyCastItem(dummy)
+                    ItemRuntime.syncAbilitySlots(pid)
+                end
+                pending_native_restore[dummy] = nil
+            end)
+            return true
+        end
+
         -- Called on equip to stack with an existing item if applicable
         ---@type fun(self: Item, pid: integer, limit: integer): boolean
         function thistype:stack(pid, limit)
@@ -717,8 +886,12 @@
         end
 
         ---@type fun(itm: Item)
-        local function add_item_abilities(itm)
+        add_item_abilities = function(itm, suppress_sync)
             if not itm.holder then return end
+
+            if itm.holder == Hero[itm.pid] then
+                itm.native_display = itm.native_display or MakeDummyCastItem(itm.holder)
+            end
 
             local prof = ItemProfMod(itm.id, itm.pid) >= 1
 
@@ -736,15 +909,19 @@
                     end
 
                     local dummy
+                    local newly_attached = false
                     local desc = ParseItemAbilityTooltip(itm, index,
                                                          itm.cached_stats[index])
 
                     -- if no item spell dummy, generate it
-                    if not itm.abilities[index] then
-                        dummy = MakeDummyCastItem(
-                                    backpack_allowed[abilid] and
-                                        Backpack[itm.pid] or Hero[itm.pid])
+                    if not itm.abilities[index] or not itm.abilities[index].obj then
+                        if backpack_allowed[abilid] then
+                            dummy = MakeDummyCastItem(Backpack[itm.pid])
+                        else
+                            dummy = itm.native_display
+                        end
                         itm.abilities[index] = {obj = dummy, id = abilid}
+                        newly_attached = true
                     else
                         dummy = itm.abilities[index].obj
                     end
@@ -757,18 +934,35 @@
 
                     -- dummy may be nil if no spell inventory space remaining
                     if dummy then
-                        if Spells[abilid].ACTIVE then
+                        -- Native auras/detection still need attachment even
+                        -- though they are passive and have no Use hint.
+                        if Spells[abilid].ACTIVE or
+                            Spells[abilid].ITEM_NATIVE_ABILITY then
                             BlzItemAddAbility(dummy, abilid)
+                            if newly_attached and not backpack_allowed[abilid] then
+                                local remaining = retained_cooldown(itm.pid, abilid)
+                                if remaining > 0 and remaining >
+                                    BlzGetUnitAbilityCooldownRemaining(Hero[itm.pid], abilid) then
+                                    BlzStartUnitAbilityCooldown(Hero[itm.pid], abilid, remaining)
+                                end
+                            end
                         end
+                        -- Slot carriers can display either kind of effect.
+                        -- Set this after attachment, on the instance rather
+                        -- than its shared dummy ID.
+                        BlzSetItemBooleanField(dummy, ITEM_BF_ACTIVELY_USED,
+                                               Spells[abilid].ACTIVE == true)
                         BlzSetItemIconPath(dummy, BlzGetAbilityIcon(abilid))
                         -- BlzSetItemDescription(dummy, desc)
                         BlzSetItemExtendedTooltip(dummy, desc)
                         BlzSetItemName(dummy, GetObjectName(abilid))
 
                         Spells[abilid].onEquip(itm, abilid, index)
+                        LockDummyCastItem(dummy)
                     end
                 end
             end
+            if not suppress_sync then ItemRuntime.syncAbilitySlots(itm.pid) end
         end
 
         function thistype:lvl(lvl)
@@ -917,12 +1111,22 @@
                             backpack_allowed[abil.id] and Backpack[self.pid] or
                                 Hero[self.pid]
 
-                        -- remove ability after cooldown expires
-                        TQ:callDelayed(BlzGetUnitAbilityCooldownRemaining(
-                                           orig_spell_owner, abil.id),
-                                       remove_item_ability, self, abil, i)
+                        local remaining = BlzGetUnitAbilityCooldownRemaining(orig_spell_owner, abil.id)
+                        if not backpack_allowed[abil.id] then
+                            -- Preserve readiness without occupying an equipment
+                            -- slot with a ghost of an unequipped item.
+                            retain_cooldown(self.pid, abil.id, remaining)
+                            self.abilities[i] = nil
+                        else
+                            TQ:callDelayed(remaining, remove_item_ability, self, abil, i)
+                        end
                     end
                 end
+            end
+            if self.native_display then
+                set_widget_life(self.native_display, 1.)
+                RemoveItem(self.native_display)
+                self.native_display = nil
             end
         end
 
@@ -1173,7 +1377,11 @@
             -- A move within the same holder changes only the slot. Re-running
             -- onEquip in that case can duplicate periodic item effects.
             if orig_holder ~= new_holder then
-                add_item_abilities(self)
+                if suppress_refresh then
+                    self.pending_abilities = true
+                else
+                    add_item_abilities(self)
+                end
             end
 
             SetItemPosition(self.obj, 30000., 30000.)

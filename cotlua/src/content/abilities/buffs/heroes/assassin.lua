@@ -37,6 +37,7 @@ OnInit.final("BuffsHeroesAssassin", function(Require)
     end
 
     ---@class SmokebombBuff : Buff
+    ---@field evasion number
     SmokebombBuff = Buff.new()
     do
         local thistype = SmokebombBuff
@@ -52,10 +53,9 @@ OnInit.final("BuffsHeroesAssassin", function(Require)
         end
 
         function thistype:onApply()
+            self.evasion = 9 + GetUnitAbilityLevel(self.source, SMOKEBOMB.id)
             if self.source == self.target then
-                self.evasion = self.evasion + (9 + GetUnitAbilityLevel(self.source, SMOKEBOMB.id)) * 2
-            else
-                self.evasion = self.evasion + 9 + GetUnitAbilityLevel(self.source, SMOKEBOMB.id)
+                self.evasion = self.evasion * 2
             end
 
             Unit[self.target].evasion = Unit[self.target].evasion + self.evasion

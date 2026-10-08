@@ -2,6 +2,7 @@ OnInit.final("ItemEquipmentMobility", function(Require)
     Require("Spells")
 
     local THANATOS_WINGS = Spell.define('A01F')
+    THANATOS_WINGS.ACTIVE = true
     do
         local thistype = THANATOS_WINGS
 
@@ -39,6 +40,7 @@ OnInit.final("ItemEquipmentMobility", function(Require)
     end
 
     local SHORT_BLINK = Spell.define('A03D', 'A061', 'AIbk')
+    SHORT_BLINK.ACTIVE = true
     do
         local thistype = SHORT_BLINK
 
@@ -54,6 +56,7 @@ OnInit.final("ItemEquipmentMobility", function(Require)
     end
 
     local GOD_BLINK = Spell.define('A018')
+    GOD_BLINK.ACTIVE = true
     do
         local thistype = GOD_BLINK
 
@@ -76,6 +79,7 @@ OnInit.final("ItemEquipmentMobility", function(Require)
     end
 
     local THANATOS_BOOTS = Spell.define('A01S')
+    THANATOS_BOOTS.ACTIVE = true
     do
         local thistype = THANATOS_BOOTS
 

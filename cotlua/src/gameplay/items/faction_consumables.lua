@@ -127,6 +127,7 @@ OnInit.final("FactionConsumables", function(Require)
                    AshenVanguardServices.shareBlessing(pid)
     end)
     local MARK_BOUNTY = Spell.define('A1VB')
+    MARK_BOUNTY.ACTIVE = true
     do
         local thistype = MARK_BOUNTY
 

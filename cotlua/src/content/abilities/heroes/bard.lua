@@ -43,7 +43,16 @@ OnInit.final("BardSpells", function(Require)
         return true
     end
 
-    local songeffect = {} ---@type effect[] 
+    local songeffect = {} ---@type effect[]
+
+    local function remove_native_song_auras(caster)
+        -- These zero-value native auras were song indicators, not the actual
+        -- bonuses. The Lua song buffs own all stats and custom status icons.
+        UnitRemoveAbility(caster, SONG_FATIGUE)
+        UnitRemoveAbility(caster, SONG_HARMONY)
+        UnitRemoveAbility(caster, SONG_PEACE)
+        UnitRemoveAbility(caster, SONG_WAR)
+    end
 
     local function change_song(self, song)
         local p = Player(self.pid - 1)
@@ -63,6 +72,7 @@ OnInit.final("BardSpells", function(Require)
                 SetPlayerAbilityAvailable(Player(this.pid - 1), SONG_PEACE, false)
                 SetPlayerAbilityAvailable(Player(this.pid - 1), SONG_WAR, false)
                 DestroyEffect(songeffect[this.pid])
+                songeffect[this.pid] = nil
             end
 
             pt:startLoop(1., song_periodic)
@@ -74,7 +84,7 @@ OnInit.final("BardSpells", function(Require)
         SetPlayerAbilityAvailable(p, SONG_PEACE, false)
         SetPlayerAbilityAvailable(p, SONG_WAR, false)
 
-        SetPlayerAbilityAvailable(p, song, true)
+        remove_native_song_auras(self.caster)
         if songeffect[self.pid] == nil then
             songeffect[self.pid] = AddSpecialEffectTarget("war3mapImported\\Music effect01.mdx", self.caster, "overhead")
         end
@@ -82,6 +92,10 @@ OnInit.final("BardSpells", function(Require)
     end
 
     local SONGSOFTHETRAVELLER = Spell.define("A02F")
+    function SONGSOFTHETRAVELLER.onSetup(caster)
+        -- Unit setup is enumerating abilities; defer removals until it finishes.
+        TQ:callDelayed(0., remove_native_song_auras, caster)
+    end
 
     ---@class SONGOFFATIGUE : Spell
     local SONGOFFATIGUE = Spell.define("A025")
@@ -145,8 +159,9 @@ OnInit.final("BardSpells", function(Require)
         function thistype:onCast()
             local ug = CreateGroup()
             local p = Player(self.pid - 1)
+            local aoe = self.aoe * LBOOST[self.pid]
 
-            MakeGroupInRange(self.pid, ug, self.x, self.y, self.aoe * LBOOST[self.pid], Condition(isalive))
+            MakeGroupInRange(self.pid, ug, self.x, self.y, aoe, Condition(isalive))
 
             -- harmony all allied units
             -- war all allied heroes
@@ -155,45 +170,48 @@ OnInit.final("BardSpells", function(Require)
 
             -- improv
             local pt = TimerList[self.pid]:get(IMPROV.id, nil, self.caster)
-            local x2, y2, aoe, song = 0, 0, 0, 0
+            local x2, y2, improv_aoe, song = 0, 0, 0, 0
 
             if pt then
                 GroupEnumUnitsInRangeEx(self.pid, ug, pt.x, pt.y, pt.aoe, Condition(isalive))
                 x2 = pt.x
                 y2 = pt.y
-                aoe = pt.aoe
+                improv_aoe = pt.aoe
                 song = pt.song ---@type integer 
             end
 
             for target in each(ug) do
                 self.tpid = GetPlayerId(GetOwningPlayer(target)) + 1
+                local in_song = IsUnitInRangeXY(target, self.x, self.y, aoe)
+                local in_improv = pt and IsUnitInRangeXY(target, x2, y2, improv_aoe)
 
                 -- allied units
                 if IsUnitAlly(target, p) == true then
                     -- song of harmony
-                    if (BARD_SONG[self.pid] == SONG_HARMONY and IsUnitInRangeXY(target, self.x, self.y, aoe)) or (song == SONG_HARMONY and IsUnitInRangeXY(target, x2, y2, aoe)) then
+                    if (BARD_SONG[self.pid] == SONG_HARMONY and in_song) or (song == SONG_HARMONY and in_improv) then
                         HP(self.caster, target, self.heal * BOOST[self.pid], thistype.tag)
                         DestroyEffect(AddSpecialEffectTarget("Abilities\\Spells\\Undead\\VampiricAura\\VampiricAuraTarget.mdl", target, "origin"))
                     end
                     -- heroes
                     if target == Hero[self.tpid] then
                         -- song of war
-                        if (BARD_SONG[self.pid] == SONG_WAR and IsUnitInRangeXY(target, self.x, self.y, aoe)) or (song == SONG_WAR and IsUnitInRangeXY(target, x2, y2, aoe)) then
+                        if (BARD_SONG[self.pid] == SONG_WAR and in_song) or (song == SONG_WAR and in_improv) then
                             SongOfWarEncoreBuff:add(self.caster, target):duration(thistype.wardur * LBOOST[self.pid])
                         end
                         -- song of peace
-                        if (BARD_SONG[self.pid] == SONG_PEACE and IsUnitInRangeXY(target, self.x, self.y, aoe)) or (song == SONG_PEACE and IsUnitInRangeXY(target, x2, y2, aoe)) then
+                        if (BARD_SONG[self.pid] == SONG_PEACE and in_song) or (song == SONG_PEACE and in_improv) then
                             SongOfPeaceEncoreBuff:add(self.caster, target):duration(thistype.peacedur * LBOOST[self.pid])
                         end
                     end
                 else
                 -- enemies
                     -- song of fatigue
-                    if (BARD_SONG[self.pid] == SONG_FATIGUE and IsUnitInRangeXY(target, self.x, self.y, aoe)) or (song == SONG_FATIGUE and IsUnitInRangeXY(target, x2, y2, aoe)) then
+                    if (BARD_SONG[self.pid] == SONG_FATIGUE and in_song) or (song == SONG_FATIGUE and in_improv) then
                         StunUnit(self.pid, target, thistype.fatiguedur * LBOOST[self.pid])
                     end
                 end
             end
+            DestroyGroup(ug)
         end
     end
 
@@ -387,7 +405,7 @@ OnInit.final("BardSpells", function(Require)
         local thistype = TONEOFDEATH
 
         thistype.values = {
-            aoe = 350.,
+            aoe = 700.,
             dmg = function(pid) local ablev = GetUnitAbilityLevel(Hero[pid], thistype.id) return (0.5 + 0.5 * ablev) * GetHeroInt(Hero[pid], true) end,
             dur = 5.,
         }
@@ -442,7 +460,7 @@ OnInit.final("BardSpells", function(Require)
 
         local function pull(missile)
             if missile.lifetime > 0 then
-                ALICE_ForAllObjectsInRangeDo(pull_force, missile.x, missile.y, 800., "nonhero", valid_pull_target, missile)
+                ALICE_ForAllObjectsInRangeDo(pull_force, missile.x, missile.y, missile.aoe, "nonhero", valid_pull_target, missile)
                 TimerQueue:callDelayed(FPS_32, pull, missile)
             end
         end
@@ -482,13 +500,21 @@ OnInit.final("BardSpells", function(Require)
         end
 
         local manacost = function(u, key)
-            if key == "int" or key == "bonus_mana" or key == "bonus_int" then
-                BlzSetUnitAbilityManaCost(u, thistype.id, GetUnitAbilityLevel(u, thistype.id) - 1, R2I(BlzGetUnitMaxMana(u) * 0.2))
+            if key == nil or key == "int" or key == "bonus_mana" or key == "bonus_int" then
+                local ablev = GetUnitAbilityLevel(u, thistype.id)
+                if ablev > 0 then
+                    BlzSetUnitAbilityManaCost(u, thistype.id, ablev - 1,
+                        R2I(BlzGetUnitMaxMana(u) * 0.2))
+                end
             end
         end
 
-        function thistype.onLearn(source, ablev, pid)
+        local function setup_manacost(source)
             EVENT_STAT_CHANGE:register_unit_action(source, manacost)
+            manacost(source)
         end
+
+        thistype.onSetup = setup_manacost
+        thistype.onLearn = setup_manacost
     end
 end, Debug and Debug.getLine())

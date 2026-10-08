@@ -55,6 +55,24 @@ OnInit.final("WarriorSpells", function(Require)
     SPINDASH = Spell.define("A0EE")
     do
         local thistype = SPINDASH
+        local active_dashes = {}
+
+        local function finish_dash(self)
+            if self.finished then return end
+            self.finished = true
+            if self.callback then TQ:disableCallback(self.callback) end
+            if self.sfx then
+                HideEffect(self.sfx)
+                self.sfx = nil
+            end
+            SetUnitPropWindow(self.source, bj_DEGTORAD * 60.)
+            SetUnitTimeScale(self.source, 1.)
+            AddUnitAnimationProperties(self.source, "spin", false)
+            SetUnitPathing(self.source, true)
+            if active_dashes[self.source] == self then
+                active_dashes[self.source] = nil
+            end
+        end
         thistype.preCast = function(pid, tpid, caster, target, x, y, targetX, targetY)
             local buff = SpinDashBuff:get(caster, caster)
             --recast
@@ -89,6 +107,7 @@ OnInit.final("WarriorSpells", function(Require)
         end
 
         local function periodic(self)
+            if self.finished then return end
             self.dur = self.dur - self.speed
 
             if UnitAlive(self.source) and self.dur > 0. and IsUnitInRangeXY(self.source, self.x, self.y, self.dur + 50.) then
@@ -101,15 +120,13 @@ OnInit.final("WarriorSpells", function(Require)
 
                 self.callback = TQ:callDelayed(FPS_32, periodic, self)
             else
-                HideEffect(self.sfx)
-                SetUnitPropWindow(self.source, bj_DEGTORAD * 60.)
-                SetUnitTimeScale(self.source, 1.)
-                AddUnitAnimationProperties(self.source, "spin", false)
-                SetUnitPathing(self.source, true)
+                finish_dash(self)
             end
         end
 
         function thistype:onCast()
+            local previous = active_dashes[self.caster]
+            if previous then finish_dash(previous) end
             local buff = AdaptiveStrikeBuff:get(self.caster, self.caster) ---@type Buff
             local startX, startY = GetUnitX(self.caster), GetUnitY(self.caster)
             UnitDisableAbility(self.caster, ADAPTIVESTRIKE.id, false)
@@ -150,6 +167,7 @@ OnInit.final("WarriorSpells", function(Require)
             self.speed = 40.
             self.source = self.caster
             self.g = {}
+            active_dashes[self.caster] = self
 
             SetUnitPropWindow(self.caster, 0)
             SetUnitTimeScale(self.caster, 2.)
@@ -479,8 +497,9 @@ OnInit.final("WarriorSpells", function(Require)
                     pt.dur = thistype.tornadodur * LBOOST[pid]
                     pt.ug = CreateGroup()
 
-                    SetUnitPathing(pt.target, false)
                     BlzSetUnitSkin(pt.target, FourCC('n001'))
+                    SetUnitPathing(pt.target, false)
+                    BlzSetUnitRealField(pt.target, UNIT_RF_COLLISION_SIZE, 0.)
                     SetUnitMoveSpeed(pt.target, 100.)
                     SetUnitScale(pt.target, 0.5, 0.5, 0.5)
                     UnitAddAbility(pt.target, FourCC('Amrf'))

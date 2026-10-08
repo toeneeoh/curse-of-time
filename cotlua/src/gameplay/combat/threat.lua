@@ -13,8 +13,11 @@ OnInit.final("Threat", function(Require)
     local CALL_FOR_HELP_RANGE = 800.
 
     ---@return boolean
-    local function proximity_filter(object)
-        return GetUnitAbilityLevel(object, ABIL_AVUL) == 0 and GetPlayerId(GetOwningPlayer(object)) < PLAYER_CAP
+    local function proximity_filter(object, source)
+        return UnitAlive(object) and
+            GetUnitAbilityLevel(object, ABIL_AVUL) == 0 and
+            GetPlayerId(GetOwningPlayer(object)) < PLAYER_CAP and
+            IsUnitVisible(object, GetOwningPlayer(source))
     end
 
     ---@type fun(source: unit, dist: number)
@@ -22,7 +25,7 @@ OnInit.final("Threat", function(Require)
         local x  = GetUnitX(source)
         local y  = GetUnitY(source)
         local new_target = nil
-        local targets = ALICE_EnumObjectsInRange(x, y, dist, "unit", proximity_filter)
+        local targets = ALICE_EnumObjectsInRange(x, y, dist, "unit", proximity_filter, source)
 
         for _, enemy in ipairs(targets) do
             local new_dist = UnitDistance(source, enemy)
@@ -76,7 +79,8 @@ OnInit.final("Threat", function(Require)
     end
 
     local function creep_aggro(source, target)
-        if GetPlayerId(GetOwningPlayer(target)) < PLAYER_CAP then
+        if GetPlayerId(GetOwningPlayer(target)) < PLAYER_CAP and
+            IsUnitVisible(target, GetOwningPlayer(source)) then
             Unit[target]:taunt(Unit[source])
         end
     end
@@ -94,7 +98,8 @@ OnInit.final("Threat", function(Require)
         local allies = ALICE_EnumObjectsInRange(GetUnitX(target), GetUnitY(target), CALL_FOR_HELP_RANGE, "unit", is_ally, target)
 
         for _, ally in ipairs(allies) do
-            if Unit[ally].target == nil then
+            if Unit[ally].target == nil and
+                IsUnitVisible(source, GetOwningPlayer(ally)) then
                 Unit[source]:taunt(Unit[ally])
             end
         end

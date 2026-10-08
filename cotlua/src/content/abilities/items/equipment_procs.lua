@@ -3,27 +3,8 @@ OnInit.final("ItemEquipmentProcs", function(Require)
 
     local TQ = TimerQueue
 
-    local ARMOR_OF_THE_GODS = Spell.define('Aarm')
-    do
-        local thistype = ARMOR_OF_THE_GODS
-
-        function thistype.onEquip(itm, id, index)
-            BlzSetAbilityRealLevelField(BlzGetUnitAbility(itm.holder, id), ABILITY_RLF_ARMOR_BONUS_HAD1, 0, itm.cached_stats[index])
-        end
-    end
-
-    local BASH = Spell.define('Abas')
-    do
-        local thistype = BASH
-
-        function thistype.onEquip(itm, id, index)
-            BlzSetAbilityRealLevelField(BlzGetUnitAbility(itm.holder, id), ABILITY_RLF_CHANCE_TO_BASH, 0, itm.cached_stats[index])
-            BlzSetAbilityRealLevelField(BlzGetUnitAbility(itm.holder, id), ABILITY_RLF_DURATION_NORMAL, 0, itm:getAbilityArgument(index, 1))
-            BlzSetAbilityRealLevelField(BlzGetUnitAbility(itm.holder, id), ABILITY_RLF_DURATION_HERO, 0, itm:getAbilityArgument(index, 1))
-        end
-    end
-
     local SHIELD_BLOCK = Spell.define('Zs00', 'Zs01', 'Zs02', 'Zs03', 'Zs04', 'Zs05', 'Zs06')
+    SHIELD_BLOCK.ACTIVE = false
     do
         local thistype = SHIELD_BLOCK
         function thistype.onUnequip(itm, id, index, orig_holder)
@@ -53,6 +34,7 @@ OnInit.final("ItemEquipmentProcs", function(Require)
     end
 
     local AZAZOTH_BLADE_STORM = Spell.define('A07G')
+    AZAZOTH_BLADE_STORM.ACTIVE = true
     do
         local thistype = AZAZOTH_BLADE_STORM
 
@@ -102,6 +84,7 @@ OnInit.final("ItemEquipmentProcs", function(Require)
     end
 
     local AZAZOTH_STOMP = Spell.define('A0B5')
+    AZAZOTH_STOMP.ACTIVE = true
     do
         local thistype = AZAZOTH_STOMP
 
@@ -119,6 +102,7 @@ OnInit.final("ItemEquipmentProcs", function(Require)
     end
 
     local MANA_FLOW = Spell.define('A0C0')
+    MANA_FLOW.ACTIVE = false
     do
         local thistype = MANA_FLOW
 
@@ -132,6 +116,7 @@ OnInit.final("ItemEquipmentProcs", function(Require)
     end
 
     local HORSE_BOOST = Spell.define('A09O')
+    HORSE_BOOST.ACTIVE = false
     do
         local thistype = HORSE_BOOST
 
@@ -145,6 +130,7 @@ OnInit.final("ItemEquipmentProcs", function(Require)
     end
 
     local RESURGENCE = Spell.define('Areg')
+    RESURGENCE.ACTIVE = false
     do
         local thistype = RESURGENCE
 
@@ -162,6 +148,7 @@ OnInit.final("ItemEquipmentProcs", function(Require)
     end
 
     local POWERFULSTRIKE = Spell.define('Abon')
+    POWERFULSTRIKE.ACTIVE = false
     do
         local thistype = POWERFULSTRIKE
 
@@ -186,6 +173,7 @@ OnInit.final("ItemEquipmentProcs", function(Require)
     end
 
     local SIPHONBLOOD = Spell.define('Ahrt')
+    SIPHONBLOOD.ACTIVE = false
     do
         local thistype = SIPHONBLOOD
 
@@ -206,9 +194,9 @@ OnInit.final("ItemEquipmentProcs", function(Require)
 
                 BlzSetItemDescription(itm.obj, itm.tooltip)
                 BlzSetItemExtendedTooltip(itm.obj, itm.tooltip)
-                BlzSetItemExtendedTooltip(itm.abilities[ITEM_ABILITY].obj, abil_text)
+                BlzSetItemExtendedTooltip(itm.abilities[ITEM_ABILITY].obj, itm.tooltip)
 
-                INVENTORY.refresh(itm.pid)
+                NotifyItemChanged(itm.pid)
             end
         end
 
@@ -255,4 +243,3 @@ OnInit.final("ItemEquipmentProcs", function(Require)
         end
     end
 end, Debug and Debug.getLine())
-

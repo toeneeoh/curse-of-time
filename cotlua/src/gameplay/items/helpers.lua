@@ -31,20 +31,41 @@ OnInit.global("ItemHelpers", function(Require)
     ---@param u unit
     ---@return item?
     function MakeDummyCastItem(u)
-        local index = 0
+        local used_ids = {}
+        local has_space = false
         for i = 0, 5 do
-            if not UnitItemInSlot(u, i) then
-                index = i + 1
-                break
+            local existing = UnitItemInSlot(u, i)
+            if existing then
+                used_ids[GetItemTypeId(existing)] = true
+            else
+                has_space = true
             end
         end
 
-        if dummy_items[index] then
-            local item = CreateItem(dummy_items[index], 30000, 30000) ---@type item
-            UnitAddItem(u, item)
-            return item
+        if has_space then
+            -- Position and cooldown identity are independent. A rearranged
+            -- carrier must not cause another copy of its dummy ID to spawn.
+            for _, id in ipairs(dummy_items) do
+                if not used_ids[id] then
+                    local item = CreateItem(id, 30000, 30000) ---@type item
+                    LockDummyCastItem(item)
+                    if UnitAddItem(u, item) then return item end
+                    RemoveItem(item)
+                    return nil
+                end
+            end
         end
         return nil
+    end
+
+    ---Reapply both gameplay flags and object boolean fields after setup.
+    ---@param item item
+    function LockDummyCastItem(item)
+        SetItemDroppable(item, false)
+        SetItemPawnable(item, false)
+        SetItemDropOnDeath(item, false)
+        BlzSetItemBooleanField(item, ITEM_BF_CAN_BE_DROPPED, false)
+        BlzSetItemBooleanField(item, ITEM_BF_DROPPED_WHEN_CARRIER_DIES, false)
     end
 
     ---@param pid integer

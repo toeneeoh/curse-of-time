@@ -975,21 +975,16 @@ modifiers:
         SetPlayerAlliance(Player(pid - 1), Player(PLAYER_NEUTRAL_PASSIVE),
                           ALLIANCE_SHARED_SPELLS, true)
 
-        local i = 0
-        while i ~= bj_MAX_PLAYERS do
-
-            local i2 = 0
-            while i2 ~= bj_MAX_PLAYERS do
+        -- Include simulated hero players, but never share their vision with enemies.
+        for i = 0, PLAYER_CAP - 1 do
+            for i2 = 0, bj_MAX_PLAYER_SLOTS - 1 do
                 if i ~= i2 then
                     SetPlayerAlliance(Player(i), Player(i2),
-                                      ALLIANCE_SHARED_VISION, true)
+                                      ALLIANCE_SHARED_VISION, i2 < PLAYER_CAP)
                     SetPlayerAlliance(Player(i), Player(i2),
                                       ALLIANCE_SHARED_CONTROL, false)
                 end
-                i2 = i2 + 1
             end
-
-            i = i + 1
         end
     end
 
@@ -1240,6 +1235,6 @@ modifiers:
     end
 
     --- start somewhere
-    TimerQueue:callDelayed(1., setup, 0, 0)
+    --TimerQueue:callDelayed(1., setup, 0, 0)
 
 end, Debug and Debug.getLine())

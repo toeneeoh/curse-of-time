@@ -34,6 +34,10 @@ OnInit.final("ArchitectureTests", function(Require)
     Require('ItemHelpers')
     Require('RuntimeItemDefinitions')
     Require('ItemSocketingAbilities')
+    Require('ItemEquipmentProcs')
+    Require('ItemEquipmentMobility')
+    Require('ItemActiveAbilities')
+    Require('ItemAuraAbilities')
     Require('AbilityCasting')
     Require('PlayerLifecycle')
     Require('SummonHelpers')
@@ -450,13 +454,17 @@ OnInit.final("ArchitectureTests", function(Require)
             local advanced = ItemRuntime.create(FourCC('I00U'), 30000.,
                                                 30000.)
             local chisels_are_usable = ItemUse.isUsable(basic) and
-                                           ItemUse.isUsable(advanced) and
-                                           basic.type == TYPE_CONSUMABLE_INDEX and
-                                           advanced.type == TYPE_CONSUMABLE_INDEX
+                                           ItemUse.isUsable(advanced)
+            local chisels_are_consumable = basic and advanced and
+                                              basic.type == TYPE_CONSUMABLE_INDEX and
+                                              advanced.type == TYPE_CONSUMABLE_INDEX
             if basic then basic:destroy() end
             if advanced then advanced:destroy() end
             if not chisels_are_usable then
                 return false, "socketing chisels lack direct Use handlers"
+            end
+            if not chisels_are_consumable then
+                return false, "socketing chisels lost consumable classification after parsing"
             end
 
             local stormwatch_shop = ShopRegistry.get(FourCC('n0P0'))
@@ -2158,11 +2166,43 @@ OnInit.final("ArchitectureTests", function(Require)
         return true
     end)
 
+    ArchitectureTests.register("item abilities have active or passive classification",
+                               function()
+        local active = {
+            'A07G', 'A0B5', 'A01F', 'A03D', 'A061', 'AIbk', 'A018',
+            'A01S', 'A083', 'A02A', 'A055', 'A0SX', 'A00E', 'A00Q',
+            'AIta', 'A0E2', 'A0D3', 'A00D', 'A01G', 'A1VB'
+        }
+        local passive = {
+            'Zs00', 'Zs01', 'Zs02', 'Zs03', 'Zs04', 'Zs05', 'Zs06',
+            'A0C0', 'A09O', 'Areg', 'Abon', 'Ahrt', 'A0B9', 'A04I',
+            'A03G', 'Anrv', 'Arrv', 'Adt1', 'A03F', 'A03H', 'AIcd'
+        }
+        for _, id in ipairs(active) do
+            local spell = Spells[FourCC(id)]
+            if not spell or spell.ACTIVE ~= true then
+                return false, "active item ability misclassified: " .. id
+            end
+        end
+        for _, id in ipairs(passive) do
+            local spell = Spells[FourCC(id)]
+            if not spell or spell.ACTIVE ~= false then
+                return false, "passive item ability misclassified: " .. id
+            end
+        end
+        for _, id in ipairs({'A04I', 'A03G', 'Adt1', 'A03F', 'A03H', 'AIcd'}) do
+            if Spells[FourCC(id)].ITEM_NATIVE_ABILITY ~= true then
+                return false, "passive aura/detection lost native attachment: " .. id
+            end
+        end
+        return true
+    end)
+
     ArchitectureTests.register("unit and item abilities are registered",
                                function()
         local spell_ids = {
             'A071', 'A06C', 'A06O', 'A0B0', 'A02J', 'A0FV', 'ACfn', 'A0AJ',
-            'A01H', 'A015', 'Aarm', 'Abas', 'Zs00', 'Zs01', 'Zs02', 'Zs03',
+            'A01H', 'A015', 'Zs00', 'Zs01', 'Zs02', 'Zs03',
             'Zs04', 'Zs05', 'Zs06', 'A07G', 'A0B5', 'A0C0', 'A09O', 'Areg',
             'Abon', 'Ahrt', 'A01F', 'A03D', 'A061', 'AIbk', 'A018', 'A01S',
             'A083', 'A02A', 'A055', 'A0SX', 'A00E', 'A00Q', 'A0B9', 'A04I',

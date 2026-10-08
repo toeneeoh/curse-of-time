@@ -35,7 +35,11 @@ OnInit.final("ItemLookup", function(Require)
         local pid = GetPlayerId(p) + 1 ---@type integer
 
         -- ignore non-player inventories / dummy cast items
-        if pid > PLAYER_CAP or IsDummyCastItem(itemid) then
+        if IsDummyCastItem(itemid) then
+            ItemRuntime.guardNativeItem(orig_itm, u)
+            return false
+        end
+        if pid > PLAYER_CAP then
             return false
         end
 
@@ -57,6 +61,15 @@ OnInit.final("ItemLookup", function(Require)
         return false
     end
 
+    local function DropItem()
+        local item = GetManipulatedItem()
+        if IsDummyCastItem(GetItemTypeId(item)) then
+            ItemRuntime.guardNativeItem(item, GetTriggerUnit())
+        end
+        return false
+    end
+
     RegisterPlayerUnitEvent(EVENT_PLAYER_UNIT_PICKUP_ITEM, PickItem)
+    RegisterPlayerUnitEvent(EVENT_PLAYER_UNIT_DROP_ITEM, DropItem)
     RegisterPlayerUnitEvent(EVENT_PLAYER_UNIT_SELL_ITEM, BuyItem)
 end, Debug and Debug.getLine())

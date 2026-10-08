@@ -1,19 +1,25 @@
 OnInit.final("ItemSocketingAbilities", function(Require)
     Require("Spells")
     Require("ItemUse")
+    Require("Items")
 
     local SOCKET_ITEM_CHISEL = Spell.define('A00D')
+    SOCKET_ITEM_CHISEL.ACTIVE = true
     do
         local thistype = SOCKET_ITEM_CHISEL
         local TYPE_SOCKETABLE = 12
         local TARGET_DIALOG_KIND = "socket_item_target"
         local GEM_DIALOG_KIND = "socket_item_gem"
 
-        -- Chisels are one-use inventory tools, so present them alongside the
-        -- other context-menu consumables rather than as equippable items.
+        -- Apply after lazy tooltip parsing, which replaces the ItemData entry.
+        -- This also preserves consumable presentation when restoring a chisel.
         for _, id in ipairs({ FourCC('I00K'), FourCC('I00U') }) do
-            ItemData[id][ITEM_TYPE] = TYPE_CONSUMABLE_INDEX
-            ItemData[id][ITEM_TYPE .. "fixed"] = 1
+            ItemRuntime.define(id, {
+                prepare = function(_, data)
+                    data[ITEM_TYPE] = TYPE_CONSUMABLE_INDEX
+                    data[ITEM_TYPE .. "fixed"] = 1
+                end
+            })
         end
 
         ---@param itm Item?
@@ -170,6 +176,7 @@ OnInit.final("ItemSocketingAbilities", function(Require)
         end
 
         local ADVANCED_SOCKET_ITEM_CHISEL = Spell.define('A01G')
+        ADVANCED_SOCKET_ITEM_CHISEL.ACTIVE = true
         function ADVANCED_SOCKET_ITEM_CHISEL:onCast()
             local chisel = GetItemFromPlayer(self.pid, 'I00U:-1')
             if chisel then

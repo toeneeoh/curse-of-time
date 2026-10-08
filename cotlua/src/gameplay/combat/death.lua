@@ -105,7 +105,10 @@ OnInit.final("Death", function(Require)
                     pt.autoDestroy = false -- current timer will be destroyed already
                 -- softcore death
                 else
-                    ChargeNetworth(Player(pid - 1), 0, 0.02, 50 * GetHeroLevel(Hero[pid]), "Dying has cost you")
+                    local level = GetHeroLevel(Hero[pid])
+                    if level > 3 then
+                        ChargeNetworth(Player(pid - 1), 0, 0.02, 50 * level, "Dying has cost you")
+                    end
 
                     RevivePlayer(pid, TOWN_CENTER_X, TOWN_CENTER_Y, 1, 1)
                     SetCamera(pid, MAIN_MAP.rect)

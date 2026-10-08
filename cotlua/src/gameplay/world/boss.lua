@@ -64,7 +64,7 @@ OnInit.final("Boss", function(Require)
         local thistype = Boss
         local mt = { __index = Boss }
 
-        local function check_multiboard(boss)
+        local function check_multiboard(boss, final_result)
             if type(boss) ~= "table" then
                 boss = IsBoss(boss)
             end
@@ -74,7 +74,8 @@ OnInit.final("Boss", function(Require)
             local found_player
 
             while U do
-                if (UnitAlive(boss.unit) and IsUnitInRange(Hero[U.id], boss.unit, NEARBY_BOSS_RANGE)) then
+                if ((UnitAlive(boss.unit) or final_result) and
+                    Hero[U.id] and IsUnitInRange(Hero[U.id], boss.unit, NEARBY_BOSS_RANGE)) then
                     mb.viewing[U.id] = boss
                     mb.update_items(U.player)
                     if not mb.available[U.id] then
@@ -93,7 +94,9 @@ OnInit.final("Boss", function(Require)
 
             if found_player then
                 mb:update()
-                TQ:callDelayed(1., check_multiboard, boss)
+                if not final_result then
+                    TQ:callDelayed(1., check_multiboard, boss)
+                end
             end
         end
 
@@ -225,6 +228,7 @@ OnInit.final("Boss", function(Require)
             local x, y = GetUnitX(killed), GetUnitY(killed)
             local u = CreateUnit(Player(PLAYER_NEUTRAL_PASSIVE), FourCC('n00B'), x, y, 0.)
             Unit[u].boss = boss
+            boss.difficulty_vote = {}
 
             SetUnitAnimation(u, "birth")
 
@@ -240,6 +244,10 @@ OnInit.final("Boss", function(Require)
             local x, y = GetUnitX(killed), GetUnitY(killed)
 
             TimerList[BOSS_ID]:stopAllTimers(killed)
+
+            -- Flush the killing blow before the alive-only polling loop stops.
+            -- A one-shot may also kill the boss before its aggro event opens the UI.
+            check_multiboard(boss, true)
 
             -- rewards
             RewardXPGold(killed, killer)
@@ -269,11 +277,11 @@ OnInit.final("Boss", function(Require)
         end
 
         ON_BUY_LOOKUP[FourCC('I05V')] = function(u, b, pid, itm)
-            Unit[u].boss:vote(pid, 1)
+            Unit[u].boss:vote(pid, 1, u)
         end
 
         ON_BUY_LOOKUP[FourCC('I05W')] = function(u, b, pid, itm)
-            Unit[u].boss:vote(pid, 2)
+            Unit[u].boss:vote(pid, 2, u)
         end
 
         local function boss_safe_zone(u)
@@ -379,6 +387,7 @@ OnInit.final("Boss", function(Require)
 
             return pid <= PLAYER_CAP and
             UnitAlive(u) and
+            IsUnitVisible(u, PLAYER_BOSS) and
             GetUnitAbilityLevel(u, ABIL_AVUL) == 0 and
             GetUnitAbilityLevel(u, ABIL_ALOC) == 0
         end
@@ -409,16 +418,30 @@ OnInit.final("Boss", function(Require)
             end
         end
 
-        function thistype:vote(pid, difficulty_level)
+        function thistype:vote(pid, difficulty_level, selector)
+            local voter = User[pid - 1]
+            local hero = Hero[pid]
+            local x = selector and GetUnitX(selector) or self.loc_x
+            local y = selector and GetUnitY(selector) or self.loc_y
+            if not voter or not hero or
+                (difficulty_level ~= 1 and difficulty_level ~= 2) or
+                not IsUnitInRangeXY(hero, x, y, NEARBY_BOSS_RANGE) then
+                return
+            end
             self.difficulty_vote[pid] = difficulty_level
             local U = User.first
 
-            DisplayTextToForce(FORCE_PLAYING, User[pid - 1].nameColored .. " has selected " .. (difficulty_level == 2 and "Hard" or "Normal") .. " difficulty for |cffffcc00" .. self.name .. "|r")
+            DisplayTextToForce(FORCE_PLAYING, voter.nameColored .. " has selected " .. (difficulty_level == 2 and "Hard" or "Normal") .. " difficulty for |cffffcc00" .. self.name .. "|r")
 
             local vote_count = { [1] = 0, [2] = 0 }
             while U do
                 local vote = self.difficulty_vote[U.id]
-                vote_count[vote] = vote_count[vote] + 1
+                local nearby_hero = Hero[U.id]
+                -- Missing votes abstain; players elsewhere cannot block the group.
+                if (vote == 1 or vote == 2) and nearby_hero and
+                    IsUnitInRangeXY(nearby_hero, x, y, NEARBY_BOSS_RANGE) then
+                    vote_count[vote] = vote_count[vote] + 1
+                end
 
                 U = U.next
             end

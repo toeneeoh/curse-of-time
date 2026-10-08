@@ -66,11 +66,15 @@ OnInit.final("MapSetup", function(Require)
     end
     TriggerAddCondition(LEAVE_TRIGGER, Filter(onPlayerLeave))
 
-    -- setup alliances
-    for i = 0, bj_MAX_PLAYERS do
-        for i2 = 0, bj_MAX_PLAYERS do
-            if i ~= i2 and GetPlayerController(Player(i)) == MAP_CONTROL_USER then
-                SetPlayerAlliance(Player(i), Player(i2), ALLIANCE_SHARED_VISION, true)
+    -- Share human vision only with other human hero slots, never enemies.
+    -- Shared vision also exposes the owner's invisible units to its recipients.
+    for i = 0, PLAYER_CAP - 1 do
+        for i2 = 0, bj_MAX_PLAYER_SLOTS - 1 do
+            if i ~= i2 then
+                local shared = i2 < PLAYER_CAP
+                    and GetPlayerController(Player(i)) == MAP_CONTROL_USER
+                    and GetPlayerController(Player(i2)) == MAP_CONTROL_USER
+                SetPlayerAlliance(Player(i), Player(i2), ALLIANCE_SHARED_VISION, shared)
                 SetPlayerAlliance(Player(i), Player(i2), ALLIANCE_SHARED_CONTROL, false)
             end
         end

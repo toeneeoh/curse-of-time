@@ -87,13 +87,32 @@ OnInit.final("MasterRogueSpells", function(Require)
     do
         local thistype = HIDDENGUISE
 
-        ---@type fun(pt: PlayerTimer)
-        function thistype.expire(pt)
-            PlayerAddItemById(pt.pid, FourCC('I0OW'))
+        local function cleanup(pt)
+            if pt.finished then return end
+            pt.finished = true
+            SetUnitPathing(pt.source, true)
             SetUnitVertexColor(pt.source, 255, 255, 255, 255)
             ToggleCommandCard(pt.source, true)
             UnitRemoveAbility(pt.source, ABIL_AVUL)
-            Unit[pt.source].attack = true
+            if Unit[pt.source] then Unit[pt.source].attack = true end
+        end
+
+        ---@type fun(pt: PlayerTimer)
+        function thistype.expire(pt)
+            if pt.finished then return end
+            cleanup(pt)
+            PlayerAddItemById(pt.pid, FourCC('I0OW'))
+            -- Let native Wind Walk finish its fade before scripted retargeting.
+            local unit = Unit[pt.source]
+            TimerQueue:callDelayed(0.05, function()
+                if unit and Unit[pt.source] == unit and UnitAlive(pt.source) then
+                    DropAggro(unit)
+                end
+            end)
+            -- The one-shot dispatcher also destroys by default; this exit
+            -- owns cleanup so early cancellation and timeout follow one path.
+            pt.autoDestroy = false
+            pt:destroy()
         end
 
         function thistype:onCast()
@@ -102,6 +121,7 @@ OnInit.final("MasterRogueSpells", function(Require)
             pt.dur = 2.
             pt.source = self.caster
             pt.tag = thistype.id
+            pt.onRemove = cleanup
 
             local sfx = AddSpecialEffect("Abilities\\Spells\\Orc\\MirrorImage\\MirrorImageCaster.mdl", self.x, self.y)
             BlzSetSpecialEffectYaw(sfx, GetUnitFacing(self.caster) * bj_DEGTORAD)
@@ -109,9 +129,11 @@ OnInit.final("MasterRogueSpells", function(Require)
 
             UnitRemoveAbility(self.caster, FourCC('BOwk'))
             UnitAddAbility(self.caster, ABIL_AVUL)
+            SetUnitPathing(self.caster, false)
             ToggleCommandCard(self.caster, false)
             SetUnitVertexColor(self.caster, 50, 50, 50, 50)
             Unit[self.caster].attack = false
+            DropAggro(Unit[self.caster])
             pt:after(pt.dur, thistype.expire)
         end
     end
