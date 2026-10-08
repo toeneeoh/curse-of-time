@@ -1,4 +1,8 @@
-# Changelog 1.36 — additions pending merge
+# Changelog 1.36 — historical additions draft
+
+Superseded by [the consolidated 1.36 changelog](CHANGELOG_1.36.md).
+This earlier working draft is retained as editorial history; its cooldown,
+reroll, event, and reward descriptions are not the current release notes.
 
 This file supplements the existing 1.36 draft with notable player-facing
 changes. Internal refactors, developer tooling, raw object changes, and minor

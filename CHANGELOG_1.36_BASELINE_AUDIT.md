@@ -120,8 +120,102 @@ Because the 1.35c import manifest is protected, these asset counts are strictly
 Temporary extracted baseline data and the complete field-level JSON report are
 stored outside the source repository at:
 
-- `B:\cothub\builder\.build\changelog-135-compare\135`
-- `B:\cothub\builder\.build\changelog-135-compare\135c`
-- `B:\cothub\builder\.build\changelog-135-compare\135c-to-136-object-diff.json`
+- `B:\cothub\builder\.build\reports\changelog-135-compare\135`
+- `B:\cothub\builder\.build\reports\changelog-135-compare\135c`
+- `B:\cothub\builder\.build\reports\changelog-135-compare\135c-to-136-object-diff.json`
 
 The original map files were read only and were not modified.
+
+## Consolidated draft review — 2026-10-07
+
+The maintained local release draft is [CHANGELOG_1.36.md](CHANGELOG_1.36.md).
+It links the owner's Google Doc. The browser could not read that document, so
+the supplied pasted text was used as its editorial snapshot. No Google Doc
+edit or automatic synchronization was performed.
+
+The newly supplied `C:\Users\Antonio\Downloads\war3map.j` is 1,749,257 bytes,
+SHA-256 `C72E46F5B7BDBA130D5A66BFE2735129348BE6233D99DB65FD409F5E503A54A7`.
+It was supplied as the 1.35 baseline. Its hash differs from the previously
+extracted 1.35c script, so these two scripts must not be treated as identical
+minor releases. Neither baseline was modified or copied into the repository.
+
+### Evidence checked for this update
+
+| Player-facing change | Old-script evidence | Current source |
+| --- | --- | --- |
+| No home-dependent XP gate; new level/reward curve | `ExperienceControl`, starting at line 7946, gates XP by `urhome`, level bands, Prestige, and arena state | `gameplay/players/progression.lua`, `reward_scaling.lua` |
+| Reworked repeatable kill bounties | `KillQuestHandler`, line 22134, uses band-average reward estimates and an upper eligibility cutoff | `gameplay/world/quests.lua` accumulates actual defeated-unit values and contribution quality; `ui/hud/quest_tracker.lua` adds the tracker |
+| Colosseum is a rework, not a new mode | Existing Colosseum wave progression and clear rewards | `gameplay/world/colosseum.lua`: 20 waves, Augments, hazards, Honor |
+| Struggle is a rework, not a new mode | `AdvanceStruggle`, line 8689, advances finite waves and awards Lesser Ring/Ring | `gameplay/world/struggle.lua`, `struggle_rewards.lua`: endless waves, checkpoints, saved records, 100 reward ranks |
+| Perks replace Prestige | `AllocatePrestige` and `SetPrestigeEffects` | `gameplay/players/perks.lua`, `ui/dialogs/perk_tree.lua` |
+| New complete inventory/shop/stat/boss interfaces | Limited built-in frame use beginning around line 21892, not equivalent inventory/shop/perk systems | `ui/inventory/`, `ui/shop/`, `ui/hud/stat_view.lua`, `multiboard.lua` |
+| Factions, contracts, events, and ongoing project rewards | Home/nation progression in old XP and placement logic; owner confirms replacement | `gameplay/factions/`, `content/shops/faction.lua`, `gameplay/items/faction_consumables.lua` |
+| Potion customization and saved stash | New systems confirmed by owner and current implementation | `gameplay/items/potions.lua`, `stash.lua`, `ui/inventory/potion.lua`, `stash.lua` |
+| New Orsted/Xallarath equipment and socket recipes | Compare with existing boss pools/socketable progression, not raw object counts | `gameplay/items/boss_equipment.lua`, `gameplay/world/drop_table.lua`, `content/shops/recipe.lua` |
+
+Paths in the table are relative to `cotlua/src/`. This is a targeted source
+review, not a claim that every balance number in the original draft has been
+independently revalidated or tested in game.
+
+### Corrections to the earlier additions draft
+
+- Rerolling locks one category for the item's lifetime, rather than rerolling
+  restoration, charges, and cooldown together. Current categories are
+  Restoration, Charges, Cooldown, and Prefix strength.
+- The default flask cooldown is five seconds, not three. Rolled cooldowns have
+  their own base-dependent ranges.
+- Moving a flask into a potion slot in town adds no equip penalty; it does not
+  clear a cooldown already running. Outside town the equip penalty is ten seconds.
+- Stormwatch's current event is Eye of the Storm, with anomaly stabilization
+  followed by the Lightning Revenant encounter.
+- Current faction projects are Survey Boom, Favorable Forecast, and Vanguard
+  Mobilization. The latter grants a lobby-only 25% Boss Drop Rate buff for
+  15 minutes; it is separate from the targeted Vanguard Bounty consumable.
+- Vanguard Bounty uses native backpack targeting, marks bosses above 90% HP,
+  clears on retreat, and has a shared ten-minute shop requisition cooldown.
+- Early normal-difficulty Chaos bosses start at a 3.5% Epic-flask base chance;
+  level and difficulty improve it. It is not the earlier flat 8% estimate.
+- Forgotten jewel recipes require a +8 Heart of the Forgotten at the Reclusive
+  Blacksmith, not just mining materials at a faction shop.
+- The stronger Chaos Flask definition exists but its intended Scarab dungeon
+  acquisition is not implemented. It is excluded from available-content claims.
+- The previous additions file claimed three unique Arkaden drops. Current
+  `drop_table.lua` still registers `I02O`, `I02C`, `I02B`, and `I036` for Arkaden.
+  The builder's object-update script contains proposed unique items, but that
+  alone does not prove acquisition. The unique-drop claim is omitted pending
+  reconciliation with the active map data and drop pool.
+
+### Remaining editorial checks before publishing
+
+- The supplied draft's detailed hero and boss balance numbers are preserved,
+  not all independently audited against both script versions and object data.
+  In particular, wording about increasing/reducing physical or magic
+  resistance sometimes conflicts with the listed numbers. Confirm whether
+  these describe damage taken before normalizing the terminology.
+- The supplied Hydromancer Whirlpool line contradicted itself. It now describes
+  the stated capped increase in duration expiry rather than retaining both
+  opposite claims; confirm exact tuning before publication.
+- Retained historical item/hero names and the removed Forest Corruption claim
+  come from the owner's draft. Verify final names and availability for release.
+- Check acquisition, shop stock timing, boss previews, and save/load behavior
+  in game. Source availability is not a substitute for an end-to-end test.
+
+### Maintaining the release notes
+
+Editorial direction: keep the public draft focused on major systems,
+progression, and meaningful balance changes. Omit effect catalogs, item names
+for new boss pools, recipe components, detailed faction reward payouts,
+shop stock descriptions, potion naming/presentation, and routine interaction
+or bug-fix details players can discover naturally. Describe difficulty voting
+as a new per-boss feature, not as an incremental voting fix. Duplicate-equipment
+restrictions predate this release and must not be presented as new. Describe
+stash access directly (view anywhere, transfer in town) without the phrase
+"read-only" in public notes.
+
+Update `CHANGELOG_1.36.md` for confirmed player-visible changes. Describe new
+systems relative to the release baseline, not their intermediate prototypes.
+Merge changes into an existing entry rather than accumulating contradictory
+patch notes. Keep internal refactors, rawcodes, asset filenames, packaging,
+minor alignment fixes, and speculative/unobtainable content out of public notes.
+Put uncertain findings and supporting evidence here. The earlier
+`CHANGELOG_1.36_ADDITIONS.md` is historical and is no longer the release draft.
