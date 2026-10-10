@@ -1,12 +1,16 @@
 OnInit.global("RewardScaling", function()
     RewardScaling = {}
 
-    local OVERLEVEL_GROWTH = 1.05
+    local PRECHAOS_OVERLEVEL_GROWTH = 1.15
+    local CHAOS_OVERLEVEL_GROWTH = 1.08
+    local TRANSITION_START_LEVEL = 160.
+    local TRANSITION_END_LEVEL = 180.
 
     ---Returns the reward retained when the recipient outlevels the target.
-    ---Equal- and under-level recipients retain the full reward. A fixed level
-    ---gap has the same effect throughout progression: +15 retains about 82%,
-    ---+50 about 32%, and +100 about 4%.
+    ---Equal- and under-level recipients retain the full reward. Early targets
+    ---fall off sharply (+27 retains about 10.5%); chaos targets retain the
+    ---broader window (+50 retains about 9.8%). Blend across target levels
+    ---160-180, not recipient levels: leveling up cannot revive obsolete farms.
     ---@param recipient_level number
     ---@param target_level number
     ---@return number
@@ -16,6 +20,11 @@ OnInit.global("RewardScaling", function()
         end
 
         local overlevel = recipient_level - target_level
-        return 5. / (4. + OVERLEVEL_GROWTH ^ overlevel)
+        local chaos_weight = math.max(0., math.min(1.,
+            (target_level - TRANSITION_START_LEVEL) /
+                (TRANSITION_END_LEVEL - TRANSITION_START_LEVEL)))
+        local growth = PRECHAOS_OVERLEVEL_GROWTH
+            + (CHAOS_OVERLEVEL_GROWTH - PRECHAOS_OVERLEVEL_GROWTH) * chaos_weight
+        return 5. / (4. + growth ^ overlevel)
     end
 end, Debug and Debug.getLine())
