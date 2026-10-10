@@ -107,6 +107,7 @@ Debug = nil
 assert(load(source, "tutorial", "t", sandbox))()
 assert(#frames == 0 and #deferred == 1, "Tutorial frames were not deferred")
 deferred[1]()
+deferred = {}
 local panel = frames[1]
 assert(panel.anchor == FRAMEPOINT_TOPLEFT and panel.y - panel.height >= 0.20,
     "Tutorial panel coordinates overlap the bottom HUD")
@@ -120,6 +121,8 @@ local function click(label)
     trigger_frame = find_button(label)
     assert(trigger_frame.enabled, label .. " is disabled")
     trigger_frame.click()
+    assert(#deferred == 1, 'Tutorial click did not defer its page transition')
+    table.remove(deferred, 1)()
 end
 local function contains(text)
     for _, frame in ipairs(frames) do
@@ -133,6 +136,13 @@ Tutorial.prompt(1)
 assert(text_clears == 1, "Tutorial prompt did not clear the requesting player's displayed text")
 assert(panel.visible and contains("Start the tutorial?") and not find_button("Back").enabled)
 assert(#opened == 0, "Prompt opened a menu before opting in")
+local start_button = find_button('Start')
+start_button.click(); start_button.click()
+assert(#deferred == 1 and #opened == 0, 'Rapid clicks mutated windows inside the native click event')
+escape(1)
+table.remove(deferred, 1)()
+assert(not panel.visible and #opened == 0, 'A stale deferred click reopened the closed tutorial')
+Tutorial.prompt(1)
 click("Start")
 assert(INVENTORY.isOpen(1) and contains("K|r"), "Tour ignored the rebound inventory key")
 click("Next")
@@ -285,13 +295,57 @@ assert(camera_x == 12, "Stale tutorial page panned the camera")
 flush_camera()
 assert(camera_x == 890 and camera_y == 887.6, "Latest tutorial page did not pan")
 camera_env.RestorePlayerCameraPreview(1)
+-- Scarab-style previews hide the actual frame, never feed a tiny transparent
+-- image to the engine's minimap terrain renderer, and restore prior visibility.
+camera_env.REGION_DATA[MAIN_MAP.rect].hide_minimap = true
+local minimap_visible = true
+camera_env.BlzGetOriginFrame = function() return minimap end
+camera_env.BlzFrameIsVisible = function() return minimap_visible end
+camera_env.BlzFrameSetVisible = function(_, visible) minimap_visible = visible end
+camera_env.PreviewPlayerCamera(2, MAIN_MAP.rect, 0, 0)
+assert(minimap_visible, 'Remote preview hid the local minimap')
+camera_env.PreviewPlayerCamera(1, MAIN_MAP.rect, 0, 0)
+camera_env.PreviewPlayerCamera(1, MAIN_MAP.rect, 0, 0)
+assert(not minimap_visible)
+camera_env.RestorePlayerCameraPreview(1)
+assert(minimap_visible, 'Minimap was not restored after repeated room previews')
+minimap_visible = false
+camera_env.PreviewPlayerCamera(1, MAIN_MAP.rect, 0, 0)
+camera_env.RestorePlayerCameraPreview(1)
+assert(not minimap_visible, 'An already hidden minimap was incorrectly enabled')
+flush_camera()
+local region_mode, ambient = 'naga', nil
+camera_env.Hero = {[1] = {abilities = {A0AN = true}}, [2] = {abilities = {}}}
+camera_env.gg_rct_Naga_Dungeon = 'naga'
+camera_env.DEFAULT_LIGHTING = 'normal-light'
+camera_env.FourCC = function(id) return id end
+camera_env.GetUnitX, camera_env.GetUnitY = function() return 0 end, function() return 0 end
+camera_env.RectContainsCoords = function(rect) return rect ~= nil and rect == region_mode end
+camera_env.UnitRemoveAbility = function(unit, id) unit.abilities[id] = nil end
+camera_env.UnitAddAbility = function(unit, id) unit.abilities[id] = true end
+camera_env.GetUnitAbilityLevel = function(unit, id) return unit.abilities[id] and 1 or 0 end
+camera_env.SetDayNightModels = function(day, night) assert(day == night); ambient = day end
+camera_env.SetPlayerLightingOverride(1, 'blacklight.mdx')
+assert(ambient == 'blacklight.mdx' and not next(camera_env.Hero[1].abilities), 'Dungeon kept an automatic hero light')
+camera_env.SetPlayerLightingOverride(2, 'remote-light')
+assert(ambient == 'blacklight.mdx', 'Remote ambient override changed local rendering')
+camera_env.SetPlayerLightingOverride(1, nil)
+assert(camera_env.Hero[1].abilities.A0AN, 'Returning to Naga failed to restore its regional light')
+region_mode = 'outside'
+camera_env.SetPlayerLightingOverride(1, nil)
+assert(ambient == 'normal-light' and not next(camera_env.Hero[1].abilities))
+camera_env.Hero[1] = nil
+camera_env.SetPlayerLightingOverride(1, 'blacklight.mdx')
+camera_env.SetPlayerLightingOverride(1, nil)
+assert(ambient == 'normal-light', 'Missing hero left ambient lighting stuck black')
 print("PASS (mocked native calls only): camera preview overrides tavern bounds and restores the original local view.")
 
 -- Run the actual preview functions to check icon state independently of clicks.
 local preview_env = setmetatable({}, {__index = sandbox})
 local preview_frame = {}
 preview_env.frame, preview_env.title = preview_frame, {}
-preview_env.manage_perks, preview_env.milestone_controls = {}, {}
+preview_env.manage_perks, preview_env.milestone_controls, preview_env.perk_controls = {}, {}, {}
+preview_env.stat_controls = {}
 preview_env.breakdown_frames = {}
 preview_env.MAX_ROWS = 32
 preview_env.clear_all_rows = function() end

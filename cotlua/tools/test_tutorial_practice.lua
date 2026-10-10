@@ -15,7 +15,12 @@ BlzFrameSetVisible = function(frame, visible) frame.visible = visible end
 BlzFrameSetText = function(frame, text) frame.text = text end
 BlzFrameSetEnable = function(frame, enabled) frame.enabled = enabled end
 BlzFrameSetPoint, BlzFrameSetSize = function() end, function() end
-BlzCreateFrame = function() return {} end
+BlzCreateFrame = function(_, parent) return {parent = parent} end
+BlzCreateFrameByType = function(_, _, parent) return {parent = parent} end
+DestroyTrigger, CreateTrigger = function() end, function() return {} end
+Condition = function(callback) return callback end
+TriggerAddCondition = function(trigger, callback) trigger.callback = callback end
+BlzTriggerRegisterFrameEvent = function(trigger, frame) frame.click = trigger end
 local named, context = {}, 0
 NextFrameCreateContext = function() context = context + 1; return context end
 BlzGetFrameByName = function(name, id)
@@ -45,7 +50,10 @@ thistype = INVENTORY
 for i = 1, MAX_INVENTORY_SLOTS do
     slots[i] = {
         frame = {},
-        tooltip = {icon = function() end, name = function() end, text = function() end, visible = function() end},
+        tooltip = {frame = {}, icon = function() end, name = function() end, text = function() end,
+            visible = function(self, value)
+                if value then assert(not self.frame.visible, 'Closing a menu forced an item tooltip open') end
+            end},
         icon = function(self, icon) self.texture = icon end,
         charge = function(self, charges) self.charges = charges end,
         visible = function(self, visible) self.visible_now = visible end,
@@ -65,7 +73,7 @@ StashUI = {
 context_menu_backdrop, transparent_placeholder, cost_frame = {}, {}, {}
 context_buttons, frame_to_btn = {}, {}
 frame_clear_all_points = function() end
-BlzFrameSetTooltip = function(frame, tip) frame.tooltip = tip end
+BlzFrameSetTooltip = function() error('Practice must never rebind a real item tooltip') end
 for i = 1, 7 do
     local button = {frame = {}, visible = function(self, value) self.frame.visible = value end,
         text = function(self, value) self.frame.text = value end}
@@ -96,17 +104,27 @@ end
 EVENT_ON_M1_DOWN, EVENT_ON_M1_UP = mouse_event(), mouse_event()
 EVENT_ON_M2_DOWN, EVENT_ON_M2_UP = mouse_event(), mouse_event()
 local source = read('cotlua/src/ui/inventory/inventory.lua')
+CONTEXT_IDS = {'Equip', 'Unequip', 'Drop', 'Sell', 'Details', 'Stash', 'Use'}
+CONTEXT_BUTTON_WIDTH, CONTEXT_BUTTON_HEIGHT = 0.10, 0.022
+local made_buttons, create_button = {}, SimpleButton.create
+SimpleButton.create = function(...)
+    local button = create_button(...)
+    made_buttons[#made_buttons + 1] = button
+    return button
+end
 local first = assert(source:find('        local practice, practice_visible', 1, true))
 local last = assert(source:find('        local function send_context', first, true))
 assert(load(source:sub(first, last - 1), 'practice inventory', 't', env))()
 INVENTORY.prepareTutorialPractice()
+local real_buttons, real_menu = context_buttons, context_menu_backdrop
+context_buttons = made_buttons
+context_menu_backdrop = made_buttons[1].frame.parent
+assert(#made_buttons == 7 and context_menu_backdrop ~= real_menu)
+for i, button in ipairs(made_buttons) do assert(button.frame ~= real_buttons[i].frame) end
 assert(destroyed == 2, 'Temporary presentation items were retained')
 INVENTORY.previewTutorial(1, true)
 assert(slots[1].visible_now and slots[9].visible_now)
 assert(slots[1].texture:find('BTNSteelMelee.blp', 1, true))
-local click_first = assert(source:find('        local on_context_push = function()', 1, true))
-local click_last = assert(source:find('        for i = 1, #context_buttons do', click_first, true))
-local click_menu = assert(load(source:sub(click_first, click_last - 1) .. '\nreturn on_context_push', 'practice menu routing', 't', env))()
 local function right_click(slot, stash_slot)
     hovered, stash_hovered = slot or -1, stash_slot or -1
     EVENT_ON_M2_DOWN.callback(); EVENT_ON_M2_UP.callback()
@@ -114,11 +132,20 @@ local function right_click(slot, stash_slot)
 end
 local function choose(action)
     clicked_frame = context_buttons[action].frame
-    click_menu()
+    clicked_frame.click.callback()
     assert(not context_menu_backdrop.visible)
 end
 right_click(1)
 assert(context_buttons[2].frame.visible and context_buttons[3].frame.visible and context_buttons[4].frame.visible)
+INVENTORY.previewTutorial(1, false)
+assert(not context_menu_backdrop.visible and not EVENT_ON_M2_UP.callback)
+for _, button in ipairs(context_buttons) do assert(not button.frame.visible) end
+context_buttons[4].click.callback() -- stale native event after Next
+assert(not context_menu_backdrop.visible)
+INVENTORY.previewTutorial(1, true)
+assert(not context_menu_backdrop.visible, 'Next page retained the old context menu')
+assert(not real_menu.visible, 'Practice mutated the real inventory context menu')
+right_click(1)
 choose(3)
 assert(slots[1].visible_now, 'Context Drop removed a practice item')
 right_click(1); choose(4)
@@ -133,7 +160,7 @@ stash_open = true
 right_click(1); choose(6)
 assert(stash_items[27] and not slots[1].visible_now)
 right_click(nil, 1)
-assert(context_buttons[1].frame.text == 'Take')
+assert(context_buttons[1].text_frame.text == 'Take')
 choose(3)
 assert(stash_items[27], 'Stash context Drop removed a practice item')
 right_click(nil, 1); choose(4)

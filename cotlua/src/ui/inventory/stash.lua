@@ -463,7 +463,10 @@ OnInit.final("StashUI", function(Require)
     function StashUI.getTutorialSlotFrame(slot) return slots[slot].frame end
     function StashUI.setTutorialTooltipsVisible(pid, visible)
         if GetLocalPlayer() ~= Player(pid - 1) then return end
-        for _, button in ipairs(slots) do button.tooltip:visible(visible) end
+        for _, button in ipairs(slots) do
+            if visible then BlzFrameSetVisible(button.tooltip.frame, false) end
+            button.tooltip:visible(visible)
+        end
     end
     function StashUI.renderTutorialPractice(pid, items, drag)
         if GetLocalPlayer() ~= Player(pid - 1) or not tutorial_preview[pid] then return end

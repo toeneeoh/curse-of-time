@@ -366,7 +366,17 @@ OnInit.final("Tutorial", function(Require)
                     BlzFrameSetEnable(frame, false)
                     BlzFrameSetEnable(frame, true)
                 end
-                action(pid)
+                local state = states[pid]
+                if not state or state.pending then return end
+                state.pending = true
+                -- Let the native click finish before hiding/reanchoring any
+                -- windows, hovered tooltips, or open practice context menus.
+                -- This timer is scheduled synchronously on every client.
+                TimerQueue:callDelayed(0., function()
+                    if states[pid] ~= state then return end
+                    state.pending = nil
+                    action(pid)
+                end)
             end)
             return frame
         end

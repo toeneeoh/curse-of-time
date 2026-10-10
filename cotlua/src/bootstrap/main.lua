@@ -10,8 +10,8 @@
 DisplayTimedTextToForce(FORCE_PLAYING, 30.00, "Welcome to Curse of Time RPG: |c009966ffNevermore|r\n\n")
 DisplayTimedTextToForce(FORCE_PLAYING, 120.00, "Official |cff0080c0Discord|r for updates, bug reports, and non-hacked downloads:\n|c009ebef5https://discord.gg/peSTvTd|r\n\n")
 DisplayTimedTextToForce(FORCE_PLAYING, 600.0, "Type |cffffcc00-new|r if you are completely new.")
-DisplayTimedTextToForce(FORCE_PLAYING, 600.0, "Type |c006969ff-new profile|r to start a new profile\nor |c00ff7f00-load|r if you want to load your hero or start a new one.")
-DisplayTimedTextToForce(FORCE_PLAYING, 30.00, "Please read the Quests Menu for updates.")
+DisplayTimedTextToForce(FORCE_PLAYING, 600.0, "Type |c006969ff-new profile|r to start a new profile\nor |c00ff7f00-load|r if you want to load an existing profile and characters.")
+DisplayTimedTextToForce(FORCE_PLAYING, 30.00, "Please read the Quests Menu (F9) for updates.")
 
 -- hide load lag
 SetCineFilterTexture("ReplaceableTextures\\CameraMasks\\Black_mask.blp")

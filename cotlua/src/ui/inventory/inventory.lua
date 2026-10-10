@@ -636,15 +636,55 @@ OnInit.final("Inventory", function(Require)
         -- Moving samples is UI-only, with no profile mutations or item orders.
         local practice, practice_visible = {}, {}
         local practice_templates
+        local practice_menu_frame, practice_buttons
         local function close_practice_menu(pid)
             if GetLocalPlayer() ~= Player(pid - 1) then return end
             if practice[pid] then practice[pid].menu = nil end
-            frame_set_visible(context_menu_backdrop, false)
-            for _, button in ipairs(slots) do button.tooltip:visible(true) end
+            if practice_menu_frame then
+                frame_set_visible(practice_menu_frame, false)
+                frame_clear_all_points(practice_menu_frame)
+                for _, button in ipairs(practice_buttons) do
+                    button:visible(false)
+                    frame_clear_all_points(button.frame)
+                end
+            end
+            for _, button in ipairs(slots) do
+                -- Restore tooltip contents without forcing the hovered tooltip
+                -- root visible while its inventory window is being torn down.
+                BlzFrameSetVisible(button.tooltip.frame, false)
+                button.tooltip:visible(true)
+            end
             if StashUI then StashUI.setTutorialTooltipsVisible(pid, true) end
         end
         function INVENTORY.prepareTutorialPractice()
             if practice_templates then return end
+            -- Separate, tooltip-free buttons: never rebind a live Sell tooltip
+            -- or alter the real context menu during a tutorial page transition.
+            -- Construct once on every client, alongside the deferred tutorial UI.
+            practice_menu_frame = BlzCreateFrameByType("FRAME", "", frame, "", 0)
+            BlzFrameSetSize(practice_menu_frame, 0.001, 0.001)
+            BlzFrameSetEnable(practice_menu_frame, false)
+            frame_set_visible(practice_menu_frame, false)
+            practice_buttons = {}
+            for i, name in ipairs(CONTEXT_IDS) do
+                local button = SimpleButton.create(practice_menu_frame, "inventorymenubuttons.dds",
+                    CONTEXT_BUTTON_WIDTH, CONTEXT_BUTTON_HEIGHT, FRAMEPOINT_TOPLEFT, FRAMEPOINT_TOPLEFT, 0, 0)
+                button:text(name)
+                button:visible(false)
+                local action = i
+                button:onClick(function()
+                    local pid = GetPlayerId(GetTriggerPlayer()) + 1
+                    if GetLocalPlayer() == Player(pid - 1) then
+                        BlzFrameSetEnable(button.frame, false)
+                        BlzFrameSetEnable(button.frame, true)
+                    end
+                    -- A late click after Next/Skip must never fall through to
+                    -- real inventory handlers or read a nonexistent profile.
+                    if practice_visible[pid] then practice_context_action(pid, action) end
+                    return false
+                end)
+                practice_buttons[i] = button
+            end
             practice_templates = {}
             for _, spec in ipairs({{id = 'I01I', slot = 1}, {id = 'I02F', slot = 9, flask = true}}) do
                 local item = ItemRuntime.create(FourCC(spec.id))
@@ -747,24 +787,26 @@ OnInit.final("Inventory", function(Require)
             local anchor = in_stash and StashUI.getTutorialSlotFrame(slot - MAX_INVENTORY_SLOTS) or slots[slot].frame
             local actions = in_stash and {1, 3, 4, 5} or slot <= 8 and {2, 3, 4, 5} or {1, 3, 4, 5}
             if not in_stash and StashUI and StashUI.isTutorialPreviewOpen(pid) then actions[#actions + 1] = 6 end
-            context_buttons[1]:text(in_stash and "Take" or "Equip")
-            for _, button in ipairs(context_buttons) do button:visible(false) end
-            for i, action in ipairs(actions) do
-                local button = context_buttons[action]
+            practice_buttons[1]:text(in_stash and "Take" or "Equip")
+            -- Clear every old dependency before making a new button chain.
+            for _, button in ipairs(practice_buttons) do
+                button:visible(false)
                 frame_clear_all_points(button.frame)
+            end
+            for i, action in ipairs(actions) do
+                local button = practice_buttons[action]
                 if i == 1 then
-                    BlzFrameSetPoint(button.frame, FRAMEPOINT_TOPLEFT, context_menu_backdrop, FRAMEPOINT_TOPLEFT, 0., 0.)
+                    BlzFrameSetPoint(button.frame, FRAMEPOINT_TOPLEFT, practice_menu_frame, FRAMEPOINT_TOPLEFT, 0., 0.)
                 else
-                    BlzFrameSetPoint(button.frame, FRAMEPOINT_TOPLEFT, context_buttons[actions[i - 1]].frame, FRAMEPOINT_BOTTOMLEFT, 0., 0.)
+                    BlzFrameSetPoint(button.frame, FRAMEPOINT_TOPLEFT, practice_buttons[actions[i - 1]].frame, FRAMEPOINT_BOTTOMLEFT, 0., 0.)
                 end
                 button:visible(true)
             end
             for _, button in ipairs(slots) do button.tooltip:visible(false) end
             if StashUI then StashUI.setTutorialTooltipsVisible(pid, false) end
-            BlzFrameSetTooltip(context_buttons[4].frame, transparent_placeholder)
-            frame_clear_all_points(context_menu_backdrop)
-            BlzFrameSetPoint(context_menu_backdrop, FRAMEPOINT_TOPLEFT, anchor, FRAMEPOINT_TOPRIGHT, 0.005, 0.)
-            frame_set_visible(context_menu_backdrop, true)
+            frame_clear_all_points(practice_menu_frame)
+            BlzFrameSetPoint(practice_menu_frame, FRAMEPOINT_TOPLEFT, anchor, FRAMEPOINT_TOPRIGHT, 0.005, 0.)
+            frame_set_visible(practice_menu_frame, true)
         end
         local function practice_down()
             local pid = GetPlayerId(GetTriggerPlayer()) + 1
@@ -842,10 +884,11 @@ OnInit.final("Inventory", function(Require)
                     ItemDetails.hide(pid)
                     practice[pid].details = nil
                 end
-                context_buttons[1]:text("Equip")
-                BlzFrameSetTooltip(context_buttons[4].frame, cost_frame)
                 hide_tracker(pid)
-                if practice[pid] then practice[pid].drag = nil end
+                if practice[pid] then
+                    practice[pid].drag = nil
+                    practice[pid].right_down = nil
+                end
                 BlzFrameSetText(title, "Inventory")
             end
             frame_set_visible(frame, visible)
