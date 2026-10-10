@@ -6,6 +6,9 @@ local function load(chunk, name, mode) return native_load(chunk, name, mode or "
 
 SONG_FATIGUE, SONG_HARMONY, SONG_WAR, SONG_PEACE = 1, 2, 3, 4
 BARD_SONG, BOOST, LBOOST = {[1] = SONG_FATIGUE}, {[1] = 1}, {[1] = 1}
+-- This legacy fixture grants equal area/duration bonuses; independent scaling
+-- is covered separately by test_spell_scaling.lua.
+ABOOST, DBOOST = LBOOST, LBOOST
 IMPROV = {id = 10}
 local improv
 TimerList = {[1] = {get = function() return improv end}}

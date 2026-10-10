@@ -35,7 +35,7 @@ OnInit.final("BuffsHeroesElementalist", function(Require)
         local thistype = FireElementBuff
         thistype.NAME            = "Fire"
         thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNFireSwirl.blp"
-        thistype.DESC            = "This unit has +^$spellboost% spellboost"
+        thistype.DESC            = "This unit has +^$spellboost% Spell Power"
         thistype.AURA            = true
         thistype.DISPEL_TYPE     = BUFF_POSITIVE
         thistype.STACK_TYPE      = BUFF_STACK_NONE
@@ -108,8 +108,8 @@ OnInit.final("BuffsHeroesElementalist", function(Require)
 
                 local target = FirstOfGroup(ug)
                 if target then
-                    local dummy = Dummy.create(x, y, FourCC('A09W'), 1, 1.)
-                    dummy:attack(target, self.target, on_hit)
+                    LightningAttackVisual('A09W', self.target, target)
+                    on_hit(self.target, target)
                 end
 
                 DestroyGroup(ug)

@@ -1,6 +1,7 @@
 OnInit.final("TeleportAbilities", function(Require)
     Require('MainMap')
     Require("Spells")
+    Require('Perks')
 
     local TQ = TimerQueue
     local FPS_32 = FPS_32
@@ -90,7 +91,7 @@ OnInit.final("TeleportAbilities", function(Require)
         end
 
         ---@param pid integer
-        ---@param dur integer
+        ---@param dur number
         local function teleport(pid, caster, dur)
             local pt = TimerList[pid]:add()
 
@@ -110,13 +111,10 @@ OnInit.final("TeleportAbilities", function(Require)
         end
 
         function thistype:onCast()
-            if self.ablev > 1 then
-                teleport(self.pid, self.caster, 11 - self.ablev)
-            else
-                teleport(self.pid, self.caster, 12)
-            end
+            local duration = self.ablev > 1 and 11 - self.ablev or 12
+            local reduction = math.min(.50, Perks.getBonuses(self.pid).home_channel or 0.)
+            teleport(self.pid, self.caster, math.max(1., duration * (1. - reduction)))
         end
     end
 end, Debug and Debug.getLine())
-
 

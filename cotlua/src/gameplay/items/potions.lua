@@ -6,6 +6,7 @@ OnInit.final("PotionService", function(Require)
     Require('ItemEventRegistry')
     Require('Items')
     Require('Profile')
+    Require('Perks')
     Require('ResourceChanges')
     Require('RuntimeItemDefinitions')
     Require('Shield')
@@ -1802,13 +1803,16 @@ OnInit.final("PotionService", function(Require)
     ---carrier definition.
     ---@param item Item
     ---@return integer
-    function PotionService.getRefillCost(item)
+    function PotionService.getRefillCost(item, pid)
         local properties = PotionService.getProperties(item)
         if not properties then return 0 end
 
-        return math.floor(properties.level_requirement ^ 2 +
+        local owner = pid or item.pid
+        local bonuses = owner and Perks.getBonuses(owner) or {}
+        return math.floor((properties.level_requirement ^ 2 +
                               properties.flat_health * 0.5 +
-                              properties.flat_mana * 0.5)
+                              properties.flat_mana * 0.5) *
+                              (1. - math.min(.50, bonuses.potion_refill_discount or 0.)))
     end
 
     ---Refills one potion to its rolled maximum.
@@ -2351,6 +2355,10 @@ OnInit.final("PotionService", function(Require)
             replaces_restoration and 0. or stats[ITEM_FLAT_MANA] + 0.01 *
                 stats[ITEM_PERCENT_MANA] * Unit[hero].mana
 
+        local perk_bonuses = Perks.getBonuses(pid)
+        local restoration_bonus = 1. + (perk_bonuses.potion_restoration or 0.)
+        heal, mana = heal * restoration_bonus, mana * restoration_bonus
+
         local preserve_charge = catalyst and catalyst.preserve_charge_chance and
                                     GetRandomReal(0., 1.) <
                                         catalyst.preserve_charge_chance
@@ -2374,8 +2382,8 @@ OnInit.final("PotionService", function(Require)
             unit = Unit[hero],
             potency_multiplier = PotionService.getInfusionMultiplier(item) *
                 (catalyst and catalyst.potency_multiplier or 1.),
-            duration_multiplier = catalyst and
-                catalyst.duration_multiplier or 1.,
+            duration_multiplier = (catalyst and catalyst.duration_multiplier or 1.) *
+                (1. + (perk_bonuses.potion_duration or 0.)),
             heal = heal,
             mana = mana,
             overheal = math.max(0., attempted_healing - effective_healing),

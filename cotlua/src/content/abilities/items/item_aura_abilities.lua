@@ -12,7 +12,7 @@ OnInit.final("ItemAuraAbilities", function(Require)
         local function periodic(itm, holder)
             if itm and itm.holder then
                 local ug = CreateGroup()
-                MakeGroupInRange(itm.pid, ug, GetUnitX(holder), GetUnitY(holder), 900. * LBOOST[itm.pid], Condition(FilterAlly))
+                MakeGroupInRange(itm.pid, ug, GetUnitX(holder), GetUnitY(holder), 900. * ABOOST[itm.pid], Condition(FilterAlly))
 
                 for ally in each(ug) do
                     EmpyreanSongBuff:add(holder, ally):duration(2.)
@@ -37,7 +37,7 @@ OnInit.final("ItemAuraAbilities", function(Require)
         local function periodic(itm, holder)
             if itm and itm.holder then
                 local ug = CreateGroup()
-                MakeGroupInRange(itm.pid, ug, GetUnitX(holder), GetUnitY(holder), 900. * LBOOST[itm.pid], Condition(FilterAlly))
+                MakeGroupInRange(itm.pid, ug, GetUnitX(holder), GetUnitY(holder), 900. * ABOOST[itm.pid], Condition(FilterAlly))
 
                 for ally in each(ug) do
                     BloodHornBuff:add(holder, ally):duration(2.)

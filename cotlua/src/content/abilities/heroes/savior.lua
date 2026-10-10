@@ -45,7 +45,7 @@ OnInit.final("SaviorSpells", function(Require)
             BlzSetSpecialEffectColor(sfx, 255, 255, 200)
             BlzSetSpecialEffectTimeScale(sfx, 0.9)
 
-            TQ:callDelayed(self.dur * LBOOST[self.pid], on_expire, buff, sfx)
+            TQ:callDelayed(self.dur * DBOOST[self.pid], on_expire, buff, sfx)
         end
     end
 
@@ -189,7 +189,7 @@ OnInit.final("SaviorSpells", function(Require)
                 StunUnit(pid, target, thistype.stundur)
 
                 --aoe heal
-                MakeGroupInRange(pid, ug, GetUnitX(Hero[pid]), GetUnitY(Hero[pid]), thistype.aoe * LBOOST[pid], Condition(FilterAlly))
+                MakeGroupInRange(pid, ug, GetUnitX(Hero[pid]), GetUnitY(Hero[pid]), thistype.aoe * ABOOST[pid], Condition(FilterAlly))
 
                 for u in each(ug) do
                     DestroyEffect(AddSpecialEffectTarget("Abilities\\Spells\\Human\\HolyBolt\\HolyBoltSpecialArt.mdl", u, "origin")) --change effect
@@ -247,7 +247,7 @@ OnInit.final("SaviorSpells", function(Require)
             local buff = LightSealBuff:get(self.caster, self.caster)
             local ug = CreateGroup()
 
-            MakeGroupInRange(self.pid, ug, self.x, self.y, self.aoe * LBOOST[self.pid], Condition(FilterEnemy))
+            MakeGroupInRange(self.pid, ug, self.x, self.y, self.aoe * ABOOST[self.pid], Condition(FilterEnemy))
 
             if buff and buff.active then
                 GroupEnumUnitsInRangeEx(self.pid, ug, buff.x, buff.y, 450., Condition(FilterEnemy))
@@ -293,7 +293,7 @@ OnInit.final("SaviorSpells", function(Require)
             b.dmg = 0.2 + 0.2 * self.ablev
             b.armor = 0.2 + 0.2 * self.ablev
             b = b:check(self.caster, self.caster)
-            b:duration(self.dur * LBOOST[self.pid])
+            b:duration(self.dur * DBOOST[self.pid])
 
             HP(self.caster, self.caster, self.heal * LBOOST[self.pid], thistype.tag)
 
@@ -304,7 +304,7 @@ OnInit.final("SaviorSpells", function(Require)
                 DestroyEffect(AddSpecialEffect("Abilities\\Spells\\Human\\Resurrect\\ResurrectCaster.mdl", self.x + 500 * math.cos(angle), self.y + 500 * math.sin(angle)))
             end
 
-            MakeGroupInRange(self.pid, ug, self.x, self.y, 500 * LBOOST[self.pid], Condition(FilterEnemy))
+            MakeGroupInRange(self.pid, ug, self.x, self.y, 500 * ABOOST[self.pid], Condition(FilterEnemy))
 
             local buff = LightSealBuff:get(self.caster, self.caster)
 

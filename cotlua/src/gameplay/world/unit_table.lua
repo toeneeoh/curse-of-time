@@ -85,6 +85,8 @@
     ---@field bonus_bat number
     ---@field cd_flat number
     ---@field spellboost number
+    ---@field spell_area number
+    ---@field spell_duration number
     ---@field ghost effect
     ---@field proxy table
     ---@field hidehp boolean
@@ -499,6 +501,8 @@
             ms_percent = 1.,
             bonus_bat = 1.,
             spellboost = 0.,
+            spell_area = 0.,
+            spell_duration = 0.,
             armor_pen_percent = 0.,
             bonus_armor = 0.,
             armor_percent = 1.,

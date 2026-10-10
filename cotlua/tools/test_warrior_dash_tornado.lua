@@ -36,6 +36,9 @@ Spell = {define = function(id)
 end}
 local hero = {x = 0, y = 0, alive = true}
 Hero, Unit, BOOST, LBOOST = {[1] = hero}, {[hero] = {damage = 100}}, {[1] = 1}, {[1] = 1}
+-- This legacy fixture grants equal area/duration bonuses; independent scaling
+-- is covered separately by test_spell_scaling.lua.
+ABOOST, DBOOST = LBOOST, LBOOST
 LIMITBREAK = {id = "limit", flag = {[1] = 2}}
 ADAPTIVESTRIKE = {id = "adaptive"}
 GetUnitX, GetUnitY = function(u) return u.x end, function(u) return u.y end

@@ -36,8 +36,8 @@ OnInit.final("SummonAbilities", function(Require)
             local armor = ARMOR_PERCENT_BY_LEVEL[self.ablev]
             if not ms or not armor then return end
 
-            local radius = self.aoe * LBOOST[self.pid]
-            local duration = self.dur * LBOOST[self.pid]
+            local radius = self.aoe * ABOOST[self.pid]
+            local duration = self.dur * DBOOST[self.pid]
             local group = CreateGroup()
             MakeGroupInRange(self.pid, group, GetUnitX(self.caster), GetUnitY(self.caster),
                 radius, Condition(FilterAlly))
@@ -171,7 +171,7 @@ OnInit.final("SummonAbilities", function(Require)
 
             local x, y = GetUnitX(caster), GetUnitY(caster)
             ALICE_ForAllObjectsInRangeDo(pull_force, x, y,
-                PULL_RADIUS * LBOOST[pid], "nonhero", valid_pull_target, caster, x, y)
+                PULL_RADIUS * ABOOST[pid], "nonhero", valid_pull_target, caster, x, y)
 
             TQ:callDelayed(FPS_32, pull, caster, pid, remaining - FPS_32)
         end

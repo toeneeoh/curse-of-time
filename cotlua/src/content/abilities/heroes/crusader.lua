@@ -16,7 +16,7 @@ OnInit.final("CrusaderSpells", function(Require)
         }
 
         function thistype:onCast()
-            SoulLinkBuff:add(self.caster, self.target):duration(self.dur * LBOOST[self.pid])
+            SoulLinkBuff:add(self.caster, self.target):duration(self.dur * DBOOST[self.pid])
         end
 
         function thistype.onHit(target, source, amount, damage_type)
@@ -43,7 +43,7 @@ OnInit.final("CrusaderSpells", function(Require)
         }
 
         function thistype:onCast()
-            LawOfResonanceBuff:add(self.caster, self.target):duration(self.dur * LBOOST[self.pid])
+            LawOfResonanceBuff:add(self.caster, self.target):duration(self.dur * DBOOST[self.pid])
         end
     end
 
@@ -61,7 +61,7 @@ OnInit.final("CrusaderSpells", function(Require)
         }
 
         function thistype:onCast()
-            LawOfValorBuff:add(self.caster, self.target):duration(self.dur * LBOOST[self.pid])
+            LawOfValorBuff:add(self.caster, self.target):duration(self.dur * DBOOST[self.pid])
         end
     end
 
@@ -80,7 +80,7 @@ OnInit.final("CrusaderSpells", function(Require)
         }
 
         function thistype:onCast()
-            LawOfMightBuff:add(self.caster, self.target):duration(self.dur * LBOOST[self.pid])
+            LawOfMightBuff:add(self.caster, self.target):duration(self.dur * DBOOST[self.pid])
         end
     end
 
@@ -109,7 +109,7 @@ OnInit.final("CrusaderSpells", function(Require)
         local function periodic(pt)
             local source = pt.source
             local x, y = GetUnitX(source), GetUnitY(source)
-            ALICE_ForAllObjectsInRangeDo(buff, x, y, 900. * LBOOST[pt.pid], "unit", valid_ally, source, pt.ablev)
+            ALICE_ForAllObjectsInRangeDo(buff, x, y, 900. * ABOOST[pt.pid], "unit", valid_ally, source, pt.ablev)
 
             return true
         end
@@ -121,7 +121,7 @@ OnInit.final("CrusaderSpells", function(Require)
             DestroyEffect(AddSpecialEffect("war3mapImported\\BlessedField.mdx", self.x, self.y))
 
             for target in each(ug) do
-                Shield.add(target, BlzGetUnitMaxHP(target) * self.pshield * 0.01 * LBOOST[self.pid], self.dur * LBOOST[self.pid])
+                Shield.add(target, BlzGetUnitMaxHP(target) * self.pshield * 0.01 * LBOOST[self.pid], self.dur * DBOOST[self.pid])
             end
 
             DestroyGroup(ug)
@@ -156,7 +156,7 @@ OnInit.final("CrusaderSpells", function(Require)
         local function periodic(pt)
             pt.dur = pt.dur - 2.
 
-            MakeGroupInRange(pt.pid, pt.ug, GetUnitX(pt.source), GetUnitY(pt.source), thistype.aoe * LBOOST[pt.pid], Condition(FilterAlive))
+            MakeGroupInRange(pt.pid, pt.ug, GetUnitX(pt.source), GetUnitY(pt.source), thistype.aoe * ABOOST[pt.pid], Condition(FilterAlive))
 
             if pt.dur - 1 > 0 then
                 for target in each(pt.ug) do
@@ -178,7 +178,7 @@ OnInit.final("CrusaderSpells", function(Require)
         function thistype:onCast()
             local pt = TimerList[self.pid]:add()
 
-            pt.dur = self.dur * LBOOST[self.pid]
+            pt.dur = self.dur * DBOOST[self.pid]
             pt.source = self.caster
             pt.ug = CreateGroup()
             pt.sfx = AddSpecialEffectTarget("war3mapImported\\HolyAurora.MDX", self.caster, "origin")

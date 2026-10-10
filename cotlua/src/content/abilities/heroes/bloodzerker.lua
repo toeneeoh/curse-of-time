@@ -54,7 +54,7 @@ OnInit.final("BloodzerkerSpells", function(Require)
                     end
 
                     DestroyEffect(AddSpecialEffect("Abilities\\Spells\\Human\\Thunderclap\\ThunderClapCaster.mdl", pt.x, pt.y))
-                    MakeGroupInRange(pt.pid, ug, pt.x, pt.y, thistype.aoe * LBOOST[pt.pid], Condition(FilterEnemy))
+                    MakeGroupInRange(pt.pid, ug, pt.x, pt.y, thistype.aoe * ABOOST[pt.pid], Condition(FilterEnemy))
 
                     for target in each(ug) do
                         DestroyEffect(AddSpecialEffectTarget("Abilities\\Spells\\Orc\\Devour\\DevourEffectArt.mdl", target, "chest"))
@@ -122,10 +122,10 @@ OnInit.final("BloodzerkerSpells", function(Require)
             local ug = CreateGroup()
 
             DamageTarget(self.caster, self.caster, 0.1 * BlzGetUnitMaxHP(self.caster), ATTACK_TYPE_NORMAL, PURE, thistype.tag)
-            MakeGroupInRange(self.pid, ug, self.x, self.y, thistype.aoe * LBOOST[self.pid], Condition(FilterEnemy))
+            MakeGroupInRange(self.pid, ug, self.x, self.y, thistype.aoe * ABOOST[self.pid], Condition(FilterEnemy))
 
             for target in each(ug) do
-                BloodCurdlingScreamDebuff:add(self.caster, target):duration(self.dur * LBOOST[self.pid])
+                BloodCurdlingScreamDebuff:add(self.caster, target):duration(self.dur * DBOOST[self.pid])
             end
 
             DestroyGroup(ug)
@@ -169,7 +169,7 @@ OnInit.final("BloodzerkerSpells", function(Require)
                 local heal = 0
                 local damage = BLOODCLEAVE.dmg(pid) * BOOST[pid]
                 local ug = CreateGroup()
-                MakeGroupInRange(pid, ug, GetUnitX(source), GetUnitY(source), BLOODCLEAVE.aoe(pid) * LBOOST[pid], Condition(FilterEnemy))
+                MakeGroupInRange(pid, ug, GetUnitX(source), GetUnitY(source), BLOODCLEAVE.aoe(pid) * ABOOST[pid], Condition(FilterEnemy))
                 DestroyEffect(AddSpecialEffectTarget("war3mapImported\\Reapers Claws Red.mdx", source, "chest"))
 
                 for u in each(ug) do
@@ -285,7 +285,7 @@ OnInit.final("BloodzerkerSpells", function(Require)
         end
 
         function thistype:onCast()
-            UndyingRageBuff:add(self.caster, self.caster):duration(self.dur * LBOOST[self.pid])
+            UndyingRageBuff:add(self.caster, self.caster):duration(self.dur * DBOOST[self.pid])
         end
 
         function thistype.onLearn(source, ablev, pid)

@@ -78,6 +78,9 @@ AddLightningEx = function(id, _, x1, y1, z1, x2, y2, z2)
     return beam
 end
 DestroyLightning = function(beam) beam.destroyed = true end
+TimerQueue = TQ
+OnInit = {final = function(_, callback) callback(function() end) end}
+assert(load(read('cotlua/src/gameplay/abilities/tools.lua')))()
 local enemy = {}
 MakeGroupInRange = function(_, group, _, _, radius) group[1] = radius == 800 and enemy or nil end
 Condition = function(callback) return callback end
@@ -113,6 +116,7 @@ local timer = {pid = 1, time = 0, dur = 4, ug = {}, angle = 0,
 assert(periodic(timer) and #beams == 0)
 timer.time = 4 - FPS_32
 assert(not periodic(timer) and #beams == 1 and hits == 1)
+assert(queued[1].delay == 1.5, 'Railgun beam should last 1.5 seconds')
 for _, entry in ipairs(queued) do entry.callback(entry.handle) end
 assert(beams[1].destroyed)
 print("PASS: Railgun charging, custom beam endpoints/height, beam expiry, and unchanged single AoE hit.")

@@ -50,7 +50,7 @@ OnInit.final("BuffsHeroesDarkSavior", function(Require)
         local thistype = DarkSealBuff
         thistype.NAME            = "Dark Seal"
         thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNCircleOfPower.BLP"
-        thistype.DESC            = "This unit has +$charges% spellboost and base attack speed"
+        thistype.DESC            = "This unit has +$charges% Spell Power and base attack speed"
         thistype.DISPEL_TYPE     = BUFF_POSITIVE
         thistype.STACK_TYPE      = BUFF_STACK_NONE
 
@@ -63,7 +63,7 @@ OnInit.final("BuffsHeroesDarkSavior", function(Require)
             self.charges = 0
 
             -- count units in seal
-            ALICE_ForAllObjectsInRangeDo(count, self.x, self.y, 450. * LBOOST[self.pid], "unit", valid_damage_target, self.target, self)
+            ALICE_ForAllObjectsInRangeDo(count, self.x, self.y, 450. * ABOOST[self.pid], "unit", valid_damage_target, self.target, self)
 
             self.charges = math.min(5 + (GetHeroLevel(self.source) // 100) * 10, self.charges)
 
@@ -142,7 +142,7 @@ OnInit.final("BuffsHeroesDarkSavior", function(Require)
 
             UnitDisableAbility(self.target, DB.id, true)
             BlzUnitHideAbility(self.target, DB.id, false)
-            DarkBladeBuff:add(self.target, self.target):duration(DARKASCENSION.dur(self.pid) * LBOOST[self.pid])
+            DarkBladeBuff:add(self.target, self.target):duration(DARKASCENSION.dur(self.pid) * DBOOST[self.pid])
         end
     end
 

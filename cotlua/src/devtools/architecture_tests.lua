@@ -153,8 +153,9 @@ OnInit.final("ArchitectureTests", function(Require)
             return false, "rawcode exports changed"
         end
         if ITEM_LEVEL ~= 1 or PLAYER_TIME ~= 44 or STATUS_RESISTANCE ~= 45 or
-            TOTAL_STATS ~= 45 or COOLDOWN_ACCELERATION ~= 46 or
-            DROP_RATE ~= 47 or BOSS_DROP_RATE ~= 48 then
+            ITEM_SPELL_POWER ~= ITEM_SPELLBOOST or ITEM_SPELL_AREA ~= 46 or
+            ITEM_SPELL_DURATION ~= 47 or TOTAL_STATS ~= 47 or
+            COOLDOWN_ACCELERATION ~= 48 or DROP_RATE ~= 49 or BOSS_DROP_RATE ~= 50 then
             return false, "serialized item stat indexes changed"
         end
         if #LIMIT_STRING ~= 28 or TIER_NAME[25] ~= "|cff999999Devourer|r" then
@@ -189,6 +190,26 @@ OnInit.final("ArchitectureTests", function(Require)
         end
         if #INFO_STRING ~= 6 or #HINT_TOOLTIP ~= 16 or not FORCE_HINT then
             return false, "help, hint, or progression compatibility changed"
+        end
+        return true
+    end)
+
+    ArchitectureTests.register("spell power, area and duration are independent", function()
+        local generic = ParseItemDefinition("Test set", "", "[tier 8] [spellboost*20]")
+        local niche = ParseItemDefinition("Test niche", "", "[tier 9] [spellboost*5]")
+        local authored = ParseItemDefinition("Test explicit", "",
+            "[spellpower*20] [spellarea*7.5] [spellduration*12.5]")
+        if generic[ITEM_SPELL_POWER] ~= 20 or generic[ITEM_SPELL_AREA] ~= 0 or
+            generic[ITEM_SPELL_DURATION] ~= 0 then
+            return false, "generic sets still grant bundled spell utility"
+        end
+        if niche[ITEM_SPELL_AREA] ~= 2.5 or niche[ITEM_SPELL_DURATION] ~= 2.5 or
+            not rawget(niche, "legacy_spell_utility") then
+            return false, "legacy non-set utility migration lost half power"
+        end
+        if authored[ITEM_SPELL_AREA] ~= 7.5 or authored[ITEM_SPELL_DURATION] ~= 12.5 or
+            rawget(authored, "legacy_spell_utility") then
+            return false, "explicit spell stats are not independent"
         end
         return true
     end)
@@ -1759,6 +1780,40 @@ OnInit.final("ArchitectureTests", function(Require)
         end)
 
     ArchitectureTests.register(
+        "Perk branches use consistent names and fit profile storage", function()
+            local nodes = Perks.getNodes()
+            local names, branches, positions = {}, {}, {}
+            local experience_nodes = 0
+            for _, branch in ipairs(Perks.getBranches()) do branches[branch.key] = true end
+            if #nodes ~= 241 or #nodes - 1 > PROFILE_PERK_NODE_WORDS * 30 then
+                return false, "perk graph count or allocation storage changed"
+            end
+            for id, node in ipairs(nodes) do
+                local point = node.x .. ":" .. node.y
+                if node.id ~= id or positions[point] then
+                    return false, "perk IDs or graph positions overlap"
+                end
+                positions[point] = true
+                if node.effect == "shared_xp" then
+                    experience_nodes = experience_nodes + 1
+                    if node.value ~= .02 then return false, "experience rate node exceeds 2%" end
+                end
+                if id > 1 then
+                    if not branches[node.branch] or not nodes[node.parent]
+                        or (node.alternate_parent and not nodes[node.alternate_parent]) then
+                        return false, "perk branch or prerequisite is missing"
+                    end
+                    if names[node.effect] and names[node.effect] ~= node.name then
+                        return false, "identical perk effects have inconsistent names"
+                    end
+                    names[node.effect] = node.name
+                end
+            end
+            if experience_nodes ~= 5 then return false, "profile experience rate must cap at five 2% nodes" end
+            return true
+        end)
+
+    ArchitectureTests.register(
         "Perk budget is derived from character milestones", function()
             local test_pid = PLAYER_CAP + 1
             local previous = Profile[test_pid]
@@ -1777,8 +1832,8 @@ OnInit.final("ArchitectureTests", function(Require)
             }
 
             local total = Perks.getTotal(test_pid)
-            local first = Perks.allocateNode(test_pid, 2)
-            local second = Perks.allocateNode(test_pid, 3)
+            local first = Perks.allocateNode(test_pid, 92)
+            local second = Perks.allocateNode(test_pid, 93)
             local spent = Perks.getSpent(test_pid)
             local available = Perks.getAvailable(test_pid)
             Profile[test_pid] = previous
@@ -2066,23 +2121,27 @@ OnInit.final("ArchitectureTests", function(Require)
     end)
 
     ArchitectureTests.register(
-        "overlevel rewards use exponential fixed-gap falloff", function()
+        "overlevel rewards tighten prechaos and chaos falloff", function()
             local epsilon = 0.0001
             local low = Progression.getLevelDifferenceMultiplier(150, 100)
             local high = Progression.getLevelDifferenceMultiplier(450, 400)
             local quest = RewardNotifications.questLevelMultiplier(450, 400)
 
-            if math.abs(low - 0.3233) > epsilon or math.abs(high - 0.3233) >
-                epsilon or math.abs(quest - 0.3233) > epsilon or
+            local early_quest = RewardNotifications.questLevelMultiplier(150, 100)
+            local transition = Progression.getLevelDifferenceMultiplier(200, 170)
+            if math.abs(low - 0.004597) > epsilon or math.abs(high - 0.098229) >
+                epsilon or math.abs(quest - 0.098229) > epsilon or
+                math.abs(early_quest - low) > epsilon or
+                math.abs(transition - 0.165581) > epsilon or
                 math.abs(
-                    Progression.getLevelDifferenceMultiplier(115, 100) - 0.8225) >
+                    Progression.getLevelDifferenceMultiplier(115, 100) - 0.411972) >
                 epsilon or
                 math.abs(
-                    Progression.getLevelDifferenceMultiplier(200, 100) - 0.0369) >
+                    Progression.getLevelDifferenceMultiplier(200, 100) - 0.000004257) >
                 epsilon or Progression.getLevelDifferenceMultiplier(100, 100) ~=
                 1. or Progression.getLevelDifferenceMultiplier(100, 120) ~= 1.5 then
                 return false,
-                       "overlevel rewards do not follow the shared exponential curve"
+                       "overlevel rewards do not follow the shared prechaos/chaos curves"
             end
             return true
         end)

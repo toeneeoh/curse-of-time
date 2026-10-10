@@ -16,9 +16,9 @@ Verification notes and remaining editorial checks are kept in
 - Raised the hero level cap to 500 and the total stat cap to 255,000.
 - Completely reworked the XP and kill-reward systems. Leveling now follows a smoother progression curve instead of the old home-dependent XP rates and steep late-game XP slowdown.
 - Reworked how XP and gold are shared with nearby allies.
-- Fighting enemies below your level increasingly reduces XP and qualifying kill credit; fighting stronger eligible enemies grants bonus XP.
+- Fighting enemies below your level increasingly reduces XP and qualifying kill credit, with a sharper dropoff for outgrown prechaos enemies; fighting stronger eligible enemies grants bonus XP.
 - Reworked repeatable kill bounties, with more rewarding XP turn-ins and reduced rewards for overleveled farming.
-- Replaced Prestige with a persistent, profile-wide Perk Tree. Character milestones earn points for connected offensive, defensive, party, exploration, and inheritance bonuses.
+- Replaced Prestige with a persistent, profile-wide Perk Tree. Character milestones earn points for connected bonuses across four branches: Might, Guard, Fellowship, and Legacy.
 - Added Status Resistance, which shortens applicable negative effects, and Cooldown Acceleration, which makes ability cooldowns recover faster.
 - Critical Chance and Critical Damage are separate stats and can be increased through equipment and skills.
 - Reduced spellboost variance to ±10% (from ±20%).

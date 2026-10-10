@@ -77,7 +77,7 @@ OnInit.final("MasterRogueSpells", function(Require)
 
             local pt = TimerList[self.pid]:add()
             pt.target = self.target
-            pt:after(self.dur * LBOOST[self.pid], expire)
+            pt:after(self.dur * DBOOST[self.pid], expire)
         end
     end
 
@@ -163,10 +163,10 @@ OnInit.final("MasterRogueSpells", function(Require)
             destroy = function(self)
                 local ug = CreateGroup()
 
-                MakeGroupInRange(self.pid, ug, self.x, self.y, self.aoe * LBOOST[self.pid], Condition(FilterEnemy))
+                MakeGroupInRange(self.pid, ug, self.x, self.y, self.aoe * ABOOST[self.pid], Condition(FilterEnemy))
 
                 for enemy in each(ug) do
-                    NerveGasDebuff:add(self.source, enemy):duration(self.dur * LBOOST[self.pid])
+                    NerveGasDebuff:add(self.source, enemy):duration(self.dur * DBOOST[self.pid])
                 end
 
                 local sfx = AddSpecialEffect("war3mapImported\\Radioactivecloud.mdx", self.x, self.y)

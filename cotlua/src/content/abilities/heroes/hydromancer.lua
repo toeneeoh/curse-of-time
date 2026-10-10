@@ -47,7 +47,7 @@ OnInit.final("HydromancerSpells", function(Require)
             onUnitCollision = CAT_UnitImpact3D,
             onUnitCallback = function(self, enemy)
                 local ug = CreateGroup()
-                MakeGroupInRange(self.pid, ug, GetUnitX(enemy), GetUnitY(enemy), FROSTBLAST.aoe * LBOOST[self.pid], Condition(FilterEnemy))
+                MakeGroupInRange(self.pid, ug, GetUnitX(enemy), GetUnitY(enemy), FROSTBLAST.aoe * ABOOST[self.pid], Condition(FilterEnemy))
 
                 local b = InfusedWaterBuff:get(nil, self.source)
                 if b then
@@ -59,10 +59,10 @@ OnInit.final("HydromancerSpells", function(Require)
 
                 for target in each(ug) do
                     if enemy == target then
-                        Freeze:add(self.source, enemy):duration(FROSTBLAST.dur * LBOOST[self.pid])
+                        Freeze:add(self.source, enemy):duration(FROSTBLAST.dur * DBOOST[self.pid])
                         DamageTarget(self.source, target, self.damage * (GetUnitAbilityLevel(target, FourCC('B01G')) + 1.), ATTACK_TYPE_NORMAL, MAGIC, thistype.tag)
                     else
-                        Freeze:add(self.source, enemy):duration(FROSTBLAST.dur * 0.5 * LBOOST[self.pid])
+                        Freeze:add(self.source, enemy):duration(FROSTBLAST.dur * 0.5 * DBOOST[self.pid])
                         DamageTarget(self.source, target, self.damage / (2. - (GetUnitAbilityLevel(target, FourCC('B01G')))), ATTACK_TYPE_NORMAL, MAGIC, thistype.tag)
                     end
                 end
@@ -148,7 +148,7 @@ OnInit.final("HydromancerSpells", function(Require)
             if self.dur > 0. then
                 self.dur = self.dur - FPS_32
                 self.count = 0
-                ALICE_ForAllObjectsInRangeDo(pull_force, self.targetX, self.targetY, self.aoe * LBOOST[self.pid], "nonhero", valid_pull_target, self)
+                ALICE_ForAllObjectsInRangeDo(pull_force, self.targetX, self.targetY, self.aoe * ABOOST[self.pid], "nonhero", valid_pull_target, self)
                 self.dur = self.dur - (self.count * FPS_32 * 0.05)
                 TimerQueue:callDelayed(FPS_32, pull, self)
             else
@@ -166,7 +166,7 @@ OnInit.final("HydromancerSpells", function(Require)
 
         local function damage(self)
             if self.dur > 0. then
-                ALICE_ForAllObjectsInRangeDo(do_damage, self.targetX, self.targetY, self.aoe * LBOOST[self.pid], "unit", valid_damage_target, self)
+                ALICE_ForAllObjectsInRangeDo(do_damage, self.targetX, self.targetY, self.aoe * ABOOST[self.pid], "unit", valid_damage_target, self)
                 TimerQueue:callDelayed(1., damage, self)
             end
         end
@@ -290,7 +290,7 @@ OnInit.final("HydromancerSpells", function(Require)
             local pt = TimerList[self.pid]:add()
 
             pt.angle = self.angle
-            pt.dist = self.range * LBOOST[self.pid]
+            pt.dist = self.range * ABOOST[self.pid]
             pt.sfx = AddSpecialEffect("Abilities\\Spells\\Other\\CrushingWave\\CrushingWaveMissile.mdl", self.x, self.y)
             pt.x = self.x
             pt.y = self.y
@@ -339,12 +339,12 @@ OnInit.final("HydromancerSpells", function(Require)
 
         function thistype:onCast()
             local pt = TimerList[self.pid]:add(thistype.id)
-            pt.dur = self.dur * LBOOST[self.pid]
+            pt.dur = self.dur * DBOOST[self.pid]
 
             local dummy = Dummy.create(self.x, self.y, FourCC('A02O'), 1, pt.dur + 3.)
             dummy.source = self.caster
             pt.source = dummy.unit
-            pt.aoe = self.aoe * LBOOST[self.pid]
+            pt.aoe = self.aoe * ABOOST[self.pid]
             pt.dmg = self.dmg
             pt.infused = false
 
@@ -453,7 +453,7 @@ OnInit.final("HydromancerSpells", function(Require)
 
             pt.source = self.caster
             pt.target = self.target
-            pt.dur = self.times * LBOOST[self.pid]
+            pt.dur = self.times * DBOOST[self.pid]
             pt.infused = false
             pt.time = 0
 

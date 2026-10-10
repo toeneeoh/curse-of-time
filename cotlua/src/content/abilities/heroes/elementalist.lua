@@ -35,7 +35,7 @@ OnInit.final("ElementalistSpells", function(Require)
         local function periodic(pid)
             if masterElement[pid] == thistype.value then
                 local ug = CreateGroup()
-                MakeGroupInRange(pid, ug, GetUnitX(Hero[pid]), GetUnitY(Hero[pid]), 900. * LBOOST[pid], Filter(FilterEnemy))
+                MakeGroupInRange(pid, ug, GetUnitX(Hero[pid]), GetUnitY(Hero[pid]), 900. * ABOOST[pid], Filter(FilterEnemy))
 
                 for enemy in each(ug) do
                     if not UnitIsSleeping(enemy) then
@@ -210,10 +210,10 @@ OnInit.final("ElementalistSpells", function(Require)
 
                 -- orb shatter
                 local ug = CreateGroup()
-                MakeGroupInRange(self.pid, ug, self.x, self.y, self.aoe * LBOOST[self.pid], Condition(FilterEnemy))
+                MakeGroupInRange(self.pid, ug, self.x, self.y, self.aoe * ABOOST[self.pid], Condition(FilterEnemy))
 
                 for target in each(ug) do
-                    Freeze:add(self.source, target):duration(self.freeze * LBOOST[self.pid])
+                    Freeze:add(self.source, target):duration(self.freeze * DBOOST[self.pid])
                     DamageTarget(self.source, target, self.dmg * BOOST[self.pid], ATTACK_TYPE_NORMAL, MAGIC, thistype.tag)
                 end
 
@@ -231,7 +231,7 @@ OnInit.final("ElementalistSpells", function(Require)
             if thistype.missile[pid] then
                 local ug = CreateGroup()
 
-                MakeGroupInRange(pid, ug, missile.x, missile.y, thistype.iceaoe * LBOOST[pid], Condition(FilterEnemy))
+                MakeGroupInRange(pid, ug, missile.x, missile.y, thistype.iceaoe * ABOOST[pid], Condition(FilterEnemy))
 
                 for target in each(ug) do
                     local icicle = setmetatable({}, icicle_template)
@@ -372,10 +372,10 @@ OnInit.final("ElementalistSpells", function(Require)
             local Ay     = y + 50 * math.sin(pt.angle + bj_PI * 0.5) ---@type number 
             local Bx     = x + 50 * math.cos(pt.angle - bj_PI * 0.5) ---@type number 
             local By     = y + 50 * math.sin(pt.angle - bj_PI * 0.5) ---@type number 
-            local Cx     = Bx + pt.aoe * math.cos(pt.angle - bj_PI * 0.125) * LBOOST[pt.pid] ---@type number 
-            local Cy     = By + pt.aoe * math.sin(pt.angle - bj_PI * 0.125) * LBOOST[pt.pid] ---@type number 
-            local Dx     = Ax + pt.aoe * math.cos(pt.angle + bj_PI * 0.125) * LBOOST[pt.pid] ---@type number 
-            local Dy     = Ay + pt.aoe * math.sin(pt.angle + bj_PI * 0.125) * LBOOST[pt.pid] ---@type number 
+            local Cx     = Bx + pt.aoe * math.cos(pt.angle - bj_PI * 0.125) * ABOOST[pt.pid] ---@type number
+            local Cy     = By + pt.aoe * math.sin(pt.angle - bj_PI * 0.125) * ABOOST[pt.pid] ---@type number
+            local Dx     = Ax + pt.aoe * math.cos(pt.angle + bj_PI * 0.125) * ABOOST[pt.pid] ---@type number
+            local Dy     = Ay + pt.aoe * math.sin(pt.angle + bj_PI * 0.125) * ABOOST[pt.pid] ---@type number
             local AB ---@type number 
             local BC ---@type number 
             local CD ---@type number 
@@ -389,7 +389,7 @@ OnInit.final("ElementalistSpells", function(Require)
                     SoundHandler("Abilities\\Spells\\Other\\BreathOfFire\\BreathOfFire1.flac", true, nil, Hero[pt.pid])
                 end
 
-                MakeGroupInRange(pt.pid, pt.ug, x, y, pt.aoe * LBOOST[pt.pid], Condition(FilterEnemy))
+                MakeGroupInRange(pt.pid, pt.ug, x, y, pt.aoe * ABOOST[pt.pid], Condition(FilterEnemy))
 
                 for target in each(pt.ug) do
                     x = GetUnitX(target)
@@ -421,7 +421,7 @@ OnInit.final("ElementalistSpells", function(Require)
             pt.aoe = self.aoe
             pt.dmg = self.dmg
             pt.ug = CreateGroup()
-            BlzSetSpecialEffectScale(pt.sfx, 1.3 * LBOOST[self.pid])
+            BlzSetSpecialEffectScale(pt.sfx, 1.3 * ABOOST[self.pid])
             BlzSetSpecialEffectTimeScale(pt.sfx, 1.5)
             BlzSetSpecialEffectYaw(pt.sfx, pt.angle)
 
@@ -444,6 +444,7 @@ OnInit.final("ElementalistSpells", function(Require)
     ---@field dmg function
     ---@field aoe number
     ELEMENTALSTORM = Spell.define("A04H")
+    ELEMENTALSTORM.tooltip_scaling = {times = "none"} -- Fixed strike count.
     do
         local thistype = ELEMENTALSTORM
 
@@ -540,7 +541,7 @@ OnInit.final("ElementalistSpells", function(Require)
             pt.y = self.targetY
             pt.dur = self.times
             pt.dmg = self.dmg * BOOST[self.pid]
-            pt.aoe = self.aoe * LBOOST[self.pid]
+            pt.aoe = self.aoe * ABOOST[self.pid]
             pt.ug = CreateGroup()
 
             if masterElement[self.pid] == 0 then

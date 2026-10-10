@@ -116,7 +116,7 @@ OnInit.final("WarriorSpells", function(Require)
                 SetUnitXBounded(self.source, x + self.speed * math.cos(self.angle))
                 SetUnitYBounded(self.source, y + self.speed * math.sin(self.angle))
 
-                ALICE_ForAllObjectsInRangeDo(damage, x, y, 225. * LBOOST[self.pid], "unit", valid_target, self)
+                ALICE_ForAllObjectsInRangeDo(damage, x, y, 225. * ABOOST[self.pid], "unit", valid_target, self)
 
                 self.callback = TQ:callDelayed(FPS_32, periodic, self)
             else
@@ -210,7 +210,7 @@ OnInit.final("WarriorSpells", function(Require)
 
             local ug = CreateGroup()
 
-            MakeGroupInRange(self.pid, ug, self.x, self.y, self.aoe * LBOOST[self.pid], Condition(FilterEnemy))
+            MakeGroupInRange(self.pid, ug, self.x, self.y, self.aoe * ABOOST[self.pid], Condition(FilterEnemy))
 
             local effect
 
@@ -224,7 +224,7 @@ OnInit.final("WarriorSpells", function(Require)
             DestroyEffect(effect)
 
             for target in each(ug) do
-                IntimidatingShoutDebuff:add(self.caster, target):duration(self.dur * LBOOST[self.pid])
+                IntimidatingShoutDebuff:add(self.caster, target):duration(self.dur * DBOOST[self.pid])
             end
 
             DestroyGroup(ug)
@@ -446,7 +446,7 @@ OnInit.final("WarriorSpells", function(Require)
 
             if LAST_CAST[pid] == PARRY.id then --spin heal
                 SetUnitAnimation(caster, "spell")
-                MakeGroupInRange(pid, ug, x, y, thistype.spinaoe * LBOOST[pid], Condition(FilterEnemy))
+                MakeGroupInRange(pid, ug, x, y, thistype.spinaoe * ABOOST[pid], Condition(FilterEnemy))
 
                 local sfx = AddSpecialEffect("war3mapImported\\Ephemeral Slash Silver.mdl", x, y)
                 BlzSetSpecialEffectScale(sfx, 1.25)
@@ -468,10 +468,10 @@ OnInit.final("WarriorSpells", function(Require)
             elseif LAST_CAST[pid] == SPINDASH.id then --knock up
                 SetUnitAnimationByIndex(caster, 4)
                 DelayAnimation(pid, caster, 0.6, 0, 1., false)
-                MakeGroupInRange(pid, ug, x, y, thistype.knockaoe * LBOOST[pid], Condition(FilterEnemy))
+                MakeGroupInRange(pid, ug, x, y, thistype.knockaoe * ABOOST[pid], Condition(FilterEnemy))
 
                 for target in each(ug) do
-                    KnockUp:add(caster, target):duration(thistype.knockdur * LBOOST[pid])
+                    KnockUp:add(caster, target):duration(thistype.knockdur * DBOOST[pid])
                 end
 
                 local sfx = AddSpecialEffect("war3mapImported\\DustWindFaster3.mdx", x - 110., y)
@@ -481,10 +481,10 @@ OnInit.final("WarriorSpells", function(Require)
 
                 DestroyEffect(sfx)
             elseif LAST_CAST[pid] == INTIMIDATINGSHOUT.id then --ally attack damage buff
-                MakeGroupInRange(pid, ug, x, y, thistype.shoutaoe * LBOOST[pid], Condition(FilterAlly))
+                MakeGroupInRange(pid, ug, x, y, thistype.shoutaoe * ABOOST[pid], Condition(FilterAlly))
 
                 for target in each(ug) do
-                    IntimidatingShoutBuff:add(caster, target):duration(thistype.shoutdur * LBOOST[pid])
+                    IntimidatingShoutBuff:add(caster, target):duration(thistype.shoutdur * DBOOST[pid])
                 end
 
                 DestroyEffect(AddSpecialEffectTarget("war3mapImported\\BattleCryCaster.mdx", caster, "origin"))
@@ -494,7 +494,7 @@ OnInit.final("WarriorSpells", function(Require)
                     pt.angle = bj_PI * 0.4 * i
                     pt.target = Dummy.create(x + 75. * math.cos(pt.angle), y + 75 * math.sin(pt.angle), 0, 0).unit
                     pt.dmg = thistype.tornadodmg(pid)
-                    pt.dur = thistype.tornadodur * LBOOST[pid]
+                    pt.dur = thistype.tornadodur * DBOOST[pid]
                     pt.ug = CreateGroup()
 
                     BlzSetUnitSkin(pt.target, FourCC('n001'))

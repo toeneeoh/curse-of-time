@@ -53,6 +53,9 @@
         gold_rate = ITEM_GOLD_GAIN,
         xp_rate = XP_RATE,
         status_resist_flat = STATUS_RESISTANCE,
+        spellboost = ITEM_SPELLBOOST,
+        spell_area = ITEM_SPELL_AREA,
+        spell_duration = ITEM_SPELL_DURATION,
         cooldown_acceleration = COOLDOWN_ACCELERATION,
         drop_rate = DROP_RATE,
         boss_drop_rate = BOSS_DROP_RATE
@@ -283,18 +286,32 @@
 
     local perk_bonuses = {
         {"Primary Attribute", "primary_percent", 100., "%"},
-        {"Total Damage", "damage_percent", 100., "%"},
+        {"Attack Damage", "damage_percent", 100., "%"},
         {"Critical Chance", "crit_chance", 1., "%"},
         {"Critical Damage", "crit_damage", 1., "%"},
-        {"Spellboost", "spellboost", 100., "%"},
+        {"Spell Power", "spellboost", 100., "%"},
+        {"Spell Area", "spell_area", 100., "%"},
+        {"Spell Duration", "spell_duration", 100., "%"},
         {"Armor", "armor_percent", 100., "%"},
         {"Health Regeneration", "regen_percent", 100., "%"},
-        {"Damage Reduction", "damage_reduction", 100., "%"},
-        {"Movespeed", "movespeed", 1., ""}, {"Gold Find", "gold_rate", 1., "%"},
-        {"Shared Experience", "shared_xp", 100., "%"},
+        {"Mana Regeneration", "mana_regen_percent", 100., "%"},
+        {"Damage Resistance", "damage_reduction", 100., "%"},
+        {"Magic Resistance", "magic_reduction", 100., "%"},
+        {"Status Resistance", "status_resistance", 1., "%"},
+        {"Cooldown Recovery", "cooldown_acceleration", 1., " sec/sec"},
+        {"Movement Speed", "movespeed", 1., ""}, {"Gold Find", "gold_rate", 1., "%"},
+        {"Drop Rate", "drop_rate", 100., "%"},
+        {"Boss Drop Rate", "boss_drop_rate", 100., "%"},
+        {"Shared Experience Rate", "shared_xp", 100., "%"},
         {"New Character Levels", "inheritance", 5., ""},
         {"New Character Gold", "inheritance", 25000., ""},
-        {"Kill Quest Auto Turn-In", "huntsman", 1., ""}
+        {"Kill Quest Auto Turn-In", "huntsman", 1., ""},
+        {"Potion Restoration", "potion_restoration", 100., "%"},
+        {"Infusion Duration", "potion_duration", 100., "%"},
+        {"Potion Refill Savings", "potion_refill_discount", 100., "%"},
+        {"Reincarnation Gold Savings", "recharge_discount", 100., "%"},
+        {"Extra Reincarnation Capacity", "reincarnation_capacity", 1., ""},
+        {"Return Home Channel Reduction", "home_channel", 100., "%"}
     }
     for _, definition in ipairs(perk_bonuses) do
         local bonus = definition
@@ -307,8 +324,11 @@
                 if bonus[2] == "huntsman" then
                     return value > 0 and "Enabled" or "Disabled"
                 end
-                local result = math.floor(value * bonus[3] + .5)
-                return (result > 0 and "+" or "") .. result .. bonus[4]
+                if bonus[2] == "cooldown_acceleration" then
+                    return (value > 0 and "+" or "") .. string.format("%.2f", value) .. bonus[4]
+                end
+                local result = string.format("%g", value * bonus[3])
+                return (value > 0 and "+" or "") .. result .. bonus[4]
             end
         }
     end
@@ -331,8 +351,33 @@
     BlzFrameSetLevel(frame, 20)
 
     local MAX_ROWS = 32
+    local STATS_PER_PAGE = 28
+    local function stat_page_indices(order, priority_limit, page)
+        local all = {}
+        for priority = 1, priority_limit do
+            for _, index in ipairs(order[priority] or {}) do all[#all + 1] = index end
+        end
+        local pages = math.max(1, math.ceil(#all / STATS_PER_PAGE))
+        page = math.max(1, math.min(pages, page or 1))
+        local indices = {}
+        local first = (page - 1) * STATS_PER_PAGE + 1
+        for index = first, math.min(#all, first + STATS_PER_PAGE - 1) do
+            indices[#indices + 1] = all[index]
+        end
+        return indices, page, pages
+    end
     local PROFILE_TAB = 2
     local PERKS_TAB = 3
+    local PERK_HEADER_ROWS, PERK_BONUSES_PER_PAGE = 4, 18
+    local function perk_page_indices(total, page)
+        local pages = math.max(1, math.ceil((total - PERK_HEADER_ROWS) / PERK_BONUSES_PER_PAGE))
+        page = math.max(1, math.min(pages, page))
+        local indices = {}
+        for index = 1, math.min(total, PERK_HEADER_ROWS) do indices[#indices + 1] = index end
+        local first = PERK_HEADER_ROWS + (page - 1) * PERK_BONUSES_PER_PAGE + 1
+        for index = first, math.min(total, first + PERK_BONUSES_PER_PAGE - 1) do indices[#indices + 1] = index end
+        return indices, page, pages
+    end
     local HONOR_TAB = 4
     local FACTION_TAB = 5
     local MILESTONES_PER_PAGE = 7
@@ -489,7 +534,7 @@
 
     -- initialize viewing tables
     for i = 1, PLAYER_CAP do
-        viewing[i] = {unit = nil, page = 1, milestone_page = 1}
+        viewing[i] = {unit = nil, page = 1, milestone_page = 1, perk_page = 1, stat_page = 1}
     end
 
     BlzFrameSetAbsPoint(frame, FRAMEPOINT_TOPLEFT, -0.05, 0.55)
@@ -722,6 +767,57 @@
     tabs[4]:onClick(switch_tab)
     tabs[5]:onClick(switch_tab)
 
+    local stat_controls = BlzCreateFrameByType("FRAME", "", frame, "", 0)
+    BlzFrameSetPoint(stat_controls, FRAMEPOINT_BOTTOM, frame, FRAMEPOINT_BOTTOM, 0., .013)
+    BlzFrameSetSize(stat_controls, .11, .02)
+    BlzFrameSetVisible(stat_controls, false)
+    local stat_page_text = BlzCreateFrameByType("TEXT", "", stat_controls, "", 0)
+    BlzFrameSetPoint(stat_page_text, FRAMEPOINT_CENTER, stat_controls, FRAMEPOINT_CENTER, 0., 0.)
+    BlzFrameSetTextAlignment(stat_page_text, TEXT_JUSTIFY_CENTER, TEXT_JUSTIFY_CENTER)
+    BlzFrameSetEnable(stat_page_text, false)
+    local function change_stat_page(direction)
+        local pid = GetPlayerId(GetTriggerPlayer()) + 1
+        viewing[pid].stat_page = viewing[pid].stat_page + direction
+        local button = BlzGetTriggerFrame()
+        BlzFrameSetEnable(button, false)
+        BlzFrameSetEnable(button, true)
+        STAT_WINDOW.refresh(pid)
+    end
+    local previous_stats = SimpleButton.create(stat_controls,
+        "ReplaceableTextures\\CommandButtons\\BTNCycleLeft.blp", .016, .016,
+        FRAMEPOINT_LEFT, FRAMEPOINT_LEFT, 0., 0., function() change_stat_page(-1) end,
+        "Previous Stats", FRAMEPOINT_BOTTOM, FRAMEPOINT_TOP, 0., .01)
+    local next_stats = SimpleButton.create(stat_controls,
+        "ReplaceableTextures\\CommandButtons\\BTNCycleRight.blp", .016, .016,
+        FRAMEPOINT_RIGHT, FRAMEPOINT_RIGHT, 0., 0., function() change_stat_page(1) end,
+        "Next Stats", FRAMEPOINT_BOTTOM, FRAMEPOINT_TOP, 0., .01)
+
+    local perk_controls = BlzCreateFrameByType("FRAME", "", frame, "", 0)
+    BlzFrameSetPoint(perk_controls, FRAMEPOINT_BOTTOM, frame, FRAMEPOINT_BOTTOM, 0., .055)
+    BlzFrameSetSize(perk_controls, .11, .02)
+    BlzFrameSetVisible(perk_controls, false)
+    local perk_page_text = BlzCreateFrameByType("TEXT", "", perk_controls, "", 0)
+    BlzFrameSetPoint(perk_page_text, FRAMEPOINT_CENTER, perk_controls, FRAMEPOINT_CENTER, 0., 0.)
+    BlzFrameSetTextAlignment(perk_page_text, TEXT_JUSTIFY_CENTER, TEXT_JUSTIFY_CENTER)
+    BlzFrameSetEnable(perk_page_text, false)
+    local function change_perk_page(direction)
+        local pid = GetPlayerId(GetTriggerPlayer()) + 1
+        local _, page = perk_page_indices(#tab_tags[PERKS_TAB], viewing[pid].perk_page + direction)
+        viewing[pid].perk_page = page
+        local button = BlzGetTriggerFrame()
+        BlzFrameSetEnable(button, false)
+        BlzFrameSetEnable(button, true)
+        STAT_WINDOW.refresh(pid)
+    end
+    local previous_perks = SimpleButton.create(perk_controls,
+        "ReplaceableTextures\\CommandButtons\\BTNCycleLeft.blp", .016, .016,
+        FRAMEPOINT_LEFT, FRAMEPOINT_LEFT, 0., 0., function() change_perk_page(-1) end,
+        "Previous Perk Bonuses", FRAMEPOINT_BOTTOM, FRAMEPOINT_TOP, 0., .01)
+    local next_perks = SimpleButton.create(perk_controls,
+        "ReplaceableTextures\\CommandButtons\\BTNCycleRight.blp", .016, .016,
+        FRAMEPOINT_RIGHT, FRAMEPOINT_RIGHT, 0., 0., function() change_perk_page(1) end,
+        "Next Perk Bonuses", FRAMEPOINT_BOTTOM, FRAMEPOINT_TOP, 0., .01)
+
     local milestone_controls = BlzCreateFrameByType("FRAME", "", frame, "", 0)
     local milestone_page_text = BlzCreateFrameByType("TEXT", "",
                                                      milestone_controls, "", 0)
@@ -910,6 +1006,8 @@
                          GetUnitName(u)
         BlzFrameSetText(title, name)
         BlzFrameSetVisible(manage_perks, page == PERKS_TAB)
+        BlzFrameSetVisible(perk_controls, page == PERKS_TAB)
+        BlzFrameSetVisible(stat_controls, false)
         BlzFrameSetText(manage_perks,
                         tpid == pid and "Manage Perks" or "View Perk Tree")
 
@@ -933,6 +1031,32 @@
         -- clear previous mapping
         for k in pairs(row_index) do row_index[k] = nil end
 
+        if page == PERKS_TAB then
+            local indices, selected_page, pages = perk_page_indices(#T.entries, viewing[pid].perk_page)
+            viewing[pid].perk_page = selected_page
+            BlzFrameSetText(perk_page_text, "Bonuses " .. selected_page .. "/" .. pages)
+            previous_perks:enable(selected_page > 1)
+            next_perks:enable(selected_page < pages)
+            for line, idx in ipairs(indices) do
+                row_index[idx] = line
+                render_stat_row(u, page, line, idx)
+            end
+            return
+        end
+
+        if page == 1 then
+            local indices, selected_page, pages = stat_page_indices(T.order, ishero, viewing[pid].stat_page)
+            viewing[pid].stat_page = selected_page
+            BlzFrameSetVisible(stat_controls, pages > 1)
+            BlzFrameSetText(stat_page_text, "Stats " .. selected_page .. "/" .. pages)
+            previous_stats:enable(selected_page > 1)
+            next_stats:enable(selected_page < pages)
+            for line, idx in ipairs(indices) do
+                row_index[idx] = line
+                render_stat_row(u, page, line, idx)
+            end
+            return
+        end
         local line = 0
         local order = T.order
 
@@ -1039,6 +1163,8 @@
             clear_all_rows()
             BlzFrameSetText(title, "Tutorial")
             BlzFrameSetVisible(manage_perks, false)
+            BlzFrameSetVisible(perk_controls, false)
+            BlzFrameSetVisible(stat_controls, false)
             BlzFrameSetVisible(milestone_controls, false)
             for i = 1, #breakdown_frames do BlzFrameSetVisible(breakdown_frames[i], i == page) end
             for i = 1, #tabs do

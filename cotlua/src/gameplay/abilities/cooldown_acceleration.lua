@@ -1,4 +1,4 @@
--- Temporary cooldown acceleration shared by consumables and future effects.
+-- Persistent and temporary cooldown acceleration share one ticker per unit.
 OnInit.final("CooldownAcceleration", function(Require)
     Require('TimerQueue')
     Require('UnitTable')
@@ -12,19 +12,28 @@ OnInit.final("CooldownAcceleration", function(Require)
 
     CooldownAcceleration.PERIOD = PERIOD
 
-    local function clear(u)
-        if not active[u] then return end
-
-        active[u] = nil
-        active_count = active_count - 1
-
+    local function publish(u, state)
         local data = Unit[u]
-        if data then data.cooldown_acceleration = 0. end
+        if data then data.cooldown_acceleration = state.permanent + state.rate end
+        if state.permanent == 0. and state.rate == 0. then
+            active[u] = nil
+            active_count = active_count - 1
+        end
+    end
+
+    local function clear(u)
+        local state = active[u]
+        if not state then return end
+        state.rate, state.remaining = 0., 0.
+        publish(u, state)
     end
 
     local function tick()
         for u, state in pairs(active) do
-            if not UnitAlive(u) then
+            if not Unit[u] then
+                active[u] = nil
+                active_count = active_count - 1
+            elseif not UnitAlive(u) then
                 clear(u)
             else
                 local index = 0
@@ -35,22 +44,56 @@ OnInit.final("CooldownAcceleration", function(Require)
                     if id ~= 0 and
                         BlzGetUnitAbilityCooldownRemaining(u, id) > 0. then
                         BlzAdjustUnitAbilityCooldownRemaining(
-                            u, id, -state.rate * PERIOD)
+                            u, id, -(state.permanent + state.rate) * PERIOD)
                     end
 
                     index = index + 1
                     ability = BlzGetUnitAbilityByIndex(u, index)
                 end
 
-                state.remaining = state.remaining - PERIOD
-                if state.remaining <= 0. then clear(u) end
+                if state.rate > 0. then
+                    state.remaining = state.remaining - PERIOD
+                    if state.remaining <= 0. then clear(u) end
+                end
             end
         end
 
         if active_count == 0 then ticking = false end
     end
 
-    local function finished() return active_count == 0 end
+    local function finished()
+        if active_count == 0 then
+            ticking = false
+            return true
+        end
+        return false
+    end
+
+    local function state_for(u)
+        if not active[u] then
+            active[u] = {permanent = 0., rate = 0., remaining = 0.}
+            active_count = active_count + 1
+        end
+        return active[u]
+    end
+
+    local function start_ticking()
+        if not ticking and active_count > 0 then
+            ticking = true
+            TimerQueue:callPeriodically(PERIOD, finished, tick)
+        end
+    end
+
+    ---Sets persistent acceleration without overwriting temporary effects.
+    ---@param u unit
+    ---@param rate number Additional cooldown seconds recovered per second.
+    function CooldownAcceleration.setPermanent(u, rate)
+        if not u or not Unit[u] then return end
+        local state = state_for(u)
+        state.permanent = math.max(0., rate or 0.)
+        publish(u, state)
+        start_ticking()
+    end
 
     ---Starts or refreshes acceleration on a unit. A new application replaces
     ---the current rate and duration rather than stacking another ticker.
@@ -67,14 +110,10 @@ OnInit.final("CooldownAcceleration", function(Require)
             return false
         end
 
-        if not active[u] then active_count = active_count + 1 end
-        active[u] = {rate = rate, remaining = duration}
-        data.cooldown_acceleration = rate
-
-        if not ticking then
-            ticking = true
-            TimerQueue:callPeriodically(PERIOD, finished, tick)
-        end
+        local state = state_for(u)
+        state.rate, state.remaining = rate, duration
+        publish(u, state)
+        start_ticking()
 
         return true
     end

@@ -141,8 +141,7 @@ OnInit.final("VampireSpells", function(Require)
                         DamageTarget(pt.source, target, pt.dmg * BOOST[pt.pid], ATTACK_TYPE_NORMAL, MAGIC, thistype.tag)
                     end
 
-                    local dummy = Dummy.create(GetUnitX(target), GetUnitY(target), FourCC('A09D'), 1)
-                    dummy:attack(pt.source)
+                    LightningAttackVisual('A09D', target, pt.source)
                 end
 
                 DestroyGroup(ug)
@@ -158,9 +157,9 @@ OnInit.final("VampireSpells", function(Require)
             local pt = TimerList[self.pid]:add(thistype.id)
 
             if GetHeroStr(self.caster, true) > GetHeroAgi(self.caster, true) and GetUnitAbilityLevel(self.caster, BLOODLORD.id) > 0 then
-                pt.aoe = thistype.aoe * 2. * LBOOST[self.pid]
+                pt.aoe = thistype.aoe * 2. * ABOOST[self.pid]
             else
-                pt.aoe = thistype.aoe * LBOOST[self.pid]
+                pt.aoe = thistype.aoe * ABOOST[self.pid]
             end
 
             local ug = CreateGroup()
@@ -181,8 +180,7 @@ OnInit.final("VampireSpells", function(Require)
                     DamageTarget(self.caster, target, pt.dmg * BOOST[self.pid], ATTACK_TYPE_NORMAL, MAGIC, thistype.tag)
                 end
 
-                local dummy = Dummy.create(GetUnitX(target), GetUnitY(target), FourCC('A09D'), 1)
-                dummy:attack(self.caster)
+                LightningAttackVisual('A09D', target, self.caster)
             end
 
             pt:startLoop(1., periodic)
@@ -246,7 +244,7 @@ OnInit.final("VampireSpells", function(Require)
 
                 local ug = CreateGroup()
 
-                MakeGroupInRange(self.pid, ug, self.x, self.y, self.aoe * LBOOST[self.pid], Condition(FilterEnemy))
+                MakeGroupInRange(self.pid, ug, self.x, self.y, self.aoe * ABOOST[self.pid], Condition(FilterEnemy))
 
                 for target in each(ug) do
                     DamageTarget(self.caster, target, self.dmg * BOOST[self.pid], ATTACK_TYPE_NORMAL, MAGIC, thistype.tag)

@@ -16,6 +16,8 @@ end
 ITEM_CRIT_CHANCE, ITEM_CRIT_DAMAGE = "crit", "crit_damage"
 ITEM_CRIT_CHANCE_MULT, ITEM_CRIT_DAMAGE_MULT = "crit_mult", "crit_damage_mult"
 TOTAL_ATTACK_SPEED = "total_speed"
+COOLDOWN_ACCELERATION, DROP_RATE = "cooldown_acceleration", "drop_rate"
+ITEM_SPELLBOOST, ITEM_SPELL_AREA, ITEM_SPELL_DURATION = "spell_power", "spell_area", "spell_duration"
 STAT_TAG = setmetatable({}, {__index = function(tags, key)
     local tag = {}
     rawset(tags, key, tag)
@@ -35,7 +37,22 @@ BlzGetUnitWeaponBooleanField = function(u, field, weapon)
 end
 extract("    STAT_TAG[ITEM_CRIT_CHANCE].getter", "    STAT_TAG[ITEM_BASE_ATTACK_SPEED].getter")
 extract("    STAT_TAG[TOTAL_ATTACK_SPEED].getter", "    STAT_TAG[XP_RATE].getter")
+extract("    STAT_TAG[COOLDOWN_ACCELERATION].getter", "    STAT_TAG[DROP_RATE].getter")
+for _, value in ipairs({0., -0., -1e-12, 1e-12}) do
+    Unit[hero].cooldown_acceleration = value
+    assert(STAT_TAG[COOLDOWN_ACCELERATION].getter(hero) == "0.00")
+end
+Unit[hero].cooldown_acceleration = .07
+assert(STAT_TAG[COOLDOWN_ACCELERATION].getter(hero) == "0.07")
 local function contains(text, fragment) assert(text:find(fragment, 1, true), fragment .. " missing from " .. text) end
+extract("    STAT_TAG[ITEM_SPELLBOOST].getter", "    STAT_TAG[ITEM_CRIT_CHANCE].getter")
+Unit[hero].spellboost = .2
+local spell_power = STAT_TAG[ITEM_SPELLBOOST]
+assert(spell_power.getter(hero) == "20.000")
+contains(spell_power.breakdown(hero), "|cff999999Increases supported spell damage, healing,")
+contains(spell_power.breakdown(hero), "shield strength, and other spell bonuses.")
+contains(spell_power.breakdown(hero), "Area and duration have no random variance.|r")
+print("PASS: Spell Power breakdown explains its effects in gray text and distinguishes utility from random variance.")
 local crit = STAT_TAG[ITEM_CRIT_CHANCE]
 assert(crit.getter(hero) == "6.00")
 contains(crit.breakdown(hero), "Base Chance:|r 5.00%")
@@ -147,3 +164,28 @@ tab_ui[1].entries[1].breakdown = nil
 render(hero, 1, 1, 1)
 assert(not tab_ui[1].rows[1].icon_frame.enabled)
 print("PASS: missing/empty breakdowns have no hitbox; populated breakdowns enable it; tab clearing hides active tooltips.")
+
+-- Exercise the actual pagination helper: repeated metadata, bounded rows,
+-- complete bonus coverage, and clamped first/last page navigation.
+local perk_source_file = assert(io.open('cotlua/src/ui/hud/stat_view.lua', 'rb'))
+local perk_source = perk_source_file:read('*a'); perk_source_file:close()
+first = assert(perk_source:find('    local PERK_HEADER_ROWS', 1, true))
+last = assert(perk_source:find('    local HONOR_TAB', first, true))
+local paginate = assert(load(perk_source:sub(first, last - 1) .. '\nreturn perk_page_indices', 'perk pages', 't', sandbox))()
+for total = 4, 100 do
+    local _, _, pages = paginate(total, 1)
+    local seen = {}
+    for page = 1, pages do
+        local indices, clamped = paginate(total, page)
+        assert(clamped == page and #indices <= 22)
+        for index = 1, 4 do assert(indices[index] == index) end
+        for row = 5, #indices do
+            local index = indices[row]
+            assert(not seen[index]); seen[index] = true
+        end
+    end
+    for index = 5, total do assert(seen[index], 'Perk bonus omitted by pagination') end
+    local _, clamped = paginate(total, -100); assert(clamped == 1)
+    _, clamped = paginate(total, 100); assert(clamped == pages)
+end
+print('PASS: perk summary pages repeat point/reset metadata and display every bonus within 22 rows.')

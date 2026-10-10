@@ -37,7 +37,7 @@ OnInit.final("BuffsHeroesMasterRogue", function(Require)
         thistype.STACK_TYPE      = BUFF_STACK_PARTIAL
 
         local function periodic(self)
-            local dmg = NERVEGAS.dmg(self.pid) * BOOST[self.pid] / (NERVEGAS.dur * LBOOST[self.pid] * 2.)
+            local dmg = NERVEGAS.dmg(self.pid) * BOOST[self.pid] / (NERVEGAS.dur * DBOOST[self.pid] * 2.)
 
             DamageTarget(self.source, self.target, dmg, ATTACK_TYPE_NORMAL, MAGIC, "Nerve Gas")
 

@@ -83,10 +83,10 @@ OnInit.global("StatSchema", function(Require)
             syntax = "evasion"
         },
         [ITEM_SPELLBOOST] = {
-            tag = "|cff80ffffSpellboost|r",
+            tag = "|cff80ffffSpell Power|r",
             priority = 1,
             suffix = "%",
-            syntax = "spellboost"
+            syntax = "spellpower"
         },
         [ITEM_CRIT_CHANCE] = {
             tag = "|cffffcc00Critical Chance|r",
@@ -176,6 +176,14 @@ OnInit.global("StatSchema", function(Require)
             priority = 2,
             suffix = "%",
             syntax = "statusresist"
+        },
+        [ITEM_SPELL_AREA] = {
+            tag = "|cff80ffffSpell Area|r",
+            priority = 2, suffix = "%", syntax = "spellarea"
+        },
+        [ITEM_SPELL_DURATION] = {
+            tag = "|cff80ffffSpell Duration|r",
+            priority = 2, suffix = "%", syntax = "spellduration"
         },
         [COOLDOWN_ACCELERATION] = {
             tag = "|cffcc99ffCooldown Acceleration|r",

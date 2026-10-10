@@ -36,6 +36,9 @@ local caster = {cooldown_until = 0}
 local enemy = {x = 0, y = 0, speed = 300, damage_count = 0}
 local stationary = {x = 0, y = 0, speed = 0, damage_count = 0}
 Hero, BOOST, LBOOST = {[1] = caster}, {[1] = 1}, {[1] = 1}
+-- This legacy fixture grants equal area/duration bonuses; independent scaling
+-- is covered separately by test_spell_scaling.lua.
+ABOOST, DBOOST = LBOOST, LBOOST
 Spell = {define = function(id) return {id = id, tag = id} end}
 CreateGroup = function() return {} end
 DestroyGroup = function(group) assert(not group.destroyed) group.destroyed = true end

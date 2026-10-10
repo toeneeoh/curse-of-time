@@ -6,6 +6,7 @@ OnInit.final("NagaAbilities", function(Require)
     Require("Buffs")
     Require("EnemyAI")
     Require("TimerQueue")
+    Require("SpellTools")
 
     local TQ = TimerQueue
     local random = math.random
@@ -226,9 +227,9 @@ OnInit.final("NagaAbilities", function(Require)
             return UnitAlive(object) and GetUnitAbilityLevel(object, ABIL_AVUL) == 0 and GetPlayerId(GetOwningPlayer(object)) < PLAYER_CAP
         end
 
-        local function dummy_attack(object, source)
-            local dummy = Dummy.create(GetUnitX(source), GetUnitY(source), FourCC('A09R'), 1)
-            dummy:attack(object, source, spirit_call_on_hit)
+        local function spirit_strike(object, source)
+            LightningAttackVisual('A09R', source, object)
+            spirit_call_on_hit(source, object)
         end
 
         local minX, minY, maxX, maxY = GetRectMinX(gg_rct_Naga_Dungeon_Boss), GetRectMinY(gg_rct_Naga_Dungeon_Boss), GetRectMaxX(gg_rct_Naga_Dungeon_Boss), GetRectMaxY(gg_rct_Naga_Dungeon_Boss)
@@ -245,7 +246,7 @@ OnInit.final("NagaAbilities", function(Require)
                             local u = player_units[random(1, #player_units)]
                             IssuePointOrder(source, "move", GetUnitX(u) + random(-150, 150), GetUnitY(u) + random(-150, 150))
                         end
-                        ALICE_ForAllObjectsInRangeDo(dummy_attack, GetUnitX(source), GetUnitY(source), 300., "unit", valid_target, source)
+                        ALICE_ForAllObjectsInRangeDo(spirit_strike, GetUnitX(source), GetUnitY(source), 300., "unit", valid_target, source)
                     end
                 end
                 TQ:callDelayed(1., periodic, time)

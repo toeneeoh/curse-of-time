@@ -126,7 +126,7 @@ OnInit.final("AssassinSpells", function(Require)
             end
 
             DestroyEffect(AddSpecialEffect("Abilities\\Spells\\Orc\\FeralSpirit\\feralspiritdone.mdl", self.targetX, self.targetY))
-            MakeGroupInRange(self.pid, ug, self.targetX, self.targetY, self.aoe * LBOOST[self.pid], Condition(FilterEnemy))
+            MakeGroupInRange(self.pid, ug, self.targetX, self.targetY, self.aoe * ABOOST[self.pid], Condition(FilterEnemy))
 
             for target in each(ug) do
                 DestroyEffect(AddSpecialEffectTarget("Abilities\\Spells\\Other\\Stampede\\StampedeMissileDeath.mdl", target, "origin"))
@@ -200,12 +200,12 @@ OnInit.final("AssassinSpells", function(Require)
             local pt = TimerList[self.pid]:add()
             pt.x = self.targetX
             pt.y = self.targetY
-            pt.aoe = self.aoe * LBOOST[self.pid]
-            pt.dur = self.dur * LBOOST[self.pid]
+            pt.aoe = self.aoe * ABOOST[self.pid]
+            pt.dur = self.dur * DBOOST[self.pid]
             pt.ug = CreateGroup()
 
             pt.sfx = AddSpecialEffect("war3mapImported\\GreySmoke.mdx", self.targetX, self.targetY)
-            BlzSetSpecialEffectScale(pt.sfx, LBOOST[self.pid])
+            BlzSetSpecialEffectScale(pt.sfx, ABOOST[self.pid])
             pt:startLoop(0.5, periodic)
         end
 
@@ -345,7 +345,7 @@ OnInit.final("AssassinSpells", function(Require)
                 DestroyEffect(sfx)
             end
 
-            MakeGroupInRange(pid, ug, x, y, thistype.aoe * LBOOST[pid], Condition(FilterEnemy))
+            MakeGroupInRange(pid, ug, x, y, thistype.aoe * ABOOST[pid], Condition(FilterEnemy))
 
             for target in each(ug) do
                 DestroyEffect(AddSpecialEffectTarget("Objects\\Spawnmodels\\Critters\\Albatross\\CritterBloodAlbatross.mdl", target, "chest"))

@@ -20,6 +20,8 @@ OnInit.final("HeroRefresh", function(Require)
 
                 BOOST[pid] = 1. + unit.spellboost + SpellboostVariance()
                 LBOOST[pid] = 1. + 0.5 * unit.spellboost
+                ABOOST[pid] = math.max(0., 1. + unit.spell_area)
+                DBOOST[pid] = math.max(0., 1. + unit.spell_duration)
                 unit.proxy.x = x
                 unit.proxy.y = y
 

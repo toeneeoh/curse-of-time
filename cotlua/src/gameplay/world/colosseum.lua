@@ -2361,7 +2361,7 @@ OnInit.final("Colosseum", function(Require)
             AttributeExpertBuff:add(Hero[pid], Hero[pid])
         end
     end
-    local battle_trance = Augment.create("Battle Trance", "Your hero gains |cffffcc0025%|r attack damage and |cffffcc0025%|r Spellboost.", "ReplaceableTextures\\CommandButtons\\BTNBloodLust.blp", "offense")
+    local battle_trance = Augment.create("Battle Trance", "Your hero gains |cffffcc0025%|r attack damage and |cffffcc0025%|r Spell Power.", "ReplaceableTextures\\CommandButtons\\BTNBloodLust.blp", "offense")
     do
         battle_trance.cleanup = function(pid)
             BattleTranceBuff:dispel(nil, Hero[pid])

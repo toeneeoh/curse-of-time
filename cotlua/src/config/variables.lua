@@ -55,7 +55,9 @@ OnInit.global("Variables", function(Require)
     HeroGrave = {} ---@type unit[]
     Backpack = {} ---@type unit[]
     BOOST = __jarray(1) ---@type number[]
-    LBOOST = __jarray(1) ---@type number[]
+    LBOOST = __jarray(1) ---@type number[] Half-strength Spell Power, not duration/area.
+    ABOOST = __jarray(1) ---@type number[] Spell radius/range multiplier.
+    DBOOST = __jarray(1) ---@type number[] Spell lifetime/duration multiplier.
 
     TOWN_CENTER_X = -250.
     TOWN_CENTER_Y = 160.

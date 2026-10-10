@@ -203,7 +203,7 @@ OnInit.final("BuffsWorldColosseum", function(Require)
     do
         local thistype = BattleTranceBuff
         thistype.NAME            = "Battle Trance"
-        thistype.DESC            = "This unit has +^$attack% attack damage and +^$spellboost% Spellboost"
+        thistype.DESC            = "This unit has +^$attack% attack damage and +^$spellboost% Spell Power"
         thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNBloodLust.blp"
         thistype.AURA            = true
         thistype.DISPEL_TYPE     = BUFF_POSITIVE

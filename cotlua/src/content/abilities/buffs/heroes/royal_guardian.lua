@@ -52,7 +52,7 @@ OnInit.final("BuffsHeroesRoyalGuardian", function(Require)
         end
 
         local function periodic(self)
-            ALICE_EnumObjectsInRange(GetUnitX(self.source), GetUnitY(self.source), 900. * LBOOST[self.pid], "unit", aura_target, self.target, GetOwningPlayer(self.target))
+            ALICE_EnumObjectsInRange(GetUnitX(self.source), GetUnitY(self.source), 900. * ABOOST[self.pid], "unit", aura_target, self.target, GetOwningPlayer(self.target))
 
             self.timer = TQ:callDelayed(1., periodic, self)
         end

@@ -35,6 +35,8 @@
 
     for index = 1, ITEM_ABILITY2 do DISPLAY_STATS[#DISPLAY_STATS + 1] = index end
     DISPLAY_STATS[#DISPLAY_STATS + 1] = STATUS_RESISTANCE
+    DISPLAY_STATS[#DISPLAY_STATS + 1] = ITEM_SPELL_AREA
+    DISPLAY_STATS[#DISPLAY_STATS + 1] = ITEM_SPELL_DURATION
 
     local function item_data(item) return item.data or ItemData[item.id] end
 
@@ -76,6 +78,12 @@
 
     STAT_APPLIERS[ITEM_SPELLBOOST] = function(unit, mult, value)
         unit.spellboost = unit.spellboost + mult * value * 0.01
+    end
+    STAT_APPLIERS[ITEM_SPELL_AREA] = function(unit, mult, value)
+        unit.spell_area = unit.spell_area + mult * value * 0.01
+    end
+    STAT_APPLIERS[ITEM_SPELL_DURATION] = function(unit, mult, value)
+        unit.spell_duration = unit.spell_duration + mult * value * 0.01
     end
 
     STAT_APPLIERS[ITEM_MOVESPEED] = function(unit, mult, value)
@@ -358,7 +366,8 @@
                 local quality_count = 1
 
                 for stat = 1, TOTAL_STATS do
-                    if data[stat .. "range"] ~= 0 then
+                    if data[stat .. "range"] ~= 0 and not
+                        (rawget(data, "legacy_spell_utility") and data.legacy_spell_utility[stat]) then
                         quality_index[stat] = quality_count
                         quality_count = quality_count + 1
                     end
@@ -386,7 +395,8 @@
 
                 local count = 1
                 for stat = 1, TOTAL_STATS do
-                    if data[stat .. "range"] ~= 0 then
+                    if data[stat .. "range"] ~= 0 and not
+                        (rawget(data, "legacy_spell_utility") and data.legacy_spell_utility[stat]) then
                         item.quality[count] = GetRandomInt(0, 63)
                         count = count + 1
                     end
@@ -1030,6 +1040,13 @@
         -- 1 = lower, 2 = upper
         ---@type fun(self: Item, STAT: integer, flag: integer): number
         function Item:calculateValue(STAT, flag)
+            -- Legacy non-set items preserve half of their exact rolled power
+            -- as utility. Share its roll/unlock/scaling, without rounding a
+            -- 5% power roll down to 2% utility or rolling it independently.
+            local derived = rawget(item_data(self), "legacy_spell_utility")
+            if derived and derived[STAT] then
+                return self:calculateValue(ITEM_SPELLBOOST, flag) * 0.5
+            end
             local definition = not self.runtime_definition and
                                    ItemRuntime.definitions[self.id] or nil
             if definition and definition.calculateValue then
@@ -1038,6 +1055,12 @@
             end
 
             local tbl = item_data(self)
+            local function round_stat(value)
+                if STAT == ITEM_SPELL_AREA or STAT == ITEM_SPELL_DURATION then
+                    return math.floor(value * 1000 + 0.5) / 1000.
+                end
+                return (value < 1 and value) or floor(value)
+            end
             local unlockat = tbl[STAT .. "unlock"] ---@type number
 
             if self.level < unlockat then return 0 end
@@ -1064,9 +1087,9 @@
             end
 
             if flag == 1 then
-                return (lower < 1 and lower) or floor(lower)
+                return round_stat(lower)
             elseif flag == 2 then
-                return (upper < 1 and upper) or floor(upper)
+                return round_stat(upper)
             else
                 local final = 0
 
@@ -1084,7 +1107,7 @@
                     final = (final + 5) // 10 * 10
                 end
 
-                return (final < 1 and final) or floor(final)
+                return round_stat(final)
             end
         end
 
@@ -1533,6 +1556,10 @@
                     local lower = self.cached_lower[index]
                     local upper = self.cached_upper[index]
                     local valuestr = tostring(floor(math.abs(value) + 0.5))
+                    if index == ITEM_SPELL_AREA or index == ITEM_SPELL_DURATION then
+                        valuestr = RealToString(math.abs(value))
+                        socket_valuestr = RealToString(math.abs(socket_value))
+                    end
                     local posneg = "+ |cffffcc00"
 
                     -- handle negative values

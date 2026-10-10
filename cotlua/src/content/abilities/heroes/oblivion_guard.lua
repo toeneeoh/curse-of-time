@@ -96,10 +96,10 @@ OnInit.final("OblivionGuardSpells", function(Require)
             reselect(Hero[pt.pid])
             BlzPauseUnitEx(Hero[pt.pid], false)
 
-            MakeGroupInRange(pt.pid, ug, pt.x, pt.y, thistype.aoe * LBOOST[pt.pid], Condition(FilterEnemy))
+            MakeGroupInRange(pt.pid, ug, pt.x, pt.y, thistype.aoe * ABOOST[pt.pid], Condition(FilterEnemy))
 
             for target in each(ug) do
-                Stun:add(Hero[pt.pid], target):duration(thistype.dur * LBOOST[pt.pid])
+                Stun:add(Hero[pt.pid], target):duration(thistype.dur * DBOOST[pt.pid])
                 DamageTarget(Hero[pt.pid], target, thistype.dmg(pt.pid) * BOOST[pt.pid], ATTACK_TYPE_NORMAL, MAGIC, thistype.tag)
             end
 
@@ -218,7 +218,7 @@ OnInit.final("OblivionGuardSpells", function(Require)
 
             SetUnitAnimationByIndex(Hero[pt.pid], 2)
             BlzPauseUnitEx(Hero[pt.pid], false)
-            MakeGroupInRange(pt.pid, ug, GetUnitX(Hero[pt.pid]), GetUnitY(Hero[pt.pid]), thistype.aoe(pt.pid) * LBOOST[pt.pid], Condition(FilterEnemy))
+            MakeGroupInRange(pt.pid, ug, GetUnitX(Hero[pt.pid]), GetUnitY(Hero[pt.pid]), thistype.aoe(pt.pid) * ABOOST[pt.pid], Condition(FilterEnemy))
 
             for target in each(ug) do
                 StunUnit(pt.pid, target, 5.)

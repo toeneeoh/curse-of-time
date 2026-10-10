@@ -17,7 +17,7 @@ OnInit.final("ColosseumShop", function(Require)
             name = "Colosseum Might",
             icon = "ReplaceableTextures\\CommandButtons\\BTNBattleRoar.blp",
             max_rank = 5,
-            detail = "Gain |cffffcc003%|r attack damage and Spellboost per rank while inside the Colosseum.",
+            detail = "Gain |cffffcc003%|r attack damage and Spell Power per rank while inside the Colosseum.",
             apply = function(pid, old_rank, new_rank)
                 local delta = (new_rank - old_rank) * 0.03
                 local hero = Hero[pid]
@@ -122,7 +122,7 @@ OnInit.final("ColosseumShop", function(Require)
             .. " Only one Ring of Struggle may be equipped or one Struggle Gem socketed at a time."
             .. "\n\nReward Rank: |cffffcc00" .. rank .. "|r/|cffffcc00100|r"
             .. "\nAll Attributes: |cffffcc00+" .. attribute .. "|r"
-            .. "\nSpellboost: |cffffcc00+" .. percentage .. "%|r"
+            .. "\nSpell Power: |cffffcc00+" .. percentage .. "%|r"
             .. "\nGold Find: |cffffcc00+" .. percentage .. "%|r"
     end
 

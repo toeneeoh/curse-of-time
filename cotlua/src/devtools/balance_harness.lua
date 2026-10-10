@@ -43,6 +43,8 @@ OnInit.final("BalanceHarness", function(Require)
         { ITEM_MOVESPEED, "movespeed" },
         { ITEM_EVASION, "evasion" },
         { ITEM_SPELLBOOST, "spellboost" },
+        { ITEM_SPELL_AREA, "spell_area" },
+        { ITEM_SPELL_DURATION, "spell_duration" },
         { ITEM_CRIT_CHANCE, "crit_chance" },
         { ITEM_CRIT_DAMAGE, "crit_damage" },
         { ITEM_BASE_ATTACK_SPEED, "base_attack_speed" },

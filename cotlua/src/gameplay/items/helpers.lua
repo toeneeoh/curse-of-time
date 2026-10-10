@@ -179,10 +179,15 @@ OnInit.global("ItemHelpers", function(Require)
         data.tooltip = original
         data.path = path
         data.name = name
+        local legacy_spellboost = false
 
         original:gsub("(%b[])", function(contents)
             contents = contents:sub(2, -2)
             local tag, suffix, value = contents:match("(%a+)([ %*])(%-?%d+%.?%d*)")
+            if tag == "spellboost" then
+                legacy_spellboost = true
+                tag = "spellpower"
+            end
             local index
 
             for i = 1, #STAT_TAG do
@@ -245,6 +250,26 @@ OnInit.global("ItemHelpers", function(Require)
             end
         end)
 
+        -- Old generic sets now grant power only. Other existing Spellboost
+        -- items retain their utility until individually redesigned. New
+        -- spellpower formulas never implicitly grant area or duration.
+        if legacy_spellboost and data[ITEM_TIER] ~= 8 and
+            data[ITEM_TIER] ~= 22 then
+            data.legacy_spell_utility = {}
+            for _, stat in ipairs({ITEM_SPELL_AREA, ITEM_SPELL_DURATION}) do
+                local syntax = STAT_TAG[stat].syntax
+                if not original:find("[" .. syntax, 1, true) then
+                    data.legacy_spell_utility[stat] = true
+                    data[stat] = data[ITEM_SPELLBOOST] * 0.5
+                    for _, property in ipairs({"range", "fpl", "fpr"}) do
+                        data[stat .. property] = data[ITEM_SPELLBOOST .. property] * 0.5
+                    end
+                    for _, property in ipairs({"fixed", "percent", "unlock"}) do
+                        data[stat .. property] = data[ITEM_SPELLBOOST .. property]
+                    end
+                end
+            end
+        end
         return data
     end
 

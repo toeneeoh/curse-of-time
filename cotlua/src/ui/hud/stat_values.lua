@@ -163,6 +163,29 @@ OnInit.final("StatValues", function(Require)
     STAT_TAG[ITEM_SPELLBOOST].getter = function(u)
         return format("%.3f", Unit[u].spellboost * 100.)
     end
+    STAT_TAG[ITEM_SPELLBOOST].breakdown = function(u)
+        return "|cffffcc00Spell Power:|r " .. format("%.3f", Unit[u].spellboost * 100.) ..
+            "%\n|cff999999Increases supported spell damage, healing,\n" ..
+            "shield strength, and other spell bonuses.\n" ..
+            "Spell Power retains random variance.\n" ..
+            "Area and duration have no random variance.|r"
+    end
+    STAT_TAG[ITEM_SPELL_AREA].getter = function(u)
+        return format("%.3f", Unit[u].spell_area * 100.)
+    end
+    STAT_TAG[ITEM_SPELL_AREA].breakdown = function(u)
+        return "|cffffcc00Radius/Range Multiplier:|r x" ..
+            format("%.3f", math.max(0., 1. + Unit[u].spell_area)) ..
+            "\nApplies to supported spell radii and distances, not every cast range."
+    end
+    STAT_TAG[ITEM_SPELL_DURATION].getter = function(u)
+        return format("%.3f", Unit[u].spell_duration * 100.)
+    end
+    STAT_TAG[ITEM_SPELL_DURATION].breakdown = function(u)
+        return "|cffffcc00Duration Multiplier:|r x" ..
+            format("%.3f", math.max(0., 1. + Unit[u].spell_duration)) ..
+            "\nApplies to supported effect durations, not ability cooldowns."
+    end
     STAT_TAG[ITEM_CRIT_CHANCE].getter = function(u)
         return format("%.2f", Unit[u].cc)
     end
@@ -227,7 +250,9 @@ OnInit.final("StatValues", function(Require)
         return format("%.2f", Unit[u].status_resist * 100.)
     end
     STAT_TAG[COOLDOWN_ACCELERATION].getter = function(u)
-        return format("%.2f", Unit[u].cooldown_acceleration)
+        local value = Unit[u].cooldown_acceleration
+        -- Avoid displaying floating-point residue as a misleading -0.00.
+        return format("%.2f", math.abs(value) < .005 and 0. or value)
     end
     STAT_TAG[DROP_RATE].getter = function(u)
         return format("%.0f", Unit[u].drop_rate * 100.)

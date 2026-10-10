@@ -68,7 +68,7 @@ OnInit.final("HighPriestessSpells", function(Require)
 
             pt.x = self.x
             pt.y = self.y
-            pt.aoe = self.aoe * LBOOST[self.pid]
+            pt.aoe = self.aoe * ABOOST[self.pid]
             pt.ug = CreateGroup()
 
             pt:startLoop(0.5, periodic)
@@ -170,14 +170,14 @@ OnInit.final("HighPriestessSpells", function(Require)
             local pt = TimerList[self.pid]:add()
             pt.x = self.targetX
             pt.y = self.targetY
-            pt.aoe = self.aoe * LBOOST[self.pid]
-            pt.dur = self.dur * 2. * LBOOST[self.pid]
+            pt.aoe = self.aoe * ABOOST[self.pid]
+            pt.dur = self.dur * 2. * DBOOST[self.pid]
             pt.ug = CreateGroup()
 
             pt.sfx = AddSpecialEffect(
                          "war3mapImported\\Heaven's Gate Channel.mdl", pt.x,
                          pt.y)
-            BlzSetSpecialEffectScale(pt.sfx, LBOOST[self.pid])
+            BlzSetSpecialEffectScale(pt.sfx, ABOOST[self.pid])
             BlzPlaySpecialEffect(pt.sfx, ANIM_TYPE_BIRTH)
             BlzSetSpecialEffectZ(pt.sfx, GetLocZ(pt.x, pt.y))
 
@@ -227,18 +227,10 @@ OnInit.final("HighPriestessSpells", function(Require)
                                                      RESURRECTION.id) - 2.))
 
             MakeGroupInRange(self.pid, ug, self.x, self.y,
-                             self.aoe * LBOOST[self.pid], Condition(isalive))
+                             self.aoe * ABOOST[self.pid], Condition(isalive))
 
             for target in each(ug) do
-                -- A visual ray must not depend on a native dummy attack landing.
-                -- Match A09Q's skin art and Lit2 graphic duration.
-                local ray = AddLightningEx("YENL", true,
-                    self.x, self.y, GetUnitZ(self.caster) + 75.,
-                    GetUnitX(target), GetUnitY(target), GetUnitZ(target) + 75.)
-                TimerQueue:callDelayed(1., DestroyLightning, ray)
-                DestroyEffect(AddSpecialEffectTarget(
-                    "Abilities\\Spells\\Human\\HolyBolt\\HolyBoltSpecialArt.mdl",
-                    target, "origin"))
+                LightningAttackVisual('A09Q', self.caster, target)
                 if IsUnitAlly(target, Player(self.pid - 1)) then
                     HP(self.caster, target, self.heal * BOOST[self.pid],
                        thistype.tag)
@@ -290,7 +282,7 @@ OnInit.final("HighPriestessSpells", function(Require)
                                                      RESURRECTION.id) - 2.))
 
             MakeGroupInRange(self.pid, ug, self.x, self.y,
-                             self.aoe * LBOOST[self.pid],
+                             self.aoe * ABOOST[self.pid],
                              Condition(FilterAllyHero))
 
             for target in each(ug) do

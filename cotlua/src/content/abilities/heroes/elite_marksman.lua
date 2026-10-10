@@ -17,35 +17,30 @@ OnInit.final("EliteMarksmanSpells", function(Require)
     do
         local thistype = SNIPERSTANCE
         thistype.enabled = {}
+        local configured = setmetatable({}, {__mode = "k"})
 
-        local function toggle(pid, caster)
-            local cooldown = 3.
-            local s = "Disable"
-
-            if thistype.enabled[pid] then
-                cooldown = 6.
-                s = "Enable"
+        local function set_enabled(pid, caster, enabled)
+            local cooldown = enabled and 3. or 6.
+            local ability = BlzGetUnitAbility(caster, TRIROCKET.id)
+            if ability then
+                for i = 0, BlzGetAbilityIntegerField(ability, ABILITY_IF_LEVELS) - 1 do
+                    BlzSetUnitAbilityCooldown(caster, TRIROCKET.id, i, cooldown)
+                end
             end
-
-            for i = 0, 9 do
-                BlzSetUnitAbilityCooldown(caster, TRIROCKET.id, i, cooldown)
-                BlzSetAbilityStringLevelField(BlzGetUnitAbility(caster, thistype.id), ABILITY_SLF_TOOLTIP_NORMAL, i, s .. " Sniper Stance - [|cffffcc00D|r]")
-            end
-
-            thistype.enabled[pid] = not thistype.enabled[pid]
-        end
-
-        function thistype:onCast()
-            toggle(self.pid, self.caster)
-
-            local enabled = thistype.enabled[self.pid]
-            local u = Unit[self.caster]
+            BlzSetAbilityStringLevelField(BlzGetUnitAbility(caster, thistype.id),
+                ABILITY_SLF_TOOLTIP_NORMAL, 0, (enabled and "Disable" or "Enable") .. " Sniper Stance - [|cffffcc00D|r]")
+            if (thistype.enabled[pid] == true) == enabled then return end
+            thistype.enabled[pid] = enabled
+            local u = Unit[caster]
             u.overmovespeed = (enabled and 100) or nil
             u.cc_percent = (enabled and u.cc_percent + 1.) or u.cc_percent - 1.
             u.cd_percent = (enabled and u.cd_percent + 1.) or u.cd_percent - 1.
             u.base_bat = (enabled and u.base_bat * 2.) or u.base_bat * 0.5
             u.range = (enabled and 1150) or 650
+        end
 
+        function thistype:onCast()
+            set_enabled(self.pid, self.caster, not thistype.enabled[self.pid])
             DestroyEffect(AddSpecialEffectTarget("Abilities\\Spells\\Human\\Defend\\DefendCaster.mdl", self.caster, "origin"))
         end
 
@@ -53,7 +48,8 @@ OnInit.final("EliteMarksmanSpells", function(Require)
             local pid = GetPlayerId(GetOwningPlayer(killed)) + 1
 
             if thistype.enabled[pid] then
-                toggle(pid, killed)
+                -- Remove the actual modifiers, not just the enabled flag.
+                set_enabled(pid, killed, false)
             end
         end
 
@@ -63,6 +59,15 @@ OnInit.final("EliteMarksmanSpells", function(Require)
         end
 
         function thistype.onSetup(u)
+            -- A01Q inherits AIlu's item-ability flag. The spell view explicitly
+            -- filters that flag, despite E008 already listing the ability.
+            BlzSetAbilityBooleanField(BlzGetUnitAbility(u, thistype.id), ABILITY_BF_ITEM_ABILITY, false)
+            UnitMakeAbilityPermanent(u, true, thistype.id)
+            BlzUnitDisableAbility(u, thistype.id, false, false)
+            SetPlayerAbilityAvailable(GetOwningPlayer(u), thistype.id, true)
+            if configured[u] then return end
+            configured[u] = true
+            set_enabled(Unit[u].pid, u, false)
             EVENT_ON_UNIT_DEATH:register_unit_action(u, on_death)
             EVENT_ON_CLEANUP:register_action(Unit[u].pid, on_cleanup)
         end
@@ -79,6 +84,17 @@ OnInit.final("EliteMarksmanSpells", function(Require)
             dmg = function(pid) local ablev = GetUnitAbilityLevel(Hero[pid], thistype.id) return (ablev * GetHeroAgi(Hero[pid], true) + Unit[Hero[pid]].damage * ablev * .1) end,
             cooldown = function(pid) return SNIPERSTANCE.enabled[pid] and 3. or 6. end,
         }
+
+        local rocket_order = OrderId("carrionscarabson") -- A06I Ncl6, all five ranks.
+        local function finish_cast(caster)
+            -- Do not rewrite Channel's native level fields during learning.
+            -- Rank 5 can keep its base follow-through; release that order once
+            -- the scripted missiles have launched and the effect event exits.
+            -- Preserve movement or another cast ordered before this callback.
+            if GetUnitTypeId(caster) ~= 0 and GetUnitCurrentOrder(caster) == rocket_order then
+                IssueImmediateOrderById(caster, ORDER_ID_STOP)
+            end
+        end
 
         local missile_template = {
             interactions = {
@@ -97,7 +113,7 @@ OnInit.final("EliteMarksmanSpells", function(Require)
             destroy = function(self)
                 local ug = CreateGroup()
 
-                MakeGroupInRange(self.pid, ug, self.x, self.y, 175. * LBOOST[self.pid], Condition(FilterEnemy))
+                MakeGroupInRange(self.pid, ug, self.x, self.y, 175. * ABOOST[self.pid], Condition(FilterEnemy))
 
                 for target in each(ug) do
                     DamageTarget(self.source, target, self.damage, ATTACK_TYPE_NORMAL, MAGIC, thistype.tag)
@@ -135,8 +151,20 @@ OnInit.final("EliteMarksmanSpells", function(Require)
             CAT_Knockback(self.caster, 500 * math.cos(self.angle + bj_PI), 500 * math.sin(self.angle + bj_PI), 0)
             CAT_UnitEnableFriction(self.caster, true)
             TQ:callDelayed(1., CAT_UnitEnableFriction, self.caster, false)
+            TQ:callDelayed(0., finish_cast, self.caster)
         end
     end
+
+    -- Repair a missing innate stance in Lua without editing map objects.
+    -- Defer additions until the indexer's native ability enumeration is done.
+    Unit.onIndex(function(u)
+        if GetUnitTypeId(u) ~= HERO_MARKSMAN then return end
+        TQ:callDelayed(0., function()
+            if GetUnitTypeId(u) ~= HERO_MARKSMAN then return end
+            UnitAddAbility(u, SNIPERSTANCE.id)
+            SNIPERSTANCE.onSetup(u)
+        end)
+    end)
 
     ---@class ASSAULTHELICOPTER : Spell
     ---@field cd function
@@ -302,7 +330,7 @@ OnInit.final("EliteMarksmanSpells", function(Require)
             pt.source = heli
             pt.text_tag = tag
             pt.onRemove = on_expire
-            pt:after(self.dur * LBOOST[self.pid], nil)
+            pt:after(self.dur * DBOOST[self.pid], nil)
 
             -- text tag loop
             pt = TimerList[self.pid]:add(thistype.id)
@@ -355,7 +383,7 @@ OnInit.final("EliteMarksmanSpells", function(Require)
             local ug = CreateGroup()
 
             for _ = 1, 30 do
-                MakeGroupInRange(self.pid, ug, self.x, self.y, 150. * LBOOST[self.pid], Condition(FilterEnemy))
+                MakeGroupInRange(self.pid, ug, self.x, self.y, 150. * ABOOST[self.pid], Condition(FilterEnemy))
 
                 for target in each(ug) do
                     if SingleShotDebuff:has(self.caster, target) == false then
@@ -407,7 +435,7 @@ OnInit.final("EliteMarksmanSpells", function(Require)
             onExpire = function(self)
                 local ug = CreateGroup()
 
-                MakeGroupInRange(self.pid, ug, self.x, self.y, self.aoe * LBOOST[self.pid], Condition(FilterEnemy))
+                MakeGroupInRange(self.pid, ug, self.x, self.y, self.aoe * ABOOST[self.pid], Condition(FilterEnemy))
 
                 for target in each(ug) do
                     StunUnit(self.pid, target, 3.)
@@ -435,7 +463,7 @@ OnInit.final("EliteMarksmanSpells", function(Require)
                 local ug = CreateGroup()
                 --explode
                 DestroyEffect(AddSpecialEffect("war3mapImported\\NewMassiveEX.mdx", self.x, self.y))
-                MakeGroupInRange(self.pid, ug, self.x, self.y, self.aoe * LBOOST[self.pid], Condition(FilterEnemy))
+                MakeGroupInRange(self.pid, ug, self.x, self.y, self.aoe * ABOOST[self.pid], Condition(FilterEnemy))
 
                 for target in each(ug) do
                     StunUnit(self.pid, target, 4.)
@@ -542,7 +570,7 @@ OnInit.final("EliteMarksmanSpells", function(Require)
             local ug = CreateGroup()
 
             amount.value = 0
-            MakeGroupInRange(pid, ug, GetUnitX(target), GetUnitY(target), thistype.aoe * LBOOST[pid], Condition(FilterEnemy))
+            MakeGroupInRange(pid, ug, GetUnitX(target), GetUnitY(target), thistype.aoe * ABOOST[pid], Condition(FilterEnemy))
 
             for enemy in each(ug) do
                 DamageTarget(source, enemy, thistype.dmg(pid) * BOOST[pid], ATTACK_TYPE_NORMAL, MAGIC, thistype.tag)
@@ -553,7 +581,7 @@ OnInit.final("EliteMarksmanSpells", function(Require)
 
         function thistype:onCast()
             local turret = CreateUnit(Player(self.pid - 1), FourCC("o003"), self.targetX, self.targetY, GetUnitFacing(self.caster))
-            UnitApplyTimedLife(turret, FourCC('Bhwd'), self.dur * LBOOST[self.pid])
+            UnitApplyTimedLife(turret, FourCC('Bhwd'), self.dur * DBOOST[self.pid])
             EVENT_ON_HIT_MULTIPLIER:register_unit_action(turret, on_hit)
             SoundHandler("Units\\Creeps\\HeroTinkerRobot\\ClockwerkGoblinReady1.flac", true, nil, turret)
             DestroyEffect(AddSpecialEffect("UI\\Feedback\\TargetPreSelected\\TargetPreSelected.mdl", self.targetX, self.targetY))

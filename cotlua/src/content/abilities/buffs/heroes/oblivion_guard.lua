@@ -122,10 +122,10 @@ OnInit.final("BuffsHeroesOblivionGuard", function(Require)
             MagneticStrikeBuff:dispel(source, source)
 
             local ug = CreateGroup()
-            MakeGroupInRange(pid, ug, GetUnitX(target), GetUnitY(target), MAGNETICSTRIKE.aoe(pid) * LBOOST[pid], Condition(FilterEnemy))
+            MakeGroupInRange(pid, ug, GetUnitX(target), GetUnitY(target), MAGNETICSTRIKE.aoe(pid) * ABOOST[pid], Condition(FilterEnemy))
 
             for u in each(ug) do
-                MagneticStrikeDebuff:add(source, u):duration(MAGNETICSTRIKE.dur(pid) * LBOOST[pid])
+                MagneticStrikeDebuff:add(source, u):duration(MAGNETICSTRIKE.dur(pid) * DBOOST[pid])
             end
 
             DestroyGroup(ug)
@@ -181,7 +181,7 @@ OnInit.final("BuffsHeroesOblivionGuard", function(Require)
             local ablev = GetUnitAbilityLevel(source, INFERNALSTRIKE.id)
 
             local ug = CreateGroup()
-            MakeGroupInRange(pid, ug, GetUnitX(target), GetUnitY(target), 250. * LBOOST[pid], Condition(FilterEnemy))
+            MakeGroupInRange(pid, ug, GetUnitX(target), GetUnitY(target), 250. * ABOOST[pid], Condition(FilterEnemy))
             local count = BlzGroupGetSize(ug)
 
             for u in each(ug) do

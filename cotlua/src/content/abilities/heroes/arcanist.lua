@@ -147,7 +147,7 @@ OnInit.final("ArcanistSpells", function(Require)
                 missile.owner = Player(self.pid - 1)
                 missile.damage = self.dmg * BOOST[self.pid]
                 missile.dist = 1000.
-                missile.aoe = self.aoe * LBOOST[self.pid]
+                missile.aoe = self.aoe * ABOOST[self.pid]
                 missile.pid = self.pid
 
                 ALICE_Create(missile)
@@ -202,7 +202,7 @@ OnInit.final("ArcanistSpells", function(Require)
 
             local ug = CreateGroup()
 
-            MakeGroupInRange(self.pid, ug, self.x, self.y, self.aoe * LBOOST[self.pid], Condition(FilterEnemy))
+            MakeGroupInRange(self.pid, ug, self.x, self.y, self.aoe * ABOOST[self.pid], Condition(FilterEnemy))
 
             local size = BlzGroupGetSize(ug) ---@type integer
             local target = FirstOfGroup(ug)
@@ -299,7 +299,7 @@ OnInit.final("ArcanistSpells", function(Require)
             BlzSetUnitAbilityCooldown(self.caster, ARCANEBARRAGE.id, GetUnitAbilityLevel(self.caster, ARCANEBARRAGE.id) - 1, 3.)
 
             periodic(self)
-            TQ:callDelayed(self.dur * LBOOST[self.pid], on_expire, self)
+            TQ:callDelayed(self.dur * DBOOST[self.pid], on_expire, self)
         end
     end
 
@@ -336,16 +336,16 @@ OnInit.final("ArcanistSpells", function(Require)
         function thistype:onCast()
             local pt = TimerList[self.pid]:add()
 
-            pt.aoe = self.aoe * LBOOST[self.pid]
+            pt.aoe = self.aoe * ABOOST[self.pid]
             pt.x = self.targetX
             pt.y = self.targetY
-            pt.dur = self.dur * LBOOST[self.pid]
+            pt.dur = self.dur * DBOOST[self.pid]
             pt.source = self.caster
             pt.ug = CreateGroup()
 
             pt.target = Dummy.create(pt.x, pt.y, 0, 0, 6.).unit
             BlzSetUnitSkin(pt.target, FourCC('h02B'))
-            SetUnitScale(pt.target, 1.05 * LBOOST[self.pid], 1.05 * LBOOST[self.pid], 1.05 * LBOOST[self.pid])
+            SetUnitScale(pt.target, 1.05 * ABOOST[self.pid], 1.05 * ABOOST[self.pid], 1.05 * ABOOST[self.pid])
             UnitDisableAbility(pt.target, FourCC('Amov'), true)
             SetUnitFlyHeight(pt.target, 0., 0.)
             SetUnitAnimation(pt.target, "birth")
@@ -430,13 +430,13 @@ OnInit.final("ArcanistSpells", function(Require)
             else
                 local ug = CreateGroup()
 
-                MakeGroupInRange(self.pid, ug, self.targetX, self.targetY, self.aoe * LBOOST[self.pid], Condition(FilterEnemy))
+                MakeGroupInRange(self.pid, ug, self.targetX, self.targetY, self.aoe * ABOOST[self.pid], Condition(FilterEnemy))
 
                 if FirstOfGroup(ug) then
                     pt = TimerList[self.pid]:add()
                     pt.ug = CreateGroup()
                     pt.dmg = self.dmg * BOOST[self.pid]
-                    pt.dur = self.dur * LBOOST[self.pid]
+                    pt.dur = self.dur * DBOOST[self.pid]
                     pt.cooldown = BlzGetUnitAbilityCooldown(self.caster, self.sid, self.ablev - 1)
                     pt.source = self.caster
                     pt.tag = thistype.id

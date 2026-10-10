@@ -38,6 +38,27 @@
     local format = string.format
     local pattern = "(~?)(>?)([\\{%[])(%w-)=(.-)]"
     local gsub = string.gsub
+    -- Existing native {tag=...] placeholders used one half-Spellboost
+    -- multiplier. Route each known tag to its actual mechanic instead.
+    local area_tags = {aoe = true, aoe2 = true, iceaoe = true, orbaoe = true,
+        range = true, spinaoe = true, knockaoe = true, shoutaoe = true}
+    local duration_tags = {dur = true, freeze = true, wardur = true,
+        peacedur = true, fatiguedur = true, knockdur = true,
+        shoutdur = true, tornadodur = true}
+    local times_duration = {[FourCC('A098')] = true, [FourCC('A0MN')] = true}
+    function SpellTooltipMultiplier(spell, u, tag)
+        local unit = Unit[u]
+        local kind = spell.tooltip_scaling and spell.tooltip_scaling[tag]
+        if kind == "none" then return 1. end
+        if kind == "area" or (not kind and area_tags[tag]) then
+            return math.max(0., 1. + unit.spell_area)
+        end
+        if kind == "duration" or (not kind and (duration_tags[tag] or
+            (tag == "times" and times_duration[spell.id]))) then
+            return math.max(0., 1. + unit.spell_duration)
+        end
+        return 1. + 0.5 * unit.spellboost
+    end
 
     -- set by getTooltip before calling gsub
     local current_spell ---@type Spell
@@ -67,6 +88,7 @@
     ---@field targetY number
     ---@field angle number
     ---@field values table
+    ---@field tooltip_scaling? table<string, string> Explicit area/duration/power/none overrides.
     ---@field create function
     ---@field onEquip function
     ---@field onUnequip function
@@ -227,7 +249,7 @@
                           color)
 
             elseif prefix == "{" then
-                local mult = LBOOST[current_pid]
+                local mult = SpellTooltipMultiplier(self, u, tag)
                 local v = calc * mult
                 local out
                 if v < 1000 then
@@ -247,7 +269,8 @@
         ---@type fun(self: Spell, u: unit?, ablev: integer?): string
         function thistype:getTooltip(u, ablev)
             local level = ablev or self.ablev or 1
-            local orig = thistype.TOOLTIPS[self.id][level]
+            -- Native object tooltips still use the old player-facing stat name.
+            local orig = gsub(thistype.TOOLTIPS[self.id][level], "Spellboost", "Spell Power")
 
             -- just return raw tooltip if no dynamic values
             if not self.values or (not string.find(orig, "=", 1, true)) then

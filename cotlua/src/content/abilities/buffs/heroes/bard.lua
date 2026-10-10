@@ -11,7 +11,7 @@ OnInit.final("BuffsHeroesBard", function(Require)
         local thistype = InspireBuff
         thistype.NAME            = "Inspired"
         thistype.ICON            = "ReplaceableTextures\\CommandButtons\\BTNBearBlink.blp"
-        thistype.DESC            = "This unit has +^$spellboost% spellboost"
+        thistype.DESC            = "This unit has +^$spellboost% Spell Power"
         thistype.AURA            = true
         thistype.DISPEL_TYPE     = BUFF_POSITIVE
         thistype.STACK_TYPE      = BUFF_STACK_PARTIAL

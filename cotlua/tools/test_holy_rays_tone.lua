@@ -20,6 +20,9 @@ Spell = {define = function(id)
 end}
 local caster = {x = 0, y = 0, z = 50, ally = true}
 Hero, BOOST, LBOOST = {[1] = caster}, {[1] = 1.5}, {[1] = 1}
+-- This legacy fixture grants equal area/duration bonuses; independent scaling
+-- is covered separately by test_spell_scaling.lua.
+ABOOST, DBOOST = LBOOST, LBOOST
 GetUnitAbilityLevel = function() return 2 end
 GetHeroInt = function() return 100 end
 Player = function(id) return id end
@@ -80,6 +83,8 @@ BlzStartUnitAbilityCooldown = function(source, id, cooldown)
     assert(source == caster and id == RESURRECTION.id)
     resurrection_cd = cooldown
 end
+OnInit = {final = function(_, callback) callback(function() end) end}
+assert(load(read('cotlua/src/gameplay/abilities/tools.lua'), 'SpellTools', 't', sandbox))()
 load_spell("cotlua/src/content/abilities/heroes/high_priestess.lua", "    ---@class HOLYRAYS", "    ---@class PROTECTION")
 local function cast(definition)
     local instance = {pid = 1, caster = caster, x = 0, y = 0, angle = 0}

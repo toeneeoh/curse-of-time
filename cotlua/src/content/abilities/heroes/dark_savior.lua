@@ -30,7 +30,7 @@ OnInit.final("DarkSaviorSpells", function(Require)
             b.y = self.targetY
 
             b:check(self.caster, self.caster)
-            b:duration(self.dur * LBOOST[self.pid])
+            b:duration(self.dur * DBOOST[self.pid])
         end
 
         local manacost = function(u, key)
@@ -57,7 +57,7 @@ OnInit.final("DarkSaviorSpells", function(Require)
         }
 
         function thistype:onCast()
-            DarkBladeBuff:add(self.caster, self.caster):duration(self.dur * LBOOST[self.pid])
+            DarkBladeBuff:add(self.caster, self.caster):duration(self.dur * DBOOST[self.pid])
         end
     end
 
@@ -98,8 +98,8 @@ OnInit.final("DarkSaviorSpells", function(Require)
                 for i = 0, pt.time - 1 do
                     target = BlzGroupUnitAt(pt.ug, i)
                     if not target then break end
-                    local dummy = Dummy.create(x, y, FourCC('A01Y'), 1, 2.5)
-                    dummy:attack(target, pt.source, on_hit)
+                    LightningAttackVisual('A01Y', pt.source, target, x, y)
+                    on_hit(pt.source, target)
                 end
 
                 -- dark seal augment
@@ -118,8 +118,8 @@ OnInit.final("DarkSaviorSpells", function(Require)
                                 x = b.x + 380 * math.cos(angle)
                                 y = b.y + 380 * math.sin(angle)
 
-                                local dummy = Dummy.create(x, y, FourCC('A01Y'), 1, 2.5)
-                                dummy:attack(target, pt.source, on_hit)
+                                LightningAttackVisual('A01Y', pt.source, target, x, y)
+                                on_hit(pt.source, target)
                             end
                         end
                     end
@@ -141,8 +141,8 @@ OnInit.final("DarkSaviorSpells", function(Require)
             local pt = TimerList[self.pid]:add()
 
             pt.time = R2I(self.targets * LBOOST[self.pid])
-            pt.aoe = self.aoe * LBOOST[self.pid]
-            pt.dur = self.dur * LBOOST[self.pid]
+            pt.aoe = self.aoe * ABOOST[self.pid]
+            pt.dur = self.dur * DBOOST[self.pid]
             pt.sfx = Unit[self.caster]:addEffect("Abilities\\Spells\\Orc\\LightningShield\\LightningShieldTarget.mdl", "origin")
             pt.sfx.timescale = 1.5
             pt.source = self.caster
@@ -179,14 +179,14 @@ OnInit.final("DarkSaviorSpells", function(Require)
         }
 
         local function slow(self)
-            FreezingBlastDebuff:add(self.source, self.target):duration(FREEZINGBLAST.freeze * LBOOST[self.pid])
+            FreezingBlastDebuff:add(self.source, self.target):duration(FREEZINGBLAST.freeze * DBOOST[self.pid])
         end
 
         function thistype:onCast()
             local b = DarkSealBuff:get(self.caster, self.caster)
             local ug = CreateGroup()
 
-            MakeGroupInRange(self.pid, ug, self.targetX, self.targetY, self.aoe * LBOOST[self.pid], Condition(FilterEnemy))
+            MakeGroupInRange(self.pid, ug, self.targetX, self.targetY, self.aoe * ABOOST[self.pid], Condition(FilterEnemy))
 
             -- dark seal
             if b then
@@ -200,15 +200,15 @@ OnInit.final("DarkSaviorSpells", function(Require)
             DestroyEffect(AddSpecialEffect("war3mapImported\\AquaSpikeVersion2.mdx", self.targetX, self.targetY))
 
             for target in each(ug) do
-                Freeze:add(self.caster, target):duration(self.freeze * LBOOST[self.pid])
-                if IsUnitInRangeXY(target, self.targetX, self.targetY, self.aoe * LBOOST[self.pid]) == true and b then
+                Freeze:add(self.caster, target):duration(self.freeze * DBOOST[self.pid])
+                if IsUnitInRangeXY(target, self.targetX, self.targetY, self.aoe * ABOOST[self.pid]) == true and b then
                     DamageTarget(self.caster, target, self.dmg * 2 * BOOST[self.pid], ATTACK_TYPE_NORMAL, MAGIC, thistype.tag)
                 else
                     DamageTarget(self.caster, target, self.dmg * BOOST[self.pid], ATTACK_TYPE_NORMAL, MAGIC, thistype.tag)
                 end
 
                 -- apply slow after
-                TQ:callDelayed(self.freeze * LBOOST[self.pid], slow, self)
+                TQ:callDelayed(self.freeze * DBOOST[self.pid], slow, self)
             end
         end
 
@@ -264,7 +264,7 @@ OnInit.final("DarkSaviorSpells", function(Require)
         }
 
         local function delay(self)
-            DarkAscensionBuff:add(self.caster, self.caster):duration(self.dur * LBOOST[self.pid])
+            DarkAscensionBuff:add(self.caster, self.caster):duration(self.dur * DBOOST[self.pid])
         end
 
         function thistype.preCast(pid, tpid, caster)

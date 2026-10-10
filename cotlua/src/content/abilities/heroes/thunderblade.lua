@@ -126,7 +126,7 @@ OnInit.final("ThunderbladeSpells", function(Require)
             UnitAddAbility(self.caster, ABIL_AVUL)
             DestroyEffect(AddSpecialEffectTarget("Abilities\\Weapons\\FarseerMissile\\FarseerMissile.mdl", self.caster, "chest"))
 
-            local range = self.range * LBOOST[self.pid]
+            local range = self.range * ABOOST[self.pid]
             local missile = setmetatable({}, missile_template)
             missile.x = self.x
             missile.y = self.y
@@ -137,7 +137,7 @@ OnInit.final("ThunderbladeSpells", function(Require)
             missile.source = self.caster
             missile.owner = Player(self.pid - 1)
             missile.damage = self.dmg * BOOST[self.pid]
-            missile.aoe = self.aoe * LBOOST[self.pid]
+            missile.aoe = self.aoe * ABOOST[self.pid]
             missile.pid = self.pid
             missile.dist = range
             missile.range = range
@@ -165,7 +165,7 @@ OnInit.final("ThunderbladeSpells", function(Require)
             pt.dur = pt.dur - 1
 
             if pt.dur >= -0.5 then
-                MakeGroupInRange(pt.pid, pt.ug, pt.x, pt.y, thistype.aoe(pt.pid) * LBOOST[pt.pid], Condition(FilterEnemy))
+                MakeGroupInRange(pt.pid, pt.ug, pt.x, pt.y, thistype.aoe(pt.pid) * ABOOST[pt.pid], Condition(FilterEnemy))
 
                 for target in each(pt.ug) do
                     DestroyEffect(AddSpecialEffect("Abilities\\Spells\\Other\\Monsoon\\MonsoonBoltTarget.mdl", GetUnitX(target), GetUnitY(target)))
@@ -183,7 +183,7 @@ OnInit.final("ThunderbladeSpells", function(Require)
 
             pt.x = self.targetX
             pt.y = self.targetY
-            pt.dur = self.times * LBOOST[self.pid]
+            pt.dur = self.times * DBOOST[self.pid]
             pt.ug = CreateGroup()
 
             local sfx = AddSpecialEffect("war3mapImported\\AnimatedEnviromentalEffectRainBv005", self.targetX, self.targetY)
@@ -220,12 +220,12 @@ OnInit.final("ThunderbladeSpells", function(Require)
             pt.dur = pt.dur - 1
 
             if UnitAlive(Hero[pt.pid]) and pt.dur >= 0 then
-                MakeGroupInRange(pt.pid, pt.ug, GetUnitX(Hero[pt.pid]), GetUnitY(Hero[pt.pid]), thistype.aoe * LBOOST[pt.pid], Condition(FilterEnemy))
+                MakeGroupInRange(pt.pid, pt.ug, GetUnitX(Hero[pt.pid]), GetUnitY(Hero[pt.pid]), thistype.aoe * ABOOST[pt.pid], Condition(FilterEnemy))
 
                 if math.random() * 100 < thistype.chance * LBOOST[pt.pid] and BlzGroupGetSize(pt.ug) > 0 then
                     local enemy = BlzGroupUnitAt(pt.ug, GetRandomInt(0, BlzGroupGetSize(pt.ug) - 1))
-                    local dummy = Dummy.create(GetUnitX(Hero[pt.pid]), GetUnitY(Hero[pt.pid]), FourCC('A01Y'), 1, 2.)
-                    dummy:attack(enemy, Hero[pt.pid], on_hit)
+                    LightningAttackVisual('A01Y', Hero[pt.pid], enemy)
+                    on_hit(Hero[pt.pid], enemy)
                 end
 
                 for target in each(pt.ug) do
@@ -318,10 +318,9 @@ OnInit.final("ThunderbladeSpells", function(Require)
 
                 -- A visual-only beam needs no attack dummy or native hit.
                 local start_x, start_y = GetUnitX(pt.target), GetUnitY(pt.target)
-                local beam = AddLightningEx("RAIL", true, start_x, start_y,
-                                            GetTerrainZ(start_x, start_y) + 135.,
-                                            x, y, GetTerrainZ(x, y) + 135.)
-                if beam then TQ:callDelayed(0.35, DestroyLightning, beam) end
+                LightningAttackBeam('A010', start_x, start_y,
+                    GetTerrainZ(start_x, start_y) + 135.,
+                    x, y, GetTerrainZ(x, y) + 135.)
 
                 SetUnitScale(pt.target, 1., 1., 1.)
                 SetUnitAnimation(pt.target, "death")

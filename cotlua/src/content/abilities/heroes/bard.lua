@@ -16,7 +16,7 @@ OnInit.final("BardSpells", function(Require)
 
     local function song_periodic(pt)
         local pt2 = TimerList[pt.pid]:get(IMPROV.id, nil, pt.caster)
-        MakeGroupInRange(pt.pid, pt.ug, GetUnitX(pt.caster), GetUnitY(pt.caster), 900. * LBOOST[pt.pid], Condition(isalive))
+        MakeGroupInRange(pt.pid, pt.ug, GetUnitX(pt.caster), GetUnitY(pt.caster), 900. * ABOOST[pt.pid], Condition(isalive))
 
         if pt2 then
             GroupEnumUnitsInRangeEx(pt.pid, pt.ug, pt2.x, pt2.y, pt2.aoe, Condition(isalive))
@@ -159,7 +159,7 @@ OnInit.final("BardSpells", function(Require)
         function thistype:onCast()
             local ug = CreateGroup()
             local p = Player(self.pid - 1)
-            local aoe = self.aoe * LBOOST[self.pid]
+            local aoe = self.aoe * ABOOST[self.pid]
 
             MakeGroupInRange(self.pid, ug, self.x, self.y, aoe, Condition(isalive))
 
@@ -196,18 +196,18 @@ OnInit.final("BardSpells", function(Require)
                     if target == Hero[self.tpid] then
                         -- song of war
                         if (BARD_SONG[self.pid] == SONG_WAR and in_song) or (song == SONG_WAR and in_improv) then
-                            SongOfWarEncoreBuff:add(self.caster, target):duration(thistype.wardur * LBOOST[self.pid])
+                            SongOfWarEncoreBuff:add(self.caster, target):duration(thistype.wardur * DBOOST[self.pid])
                         end
                         -- song of peace
                         if (BARD_SONG[self.pid] == SONG_PEACE and in_song) or (song == SONG_PEACE and in_improv) then
-                            SongOfPeaceEncoreBuff:add(self.caster, target):duration(thistype.peacedur * LBOOST[self.pid])
+                            SongOfPeaceEncoreBuff:add(self.caster, target):duration(thistype.peacedur * DBOOST[self.pid])
                         end
                     end
                 else
                 -- enemies
                     -- song of fatigue
                     if (BARD_SONG[self.pid] == SONG_FATIGUE and in_song) or (song == SONG_FATIGUE and in_improv) then
-                        StunUnit(self.pid, target, thistype.fatiguedur * LBOOST[self.pid])
+                        StunUnit(self.pid, target, thistype.fatiguedur * DBOOST[self.pid])
                     end
                 end
             end
@@ -298,9 +298,9 @@ OnInit.final("BardSpells", function(Require)
                 pt.y = self.targetY
                 pt.song = BARD_SONG[self.pid]
                 pt.tag = thistype.id -- important for aura check
-                pt.aoe = self.aoe * LBOOST[self.pid]
+                pt.aoe = self.aoe * ABOOST[self.pid]
                 pt.dmg = self.dmg
-                pt.dur = self.dur * LBOOST[self.pid]
+                pt.dur = self.dur * DBOOST[self.pid]
                 pt.target = self.caster
                 pt.source = Dummy.create(pt.x, pt.y, 0, 0, pt.dur).unit
                 pt.ug = CreateGroup()
@@ -355,7 +355,7 @@ OnInit.final("BardSpells", function(Require)
             local cost = BlzGetUnitMaxMana(self.caster) * 0.02
             SetUnitState(self.caster, UNIT_STATE_MANA, math.max(mana - cost, 0))
             if mana - cost > 0 then
-                ALICE_ForAllObjectsInRangeDo(buff, GetUnitX(self.caster), GetUnitY(self.caster), 900. * LBOOST[self.pid], "unit", valid_ally, self.caster, self.ablev)
+                ALICE_ForAllObjectsInRangeDo(buff, GetUnitX(self.caster), GetUnitY(self.caster), 900. * ABOOST[self.pid], "unit", valid_ally, self.caster, self.ablev)
                 thistype.callback[self.pid] = TQ:callDelayed(1, periodic, self)
             else
                 IssueImmediateOrderById(self.caster, ORDER_ID_UNIMMOLATION)
@@ -488,10 +488,10 @@ OnInit.final("BardSpells", function(Require)
             missile.vy = missile.speed * math.sin(self.angle)
             missile.owner = Player(self.pid - 1)
             missile.source = self.caster
-            missile.aoe = self.aoe * LBOOST[self.pid]
+            missile.aoe = self.aoe * ABOOST[self.pid]
             missile.dmg = self.dmg
             missile.pid = self.pid
-            missile.lifetime = self.dur * LBOOST[self.pid]
+            missile.lifetime = self.dur * DBOOST[self.pid]
 
             ALICE_Create(missile)
 

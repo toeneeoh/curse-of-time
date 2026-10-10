@@ -52,6 +52,9 @@ assert(loadfile("cotlua/src/framework/scheduling/player_timer.lua"))()
 
 local caster, ally, enemy = {}, {}, {enemy = true}
 Hero, LBOOST = {[1] = caster}, {[1] = 1}
+-- This legacy fixture grants equal area/duration bonuses; independent scaling
+-- is covered separately by test_spell_scaling.lua.
+ABOOST, DBOOST = LBOOST, LBOOST
 Unit = {[caster] = {evasion = 5}, [ally] = {evasion = 2}, [enemy] = {ms_percent = 1}}
 local ability_level = 1
 GetUnitAbilityLevel = function() return ability_level end

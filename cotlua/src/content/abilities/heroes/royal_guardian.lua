@@ -86,7 +86,7 @@ OnInit.final("RoyalGuardianSpells", function(Require)
             SoundHandler("Units\\Human\\Knight\\KnightYesAttack3.flac", true, nil, self.caster)
             DestroyEffect(AddSpecialEffect("Abilities\\Spells\\Human\\Polymorph\\PolyMorphDoneGround.mdl", self.x, self.y))
 
-            SteedChargeBuff:add(self.caster, self.caster):duration(self.dur * LBOOST[self.pid])
+            SteedChargeBuff:add(self.caster, self.caster):duration(self.dur * DBOOST[self.pid])
             self.g = {}
             self.x = self.targetX
             self.y = self.targetY
@@ -121,7 +121,7 @@ OnInit.final("RoyalGuardianSpells", function(Require)
 
             if Unit[self.caster].shield_count > 0 then
                 local ug = CreateGroup()
-                MakeGroupInRange(self.pid, ug, GetUnitX(self.target), GetUnitY(self.target), 300 * LBOOST[self.pid], Condition(FilterEnemy))
+                MakeGroupInRange(self.pid, ug, GetUnitX(self.target), GetUnitY(self.target), 300 * ABOOST[self.pid], Condition(FilterEnemy))
                 GroupRemoveUnit(ug, self.target)
 
                 for target in each(ug) do
@@ -147,7 +147,7 @@ OnInit.final("RoyalGuardianSpells", function(Require)
         }
 
         function thistype:onCast()
-            RoyalPlateBuff:add(self.caster, self.caster):duration(self.dur * LBOOST[self.pid])
+            RoyalPlateBuff:add(self.caster, self.caster):duration(self.dur * DBOOST[self.pid])
         end
     end
 
@@ -169,11 +169,11 @@ OnInit.final("RoyalGuardianSpells", function(Require)
             local ug = CreateGroup()
 
             HP(self.caster, self.caster, self.heal * BOOST[self.pid], thistype.tag)
-            MakeGroupInRange(self.pid, ug, self.x, self.y, self.aoe * LBOOST[self.pid], Condition(FilterEnemy))
+            MakeGroupInRange(self.pid, ug, self.x, self.y, self.aoe * ABOOST[self.pid], Condition(FilterEnemy))
             DestroyEffect(AddSpecialEffectTarget("Abilities\\Spells\\NightElf\\Taunt\\TauntCaster.mdl", self.caster, "origin"))
 
             for target in each(ug) do
-                ProvokeDebuff:add(self.caster, target):duration(self.dur * LBOOST[self.pid])
+                ProvokeDebuff:add(self.caster, target):duration(self.dur * DBOOST[self.pid])
             end
 
             Taunt(self.caster, 800.)
@@ -193,7 +193,7 @@ OnInit.final("RoyalGuardianSpells", function(Require)
         }
 
         function thistype:onCast()
-            FightMeCasterBuff:add(self.caster, self.caster):duration(self.dur * LBOOST[self.pid])
+            FightMeCasterBuff:add(self.caster, self.caster):duration(self.dur * DBOOST[self.pid])
         end
     end
 
@@ -213,7 +213,7 @@ OnInit.final("RoyalGuardianSpells", function(Require)
         local function periodic(pt)
             local source = pt.source
             local x, y = GetUnitX(source), GetUnitY(source)
-            ALICE_ForAllObjectsInRangeDo(buff, x, y, 900. * LBOOST[pt.pid], "unit", valid_ally, pt.source, pt.ablev)
+            ALICE_ForAllObjectsInRangeDo(buff, x, y, 900. * ABOOST[pt.pid], "unit", valid_ally, pt.source, pt.ablev)
 
             return true
         end

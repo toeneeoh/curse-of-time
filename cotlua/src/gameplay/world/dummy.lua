@@ -13,6 +13,7 @@ OnInit.final("Dummy", function(Require)
     Require("Units")
     Require('Frames')
     Require('CircularArray')
+    Require('SpellTools')
 
     local TQ = TimerQueue
     local atan = math.atan
@@ -122,10 +123,10 @@ OnInit.final("Dummy", function(Require)
         end
 
         function thistype:lightning(x, y)
-            local dummy = thistype.create(x, y, 0, 0, 1.)
-            UnitRemoveAbility(dummy.unit, ABIL_AVUL)
-            UnitRemoveAbility(dummy.unit, ABIL_ALOC)
-            self:attack(dummy.unit)
+            local source_x, source_y = GetUnitX(self.unit), GetUnitY(self.unit)
+            return LightningAttackBeam(string.pack(">I4", self.abil),
+                source_x, source_y, GetUnitZ(self.unit) + 75.,
+                x, y, GetTerrainZ(x, y) + 75.)
         end
 
         ---@type fun(self: Dummy)

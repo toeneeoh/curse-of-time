@@ -7,6 +7,7 @@ OnInit.final("ShopServices", function(Require)
     Require('Items')
     Require('PotionService')
     Require('Profile')
+    Require('Perks')
     Require('Spells')
     Require('TimerQueue')
 
@@ -84,7 +85,9 @@ OnInit.final("ShopServices", function(Require)
         end
         local item = GetResurrectionItem(pid, true)
         if not item then return result(false, "NO ITEM") end
-        if item.charges >= MAX_REINCARNATION_CHARGES then return result(false, "FULL") end
+        local bonuses = Perks.getBonuses(pid)
+        local capacity = MAX_REINCARNATION_CHARGES + (bonuses.reincarnation_capacity or 0)
+        if item.charges >= capacity then return result(false, "FULL") end
         if RECHARGE_COOLDOWN[pid] >= 1 then return result(false, "COOLDOWN") end
 
         local percentage = Profile[pid].hero.hardcore > 0 and 0.03 or 0.01
@@ -96,6 +99,11 @@ OnInit.final("ShopServices", function(Require)
             + player_gold * percentage
             + (platinum_fraction - R2I(platinum_fraction)) * 1000000)
         quote.platinum = R2I(platinum_fraction)
+        local savings = math.min(.50, bonuses.recharge_discount or 0.)
+        -- Keep the platinum cost and denomination split intact. The perk
+        -- discounts gold only, so taking it cannot raise the gold required.
+        quote.gold = math.floor(quote.gold * (1. - savings))
+        quote.maximum_charges = capacity
         if player_gold < quote.gold or GetCurrency(pid, PLATINUM) < quote.platinum then
             quote.available = false
             quote.reason = "currency"
@@ -135,7 +143,7 @@ OnInit.final("ShopServices", function(Require)
                     properties.maximum_charges then
                     quote.potions[#quote.potions + 1] = potion
                     quote.price = quote.price +
-                                      PotionService.getRefillCost(potion)
+                                      PotionService.getRefillCost(potion, pid)
                 end
             end
         end

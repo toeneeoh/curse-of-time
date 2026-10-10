@@ -792,7 +792,7 @@ OnInit.final("DarkSummonerSpells", function(Require)
             local end_width = 225. + tier * 15.
             local cleave_damage = (attack_amount or amount.value) * (0.2 + tier * 0.06)
             local dreadful_wounds = (tier >= 4 and 0.10) or 0.05
-            local dreadful_duration = 4. * LBOOST[pid]
+            local dreadful_duration = 4. * DBOOST[pid]
             local healing = 0.
             local source_x, source_y = GetUnitX(source), GetUnitY(source)
             local dx, dy = GetUnitX(target) - source_x, GetUnitY(target) - source_y
@@ -812,9 +812,9 @@ OnInit.final("DarkSummonerSpells", function(Require)
                 dx, dy = math.cos(facing), math.sin(facing)
             end
 
-            local length = CLEAVE_LENGTH * LBOOST[pid]
-            local start_width = CLEAVE_START_WIDTH * LBOOST[pid]
-            end_width = end_width * LBOOST[pid]
+            local length = CLEAVE_LENGTH * ABOOST[pid]
+            local start_width = CLEAVE_START_WIDTH * ABOOST[pid]
+            end_width = end_width * ABOOST[pid]
             local center_x = source_x + dx * length * 0.5
             local center_y = source_y + dy * length * 0.5
             local enum_radius = math.sqrt(length * length * 0.25 + end_width * end_width)
@@ -1173,7 +1173,7 @@ OnInit.final("DarkSummonerSpells", function(Require)
         end)
 
         local function cast_radius(pid, caster)
-            return AOE_BY_LEVEL[ability_level(caster)] * LBOOST[pid]
+            return AOE_BY_LEVEL[ability_level(caster)] * ABOOST[pid]
         end
 
         local function nova_scale_at(elapsed)
@@ -1230,7 +1230,7 @@ OnInit.final("DarkSummonerSpells", function(Require)
 
         function thistype:onCast()
             local level = ability_level(self.caster)
-            local radius = self.aoe * LBOOST[self.pid]
+            local radius = self.aoe * ABOOST[self.pid]
             local summons = collect_summons(self.pid, self.caster, radius)
 
             if #summons == 0 then
@@ -1241,7 +1241,7 @@ OnInit.final("DarkSummonerSpells", function(Require)
             local damage = self.damage * LBOOST[self.pid] * 0.01
             local reduction = REDUCTION_BY_LEVEL[level] * 0.01
             local attack_speed = ATTACK_SPEED_BY_LEVEL[level] * 0.01
-            local dur = self.dur * LBOOST[self.pid]
+            local dur = self.dur * DBOOST[self.pid]
 
             local cast_sfx = AddSpecialEffect("unholy_ascension.mdl", GetUnitX(self.caster), GetUnitY(self.caster))
             BlzSetSpecialEffectScale(cast_sfx, radius / NOVA_EFFECT_SCALE_DIVISOR)
@@ -1392,7 +1392,7 @@ OnInit.final("DarkSummonerSpells", function(Require)
         end
 
         local function cast_radius(pid, caster)
-            return AOE_BY_LEVEL[ability_level(caster)] * LBOOST[pid]
+            return AOE_BY_LEVEL[ability_level(caster)] * ABOOST[pid]
         end
 
         function thistype.preCast(pid, tpid, caster)
@@ -1403,7 +1403,7 @@ OnInit.final("DarkSummonerSpells", function(Require)
         end
 
         function thistype:onCast()
-            local summons = collect_summons(self.pid, self.caster, self.aoe * LBOOST[self.pid])
+            local summons = collect_summons(self.pid, self.caster, self.aoe * ABOOST[self.pid])
             if #summons == 0 then
                 BlzEndUnitAbilityCooldown(self.caster, thistype.id)
                 return
@@ -1414,7 +1414,7 @@ OnInit.final("DarkSummonerSpells", function(Require)
             local cost_percent = sacrifice_cost_percent(self.caster)
             local current_life = GetWidgetLife(self.caster)
             local payment = math.min(current_life, BlzGetUnitMaxHP(self.caster) * cost_percent * 0.01)
-            local dur = self.dur * LBOOST[self.pid]
+            local dur = self.dur * DBOOST[self.pid]
             local lethal = payment >= current_life
 
             debt_buff = debt_buff or BloodDebtBuff:add(self.caster, self.caster)
@@ -1448,7 +1448,7 @@ OnInit.final("DarkSummonerSpells", function(Require)
             dev_log(string.format(
                 "sacrifice pid=%d level=%d debt=%d cost=%.0f paid=%.0f targets=%d radius=%.0f duration=%.2f lethal=%s",
                 self.pid, self.ablev, debt, cost_percent, payment, #summons,
-                self.aoe * LBOOST[self.pid], dur, tostring(lethal)))
+                self.aoe * ABOOST[self.pid], dur, tostring(lethal)))
         end
     end
 end, Debug and Debug.getLine())

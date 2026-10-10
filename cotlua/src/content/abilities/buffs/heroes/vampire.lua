@@ -81,7 +81,7 @@ OnInit.final("BuffsHeroesVampire", function(Require)
         end
 
         local function periodic(self)
-            MakeGroupInRange(self.tpid, self.ug, GetUnitX(self.source), GetUnitY(self.source), 500. * LBOOST[self.tpid], Condition(FilterEnemy))
+            MakeGroupInRange(self.tpid, self.ug, GetUnitX(self.source), GetUnitY(self.source), 500. * ABOOST[self.tpid], Condition(FilterEnemy))
 
             if BlzGroupGetSize(self.ug) > 0 then
                 DestroyEffect(AddSpecialEffectTarget("war3mapImported\\DarknessLeechTarget_Portrait.mdx", self.source, "origin"))
@@ -91,8 +91,7 @@ OnInit.final("BuffsHeroesVampire", function(Require)
                 BLOODBANK.add(self.tpid, BLOODLEECH.gain(self.tpid) / 3.)
                 DamageTarget(self.source, target, BLOODLEECH.dmg(self.tpid) / 3. * BOOST[self.tpid], ATTACK_TYPE_NORMAL, MAGIC, BLOODLORD.tag)
 
-                local dummy = Dummy.create(GetUnitX(target), GetUnitY(target), FourCC('A0A1'), 1)
-                dummy:attack(self.source)
+                LightningAttackVisual('A0A1', target, self.source)
             end
 
             self.timer = TQ:callDelayed(1., periodic, self)

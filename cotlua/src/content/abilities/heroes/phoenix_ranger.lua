@@ -102,7 +102,7 @@ OnInit.final("PhoenixRangerSpells", function(Require)
             local r = GetRectFromCoords(x, y)
             local r2 = GetRectFromCoords(targetX, targetY)
             local angle = atan(targetY - y, targetX - x)
-            local range = math.min(thistype.values.range(pid) * LBOOST[pid],
+            local range = math.min(thistype.values.range(pid) * ABOOST[pid],
                                    math.max(17., DistanceCoords(x, y, targetX,
                                                                 targetY)))
 
@@ -152,7 +152,7 @@ OnInit.final("PhoenixRangerSpells", function(Require)
         missile_template.__index = missile_template
 
         function thistype:onCast()
-            local range = math.min(self.range * LBOOST[self.pid], math.max(17.,
+            local range = math.min(self.range * ABOOST[self.pid], math.max(17.,
                                                                            DistanceCoords(
                                                                                self.x,
                                                                                self.y,
@@ -170,7 +170,7 @@ OnInit.final("PhoenixRangerSpells", function(Require)
             BlzSetSpecialEffectScale(missile.visual, 1.5)
             missile.source = self.caster
             missile.owner = Player(self.pid - 1)
-            missile.collisionRadius = self.aoe * LBOOST[self.pid]
+            missile.collisionRadius = self.aoe * ABOOST[self.pid]
             missile.damage = self.dmg
             missile.pid = self.pid
             missile.dist = range
@@ -267,7 +267,7 @@ OnInit.final("PhoenixRangerSpells", function(Require)
             local ug = CreateGroup()
 
             MakeGroupInRange(self.pid, ug, self.x, self.y,
-                             self.aoe * LBOOST[self.pid], Condition(FilterEnemy))
+                             self.aoe * ABOOST[self.pid], Condition(FilterEnemy))
 
             for target in each(ug) do
                 local missile = setmetatable({}, missile_template)
@@ -321,7 +321,7 @@ OnInit.final("PhoenixRangerSpells", function(Require)
 
         function thistype:onCast()
             FlamingBowBuff:add(self.caster, self.caster):duration(self.dur *
-                                                                      LBOOST[self.pid])
+                                                                      DBOOST[self.pid])
         end
 
         function thistype.onLearn(source, ablev, pid)

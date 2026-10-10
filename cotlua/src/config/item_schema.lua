@@ -35,7 +35,12 @@ OnInit.global("ItemSchema", function()
                        "ITEM_LEVEL_REQUIREMENT", "ITEM_LIMIT", "ITEM_COST",
                        "ITEM_DISCOUNT", "ITEM_STACK", "ITEM_RARITY",
                        "TOTAL_ATTACK_SPEED", "XP_RATE", "HERO_TIME",
-                       "PLAYER_TIME", "STATUS_RESISTANCE")
+                       "PLAYER_TIME", "STATUS_RESISTANCE",
+                       "ITEM_SPELL_AREA", "ITEM_SPELL_DURATION")
+
+    -- Keep the existing serialized power index; old object formulas remain
+    -- readable through the spellboost parser alias.
+    ITEM_SPELL_POWER = ITEM_SPELLBOOST
 
     -- Runtime-only stats follow the serialized item-stat range. They may be
     -- displayed by Stat View, but are never rolled or saved on items.
