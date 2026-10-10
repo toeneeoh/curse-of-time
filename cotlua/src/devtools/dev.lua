@@ -34,6 +34,8 @@
     Require('FactionConsumables')
     Require('AshenVanguard')
     Require('BalanceHarness')
+    Require('ScarabCrawl')
+    Require('ScarabLayout')
     local pack, find, lower = string.pack, string.find, string.lower
     local searchable = {} ---@type boolean[]
     local dev_cmds, wipe_item_stats, find_item, event_setup
@@ -54,6 +56,7 @@
         ["rewardmetrics"] = "Print reward HUD counters, or reset them with -rewardmetrics reset.",
         ["levelmetrics"] = "Print level-up timing stages, or reset them with -levelmetrics reset.",
         ["balance"] = "Balance tools: -balance items, -balance start [seconds] [label], -balance stop, -balance snapshot [label], or -balance equip [average|perfect] [six rawcodes].",
+        ["scarab"] = "Crawl prototype: -scarab ready (after clearing/flattening the corner), -scarab start [seed], -scarab n/e/s/w, -scarab leave, -scarab stop, or -scarab graph [seed].",
         ["sf"] = "Set the amount of faction points you have to #. usage: -sf [#]",
         ["factionrep"] = "Set the active faction's lifetime Faction Points to #. usage: -factionrep [#]",
         ["leavefaction"] = "Immediately leave your active faction while preserving its progress.",
@@ -414,6 +417,36 @@ modifiers:
                 SetHeroLevel(PLAYER_SELECTED_UNIT[pid], S2I(args[2]), false)
             end
             ExperienceControl(pid)
+        end,
+        ["lamp"] = function(p, pid, args)
+            local action = string.lower(args[2] or 'toggle')
+            if action ~= 'on' and action ~= 'off' and action ~= 'toggle' then
+                DisplayTextToPlayer(p, 0, 0, 'Use -lamp [on|off].'); return
+            end
+            local enabled
+            if action ~= 'toggle' then enabled = action == 'on' end
+            local _, text = ScarabCrawl.setLamp(pid, enabled)
+            DisplayTextToPlayer(p, 0, 0, text)
+        end,
+        ["scarab"] = function(p, pid, args)
+            local action = string.lower(args[2] or "help")
+            local success, text
+            local seed = tonumber(args[3] or "1")
+            if not seed or seed ~= seed or math.abs(seed) >= 2147483647 or seed % 1 ~= 0 then
+                DisplayTextToPlayer(p, 0, 0, "Scarab seed must be an integer between -2147483646 and 2147483646.")
+                return
+            end
+            if action == "ready" then success, text = ScarabCrawl.setPrepared(true)
+            elseif action == "start" then success, text = ScarabCrawl.enter(pid, seed)
+            elseif action == "leave" then ScarabCrawl.leave(pid); text = "Left the Scarab crawl."
+            elseif action == "stop" then ScarabCrawl.stop(); text = "Scarab crawl stopped; restoring pathing."
+            elseif action == "graph" then
+                local graph = ScarabLayout.generate(seed)
+                text = "Scarab seed " .. seed .. ": " .. #graph.rooms .. " connected logical chambers."
+            elseif action == "n" or action == "e" or action == "s" or action == "w" then
+                success, text = ScarabCrawl.travel(pid, action)
+            else text = help_table.scarab end
+            if text then DisplayTextToPlayer(p, 0, 0, text) end
         end,
         ["str"] = function(p, pid, args)
             Unit[PLAYER_SELECTED_UNIT[pid]].str = S2I(args[2])

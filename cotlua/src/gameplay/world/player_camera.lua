@@ -6,6 +6,7 @@ OnInit.global("PlayerCamera", function(Require)
     local is_camera_locked = {}
     local preview_camera = {}
     local minimap_texture
+    local lighting_override = {}
 
     ---@param pid integer
     local function apply_camera_lock(pid)
@@ -47,7 +48,10 @@ OnInit.global("PlayerCamera", function(Require)
             custom_lighting[pid] = 4
         end
 
-        if custom_lighting[pid] ~= 1 then daynight_model = "blacklight.mdx" end
+        if lighting_override[pid] then
+            custom_lighting[pid] = 1 -- No automatic coloured hero light.
+            daynight_model = lighting_override[pid]
+        elseif custom_lighting[pid] ~= 1 then daynight_model = "blacklight.mdx" end
 
         if custom_lighting[pid] == 1 then
             UnitRemoveAbility(Hero[pid], FourCC('A059'))
@@ -70,6 +74,13 @@ OnInit.global("PlayerCamera", function(Require)
         if GetLocalPlayer() == Player(pid - 1) then
             SetDayNightModels(daynight_model, daynight_model)
         end
+    end
+
+    -- Overrides ambient lighting only; lamp effects are owned by the dungeon.
+    function SetPlayerLightingOverride(pid, model)
+        lighting_override[pid] = model
+        if Hero[pid] then update_lighting(pid, GetUnitX(Hero[pid]), GetUnitY(Hero[pid]))
+        elseif GetLocalPlayer() == Player(pid - 1) then SetDayNightModels(model or DEFAULT_LIGHTING, model or DEFAULT_LIGHTING) end
     end
 
     local function set_bounds(player, rect)
@@ -115,6 +126,11 @@ OnInit.global("PlayerCamera", function(Require)
             generation = saved.generation
             local data = REGION_DATA[region]
             local rect = data.vision
+            if data.hide_minimap then
+                local frame = BlzGetOriginFrame(ORIGIN_FRAME_MINIMAP, 0)
+                if saved.minimap_visible == nil then saved.minimap_visible = BlzFrameIsVisible(frame) end
+                BlzFrameSetVisible(frame, false)
+            end
             SetCameraBounds(GetRectMinX(rect), GetRectMinY(rect), GetRectMinX(rect),
                 GetRectMaxY(rect), GetRectMaxX(rect), GetRectMaxY(rect), GetRectMaxX(rect), GetRectMinY(rect))
             if data.minimap then SetMinimapTexture(pid, data.minimap) end
@@ -138,6 +154,9 @@ OnInit.global("PlayerCamera", function(Require)
         SetCameraBounds(saved.min_x, saved.min_y, saved.min_x, saved.max_y,
             saved.max_x, saved.max_y, saved.max_x, saved.min_y)
         if saved.minimap then SetMinimapTexture(pid, saved.minimap) end
+        if saved.minimap_visible ~= nil then
+            BlzFrameSetVisible(BlzGetOriginFrame(ORIGIN_FRAME_MINIMAP, 0), saved.minimap_visible)
+        end
         PanCameraToTimed(saved.x, saved.y, 0.)
     end
 
