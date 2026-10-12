@@ -6,11 +6,13 @@ OnInit.final("BloodzerkerSpells", function(Require)
 
     ---@class BLOODFRENZY : Spell
     BLOODFRENZY = Spell.define("A05Y")
+    BLOODFRENZY.tooltip_rewrite = TagSpellDurationTooltip
     do
         local thistype = BLOODFRENZY
+        thistype.values = {dur = 5.}
 
         function thistype:onCast()
-            BloodFrenzyBuff:add(self.caster, self.caster):duration(5.)
+            BloodFrenzyBuff:add(self.caster, self.caster):duration(self.dur * DBOOST[self.pid])
         end
     end
 

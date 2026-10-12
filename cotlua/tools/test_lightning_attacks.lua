@@ -89,7 +89,7 @@ end
 local seal_beam = LightningAttackVisual('A01Y', source, target, 100, 200)
 assert(seal_beam.x1 == 100 and seal_beam.y1 == 200 and seal_beam.z1 == 375)
 local rail = LightningAttackBeam('A010', 1, 2, 3, 4, 5, 6)
-assert(rail.kind == records.A010.alig and scheduled[#scheduled].duration == 1.5)
+assert(rail.kind == records.A010.alig and scheduled[#scheduled].duration == 1.)
 local dummy_source = read('cotlua/src/gameplay/world/dummy.lua'):gsub('\r\n', '\n')
 local first = assert(dummy_source:find('        function thistype:lightning(x, y)', 1, true))
 local last = assert(dummy_source:find('        ---@type fun(self: Dummy)', first, true))
@@ -98,9 +98,9 @@ assert(load(dummy_source:sub(first, last - 1), 'Dummy point beam', 't', env))()
 local point_beam = thistype.lightning({unit = source, abil = string.unpack('>I4', 'A010'),
     attack = function() error('Point beam issued a dummy attack') end}, 70, 80)
 assert(point_beam.kind == 'RAIL' and point_beam.x2 == 70 and point_beam.y2 == 80)
-assert(point_beam.z2 == 225 and scheduled[#scheduled].duration == 1.5)
+assert(point_beam.z2 == 225 and scheduled[#scheduled].duration == 1.)
 for _, cleanup in ipairs(scheduled) do cleanup.callback(cleanup.beam); assert(cleanup.beam.destroyed) end
-print('PASS (mocked native calls): lightning settings match object data with the requested 1.5-second Railgun override; cleanup, corpse sources and seal coordinates work.')
+print('PASS (mocked native calls): lightning settings match object data with the requested 1-second Railgun override; cleanup, corpse sources and seal coordinates work.')
 
 for _, path in ipairs({
     'heroes/dark_savior.lua', 'heroes/thunderblade.lua', 'heroes/vampire.lua',

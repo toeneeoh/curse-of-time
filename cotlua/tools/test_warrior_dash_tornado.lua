@@ -111,7 +111,6 @@ print("PASS: empowered recasts keep their own visual; old dash callbacks cannot 
 PARRY, INTIMIDATINGSHOUT, WINDSCAR = {id = "parry"}, {id = "shout"}, {id = "wind"}
 LAST_CAST = {[1] = WINDSCAR.id}
 FourCC = function(id) return id end
-UNIT_RF_COLLISION_SIZE = "collision"
 CreateGroup, DestroyGroup = function() return {} end, function() end
 local tornadoes, timers = {}, {}
 Dummy = {create = function(x, y)
@@ -123,10 +122,10 @@ BlzSetUnitSkin = function(u, skin)
     assert(skin == "n001")
     u.skin, u.pathing, u.collision = skin, true, 32
 end
-BlzSetUnitRealField = function(u, field, value) assert(field == "collision"); u.collision = value end
+BlzSetUnitRealField = function() error('Tornado must not set unsupported unit real fields') end
 SetUnitMoveSpeed, SetUnitScale, UnitAddAbility = function() end, function() end, function() end
 IssuePointOrder = function(u)
-    assert(u.skin == "n001" and not u.pathing and u.collision == 0, "Tornado can block movement after its skin changes")
+    assert(u.skin == "n001" and not u.pathing, "Tornado can block movement after its skin changes")
 end
 TimerList = {[1] = {add = function()
     local timer = {pid = 1, time = 0, startLoop = function(self, period, callback)
@@ -140,6 +139,6 @@ ADAPTIVESTRIKE.effect(hero, hero.x, hero.y)
 assert(#tornadoes == 5 and #timers == 5)
 for _, timer in ipairs(timers) do
     assert(timer.period == 0.5 and timer.dur == 3 and timer.dmg == 40)
-    assert(not timer.target.pathing and timer.target.collision == 0)
+    assert(not timer.target.pathing)
 end
 print("PASS: all five Adaptive Strike tornadoes are non-blocking after skin changes; duration and damage are unchanged.")

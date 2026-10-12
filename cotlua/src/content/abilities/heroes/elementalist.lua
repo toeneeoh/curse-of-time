@@ -159,6 +159,9 @@ OnInit.final("ElementalistSpells", function(Require)
     ---@field freeze number
     ---@field missile table[]
     FROZENORB = Spell.define("A011", "A01W")
+    FROZENORB.tooltip_rewrite = function(text)
+        return (text:gsub("\\freeze=", "{freeze="))
+    end
     do
         local thistype = FROZENORB
         thistype.id2 = FourCC("A01W") ---@type integer 
@@ -303,11 +306,13 @@ OnInit.final("ElementalistSpells", function(Require)
     ---@class GAIAARMOR : Spell
     ---@field shield function
     GAIAARMOR = Spell.define("A032")
+    GAIAARMOR.tooltip_rewrite = TagSpellDurationTooltip
     do
         local thistype = GAIAARMOR
 
         thistype.values = {
             shield = function(pid) local ablev = GetUnitAbilityLevel(Hero[pid], thistype.id) return GetHeroInt(Hero[pid], true) * (0.5 + 0.5 * ablev) end,
+            dur = 30.,
         }
         thistype.sfx = {}
 
@@ -332,9 +337,9 @@ OnInit.final("ElementalistSpells", function(Require)
             thistype.sfx[self.pid].color = {160, 255, 160}
 
             if masterElement[self.pid] == ELEMENTEARTH.value then -- earth element bonus
-                Shield.add(self.caster, self.shield * 2.5 * BOOST[self.pid], 31.)
+                Shield.add(self.caster, self.shield * 2.5 * BOOST[self.pid], self.dur * DBOOST[self.pid])
             else
-                Shield.add(self.caster, self.shield * BOOST[self.pid], 31.)
+                Shield.add(self.caster, self.shield * BOOST[self.pid], self.dur * DBOOST[self.pid])
             end
 
             EVENT_ON_SHIELD_EXPIRE:register_unit_action(self.caster, on_expire)

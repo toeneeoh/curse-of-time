@@ -22,8 +22,11 @@ OnInit.final("ThunderbladeSpells", function(Require)
         end
 
         local manacost = function(u, key)
-            if key == "int" or key == "bonus_mana" or key == "bonus_int" then
-                BlzSetUnitAbilityManaCost(u, thistype.id, GetUnitAbilityLevel(u, thistype.id) - 1, R2I(BlzGetUnitMaxMana(u) * 0.02))
+            if key == nil or key == "int" or key == "bonus_mana" or key == "bonus_int" then
+                local level = GetUnitAbilityLevel(u, thistype.id)
+                if level > 0 then
+                    BlzSetUnitAbilityManaCost(u, thistype.id, level - 1, R2I(BlzGetUnitMaxMana(u) * 0.02))
+                end
             end
         end
 
@@ -35,9 +38,11 @@ OnInit.final("ThunderbladeSpells", function(Require)
 
         local function update_level(u, level)
             SetUnitAbilityLevel(u, thistype.id, level // 75 + 1)
+            manacost(u)
         end
 
         function thistype.onLearn(source, ablev, pid)
+            manacost(source)
             local b = OverloadBuff:get(nil, source)
 
             if b then
@@ -199,11 +204,13 @@ OnInit.final("ThunderbladeSpells", function(Require)
     ---@field chance number
     ---@field dmg function
     BLADESTORM = Spell.define("A03O")
+    BLADESTORM.tooltip_rewrite = TagSpellDurationTooltip
     do
         local thistype = BLADESTORM
 
         thistype.values = {
             aoe = 400.,
+            dur = 3.,
             dot = function(pid) local ablev = GetUnitAbilityLevel(Hero[pid], thistype.id) return GetHeroAgi(Hero[pid],true) * ablev * 0.2 end,
             chance = 15.,
             dmg = function(pid) local ablev = GetUnitAbilityLevel(Hero[pid], thistype.id) return GetHeroAgi(Hero[pid],true) * (ablev + 2.) end,
@@ -243,7 +250,8 @@ OnInit.final("ThunderbladeSpells", function(Require)
 
         function thistype:onCast()
             local pt = TimerList[self.pid]:add()
-            pt.dur = 9.
+            -- Existing three damage ticks per second; only lifetime scales.
+            pt.dur = self.dur * 3. * DBOOST[self.pid]
             pt.dmg = self.dmg
             pt.dot = self.dot
             pt.ug = CreateGroup()
@@ -330,11 +338,11 @@ OnInit.final("ThunderbladeSpells", function(Require)
                 BlzPlaySpecialEffect(sfx, ANIM_TYPE_DEATH)
                 TQ:callDelayed(0.5, DestroyEffect, sfx)
                 sfx = AddSpecialEffect("war3mapImported\\EMPBubble.mdx", x, y)
-                BlzSetSpecialEffectScale(sfx, thistype.aoe * 0.01)
+                BlzSetSpecialEffectScale(sfx, thistype.aoe * ABOOST[pt.pid] * 0.01)
                 BlzPlaySpecialEffectWithTimeScale(sfx, ANIM_TYPE_DEATH, 1.5)
                 TQ:callDelayed(1.5, DestroyEffect, sfx)
 
-                MakeGroupInRange(pt.pid, pt.ug, x, y, thistype.aoe, Condition(FilterEnemy))
+                MakeGroupInRange(pt.pid, pt.ug, x, y, thistype.aoe * ABOOST[pt.pid], Condition(FilterEnemy))
 
                 for target in each(pt.ug) do
                     DamageTarget(pt.source, target, thistype.dmg(pt.pid) * BOOST[pt.pid], ATTACK_TYPE_NORMAL, MAGIC, thistype.tag)

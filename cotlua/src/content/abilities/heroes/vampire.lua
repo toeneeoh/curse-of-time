@@ -281,7 +281,7 @@ OnInit.final("VampireSpells", function(Require)
         thistype.dr = __jarray(1) ---@type number[]
 
         function thistype:onCast()
-            BloodLordBuff:add(self.caster, self.caster):duration(self.dur)
+            BloodLordBuff:add(self.caster, self.caster):duration(self.dur * DBOOST[self.pid])
         end
 
         function thistype.onLearn(source)

@@ -499,7 +499,6 @@ OnInit.final("WarriorSpells", function(Require)
 
                     BlzSetUnitSkin(pt.target, FourCC('n001'))
                     SetUnitPathing(pt.target, false)
-                    BlzSetUnitRealField(pt.target, UNIT_RF_COLLISION_SIZE, 0.)
                     SetUnitMoveSpeed(pt.target, 100.)
                     SetUnitScale(pt.target, 0.5, 0.5, 0.5)
                     UnitAddAbility(pt.target, FourCC('Amrf'))

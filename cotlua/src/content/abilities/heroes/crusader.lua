@@ -117,7 +117,7 @@ OnInit.final("CrusaderSpells", function(Require)
         function thistype:onCast()
             local ug = CreateGroup()
 
-            MakeGroupInRange(self.pid, ug, self.x, self.y, 900., Condition(FilterAlly))
+            MakeGroupInRange(self.pid, ug, self.x, self.y, 900. * ABOOST[self.pid], Condition(FilterAlly))
             DestroyEffect(AddSpecialEffect("war3mapImported\\BlessedField.mdx", self.x, self.y))
 
             for target in each(ug) do

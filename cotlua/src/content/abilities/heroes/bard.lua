@@ -16,7 +16,8 @@ OnInit.final("BardSpells", function(Require)
 
     local function song_periodic(pt)
         local pt2 = TimerList[pt.pid]:get(IMPROV.id, nil, pt.caster)
-        MakeGroupInRange(pt.pid, pt.ug, GetUnitX(pt.caster), GetUnitY(pt.caster), 900. * ABOOST[pt.pid], Condition(isalive))
+        local radius = 900. * ABOOST[pt.pid]
+        MakeGroupInRange(pt.pid, pt.ug, GetUnitX(pt.caster), GetUnitY(pt.caster), radius, Condition(isalive))
 
         if pt2 then
             GroupEnumUnitsInRangeEx(pt.pid, pt.ug, pt2.x, pt2.y, pt2.aoe, Condition(isalive))
@@ -24,17 +25,17 @@ OnInit.final("BardSpells", function(Require)
 
         for target in each(pt.ug) do
             if IsUnitAlly(target, Player(pt.pid - 1)) then
-                if (BARD_SONG[pt.pid] == SONG_WAR and IsUnitInRange(target, pt.caster, 900.)) or (pt2 and pt2.song == SONG_WAR and IsUnitInRangeXY(target, pt2.x, pt2.y, pt2.aoe)) then
+                if (BARD_SONG[pt.pid] == SONG_WAR and IsUnitInRange(target, pt.caster, radius)) or (pt2 and pt2.song == SONG_WAR and IsUnitInRangeXY(target, pt2.x, pt2.y, pt2.aoe)) then
                     SongOfWarBuff:add(pt.caster, target):duration(2.)
                 end
-                if (BARD_SONG[pt.pid] == SONG_PEACE and IsUnitInRange(target, pt.caster, 900.)) or (pt2 and pt2.song == SONG_PEACE and IsUnitInRangeXY(target, pt2.x, pt2.y, pt2.aoe)) then
+                if (BARD_SONG[pt.pid] == SONG_PEACE and IsUnitInRange(target, pt.caster, radius)) or (pt2 and pt2.song == SONG_PEACE and IsUnitInRangeXY(target, pt2.x, pt2.y, pt2.aoe)) then
                     SongOfPeaceBuff:add(pt.caster, target):duration(2.)
                 end
-                if (BARD_SONG[pt.pid] == SONG_HARMONY and IsUnitInRange(target, pt.caster, 900.)) or (pt2 and pt2.song == SONG_HARMONY and IsUnitInRangeXY(target, pt2.x, pt2.y, pt2.aoe)) then
+                if (BARD_SONG[pt.pid] == SONG_HARMONY and IsUnitInRange(target, pt.caster, radius)) or (pt2 and pt2.song == SONG_HARMONY and IsUnitInRangeXY(target, pt2.x, pt2.y, pt2.aoe)) then
                     SongOfHarmonyBuff:add(pt.caster, target):duration(2.)
                 end
             elseif not IsUnitAlly(target, Player(pt.pid - 1)) then
-                if (BARD_SONG[pt.pid] == SONG_FATIGUE and IsUnitInRange(target, pt.caster, 900.)) or (pt2 and pt2.song == SONG_FATIGUE and IsUnitInRangeXY(target, pt2.x, pt2.y, pt2.aoe)) then
+                if (BARD_SONG[pt.pid] == SONG_FATIGUE and IsUnitInRange(target, pt.caster, radius)) or (pt2 and pt2.song == SONG_FATIGUE and IsUnitInRangeXY(target, pt2.x, pt2.y, pt2.aoe)) then
                     SongOfFatigueSlow:add(pt.caster, target):duration(2.)
                 end
             end
@@ -99,6 +100,7 @@ OnInit.final("BardSpells", function(Require)
 
     ---@class SONGOFFATIGUE : Spell
     local SONGOFFATIGUE = Spell.define("A025")
+    SONGOFFATIGUE.scaling_note = "Improved by: Spell Area."
     do
         local thistype = SONGOFFATIGUE
 
@@ -109,6 +111,7 @@ OnInit.final("BardSpells", function(Require)
 
     ---@class SONGOFHARMONY : Spell
     local SONGOFHARMONY = Spell.define("A026")
+    SONGOFHARMONY.scaling_note = "Improved by: Spell Area."
     do
         local thistype = SONGOFHARMONY
 
@@ -119,6 +122,7 @@ OnInit.final("BardSpells", function(Require)
 
     ---@class SONGOFPEACE : Spell
     local SONGOFPEACE = Spell.define("A027")
+    SONGOFPEACE.scaling_note = "Improved by: Spell Area."
     do
         local thistype = SONGOFPEACE
 
@@ -129,6 +133,7 @@ OnInit.final("BardSpells", function(Require)
 
     ---@class SONGOFWAR : Spell
     local SONGOFWAR = Spell.define("A02C")
+    SONGOFWAR.scaling_note = "Improved by: Spell Area."
     do
         local thistype = SONGOFWAR
 

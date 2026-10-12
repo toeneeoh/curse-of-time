@@ -259,6 +259,7 @@ OnInit.final("HighPriestessSpells", function(Require)
     ---@field shield function
     ---@field aoe number
     PROTECTION = Spell.define("A0J3")
+    PROTECTION.tooltip_rewrite = TagSpellDurationTooltip
     do
         local thistype = PROTECTION
 
@@ -266,11 +267,15 @@ OnInit.final("HighPriestessSpells", function(Require)
             shield = function(pid)
                 return 3. * GetHeroInt(Hero[pid], true)
             end,
-            aoe = 650.
+            aoe = 650.,
+            dur = function(pid)
+                return 20. + 10. * GetUnitAbilityLevel(Hero[pid], thistype.id)
+            end
         }
 
         function thistype:onCast()
             local ug = CreateGroup()
+            local duration = self.dur * DBOOST[self.pid]
 
             DestroyEffect(AddSpecialEffectTarget(
                               "war3mapImported\\RighteousGuard.mdx",
@@ -286,11 +291,11 @@ OnInit.final("HighPriestessSpells", function(Require)
                              Condition(FilterAllyHero))
 
             for target in each(ug) do
-                ProtectionBuff:add(self.caster, target):duration(20 + 10 *
-                                                                     self.ablev)
+                ProtectionBuff:add(self.caster, target):duration(duration)
                 Shield.add(target, self.shield * BOOST[self.pid],
-                           20 + 10 * self.ablev):color(4)
+                           duration):color(4)
             end
+            DestroyGroup(ug)
         end
 
         local manacost = function(u, key)

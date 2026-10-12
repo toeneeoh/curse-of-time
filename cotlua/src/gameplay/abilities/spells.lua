@@ -46,18 +46,138 @@
         peacedur = true, fatiguedur = true, knockdur = true,
         shoutdur = true, tornadodur = true}
     local times_duration = {[FourCC('A098')] = true, [FourCC('A0MN')] = true}
-    function SpellTooltipMultiplier(spell, u, tag)
-        local unit = Unit[u]
+    local function tooltip_scaling_kind(spell, tag)
         local kind = spell.tooltip_scaling and spell.tooltip_scaling[tag]
-        if kind == "none" then return 1. end
+        if kind == "none" then return "none" end
         if kind == "area" or (not kind and area_tags[tag]) then
-            return math.max(0., 1. + unit.spell_area)
+            return "area"
         end
         if kind == "duration" or (not kind and (duration_tags[tag] or
             (tag == "times" and times_duration[spell.id]))) then
-            return math.max(0., 1. + unit.spell_duration)
+            return "duration"
         end
+        return "half_power"
+    end
+    function SpellTooltipMultiplier(spell, u, tag)
+        local unit = Unit[u]
+        local kind = tooltip_scaling_kind(spell, tag)
+        if kind == "none" then return 1. end
+        if kind == "area" then return math.max(0., 1. + unit.spell_area) end
+        if kind == "duration" then return math.max(0., 1. + unit.spell_duration) end
         return 1. + 0.5 * unit.spellboost
+    end
+
+    -- Rewrite only text outside native color codes. A regex over the whole
+    -- tooltip can consume the last hex digit: |c000080c03 contains "03".
+    function TagSpellDurationTooltip(text)
+        local parts, cursor = {}, 1
+        while cursor <= #text do
+            local first, last = text:find("|c%x%x%x%x%x%x%x%x", cursor)
+            local boundary = first or (#text + 1)
+            local plain, count = text:sub(cursor, boundary - 1):gsub("(%d+) second duration", ">{dur=%1] second duration", 1)
+            parts[#parts + 1] = plain
+            if count > 0 then
+                parts[#parts + 1] = text:sub(boundary)
+                return table.concat(parts)
+            end
+            if not first then return table.concat(parts) end
+            parts[#parts + 1] = text:sub(first, last)
+            cursor = last + 1
+        end
+        return table.concat(parts)
+    end
+
+    -- Derive the note from the same tags that calculate displayed values.
+    -- Explicit notes cover mechanics delegated to buffs/other spell definitions;
+    -- an empty override deliberately suppresses the note.
+    function SpellScalingTooltip(spell, orig, result)
+        local note = spell.scaling_note
+        if note == nil then
+            local kinds = {}
+            if spell.values then
+                for _, _, prefix, tag in orig:gmatch(pattern) do
+                    if spell.values[tag] ~= nil then
+                        if prefix == "[" then kinds.power = true
+                        elseif prefix == "{" then kinds[tooltip_scaling_kind(spell, tag)] = true end
+                    end
+                end
+            end
+            local stats = {}
+            if kinds.power or kinds.half_power then
+                stats[#stats + 1] = "Spell Power"
+            end
+            if kinds.duration then stats[#stats + 1] = "Spell Duration" end
+            if kinds.area then stats[#stats + 1] = "Spell Area" end
+            if #stats == 0 then return result end
+            note = "Improved by: " .. table.concat(stats, ", ") .. "."
+        end
+        if note == "" then return result end
+        note = "|cff40e0d0* " .. note .. "|r"
+        -- Native skill footers use blue. Keep their existing text and color
+        -- together, including a duration line preceding the cooldown line.
+        local footer
+        for position, color in result:gmatch("()\n|c(%x%x%x%x%x%x%x%x)") do
+            local tail = result:sub(position):lower()
+            if color:sub(3):lower() == "0080c0" and
+                (tail:find("cooldown", 1, true) or tail:find("duration", 1, true)) then
+                footer = position
+                break
+            end
+        end
+        if footer then
+            return result:sub(1, footer - 1):gsub("%s+$", "") .. "\n" .. note .. "\n" .. result:sub(footer + 1)
+        end
+        return result:gsub("%s+$", "") .. "\n" .. note
+    end
+
+    -- ASCII-only markers. Restore the native surrounding color so units such
+    -- as %, seconds, and AoE retain their existing formatting after the star.
+    local function tooltip_color_before(text, position)
+        local color, cursor = "|r", 1
+        while true do
+            local start = text:find("|[cr]", cursor)
+            if not start or start >= position then return color end
+            if text:sub(start, start + 1) == "|r" then
+                color, cursor = "|r", start + 2
+            else
+                local code = text:sub(start, start + 9)
+                if code:match("^|c%x%x%x%x%x%x%x%x$") then color = code end
+                cursor = start + 10
+            end
+        end
+    end
+    local function mark_scaling_value(spell, prefix, tag, value, alt)
+        local kind = prefix == "[" and "power" or
+            (prefix == "{" and tooltip_scaling_kind(spell, tag) or "none")
+        if kind == "none" then return value end
+        if alt then return value .. (kind == "half_power" and "\1" or "") end
+        return value .. "\2"
+    end
+
+    -- Move annotations past native color resets and a percentage unit. Private
+    -- sentinels never reach a frame/native tooltip. No arbitrary prose is moved.
+    local function place_scaling_annotations(text)
+        local parts, start = {}, 1
+        local function skip_colors(cursor)
+            while true do
+                if text:sub(cursor, cursor + 1) == "|r" then cursor = cursor + 2
+                elseif text:sub(cursor, cursor + 9):match("^|c%x%x%x%x%x%x%x%x$") then cursor = cursor + 10
+                else return cursor end
+            end
+        end
+        while true do
+            local position = text:find("[\1\2]", start)
+            if not position then parts[#parts + 1] = text:sub(start); break end
+            local half = text:sub(position, position) == "\1"
+            local cursor = skip_colors(position + 1)
+            if text:sub(cursor, cursor) == "%" then
+                cursor = skip_colors(cursor + 1)
+            end
+            parts[#parts + 1] = text:sub(start, position - 1) .. text:sub(position + 1, cursor - 1)
+            parts[#parts + 1] = "|cff40e0d0" .. (half and " (50% scaling)" or "*") .. tooltip_color_before(text, cursor)
+            start = cursor
+        end
+        return table.concat(parts)
     end
 
     -- set by getTooltip before calling gsub
@@ -89,6 +209,8 @@
     ---@field angle number
     ---@field values table
     ---@field tooltip_scaling? table<string, string> Explicit area/duration/power/none overrides.
+    ---@field scaling_note? string Override automatic scaling prose for delegated mechanics; empty hides it.
+    ---@field tooltip_rewrite? fun(text: string): string Correct native formula tags without editing object data.
     ---@field create function
     ---@field onEquip function
     ---@field onUnequip function
@@ -224,12 +346,9 @@
             local self = current_spell
             local u = current_unit
 
-            -- if we don't have a unit, just show raw content
-            if not u then return content end
-
-            -- only calculate if alt mode is active for this player
+            -- ~ values are always calculated, but half-power details remain
+            -- Alt-only even for these always-dynamic values.
             local alt = current_alt or (defaultflag == "~")
-            if not alt then return content end
 
             local color = (colorflag ~= ">")
 
@@ -237,16 +356,21 @@
             local val = self[tag]
             if val == nil then return content end
 
+            local function marked(value)
+                return mark_scaling_value(self, prefix, tag, value, current_alt)
+            end
+            if not u or not alt then return marked(content) end
+
             local calc = (type(val) == "table") and val[current_pid] or val
 
             if prefix == "[" then
                 local sb = Unit[u].spellboost
-                return HL(real_to_string(calc *
+                return marked(HL(real_to_string(calc *
                                              (1 + sb + MIN_SPELLBOOST_VARIANCE)) ..
                               " - " ..
                               real_to_string(
                                   calc * (1 + sb + MAX_SPELLBOOST_VARIANCE)),
-                          color)
+                          color))
 
             elseif prefix == "{" then
                 local mult = SpellTooltipMultiplier(self, u, tag)
@@ -257,7 +381,7 @@
                 else
                     out = real_to_string(v)
                 end
-                return HL(out, color)
+                return marked(HL(out, color))
 
             elseif prefix == "\\" then
                 return HL(real_to_string(calc), color)
@@ -271,10 +395,11 @@
             local level = ablev or self.ablev or 1
             -- Native object tooltips still use the old player-facing stat name.
             local orig = gsub(thistype.TOOLTIPS[self.id][level], "Spellboost", "Spell Power")
+            if self.tooltip_rewrite then orig = self.tooltip_rewrite(orig) end
 
             -- just return raw tooltip if no dynamic values
             if not self.values or (not string.find(orig, "=", 1, true)) then
-                return orig
+                return SpellScalingTooltip(self, orig, orig)
             end
 
             -- set context for the replacer
@@ -284,8 +409,9 @@
             current_alt = alt_down[self.pid] or false
 
             local result = gsub(orig, pattern, tooltip_replacer)
+            result = place_scaling_annotations(result)
 
-            return result
+            return SpellScalingTooltip(self, orig, result)
         end
 
         ---@type fun(self: Spell, u: unit, sid: integer?)

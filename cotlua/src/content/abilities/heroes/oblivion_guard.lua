@@ -10,6 +10,7 @@ OnInit.final("OblivionGuardSpells", function(Require)
     ---@field cooldown function
     ---@field charges integer[]
     BODYOFFIRE = Spell.define("A07R")
+    BODYOFFIRE.scaling_note = "Improved by: Spell Power."
     do
         local thistype = BODYOFFIRE
         local MAX_CHARGES = 5

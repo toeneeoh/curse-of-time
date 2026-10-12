@@ -178,15 +178,16 @@ OnInit.final("HydromancerSpells", function(Require)
                 b:dispel()
                 self.dur = self.dur + 3
             end
+            self.dur = self.dur * DBOOST[self.pid]
 
             self.sfx = AddSpecialEffect("war3mapImported\\Whirlpool4.mdl", self.targetX, self.targetY)
             BlzSetSpecialEffectTimeScale(self.sfx, 1.3)
-            BlzSetSpecialEffectScale(self.sfx, 0.6)
+            BlzSetSpecialEffectScale(self.sfx, 0.6 * ABOOST[self.pid])
             BlzSetSpecialEffectZ(self.sfx, GetLocZ(self.targetX, self.targetY) + 50.)
 
             self.sfx2 = AddSpecialEffect("war3mapImported\\Whirlpool4.mdl", self.targetX, self.targetY)
             BlzSetSpecialEffectTimeScale(self.sfx2, 1.1)
-            BlzSetSpecialEffectScale(self.sfx2, 0.35)
+            BlzSetSpecialEffectScale(self.sfx2, 0.35 * ABOOST[self.pid])
             BlzSetSpecialEffectZ(self.sfx2, GetLocZ(self.targetX, self.targetY) + 50.)
             BlzSetSpecialEffectAlpha(self.sfx2, 100)
 

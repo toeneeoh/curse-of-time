@@ -65,6 +65,7 @@ assert(effects[2].color == 4, "Song music did not restart after repick/cleanup")
 print("PASS: Bard native indicators removed, music reuse/recolor, and recreation after cleanup.")
 
 FPS_32, bj_PI, BOOST = 1 / 32, math.pi, {[1] = 1}
+ABOOST = {[1] = 1} -- Baseline Area; expanded impacts are covered by test_hero_scaling_fixes.
 local queued = {}
 TQ = {callDelayed = function(_, delay, callback, handle)
     queued[#queued + 1] = {delay = delay, callback = callback, handle = handle}
@@ -116,7 +117,7 @@ local timer = {pid = 1, time = 0, dur = 4, ug = {}, angle = 0,
 assert(periodic(timer) and #beams == 0)
 timer.time = 4 - FPS_32
 assert(not periodic(timer) and #beams == 1 and hits == 1)
-assert(queued[1].delay == 1.5, 'Railgun beam should last 1.5 seconds')
+assert(queued[1].delay == 1., 'Railgun beam should last 1 second')
 for _, entry in ipairs(queued) do entry.callback(entry.handle) end
 assert(beams[1].destroyed)
 print("PASS: Railgun charging, custom beam endpoints/height, beam expiry, and unchanged single AoE hit.")

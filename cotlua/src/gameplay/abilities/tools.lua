@@ -10,7 +10,7 @@ OnInit.final("SpellTools", function(Require)
         A09R = {kind = "MBUR", duration = 1., art = "Abilities\\Weapons\\FarseerMissile\\FarseerMissile.mdl", attach = "chest"},
         A09W = {kind = "CLPB", duration = 1., art = "Abilities\\Weapons\\Bolt\\BoltImpact.mdl", attach = "origin"},
         A0A1 = {kind = "AFOD", duration = 1.},
-        A010 = {kind = "RAIL", duration = 1.5}, -- Scripted Railgun lifetime, intentionally shorter than Lit2.
+        A010 = {kind = "RAIL", duration = 1.0}, -- Scripted Railgun lifetime, intentionally shorter than Lit2.
     }
 
     ---Play an instant, fixed-endpoint beam. Gameplay damage stays at the call site.

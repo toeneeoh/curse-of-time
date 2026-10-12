@@ -54,33 +54,35 @@ OnInit.final("ArcanistSpells", function(Require)
             MakeGroupInRange(self.pid, ug, x, y, aoe, Condition(FilterEnemy))
 
             for target in each(ug) do
-                DamageTarget(self.caster, target, self.dmg, ATTACK_TYPE_NORMAL, MAGIC, thistype.tag)
+                DamageTarget(self.caster, target, self.dmg * BOOST[self.pid], ATTACK_TYPE_NORMAL, MAGIC, thistype.tag)
             end
 
             DestroyGroup(ug)
         end
 
         local function spawn(self, count)
-            local pt = TimerList[self.pid]:get(ARCANOSPHERE.id)
+            local pt = ARCANOSPHERE.active[self.pid]
 
-            if pt then
+            if pt and pt.source == self.caster and count > 0 then
                 count = count - 1
 
                 if count >= 0 then
-                    MakeGroupInRange(self.pid, self.ug, pt.x, pt.y, 800., Condition(FilterEnemy))
+                    MakeGroupInRange(self.pid, self.ug, pt.x, pt.y, pt.aoe, Condition(FilterEnemy))
 
-                    for enemy in each(pt.ug) do
+                    for enemy in each(self.ug) do
                         local x = GetUnitX(enemy)
                         local y = GetUnitY(enemy)
 
                         local sfx = AddSpecialEffect("war3mapImported\\Voidfall Medium.mdx", x, y)
                         BlzPlaySpecialEffectWithTimeScale(sfx, ANIM_TYPE_STAND, 1.5)
                         TQ:callDelayed(2., DestroyEffect, sfx)
-                        TQ:callDelayed(0.6, comet_land, self, x, y, pt.aoe)
+                        TQ:callDelayed(0.6, comet_land, self, x, y, self.aoe * ABOOST[self.pid])
                     end
 
                     TQ:callDelayed(0.2, spawn, self, count)
                 end
+            else
+                DestroyGroup(self.ug)
             end
         end
 
@@ -241,6 +243,8 @@ OnInit.final("ArcanistSpells", function(Require)
     ---@class ARCANOSPHERE : Spell
     ---@field dur function
     ARCANOSPHERE = Spell.define("A079")
+    ARCANOSPHERE.active = {}
+    ARCANOSPHERE.scaling_note = "Improved by: Spell Duration, Spell Area."
     do
         local thistype = ARCANOSPHERE
 
@@ -263,7 +267,12 @@ OnInit.final("ArcanistSpells", function(Require)
             self.callback = TQ:callDelayed(0.5, periodic, self)
         end
 
+        local on_cleanup
         local function on_expire(self)
+            if self.expired then return end
+            self.expired = true
+            if thistype.active[self.pid] == self then thistype.active[self.pid] = nil end
+            EVENT_ON_CLEANUP:unregister_action(self.pid, on_cleanup)
             TQ:disableCallback(self.callback)
 
             BlzPlaySpecialEffectWithTimeScale(self.sfx, ANIM_TYPE_DEATH, 1.5)
@@ -276,8 +285,15 @@ OnInit.final("ArcanistSpells", function(Require)
             DestroyGroup(self.ug)
         end
 
+        on_cleanup = function(pid)
+            local active = thistype.active[pid]
+            if active then on_expire(active) end
+        end
+
         function thistype:onCast()
-            self.aoe = 800.
+            local old = thistype.active[self.pid]
+            if old then on_expire(old) end
+            self.aoe = 800. * ABOOST[self.pid]
             self.x = self.targetX
             self.y = self.targetY
             self.source = self.caster
@@ -286,8 +302,11 @@ OnInit.final("ArcanistSpells", function(Require)
 
             self.sfx = AddSpecialEffect("war3mapImported\\Ubershield Void.mdl", self.targetX, self.targetY)
             BlzSetSpecialEffectZ(self.sfx, GetTerrainZ(self.targetX, self.targetY) - 50.)
-            BlzSetSpecialEffectScale(self.sfx, 10.)
+            BlzSetSpecialEffectScale(self.sfx, 10. * ABOOST[self.pid])
             BlzPlaySpecialEffectWithTimeScale(self.sfx, ANIM_TYPE_BIRTH, 0.4)
+
+            thistype.active[self.pid] = self
+            EVENT_ON_CLEANUP:register_action(self.pid, on_cleanup)
 
             --swap to comets
             UnitAddAbility(self.caster, ARCANECOMETS.id)

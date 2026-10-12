@@ -406,6 +406,13 @@ OnInit.final("EliteMarksmanSpells", function(Require)
     ---@field dmg2 function
     ---@field aoe2 number
     HANDGRENADE = Spell.define("A0J4")
+    HANDGRENADE.tooltip_rewrite = function(text)
+        local count = 0
+        return (text:gsub("%[dmg=", function()
+            count = count + 1
+            return count == 2 and "[dmg2=" or "[dmg="
+        end))
+    end
     do
         local thistype = HANDGRENADE
 
