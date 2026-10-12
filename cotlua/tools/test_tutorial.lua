@@ -266,7 +266,8 @@ camera_env.GetCameraBoundMaxY = function() return bounds[4] end
 camera_env.GetCameraTargetPositionX = function() return camera_x end
 camera_env.GetCameraTargetPositionY = function() return camera_y end
 camera_env.SetCameraBounds = function(minx, miny, _, maxy, maxx) bounds = {minx, miny, maxx, maxy} end
-camera_env.PanCameraToTimed = function(x, y) camera_x, camera_y = x, y end
+local camera_duration
+camera_env.PanCameraToTimed = function(x, y, duration) camera_x, camera_y, camera_duration = x, y, duration end
 camera_env.BlzChangeMinimapTerrainTex = function(value) texture = value end
 camera_env.REGION_DATA = {[MAIN_MAP.rect] = {vision = {}, minimap = "main.dds"}}
 camera_env.GetRectMinX, camera_env.GetRectMinY = function() return -1000 end, function() return -2000 end
@@ -283,6 +284,11 @@ camera_env.PreviewPlayerCamera(1, MAIN_MAP.rect, -256, 320)
 assert(camera_x == 12, "Camera pan started before the bounds update settled")
 flush_camera()
 assert(bounds[1] == -1000 and camera_x == -256 and texture == "main.dds")
+assert(camera_duration == .35, 'Tutorial preview lost its smooth pan')
+camera_env.PreviewPlayerCamera(1, MAIN_MAP.rect, 100, 200, true)
+assert(camera_x == 100 and camera_y == 200 and camera_duration == 0, 'Instant preview queued its initial camera move')
+flush_camera()
+assert(camera_x == 100 and camera_y == 200 and camera_duration == 0, 'Bounds correction animated an instant preview')
 camera_env.PreviewPlayerCamera(1, MAIN_MAP.rect, 2160, -3856)
 camera_env.RestorePlayerCameraPreview(1)
 flush_camera()

@@ -110,7 +110,8 @@ OnInit.global("PlayerCamera", function(Require)
 
     -- Local presentation only; unlike SetCamera this does not touch a hero's
     -- lighting abilities and therefore also works before a hero is selected.
-    function PreviewPlayerCamera(pid, region, x, y)
+    ---@param instant boolean? Snap immediately and keep bounds correction instant.
+    function PreviewPlayerCamera(pid, region, x, y, instant)
         local saved, generation
         if GetLocalPlayer() == Player(pid - 1) then
             if not preview_camera[pid] then
@@ -134,14 +135,18 @@ OnInit.global("PlayerCamera", function(Require)
             SetCameraBounds(GetRectMinX(rect), GetRectMinY(rect), GetRectMinX(rect),
                 GetRectMaxY(rect), GetRectMaxX(rect), GetRectMaxY(rect), GetRectMaxX(rect), GetRectMinY(rect))
             if data.minimap then SetMinimapTexture(pid, data.minimap) end
+            if instant then PanCameraToTimed(x, y, 0.) end
         end
         -- Bounds changes can clamp the old tavern position on the next update.
-        -- Start the timed pan afterwards so it uses that updated origin. Queue
-        -- this on every client; only the camera mutation itself is local.
+        -- Reassert the target afterwards; regular previews start their smooth pan
+        -- then, while instant traversal has already snapped. Queue this on every
+        -- client; only the camera mutation itself is local.
         TimerQueue:callDelayed(0.03, function()
             if GetLocalPlayer() == Player(pid - 1) and preview_camera[pid] == saved
                 and saved and saved.generation == generation then
-                PanCameraToTimed(x, y, 0.35)
+                -- Room traversal snaps now and reasserts after bounds settle;
+                -- tutorial sightseeing retains its existing smooth pan.
+                PanCameraToTimed(x, y, instant and 0. or 0.35)
             end
         end)
     end

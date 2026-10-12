@@ -16,6 +16,7 @@ TasSpellView.AddUnitSkill(unitCode, skillCode)
 ]]
 
 OnInit.final("SpellView", function(Require)
+    Require('RuntimeSpells')
     -- spells disabled on spellview
     local disabled_spells = {
         -- backpack utilities
@@ -233,8 +234,29 @@ OnInit.final("SpellView", function(Require)
         local unitCode = GetUnitTypeId(unit)
         local isHero = IsHeroUnitId(unitCode)
         local commandCardPos = (not isHero and this.UseCommandCardPos) or (isHero and this.UseCommandCardPosHero)
-        for i= 0, 11 do this.Data[i].FourCC = 0 this.Data[i].Used = false end
+        for i= 0, 11 do
+            this.Data[i].FourCC = 0
+            this.Data[i].Used = false
+            this.Data[i].RuntimeKey = nil
+        end
         if not unit or unitCode == 0 then return end
+
+        -- Per-handle runtime bindings override the presentation template's
+        -- native skills. Other units with the same FourCC remain unaffected.
+        local binding = RuntimeSpells.get(unit)
+        if binding then
+            for index, key in ipairs(binding.keys) do
+                local view = RuntimeSpells.view(unit, key)
+                local pos = FindDisplayPosition(view.Position or (index - 1))
+                if pos >= 0 then
+                    local data = this.Data[pos]
+                    data.RuntimeKey, data.Used = key, true
+                    for field, value in pairs(view) do data[field] = value end
+                    BlzFrameSetTexture(this.Frame[pos].Icon, data.Icon, 0, false)
+                end
+            end
+            return
+        end
 
         -- have presaved Data
         if this.UnitSkills[unitCode] then
@@ -316,7 +338,7 @@ OnInit.final("SpellView", function(Require)
         end
     end
 
-    local LastHoveredIndex, LastUnit, LastUnitCode
+    local LastHoveredIndex, LastUnit, LastUnitCode, LastRuntimeRevision
     function this.TechFullFilled(player, skill)
         local data = this.TechReq[skill]
         if not data then return true end
@@ -348,10 +370,13 @@ OnInit.final("SpellView", function(Require)
 
         -- from this point you need to clear unit = nil !!!
         unitCode = GetUnitTypeId(unit)
-        if unit ~= LastUnit or LastUnitCode ~= unitCode then
+        local runtimeBinding = RuntimeSpells.get(unit)
+        local runtimeRevision = runtimeBinding and runtimeBinding.revision or 0
+        if unit ~= LastUnit or LastUnitCode ~= unitCode or runtimeRevision ~= LastRuntimeRevision then
             -- happen only when a new unit is selected or the unit morphed
             LastUnit = unit
             LastUnitCode = unitCode
+            LastRuntimeRevision = runtimeRevision
             this.GetUnitData(unit)
             LastHoveredIndex = -1
             for i = 0, 11 do
@@ -359,7 +384,7 @@ OnInit.final("SpellView", function(Require)
                 local obj = this.Frame[i]
                 BlzFrameSetVisible(obj.Button, dataI.Used)
                 
-                if dataI.FourCC <= 0 then
+                if dataI.FourCC <= 0 and not dataI.RuntimeKey then
                     BlzFrameSetVisible(obj.Cooldown, false)
                     BlzFrameSetVisible(obj.OverLayFrame, false)
                 else
@@ -387,11 +412,15 @@ OnInit.final("SpellView", function(Require)
                 local obj = this.Frame[i]
                 local level = 1
                 if dataI.Used then
-                    if dataI.FourCC > 0 then
+                    if dataI.FourCC > 0 or dataI.RuntimeKey then
                         local skill = dataI.FourCC
-                        level = GetUnitAbilityLevel(unit, skill)
+                        local runtimeView = dataI.RuntimeKey and RuntimeSpells.view(unit, dataI.RuntimeKey)
+                        level = runtimeView and runtimeView.Level or GetUnitAbilityLevel(unit, skill)
+                        if runtimeView then
+                            for field, value in pairs(runtimeView) do dataI[field] = value end
+                        end
                         if this.ShowCooldown then
-                            local cdRemain = BlzGetUnitAbilityCooldownRemaining(unit, skill)
+                            local cdRemain = runtimeView and runtimeView.Remaining or BlzGetUnitAbilityCooldownRemaining(unit, skill)
                             if cdRemain > 0 then
                                 if this.ShowCooldownText then
                                     BlzFrameSetVisible(obj.TextCool, true)
@@ -404,10 +433,10 @@ OnInit.final("SpellView", function(Require)
                                     BlzFrameSetVisible(obj.TextCool, false)
                                 end
                                 -- this be inaccurate when the map has systems to change cooldowns only during the casting.
-                                local cdTotal = BlzGetUnitAbilityCooldown(unit, skill, level - 1)
+                                local cdTotal = runtimeView and runtimeView.Cool or BlzGetUnitAbilityCooldown(unit, skill, level - 1)
                                 --print(GetObjectName(skill),cdRemain,cdTotal, cdRemain/cdTotal)
                                 BlzFrameSetVisible(obj.Cooldown, true)
-                                BlzFrameSetValue(obj.Cooldown, 100-(cdRemain/cdTotal)*100)
+                                BlzFrameSetValue(obj.Cooldown, cdTotal > 0 and math.max(0, 100-(cdRemain/cdTotal)*100) or 0)
                                 --print(BlzFrameIsVisible(obj.Cooldown), BlzFrameGetValue(obj.Cooldown))
                             else
                                 BlzFrameSetVisible(obj.TextCool, false)
@@ -418,20 +447,21 @@ OnInit.final("SpellView", function(Require)
                         end
 
                         BlzFrameSetVisible(obj.OverLayFrame, true)
-                        if not this.TechFullFilled(GetOwningPlayer(unit), skill) then BlzFrameSetText(obj.ChargeBoxText, this.TextDisallowed)
+                        if runtimeView and runtimeView.Passive then BlzFrameSetText(obj.ChargeBoxText, '')
+                        elseif not runtimeView and not this.TechFullFilled(GetOwningPlayer(unit), skill) then BlzFrameSetText(obj.ChargeBoxText, this.TextDisallowed)
                         else BlzFrameSetText(obj.ChargeBoxText, level) end
                     end
 
                     -- hovered?
-                    if not stillShowLastTooltip and not foundTooltip and BlzFrameIsVisible(obj.SimpleTooltip) then
+                    if (not stillShowLastTooltip or dataI.RuntimeKey) and not foundTooltip and BlzFrameIsVisible(obj.SimpleTooltip) then
                         foundTooltip = true
                         -- only update Tooltip when needed
-                        if i ~= LastHoveredIndex then
+                        if i ~= LastHoveredIndex or dataI.RuntimeKey then
                             LastHoveredIndex = i
                             BlzFrameSetTexture(thisTooltip.Icon, dataI.Icon, 0, false)
                             BlzFrameSetText(thisTooltip.Name, dataI.Name)
 
-                            local spell = Spells[dataI.FourCC]
+                            local spell = not dataI.RuntimeKey and Spells[dataI.FourCC]
 
                             if spell then
                                 BlzFrameSetText(thisTooltip.Text, spell:getTooltip(unit, level))

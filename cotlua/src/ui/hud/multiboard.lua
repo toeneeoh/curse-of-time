@@ -6,14 +6,12 @@
 
     Features:
         -Player list
-        -Dungeon queue
         -Boss stats / threat meter
         -Damage log
 ]]
 
 OnInit.final("Multiboard", function(Require)
     Require("TimerQueue")
-    Require("Dungeons")
     Require("Shop")
     Require("Users")
     Require("DropTable")
@@ -23,7 +21,6 @@ OnInit.final("Multiboard", function(Require)
     ---@field lookingAt integer[]
     ---@field bodies table
     ---@field MAIN table
-    ---@field QUEUE table
     ---@field BOSS table
     ---@field DAMAGE table
     ---@field rows table
@@ -81,7 +78,7 @@ OnInit.final("Multiboard", function(Require)
             end
         end
 
-        -- 1 = main, 2, ready queue, 3 = boss, 4 = damage log
+        -- 1 = main, 2 = boss, 3 = damage log
         MB.bodies = {} ---@type table[]
 
         -- method operators for initializing different types of frames
@@ -376,7 +373,6 @@ OnInit.final("Multiboard", function(Require)
 
         -- create bodies
         local main = MB.create(6)
-        local queue = MB.create(3)
         local boss = MB.create(4)
         local damageLog = MB.create(6)
 
@@ -388,16 +384,8 @@ OnInit.final("Multiboard", function(Require)
         damageLog.available = __jarray(true)
         damageLog.title = "|cffffcc00Damage Log|r"
 
-        queue:addRows(User.AmountPlaying)
-        for index = 1, User.AmountPlaying do
-            queue:get(index, 1).text = {0.02, 0, 0.09, 0.011}
-            queue:get(index, 2).icon = {0.26, 0, 0.011, 0.011}
-            queue:showRow(index, false)
-        end
-        queue.last_row = 1
 
         MB.MAIN = main
-        MB.QUEUE = queue
         MB.BOSS = boss
         MB.DAMAGE = damageLog
 
@@ -422,7 +410,6 @@ OnInit.final("Multiboard", function(Require)
         -- refresh main multiboard
         local function refresh_multiboard()
             local index = 1
-            local readyIndex = 1
 
             for pid = 1, PLAYER_CAP do
                 local u = User[pid - 1]
@@ -449,16 +436,6 @@ OnInit.final("Multiboard", function(Require)
                     BlzFrameSetText(main:get(index, 4).text, heroText)
                     BlzFrameSetText(main:get(index, 5).text, levelText)
                     BlzFrameSetText(main:get(index, 6).text, hpText)
-
-                    -- ready
-                    if TableHas(QUEUE_GROUP, pid) then
-                        local readyIcon = (QUEUE_READY[pid] and "ReplaceableTextures\\CommandButtons\\BTNcheck.blp") or "ReplaceableTextures\\CommandButtons\\BTNCancel.blp"
-
-                        BlzFrameSetText(queue:get(readyIndex, 1).text, nameText)
-                        BlzFrameSetTexture(queue:get(readyIndex, 2).icon, readyIcon, 0, true)
-
-                        readyIndex = readyIndex + 1
-                    end
 
                     index = index + 1
                 end

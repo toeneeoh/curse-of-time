@@ -13,8 +13,8 @@ OnInit.global("ScarabLayout", function()
     end
     function ScarabLayout.generate(seed, count)
         assert(type(seed) == "number" and seed == seed and math.abs(seed) < 2147483647)
-        count = count or 12
-        assert(count >= 4 and count <= 20 and count % 1 == 0)
+        count = count or 32
+        assert(count >= 4 and count <= 40 and count % 1 == 0)
         local random, rooms, occupied = ScarabLayout.random(seed), {}, {}
         local function add(x, y)
             local room = {id = #rooms + 1, x = x, y = y, doors = {}, seed = random(2147483646)}
@@ -45,7 +45,25 @@ OnInit.global("ScarabLayout", function()
                 end
             end
         end
-        return {seed = seed, rooms = rooms, start = 1}
+        -- A deep, seeded approach to discover; boss/access mechanics remain separate.
+        local distances, queue, cursor, deepest = {[1] = 0}, {1}, 1, 0
+        while cursor <= #queue do
+            local id = queue[cursor]; cursor = cursor + 1
+            for _, direction in ipairs(directions) do
+                local target = rooms[id].doors[direction[1]]
+                if target and distances[target] == nil then
+                    distances[target] = distances[id] + 1
+                    deepest = math.max(deepest, distances[target])
+                    queue[#queue + 1] = target
+                end
+            end
+        end
+        local approaches = {}
+        for _, room in ipairs(rooms) do
+            room.distance = distances[room.id]
+            if room.id ~= 1 and room.distance >= math.max(1, deepest - 1) then approaches[#approaches + 1] = room.id end
+        end
+        return {seed = seed, rooms = rooms, start = 1, approach = approaches[random(#approaches)]}
     end
     function ScarabLayout.chamber(room)
         local width, height = ScarabLayout.width, ScarabLayout.height
@@ -83,12 +101,64 @@ OnInit.global("ScarabLayout", function()
             for x = 2, width - 1 do
                 local index = (y - 1) * width + x
                 if not floor[index] and (floor[index - 1] or floor[index + 1] or floor[index - width] or floor[index + width]) then
-                    walls[#walls + 1] = {x = x, y = y}
+                    local nx, ny = 0, 0
+                    for _, direction in ipairs(directions) do
+                        if floor[(y + direction[3] - 1) * width + x + direction[2]] then
+                            nx, ny = nx - direction[2], ny - direction[3]
+                        end
+                    end
+                    local length = math.sqrt(nx * nx + ny * ny)
+                    walls[#walls + 1] = {x = x, y = y, nx = length > 0 and nx / length or 0,
+                        ny = length > 0 and ny / length or 0}
                 end
             end
         end
         return {floor = floor, walls = walls, portals = portals, width = width, height = height}
     end
+    -- Seeded combat placements use open floor with clearance, never door mouths.
+    function ScarabLayout.encounter(room, layout)
+        if room.id == 1 then return {} end -- Safe arrival chamber.
+        local random = ScarabLayout.random(room.seed + 719)
+        local candidates, enemies = {}, {}
+        local function open(x, y)
+            for dy = -1, 1 do for dx = -1, 1 do
+                if not layout.floor[(y + dy - 1) * layout.width + x + dx] then return false end
+            end end
+            if (x - 21)^2 + (y - 25)^2 < 6^2 then return false end
+            for _, portal in pairs(layout.portals) do
+                if (x - portal.x)^2 + (y - portal.y)^2 < 7^2 then return false end
+            end
+            return true
+        end
+        for y = 4, layout.height - 3 do for x = 4, layout.width - 3 do
+            if open(x, y) then candidates[#candidates + 1] = {x = x, y = y} end
+        end end
+        local centers = {}
+        for _ = 1, 3 do
+            local viable = {}
+            for _, point in ipairs(candidates) do
+                local clear = true
+                for _, center in ipairs(centers) do
+                    if (point.x - center.x)^2 + (point.y - center.y)^2 < 5^2 then clear = false; break end
+                end
+                if clear then viable[#viable + 1] = point end
+            end
+            if #viable == 0 then break end
+            local center = viable[random(#viable)]
+            centers[#centers + 1] = center
+            local offsets = {{0, 0}, {2, 0}, {-2, 0}, {0, 2}}
+            local pack = random(3)
+            for index, offset in ipairs(offsets) do
+                local x, y = center.x + offset[1], center.y + offset[2]
+                if open(x, y) then
+                    local role = index == 1 and (pack == 2 and 'guard' or pack == 3 and 'spitter' or 'swarm') or 'swarm'
+                    enemies[#enemies + 1] = {x = x, y = y, role = role, facing = random(360) - 1}
+                end
+            end
+        end
+        return enemies
+    end
+
     function ScarabLayout.buffers()
         local buffers = {}
         for row = 0, 1 do

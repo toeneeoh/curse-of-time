@@ -235,6 +235,26 @@ foreach ($file in $sourceFiles) {
     }
 }
 
+# Validate named real-field arguments against the project's Warcraft constants,
+# not test-provided globals. A mock used to invent UNIT_RF_COLLISION_SIZE and
+# silently accept calls which logged nil-global errors in the actual engine.
+$commonConstants = Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\common.j.lua') -Raw
+$knownUnitRealFields = @{}
+foreach ($match in [regex]::Matches($commonConstants, '(?m)^\s*(UNIT_RF_[A-Z0-9_]+)\s*=')) {
+    $knownUnitRealFields[$match.Groups[1].Value] = $true
+}
+$unitRealFieldCall = [regex]'\bBlz(?:Set|Get)UnitRealField\s*\(\s*[^,\r\n]+,\s*(UNIT_RF_[A-Z0-9_]+)\b'
+foreach ($file in $sourceFiles) {
+    $source = Get-Content -LiteralPath $file.FullName -Raw
+    foreach ($match in $unitRealFieldCall.Matches($source)) {
+        $fieldName = $match.Groups[1].Value
+        if (-not $knownUnitRealFields.ContainsKey($fieldName)) {
+            $relativePath = [IO.Path]::GetRelativePath($sourcePath, $file.FullName)
+            $failures.Add("Unknown Warcraft unit real field '$fieldName': $relativePath")
+        }
+    }
+}
+
 if ($failures.Count -gt 0) {
     Write-Host "Architecture check failed with $($failures.Count) problem(s):"
     foreach ($failure in $failures) {

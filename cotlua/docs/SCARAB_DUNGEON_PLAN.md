@@ -1,7 +1,7 @@
 # Scarab dungeon foundation
 
 Status: design direction accepted; a development-only procedural crawl prototype
-is implemented. Production entry, enemies, rewards, shared-vision isolation/item lamp rules,
+is implemented with an initial enemy encounter pass. Production entry, rewards, shared-vision isolation/item lamp rules,
 and the boss are not implemented by this prototype. Numbers below remain test
 targets, not balance promises.
 
@@ -12,28 +12,38 @@ and flatten it in the World Editor. Remove static decorations and pathing blocke
 make it flat/dry/walkable, and paint a cave-floor base. Keep imported art available.
 No map binaries or editor objects were modified for the prototype.
 
-`ScarabLayout` generates twelve connected logical rooms, reciprocal cardinal
+`ScarabLayout` generates thirty-two connected logical rooms, reciprocal cardinal
 doors, a few loops, irregular chambers, and winding connecting passages. Six
 2624x3136 physical buffers form a 3x2 arrangement wholly within the allocated
 rectangle. Centers start at x=-27712 with 2880 spacing: the western buffers move
 640 units inward and retain at least 256 units between their physical bounds.
 Joining an occupied logical room reuses the same buffer; empty buffers
-are recycled with deterministic room shapes. No boss/key/access system yet.
+are recycled with deterministic room shapes. A seeded room near the greatest
+shortest-path distance from the entrance marks the dormant boss approach. Finding
+it announces discovery to the explorers; no boss/key/access system yet. Independent
+travel supports splitting up to explore multiple branches. Exits currently remain
+passable during combat; clear-to-advance versus bypassing is still a player choice
+to settle, not an enforced time gate.
 
 Collision is generated at native 32-unit pathing resolution, with 64-unit layout
 cells. Walking/flying availability is snapshotted and restored on stop. Walls use
 model effects independently of collision, with one rock per boundary cell;
 models, scale, and cap are the `ScarabCrawl.art` palette. The standard Warcraft
-`Doodads\\LordaeronSummer\\Rocks\\Lords_Rock\\Lords_Rock0.mdx` model uses scale 1.7
-(about 26% larger than the previous pass). The 96-model cap was removed because
+`Doodads\\LordaeronSummer\\Rocks\\Lords_Rock\\Lords_Rock0.mdx` model uses scale 1.49
+(about 12% smaller than the 1.7 pass). The 96-model cap was removed because
 it skipped arbitrary boundary cells while retaining their blocked collision. There are
 no glowing exit markers. Effects are removed immediately when supported, or hidden
 and buried before destruction on older engines, rather than leaving death animations.
+Rock centers are offset 48 units outward along the floor-boundary normal while
+collision stays on the original grid. Symmetric thin walls have no safe outward
+normal and keep their center. This reduces visible model overlap with walkable floor.
 No runtime tile painting or terrain height edits: the floor painted in the editor
 is retained. The previous registered IDs resolved to unsuitable imported textures.
-Construction/decorations/pathing restoration are batched. One 64-unit row per tick,
-six rock creations per decoration tick, and cached walk/fly flags limit native work;
-recycled buffers update only changed flags. Generation guards cancel stale callbacks.
+Construction and decoration finish synchronously with the transition: there are
+no artificial row/decorating delays, so the old rocks disappearing cannot render
+before arrival in the next chamber. Cached walk/fly flags retain delta updates;
+only final pathing restoration on stop is batched. Native in-game timing still
+needs validation after this change.
 Optional immediate removal is detected once with rawget, bypassing strict-global
 logging when the native is absent. The previous per-rock lookup generated dozens
 of warnings and full FileIO log rewrites at transitions, a likely stall contributor.
@@ -54,22 +64,90 @@ Test commands after a normal build/run:
 6. `-scarab stop` returns remaining explorers, removes generated art, and restores
    saved pathing. Wait for restoration before starting another seed.
 7. `-scarab graph 12345` exercises topology generation without altering the map.
+8. `-scarab encounters off` before starting disables enemies for geometry testing;
+   `-scarab encounters on` restores them. Encounters default on. Stop the run
+   before changing this setting.
+9. `-scarab status` reports elapsed run time, rooms visited/cleared, the party-scaling
+   high-water mark, and when the boss approach was found. It does not reveal the
+   approach's location in advance. Run time includes time spent idle in the lobby.
 
 Camera targets are restricted to the generated floor's bounding rectangle, inset
 384 horizontally / 256 vertically (less in small chambers), rather than the whole
 buffer. The actual minimap frame is hidden; no transparent minimap terrain texture
 is used. Its previous visibility and camera presentation are restored on leaving.
-Ambient lighting uses `blacklight.mdx`, without the Naga green hero ability.
-Hero sight is 192 without the test lamp, 700 with it; backpack sight is zero.
+Room transitions snap the camera immediately, with an instant reassertion after
+bounds settle. Tutorial sightseeing retains its smooth pan. Ambient lighting
+uses `blacklight.mdx`, without the Naga green hero ability.
+Hero sight is 192 without the test lamp, 384 with it; backpack sight is zero.
 The lamp attaches existing `LightYellow30.mdx`. Original sight and normal regional
 lighting are restored on exit, death, cleanup, or stop. Shared vision remains unchanged.
 
-This is an exploration test, not a ready-to-play dungeon: no enemies, reward
-economy, actual lamp item integration, fog isolation, logical map UI, or encounter persistence.
+This is a combat/exploration test, not a ready-to-play dungeon: no reward economy,
+actual lamp item integration, fog isolation, or logical map UI.
 Summon movement and ground-item/grave snapshots remain future work. Do not leave
 valuable ground items in recycled rooms, save a character inside the prototype,
 or use the prototype as a hardcore combat area. Runtime tests need to establish
 actual wall coverage, collision, door timing, camera behavior, and multiplayer FPS.
+
+## Initial enemy encounters
+
+The entrance stays empty. Other rooms use up to three seeded packs of up to
+four enemies (at most twelve total). Placement requires a clear 3x3 floor
+footprint and keeps enemies away from the arrival center and all door mouths.
+Roles are small Broodlings, larger Hive Guards, and Tunnel Spitters. They reuse
+the existing `n0sl` (Spider Lord) and `n0ss` (Spider Seer) attack templates;
+all three roles are created with the existing `u002` Carrion Beetle presentation
+skin, the same beetle used by Naga's swarm (object base `ucs1`). The original
+attack templates remain, while the spider models are replaced with differently
+sized beetles. No editor objects or new assets were added.
+
+The tuning target is level-500 heroes with max-upgrade Azazoth (+17) equipment,
+above Naga difficulty. Verified current Naga regular templates have 25/30 million
+HP and 500 armor; Naga applies incoming damage x(1 - 0.1 * participant count),
+and its second floor adds 200,000 attack damage per participant. Scarab's first
+late-game tuning pass uses:
+
+| Role | HP | Solo base damage | Armor | Attack time |
+| --- | ---: | ---: | ---: | ---: |
+| Broodling | 40 million | 300,000 | 550 | 1 second |
+| Hive Guard | 150 million | 850,000 | 650 | 1.6 seconds |
+| Tunnel Spitter | 60 million | 450,000 | 550 | 1.4 seconds |
+
+All use Chaos attack/armor, so the existing combat scaling applies; these are
+base amounts, not final damage dealt to a hero. Each extra run participant adds
+200,000 base damage. Incoming damage uses the same Naga rule, from x0.9 solo
+to x0.4 at six players. Scaling uses a run-wide concurrent-participant high-water
+mark, not the players currently in a chamber: splitting up or leaving does not
+weaken packs. Joining updates already spawned enemies without healing them.
+
+Broodlings move at 340 and attack at range 90; guards move at 300 and attack at
+128. Broodlings and guards now receive native Ghost (Visible), `Aeth`, for melee
+overlap. This replaces the invalid collision-size setter without changing editor
+objects or disabling terrain pathing. Native behavior still needs an in-game
+test. All chamber enemies have native guard positions removed and recheck
+pursuit every 0.6 seconds, preserving valid targets without repeating attack
+orders while already attacking. Invisible/invulnerable heroes are not chased.
+Spitters use range 550. All have acquisition range 650. The source palette is
+`ScarabCrawl.enemies`; native template abilities remain. Bespoke enemy abilities,
+final balance, and progression level remain future work. No XP, gold, loot, or
+dungeon completion rewards are granted here.
+
+32 rooms is a first depth pass toward a 25-30 minute average crawl, not a measured
+duration guarantee. Test with +17 Azazoth gear both solo and with explorers split
+across branches. Record approach discovery time, room-clear times, deaths, and
+remaining health/resources with `-scarab status` and the existing balance harness.
+Tune combat burden and graph depth from those results; do not force a waiting timer.
+
+Occupied rooms share one enemy group. Kills persist for the run; removing the
+last participant snapshots survivor health fractions and removes unit handles
+without death events. Revisiting restores survivors at their original pack
+positions with that health, not a new pack. Temporary buffs and mana are not
+snapshotted. Polling returns escaped enemies to their pack position. Stop removes
+all enemies and their death callbacks; a new run resets encounter state.
+
+Test a room solo, wound/kill part of a pack, leave and return, then join that same
+room with another player. Confirm no duplicate packs, no revived kills, preserved
+health, usable exits, cleanup on stop/death, and acceptable instant-transition FPS.
 
 ## Identity and first recommendation
 
@@ -91,13 +169,14 @@ upgraded-sphere sacrifice, permanent bonus-stat purchases, or full game-state re
 
 ## Existing code and content
 
-`gameplay/world/dungeons.lua` supplies queues, readiness, participant lists,
-enemy ownership, exit handling, and the Naga dungeon's completion flow. Existing
+`gameplay/dungeons/dungeon.lua` supplies queues, readiness, participant lists,
+enemy ownership and exit handling. Naga and Azazoth definitions live separately
+in `content/dungeons/`, with Scarab crawl modules in `gameplay/dungeons/scarab/`. Existing
 dungeons are singleton runs with a global queue; reuse those entry semantics for
 the first Scarab run rather than introducing concurrent parties immediately.
-Its generic startup also applies `DisableItems` and backpack teleport restrictions.
-Audit what those restrictions actually block before adopting them: the lamp,
-flasks, combat item actives, and reincarnation must not accidentally stop working.
+Naga/Azazoth startup retains `DisableItems` and backpack teleport restrictions.
+Scarab owns its own entry/camera lifecycle: it disables backpack teleports but
+keeps the custom inventory usable for flasks and the future lamp.
 
 `Perks.completeMilestone(pid, "scarab")` already recognizes Scarab's milestone:
 4 softcore / 6 hardcore points, once per character. There is no implemented Scarab
@@ -247,6 +326,9 @@ buffer. They cannot reset by revisiting. Avoid a mandatory beetle set that playe
 must already finish farming to be capable of reaching the boss.
 
 ## Scarab boss: hive first, time distortion second
+
+Model inspection and the dedicated-arena implementation basis are in
+[SCARAB_BOSS_IMPLEMENTATION.md](SCARAB_BOSS_IMPLEMENTATION.md).
 
 Build a recognizable insect boss with three initial mechanics:
 

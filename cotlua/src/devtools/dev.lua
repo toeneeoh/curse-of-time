@@ -35,6 +35,8 @@
     Require('AshenVanguard')
     Require('BalanceHarness')
     Require('ScarabCrawl')
+    Require('ScarabKitPreview')
+    Require('ScarabBoss')
     Require('ScarabLayout')
     local pack, find, lower = string.pack, string.find, string.lower
     local searchable = {} ---@type boolean[]
@@ -56,7 +58,7 @@
         ["rewardmetrics"] = "Print reward HUD counters, or reset them with -rewardmetrics reset.",
         ["levelmetrics"] = "Print level-up timing stages, or reset them with -levelmetrics reset.",
         ["balance"] = "Balance tools: -balance items, -balance start [seconds] [label], -balance stop, -balance snapshot [label], or -balance equip [average|perfect] [six rawcodes].",
-        ["scarab"] = "Crawl prototype: -scarab ready (after clearing/flattening the corner), -scarab start [seed], -scarab n/e/s/w, -scarab leave, -scarab stop, or -scarab graph [seed].",
+        ["scarab"] = "Larger floor preview: -scarab kitfloors [seed] [5-10 floors], gather at a numbered hole, then -scarab descend [hole number]. Comparisons: -scarab kit [scale] [floor lift] or -scarab kitseed [seed] [room count], -scarab n/e/s/w for seeded room transitions. -scarab kitstatus, -scarab kitleave, -scarab kitstop. Crawl prototype: -scarab ready (after clearing/flattening the corner), -scarab start [seed], -scarab n/e/s/w, -scarab status, -scarab visibility, -scarab leave, -scarab stop, -scarab graph [seed], or -scarab encounters [on|off] before starting.",
         ["sf"] = "Set the amount of faction points you have to #. usage: -sf [#]",
         ["factionrep"] = "Set the active faction's lifetime Faction Points to #. usage: -factionrep [#]",
         ["leavefaction"] = "Immediately leave your active faction while preserving its progress.",
@@ -425,28 +427,63 @@ modifiers:
             end
             local enabled
             if action ~= 'toggle' then enabled = action == 'on' end
-            local _, text = ScarabCrawl.setLamp(pid, enabled)
+            local _, text
+            if ScarabKitPreview.containsPlayer(pid) then _, text = ScarabKitPreview.setLamp(pid, enabled)
+            else _, text = ScarabCrawl.setLamp(pid, enabled) end
             DisplayTextToPlayer(p, 0, 0, text)
         end,
         ["scarab"] = function(p, pid, args)
             local action = string.lower(args[2] or "help")
             local success, text
-            local seed = tonumber(args[3] or "1")
+            local seed = tonumber((action == 'start' or action == 'graph' or action == 'kitseed' or action == 'kitfloors') and (args[3] or "1") or "1")
             if not seed or seed ~= seed or math.abs(seed) >= 2147483647 or seed % 1 ~= 0 then
                 DisplayTextToPlayer(p, 0, 0, "Scarab seed must be an integer between -2147483646 and 2147483646.")
                 return
             end
-            if action == "ready" then success, text = ScarabCrawl.setPrepared(true)
+            if action == "encounters" then
+                local mode = string.lower(args[3] or '')
+                if mode ~= 'on' and mode ~= 'off' then
+                    DisplayTextToPlayer(p, 0, 0, "Use -scarab encounters [on|off] before starting a run.")
+                    return
+                end
+                success, text = ScarabCrawl.setEncounters(mode == 'on')
+            elseif action == "kit" then success, text = ScarabKitPreview.enter(pid,tonumber(args[3]),tonumber(args[4]))
+            elseif action == "kitseed" then
+                if args[4] and not tonumber(args[4]) then text = 'Room count must be a number.'
+                else success, text = ScarabKitPreview.enterSeeded(pid,seed,tonumber(args[4])) end
+            elseif action == "kitfloors" then
+                if args[4] and not tonumber(args[4]) then text = 'Floor count must be a number.'
+                else success, text = ScarabKitPreview.enterFloors(pid,seed,tonumber(args[4])) end
+            elseif action == "descend" then success, text = ScarabKitPreview.travel(pid,args[3] or '1')
+            elseif action == "kitleave" then ScarabKitPreview.leave(pid); text = 'Left the cave-kit preview.'
+            elseif action == "kitstop" then ScarabKitPreview.stop(); text = 'Cave-kit preview stopped; restoring pathing.'
+            elseif action == "kitstatus" then text = ScarabKitPreview.status()
+            elseif action == "ready" then success, text = ScarabCrawl.setPrepared(true)
             elseif action == "start" then success, text = ScarabCrawl.enter(pid, seed)
             elseif action == "leave" then ScarabCrawl.leave(pid); text = "Left the Scarab crawl."
             elseif action == "stop" then ScarabCrawl.stop(); text = "Scarab crawl stopped; restoring pathing."
+            elseif action == "status" then text = ScarabCrawl.status()
+            elseif action == "visibility" then text = ScarabCrawl.visibility(pid)
             elseif action == "graph" then
                 local graph = ScarabLayout.generate(seed)
                 text = "Scarab seed " .. seed .. ": " .. #graph.rooms .. " connected logical chambers."
             elseif action == "n" or action == "e" or action == "s" or action == "w" then
-                success, text = ScarabCrawl.travel(pid, action)
+                if ScarabKitPreview.containsPlayer(pid) then success, text = ScarabKitPreview.travel(pid,action)
+                else success, text = ScarabCrawl.travel(pid, action) end
             else text = help_table.scarab end
             if text then DisplayTextToPlayer(p, 0, 0, text) end
+        end,
+        ["scarabboss"] = function(p, pid, args)
+            local action = string.lower(args[2] or 'help')
+            local success, text
+            if action == 'enter' then success, text = ScarabBoss.enter(pid)
+            elseif action == 'fight' then success, text = ScarabBoss.fight(pid)
+            elseif action == 'anim' then success, text = ScarabBoss.previewAnimation(pid, string.lower(args[3] or ''))
+            elseif action == 'leave' then ScarabBoss.leave(pid); text = 'Left the Scarab arena.'
+            elseif action == 'stop' then ScarabBoss.stop(); text = 'Scarab boss prototype stopped.'
+            elseif action == 'status' then text = ScarabBoss.status()
+            else text = 'Use -scarabboss enter / fight / status / leave / stop, or -scarabboss anim [name] while staged. Development encounter; no rewards.' end
+            DisplayTextToPlayer(p, 0, 0, text)
         end,
         ["str"] = function(p, pid, args)
             Unit[PLAYER_SELECTED_UNIT[pid]].str = S2I(args[2])
@@ -620,8 +657,8 @@ modifiers:
             Honor.setTotal(pid, 9999)
             SetCurrency(pid, FACTION, 9999)
             SetHeroLevel(Hero[pid], 400, false)
-            FogMaskEnable(false)
-            FogEnable(false)
+            -- Keep normal visibility for dungeon/light testing. Use -vision
+            -- explicitly when a fully revealed map is needed.
             ExperienceControl(pid)
             grant_vampire_colosseum_loadout(pid)
         end,
