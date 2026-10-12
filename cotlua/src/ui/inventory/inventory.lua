@@ -25,8 +25,8 @@ OnInit.final("Inventory", function(Require)
     local INVENTORY_COLUMN_PITCH = INVENTORY_WIDTH / 6.
     local INVENTORY_TEXTURE = "inventory_row.tga"
     local POTION_TEXTURE    = "war3mapImported\\PotionBackdrop2.dds"
-    local INVENTORY_MIN_X   = 0.612
-    local INVENTORY_MIN_Y   = 0.214
+    local INVENTORY_FRAME_X, INVENTORY_FRAME_Y = 0.575, 0.408
+    local INVENTORY_ROW_X, INVENTORY_ROW_Y = 0.02, -0.06
     local INVENTORY_SLOT_SIZE = 0.0266
     local TRACKER_FOLLOW    = 0.82
     local DROP_ITEM_COMMAND = "robogoblin"
@@ -113,12 +113,11 @@ OnInit.final("Inventory", function(Require)
     do
         local thistype = INVENTORY
         local context = __jarray(0) ---@type integer[]
-        local target = __jarray(0) ---@type integer[]
         local slots = {} ---@type Button[]
+        local slot_centers = {} -- derived from the same offsets as Button.create
         local viewing, move_item_cooldown = __jarray(-1), {}
         local on_m1_down, on_m2_down, on_m1_up, on_m2_up, open_context_menu
-        local target_thread = {} -- used to sync context and target acquisition
-        local synced_context, synced_target = {}, {}
+        local dragging = {} -- local input drafts; never consulted by sync handlers
         local ui_mode = __jarray(0) -- 0 = normal, 1 = context menu open
         local right_click_origin = __jarray(0)
         local skip_drag_release = __jarray(false)
@@ -151,23 +150,21 @@ OnInit.final("Inventory", function(Require)
                 return -1
             end
 
-            -- bail if mouse is outside inventory UI
-            if x < INVENTORY_MIN_X - 0.03 or x > INVENTORY_MIN_X + INVENTORY_WIDTH + 0.03 or
-            y < INVENTORY_MIN_Y - 0.03 or y > INVENTORY_MIN_Y + INVENTORY_HEIGHT - 0.03
+            -- Outside the window means a world drop; inside a gap means cancel.
+            if x < INVENTORY_FRAME_X or x > INVENTORY_FRAME_X + INVENTORY_WIDTH + 0.072 or
+            y < INVENTORY_FRAME_Y - INVENTORY_HEIGHT or y > INVENTORY_FRAME_Y
             then
                 return -1
             end
 
-            local mouse_x = x - INVENTORY_MIN_X
-            local mouse_y = y - INVENTORY_MIN_Y
             local half_slot = INVENTORY_SLOT_SIZE * 0.5
 
             -- Test the actual square occupied by each slot. The previous nearest-
             -- center radius also accepted gaps and points outside the icon bounds.
-            for i = 1, #inventory_slots do
-                local pos = inventory_slots[i]
-                if math.abs(mouse_x - pos[1]) <= half_slot and
-                math.abs(mouse_y - pos[2]) <= half_slot
+            for i = 1, #slot_centers do
+                local pos = slot_centers[i]
+                if math.abs(x - pos[1]) <= half_slot and
+                math.abs(y - pos[2]) <= half_slot
                 then
                     return i
                 end
@@ -222,7 +219,7 @@ OnInit.final("Inventory", function(Require)
 
         --#region frame setup
         local frame = BlzCreateFrame("ListBoxWar3", BlzGetFrameByName("ConsoleUIBackdrop", 0), 0, 0)
-        BlzFrameSetAbsPoint(frame, FRAMEPOINT_TOPLEFT, 0.575, 0.408)
+        BlzFrameSetAbsPoint(frame, FRAMEPOINT_TOPLEFT, INVENTORY_FRAME_X, INVENTORY_FRAME_Y)
         BlzFrameSetSize(frame, INVENTORY_WIDTH + 0.072, INVENTORY_HEIGHT)
         BlzFrameSetEnable(frame, false)
         thistype.frame = frame
@@ -234,7 +231,7 @@ OnInit.final("Inventory", function(Require)
 
         local inv = {}
         local inv_main = BlzCreateFrameByType("BACKDROP", "", frame, "", 0)
-        BlzFrameSetPoint(inv_main, FRAMEPOINT_TOPLEFT, frame, FRAMEPOINT_TOPLEFT, 0.02, -0.06)
+        BlzFrameSetPoint(inv_main, FRAMEPOINT_TOPLEFT, frame, FRAMEPOINT_TOPLEFT, INVENTORY_ROW_X, INVENTORY_ROW_Y)
         BlzFrameSetSize(inv_main, INVENTORY_WIDTH, INVENTORY_GAPY)
         BlzFrameSetTexture(inv_main, INVENTORY_TEXTURE, 0, false)
         BlzFrameSetEnable(inv_main, true)
@@ -377,10 +374,8 @@ OnInit.final("Inventory", function(Require)
 
         local function clear_context(pid)
             context[pid] = 0
-            target[pid] = 0
+            dragging[pid] = nil
             right_click_origin[pid] = 0
-            synced_context[pid] = false
-            synced_target[pid] = false
         end
 
         local on_context_push = function()
@@ -399,7 +394,9 @@ OnInit.final("Inventory", function(Require)
             open_context_menu(pid, false)
 
             if btn_index == 5 then
-                context_functions[btn_index](pid, context[pid])
+                if GetLocalPlayer() == GetTriggerPlayer() and context[pid] > 0 then
+                    context_functions[btn_index](pid, context[pid])
+                end
                 clear_context(pid)
             elseif context[pid] > 0 and GetLocalPlayer() == GetTriggerPlayer() then
                 BlzSendSyncData("inventory_action", btn_index .. ":" .. context[pid])
@@ -569,12 +566,12 @@ OnInit.final("Inventory", function(Require)
             end
         end
 
-        INVENTORY.refresh = function(pid)
+        -- Presentation-only refresh for local drag/tooltip input. Do not call
+        -- POTION.refresh here: it rebuilds native item presentation/state.
+        local function render_inventory(pid)
             if not pid or pid < 1 or not Profile[pid] or not Profile[pid].hero then
                 return
             end
-
-            POTION.refresh(pid)
 
             local me = GetPlayerId(GetLocalPlayer()) + 1
 
@@ -587,6 +584,12 @@ OnInit.final("Inventory", function(Require)
             for i = 1, MAX_INVENTORY_SLOTS do
                 thistype.renderItemButton(slots[i], items[i], pid)
             end
+        end
+
+        INVENTORY.refresh = function(pid)
+            if not pid or pid < 1 or not Profile[pid] or not Profile[pid].hero then return end
+            POTION.refresh(pid)
+            render_inventory(pid)
         end
 
         local onCloseButton = function()
@@ -898,35 +901,13 @@ OnInit.final("Inventory", function(Require)
             if GetLocalPlayer() == Player(pid - 1) then practice[pid] = nil end
         end
 
-        local function send_context(pid, slot)
-            -- set context asynchronously
-            context[pid] = slot
-            synced_context[pid] = false
-
-            -- send payload
-            if GetLocalPlayer() == Player(pid - 1) then
-                BlzSendSyncData("context", string.format("%d", slot))
-            end
-        end
-
-        local function send_target(pid, slot)
-            -- set target asynchronously
-            target[pid] = slot
-            synced_target[pid] = false
-
-            -- send payload
-            if GetLocalPlayer() == Player(pid - 1) then
-                BlzSendSyncData("target", tostring(slot))
-            end
-        end
-
         local pick_item = function(pid)
             local highlighted = get_local_item_slot(pid)
 
             if highlighted > 0 then
                 local new_slot = slots[highlighted]
-
-                send_context(pid, highlighted)
+                local item = Profile[pid].hero.items[highlighted]
+                dragging[pid] = {slot = highlighted, identity = GetHandleId(item.obj)}
 
                 if GetLocalPlayer() == Player(pid - 1) then
                     new_slot:visible(false)
@@ -1024,6 +1005,7 @@ OnInit.final("Inventory", function(Require)
         end
 
         open_context_menu = function(pid, open, highlighted)
+            if GetLocalPlayer() ~= Player(pid - 1) then return end
             -- toggle context menu mode
             ui_mode[pid] = 1
 
@@ -1034,8 +1016,9 @@ OnInit.final("Inventory", function(Require)
                 local new_slot = slots[highlighted]
                 update_context_buttons(pid, new_slot)
 
-                -- start context sync
-                send_context(pid, highlighted)
+                -- Local menu selection is included in an explicit action packet.
+                -- It must never gate gameplay on another client's mouse release.
+                context[pid] = highlighted
 
                 -- reposition and display context menu frame
                 if GetLocalPlayer() == Player(pid - 1) then
@@ -1061,27 +1044,13 @@ OnInit.final("Inventory", function(Require)
             end
         end
 
-        local function on_context_sync()
-            local pid = GetPlayerId(GetTriggerPlayer()) + 1
-            local data = BlzGetTriggerSyncData()
-            local slot_s = string.match(data, "(%d+)")
-            local slot = tonumber(slot_s)
-            --print("context:",slot_s)
-
-            -- update context and flag as synced
-            context[pid] = slot
-            synced_context[pid] = true
-
-            return false
-        end
-
         local function on_inventory_action_sync()
             local pid = GetPlayerId(GetTriggerPlayer()) + 1
             local action, slot = BlzGetTriggerSyncData():match("^(%d+):(%d+)$")
             action = tonumber(action)
             slot = tonumber(slot)
 
-            if action and action >= 1 and action <= 7 and action ~= 5 and slot then
+            if not disabled_for_player[pid] and action and action >= 1 and action <= 7 and action ~= 5 and slot then
                 local response = context_functions[action](pid, slot)
                 render_inventory_result(pid, response)
             end
@@ -1090,76 +1059,64 @@ OnInit.final("Inventory", function(Require)
             return false
         end
 
-        local function on_target_sync()
+        -- One atomic request contains both slots and the source instance. All
+        -- clients execute this directly: no local menu state, suspended threads,
+        -- or separately arriving context/target messages decide the mutation.
+        local function on_inventory_move_sync()
             local pid = GetPlayerId(GetTriggerPlayer()) + 1
-            local data = BlzGetTriggerSyncData()
-            local slot_s = string.match(data, "(%-?%d+)")
-            local slot = tonumber(slot_s)
-            --print("target:", slot_s)
-
-            -- update target and flag as synced
-            target[pid] = slot
-            synced_target[pid] = true
-
-            -- resume any threads yielding for target
-            if target_thread[pid] then
-                coroutine.resume(target_thread[pid], slot)
+            local from, to, identity, x, y = BlzGetTriggerSyncData():match(
+                "^(%d+):(%-?%d+):(%d+):([%d%.%-]+):([%d%.%-]+)$")
+            from, to, identity, x, y = tonumber(from), tonumber(to), tonumber(identity), tonumber(x), tonumber(y)
+            local profile = Profile[pid]
+            local hero = profile and profile.hero
+            local item = hero and hero.items[from]
+            local response
+            if not disabled_for_player[pid] and not move_item_cooldown[pid]
+                and from and from >= 1 and from <= MAX_INVENTORY_SLOTS
+                and to and (to == -1 or (to >= 1 and to <= MAX_INVENTORY_SLOTS + MAX_STASH_SLOTS))
+                and identity and identity >= 0 and identity % 1 == 0
+                and x and y and math.abs(x) <= 65536 and math.abs(y) <= 65536
+            then
+                if not item or not item.alive or GetHandleId(item.obj) ~= identity then
+                    response = {ok = false, code = "stale"}
+                elseif to == -1 then
+                    hero.item_to_drop = item
+                    IssuePointOrder(item.holder, DROP_ITEM_COMMAND, x, y)
+                elseif to > MAX_INVENTORY_SLOTS then
+                    response = StashService.transfer(pid, from, to - MAX_INVENTORY_SLOTS)
+                else
+                    response = InventoryService.move(pid, from, to)
+                end
+                if DevLog then
+                    DevLog.write("INVENTORY", string.format("move pid=%d from=%d to=%d item=%d result=%s",
+                        pid, from, to, identity, response and response.code or "drop"), true)
+                end
+                render_inventory_result(pid, response)
+                move_item_cooldown[pid] = true
+                TimerQueue:callDelayed(0.05, reset_cooldown, pid)
             end
-
+            thistype.refresh(pid)
             return false
         end
 
         local confirm_item = function(pid)
-            target_thread[pid] = coroutine.create(function()
-                local hero = Profile[pid].hero
-                local slot = -1
-                if GetLocalPlayer() == Player(pid - 1) then
-                    slot = get_hovered_slot() -- intentionally asynchronous
-                end
-
-                hide_tracker(pid)
-
-                -- start target sync
-                send_target(pid, slot)
-
-                -- yield for target sync
-                slot = coroutine.yield()
-
-                -- check for syncs (extra safe)
-                if synced_context[pid] and synced_target[pid] then
-                    local itm = hero.items[context[pid]]
-
-                    if slot == -1 then -- negative indicates bailed out of menu
-                        if itm then
-                            hero.item_to_drop = itm
-                            IssuePointOrder(itm.holder, DROP_ITEM_COMMAND, GetMouseX(pid), GetMouseY(pid))
-                        end
-                    elseif slot > MAX_INVENTORY_SLOTS and itm then
-                        render_inventory_result(pid, StashService.transfer(
-                            pid, context[pid], slot - MAX_INVENTORY_SLOTS))
-                    elseif slot > 0 and itm then
-                        render_inventory_result(pid,
-                            InventoryService.move(pid, context[pid], slot))
-                    end
-                end
-
-                -- final cleanup
-                clear_context(pid)
-                thistype.refresh(pid)
-
-                -- short cooldown to prevent spam
-                move_item_cooldown[pid] = true
-                TimerQueue:callDelayed(0.05, reset_cooldown, pid)
-
-                target_thread[pid] = nil -- Clear coroutine reference
-            end)
-
-            coroutine.resume(target_thread[pid])
+            if GetLocalPlayer() ~= Player(pid - 1) then return end
+            local draft = dragging[pid]
+            dragging[pid] = nil
+            hide_tracker(pid)
+            if not draft then return end
+            local slot = get_hovered_slot()
+            if slot ~= 0 and slot ~= draft.slot then
+                BlzSendSyncData("inventory_move", string.format("%d:%d:%d:%.3f:%.3f",
+                    draft.slot, slot, draft.identity, GetMouseX(pid), GetMouseY(pid)))
+            end
+            clear_context(pid)
+            render_inventory(pid)
         end
 
         -- mouse events
-        on_m2_up = function()
-            local pid = GetPlayerId(GetTriggerPlayer()) + 1
+        on_m2_up = function(pid)
+            if GetLocalPlayer() ~= Player(pid - 1) then return end
             local pressed_slot = right_click_origin[pid]
             local released_slot = get_local_item_slot(pid)
             right_click_origin[pid] = 0
@@ -1169,16 +1126,16 @@ OnInit.final("Inventory", function(Require)
             end
         end
 
-        on_m2_down = function()
-            local pid = GetPlayerId(GetTriggerPlayer()) + 1
+        on_m2_down = function(pid)
+            if GetLocalPlayer() ~= Player(pid - 1) then return end
 
             if not disabled_for_player[pid] then
                 right_click_origin[pid] = get_local_item_slot(pid)
             end
         end
 
-        on_m1_down = function()
-            local pid = GetPlayerId(GetTriggerPlayer()) + 1
+        on_m1_down = function(pid)
+            if GetLocalPlayer() ~= Player(pid - 1) then return end
 
             if ui_mode[pid] == 0 then
                 if not disabled_for_player[pid] and not move_item_cooldown[pid] then
@@ -1206,8 +1163,8 @@ OnInit.final("Inventory", function(Require)
             end
         end
 
-        on_m1_up = function()
-            local pid = GetPlayerId(GetTriggerPlayer()) + 1
+        on_m1_up = function(pid)
+            if GetLocalPlayer() ~= Player(pid - 1) then return end
 
             if skip_drag_release[pid] then
                 skip_drag_release[pid] = false
@@ -1223,8 +1180,7 @@ OnInit.final("Inventory", function(Require)
         end
 
         -- assign a prefix and function for BlzSendSyncData calls
-        SyncCallback("context", on_context_sync)
-        SyncCallback("target", on_target_sync)
+        SyncCallback("inventory_move", on_inventory_move_sync)
         SyncCallback("inventory_action", on_inventory_action_sync)
 
         local U = User.first
@@ -1241,7 +1197,7 @@ OnInit.final("Inventory", function(Require)
 
                 local target_pid = viewing[pid]
                 if target_pid and target_pid > 0 then
-                    thistype.refresh(target_pid)
+                    render_inventory(target_pid)
                 end
             end
         end
@@ -1295,6 +1251,18 @@ OnInit.final("Inventory", function(Require)
                 local col    = column_for(id, kind)
                 local offx = 0.0032 + INVENTORY_COLUMN_PITCH * (col - 1)
                 local offy   = y_offset(kind)
+
+                local parent_x = INVENTORY_FRAME_X + INVENTORY_ROW_X
+                local parent_y = INVENTORY_FRAME_Y + INVENTORY_ROW_Y
+                if kind == "potion1" or kind == "potion2" then
+                    parent_x = parent_x + INVENTORY_WIDTH + 0.005
+                    parent_y = parent_y - INVENTORY_GAPY * (id - 7)
+                elseif id >= 9 then
+                    local row = ((id - 9) // 6) + 1
+                    parent_y = parent_y - INVENTORY_SLOT_SIZE - INVENTORY_GAPY * row
+                end
+                slot_centers[id] = {parent_x + offx + INVENTORY_SLOT_SIZE * 0.5,
+                                    parent_y + offy - INVENTORY_SLOT_SIZE * 0.5}
 
                 slots[id] = Button.create(parent, INVENTORY_SLOT_SIZE, INVENTORY_SLOT_SIZE, offx, offy, false)
                 slots[id].rarityBorder = BlzCreateFrameByType("BACKDROP", "", slots[id].iconFrame, "", 0)

@@ -293,9 +293,11 @@
             local ablev = GetUnitAbilityLevel(u, sid)
             local skill = self:create(u)
             local tooltip = skill:getTooltip(u, ablev)
+            -- Resolve the native ability handle in synchronized execution;
+            -- only the tooltip string writes belong in local presentation.
+            local ability = BlzGetUnitAbility(u, sid)
 
             if GetLocalPlayer() == GetOwningPlayer(u) then
-                local ability = BlzGetUnitAbility(u, sid)
                 if ability then
                     BlzSetAbilityStringLevelField(ability,
                                                   ABILITY_SLF_TOOLTIP_NORMAL_EXTENDED,

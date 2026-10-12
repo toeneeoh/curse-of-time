@@ -113,7 +113,7 @@ SimpleButton.create = function(...)
     return button
 end
 local first = assert(source:find('        local practice, practice_visible', 1, true))
-local last = assert(source:find('        local function send_context', first, true))
+local last = assert(source:find('        local pick_item = function', first, true))
 assert(load(source:sub(first, last - 1), 'practice inventory', 't', env))()
 INVENTORY.prepareTutorialPractice()
 local real_buttons, real_menu = context_buttons, context_menu_backdrop

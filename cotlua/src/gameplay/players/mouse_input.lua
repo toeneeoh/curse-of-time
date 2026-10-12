@@ -2,6 +2,7 @@ OnInit.final("Mouse", function(Require)
     Require('Users')
     Require('Variables')
     Require('Events')
+    Require('TimerQueue')
 
     local mouse_x       = __jarray(0) ---@type number[] 
     local mouse_y       = __jarray(0) ---@type number[] 
@@ -12,7 +13,18 @@ OnInit.final("Mouse", function(Require)
     PLAYER_SELECTED_UNIT = {} ---@type unit[] 
 
     local player_selected_unit = PLAYER_SELECTED_UNIT
+    local selected_units = {} -- synchronized native selection-event history
     local event_on_unit_select, event_on_select = EVENT_ON_UNIT_SELECT, EVENT_ON_SELECT
+
+    ---@param pid integer
+    ---@param unit unit?
+    ---@return boolean
+    function IsPlayerUnitSelected(pid, unit)
+        for _, selected in ipairs(selected_units[pid] or {}) do
+            if selected == unit then return true end
+        end
+        return false
+    end
 
     function GetMouseX(pid)
         return mouse_x[pid]
@@ -22,10 +34,15 @@ OnInit.final("Mouse", function(Require)
         return mouse_y[pid]
     end
 
-    local function select_delay(pid)
-        local u = GetMainSelectedUnit()
+    -- Selection subscribers can change gameplay and schedule shared timers.
+    -- Never feed them GetMainSelectedUnit(), which reads THIS client's UI.
+    function RefreshPlayerSelection(pid)
+        local u = player_selected_unit[pid]
         if u then
-            BlzFrameSetVisible(HIDE_HEALTH_FRAME, (u and Unit[u] and Unit[u].hidehp))
+            local data = Unit[u]
+            if GetLocalPlayer() == Player(pid - 1) then
+                BlzFrameSetVisible(HIDE_HEALTH_FRAME, data and data.hidehp or false)
+            end
             event_on_unit_select:trigger(u, pid)
             event_on_select:trigger(pid, u)
         end
@@ -37,7 +54,7 @@ OnInit.final("Mouse", function(Require)
         local mouse = BlzGetTriggerPlayerMouseButton()
 
         if mouse == MOUSE_BUTTON_TYPE_LEFT then
-            TimerQueue:callDelayed(0., select_delay, pid)
+            TimerQueue:callDelayed(0., RefreshPlayerSelection, pid)
 
             EVENT_ON_M1_UP:trigger(pid)
             IS_M1_DOWN[pid] = false
@@ -95,12 +112,34 @@ OnInit.final("Mouse", function(Require)
         local p   = GetTriggerPlayer()
         local pid = GetPlayerId(p) + 1 ---@type integer 
 
+        selected_units[pid] = selected_units[pid] or {}
+        if not IsPlayerUnitSelected(pid, u) then
+            table.insert(selected_units[pid], u)
+        end
         player_selected_unit[pid] = u
+        -- Also covers selection via hotkeys/programmatic selection, without
+        -- relying on a mouse release occurring after the native event.
+        TimerQueue:callDelayed(0., RefreshPlayerSelection, pid)
 
         return false
     end
 
+    local function OnDeselect()
+        local pid = GetPlayerId(GetTriggerPlayer()) + 1
+        local unit = GetTriggerUnit()
+        local selected = selected_units[pid] or {}
+        for index = #selected, 1, -1 do
+            if selected[index] == unit then table.remove(selected, index) end
+        end
+        if player_selected_unit[pid] == unit then
+            player_selected_unit[pid] = selected[#selected]
+            TimerQueue:callDelayed(0., RefreshPlayerSelection, pid)
+        end
+        return false
+    end
+
     local click     = CreateTrigger()
+    local deselect  = CreateTrigger()
     local move      = CreateTrigger()
     local mousedown = CreateTrigger()
     local mouseup   = CreateTrigger()
@@ -108,6 +147,7 @@ OnInit.final("Mouse", function(Require)
 
     while u do
         TriggerRegisterPlayerUnitEvent(click, u.player, EVENT_PLAYER_UNIT_SELECTED, nil)
+        TriggerRegisterPlayerUnitEvent(deselect, u.player, EVENT_PLAYER_UNIT_DESELECTED, nil)
         TriggerRegisterPlayerEvent(move, u.player, EVENT_PLAYER_MOUSE_MOVE)
         TriggerRegisterPlayerEvent(mousedown, u.player, EVENT_PLAYER_MOUSE_DOWN)
         TriggerRegisterPlayerEvent(mouseup, u.player, EVENT_PLAYER_MOUSE_UP)
@@ -115,6 +155,7 @@ OnInit.final("Mouse", function(Require)
     end
 
     TriggerAddCondition(click, Filter(OnSelect))
+    TriggerAddCondition(deselect, Filter(OnDeselect))
     TriggerAddCondition(move, Filter(MoveMouse))
     TriggerAddCondition(mousedown, Filter(MouseDown))
     TriggerAddCondition(mouseup, Filter(MouseUp))

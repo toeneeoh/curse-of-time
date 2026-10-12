@@ -7,8 +7,6 @@
 OnInit.final("Gluebutton", function(Require)
     Require('TimerQueue')
 
-    local TQ = TimerQueue
-
     local TOOLTIP_SIZE       = 0.2 ---@type number 
     local ATTACHMENT_MAX     = 3 ---@type integer
     local ATTACHMENT_WIDTH   = 0.165 ---@type number
@@ -538,21 +536,23 @@ OnInit.final("Gluebutton", function(Require)
             BlzFrameSetText(self.cooldownText, format_cooldown(remaining))
             -- 0 to 100 as cooldown progresses
             BlzFrameSetValue(self.cooldownFrame, 100 - (remaining / total_time) * 100)
+            BlzFrameSetVisible(self.cooldownFrame, true)
         end
 
-        local function cooldown_tick(self, total_time, pid)
-            local remaining = (self.cooldown_time[pid] or 0) - FPS_32
-            self.cooldown_time[pid] = remaining
-
-            if remaining <= 0 then
-                update_cooldown_ui(self, pid, 0, total_time)
-                self.cooldown_callback[pid] = nil
-                return
+        -- Potion/shop refreshes call cooldown() inside local presentation code.
+        -- One timer is allocated/started on EVERY client during initialization;
+        -- its local entries only update frames, never the gameplay TimerQueue.
+        local cooldowns = {}
+        local cooldown_timer = CreateTimer()
+        TimerStart(cooldown_timer, FPS_32, true, function()
+            local pid = GetPlayerId(GetLocalPlayer()) + 1
+            for button, total in pairs(cooldowns) do
+                local remaining = math.max(0, button.cooldown_time[pid] - FPS_32)
+                button.cooldown_time[pid] = remaining
+                update_cooldown_ui(button, pid, remaining, total)
+                if remaining <= 0 then cooldowns[button] = nil end
             end
-
-            update_cooldown_ui(self, pid, remaining, total_time)
-            self.cooldown_callback[pid] = TQ:callDelayed(FPS_32, cooldown_tick, self, total_time, pid)
-        end
+        end)
 
         local on_click_placeholder = function()
             local f = BlzGetTriggerFrame()
@@ -566,27 +566,16 @@ OnInit.final("Gluebutton", function(Require)
         end
 
         function thistype:use_cooldowns()
-            self.cooldown_time = __jarray(0)
-            self.cooldown_callback = {}
+            self.cooldown_time = self.cooldown_time or __jarray(0)
         end
 
         function thistype:cooldown(time, pid, total_time)
-            total_time = total_time or time
-
-            local cb = self.cooldown_callback[pid]
-            if cb then
-                TQ:disableCallback(cb)
-            end
-
+            if GetLocalPlayer() ~= Player(pid - 1) then return end
+            total_time = math.max(total_time or time, FPS_32)
+            time = math.max(0, time)
             self.cooldown_time[pid] = time
-
-            -- immediate ui update for the first frame
+            cooldowns[self] = time > 0 and total_time or nil
             update_cooldown_ui(self, pid, time, total_time)
-
-            if GetLocalPlayer() == Player(pid - 1) then
-                BlzFrameSetVisible(self.cooldownFrame, true)
-            end
-            self.cooldown_callback[pid] = TQ:callDelayed(FPS_32, cooldown_tick, self, total_time, pid)
         end
 
         ---@param model string

@@ -1,6 +1,7 @@
 OnInit.final("PlayerAbilityControls", function(Require)
     Require("Spells")
     Require("Cosmetics")
+    Require("Mouse")
 
     IS_HERO_PANEL_ON = {} ---@type boolean[] 
 
@@ -113,7 +114,9 @@ OnInit.final("PlayerAbilityControls", function(Require)
     end
 
     local mouse_move = function(pid, x, y, x2, y2)
-        if IS_M2_DOWN[pid] and IsUnitSelected(Hero[pid], Player(pid - 1)) then
+        -- Native selection queries are local UI state; they must not decide
+        -- whether this synchronized callback allocates groups/issues orders.
+        if IS_M2_DOWN[pid] and Hero[pid] and IsPlayerUnitSelected(pid, Hero[pid]) then
             local dist = DistanceCoords(x, y, x2, y2)
 
             if dist >= 3 then
@@ -135,7 +138,7 @@ OnInit.final("PlayerAbilityControls", function(Require)
     local function unselect_bp(pid)
         local p = Player(pid - 1)
 
-        if IsUnitSelected(Hero[pid], p) and IsUnitSelected(Backpack[pid], p) then
+        if IsPlayerUnitSelected(pid, Hero[pid]) and IsPlayerUnitSelected(pid, Backpack[pid]) then
             if GetLocalPlayer() == p then
                 SelectUnit(Backpack[pid], false)
             end

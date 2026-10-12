@@ -19,6 +19,7 @@ OnInit.final("Shop", function(Require)
     Require('ShopActions')
     Require('ShopRegistry')
     Require('Currency')
+    Require('PlayerSync')
 
     -- Credits:
     --      Taysen: FDF file
@@ -471,11 +472,7 @@ OnInit.final("Shop", function(Require)
             local self = registry[(BlzGetTriggerFrame())][0] ---@type ShopSlot
 
             if self then
-                if self.shop:buy(self.item, GetTriggerPlayer()) then
-                    if GetLocalPlayer() == GetTriggerPlayer() then
-                        self.button:play(SPRITE_MODEL, SPRITE_SCALE, 0)
-                    end
-                end
+                self.shop:requestBuy(self.item, GetTriggerPlayer())
             end
         end
     end
@@ -935,11 +932,7 @@ OnInit.final("Shop", function(Require)
                 BlzFrameSetEnable(frame, false)
                 BlzFrameSetEnable(frame, true)
 
-                if self.shop:buy(self.main[pid].item, p) then
-                    if GetLocalPlayer() == p then
-                        self.main[pid].button:play(SPRITE_MODEL, SPRITE_SCALE, 0)
-                    end
-                end
+                self.shop:requestBuy(self.main[pid].item, p)
             end
         end
 
@@ -954,31 +947,19 @@ OnInit.final("Shop", function(Require)
 
             if self then
                 if frame == self.main[pid].button.frame then
-                    if self.shop:buy(self.main[pid].item, p) then
-                        if GetLocalPlayer() == p then
-                            self.main[pid].button:play(SPRITE_MODEL, SPRITE_SCALE, 0)
-                        end
-                    end
+                    self.shop:requestBuy(self.main[pid].item, p)
                 else
                     while j ~= INVENTORY_COUNT do
                             if frame == self.components[pid][j].button.frame then
                                 found = true
-                                if self.shop:buy(self.components[pid][j].item, p) then
-                                    if GetLocalPlayer() == p then
-                                        self.components[pid][j].button:play(SPRITE_MODEL, SPRITE_SCALE, 0)
-                                    end
-                                end
+                                self.shop:requestBuy(self.components[pid][j].item, p)
                             end
 
                         j = j + 1
                     end
 
                     if not found then
-                        if self.shop:buy(self.used[pid][i], p) then
-                            if GetLocalPlayer() == p then
-                                self.button[pid][i]:play(SPRITE_MODEL, SPRITE_SCALE, 0)
-                            end
-                        end
+                        self.shop:requestBuy(self.used[pid][i], p)
                     end
                 end
             end
@@ -1204,6 +1185,36 @@ OnInit.final("Shop", function(Require)
         end
 
         ---@param i ShopItem
+        ---Send the concrete catalog key, never a peer's locally rendered detail slot.
+        function thistype:requestBuy(i, p)
+            if GetLocalPlayer() ~= p or not i or i == 0 then return end
+            BlzSendSyncData("shop_buy", tostring(self.id) .. ":" .. i.id)
+        end
+
+        local function on_shop_buy_sync()
+            local p = GetTriggerPlayer()
+            local pid = GetPlayerId(p) + 1
+            local shop_id, item_id = BlzGetTriggerSyncData():match("^(%d+):(.+)$")
+            shop_id = tonumber(shop_id)
+            if not shop_id or not item_id then return end
+            local self = registry[shop_id][0]
+            local slot = self and registry[self][item_id]
+            if not slot or GetUnitTypeId(thistype.current[pid]) ~= shop_id or
+                not self.definition:canOpen(pid) then return end
+
+            -- Range, stock, components and money are rechecked by commit on every client.
+            local bought, reason = self:buy(slot.item, p)
+            if DevLog then
+                DevLog.write("SHOP", string.format("buy pid=%d shop=%d item=%s result=%s",
+                    pid, shop_id, item_id, bought and "purchased" or (reason or "rejected")))
+            end
+            if bought and GetLocalPlayer() == p then
+                slot.button:play(SPRITE_MODEL, SPRITE_SCALE, 0)
+            end
+        end
+        SyncCallback("shop_buy", on_shop_buy_sync)
+
+        ---@param i ShopItem
         ---@param p player
         ---@param test boolean
         ---@return boolean
@@ -1213,21 +1224,21 @@ OnInit.final("Shop", function(Require)
                 or ShopTransaction.commit(self.definition, i, pid)
 
             if not quote.can_buy then
-                if not test then
+                if not test and GetLocalPlayer() == p then
                     local sound = quote.reason == "currency"
                         and self.noGold[GetPlayerRace(p)] or self.error
                     if not GetSoundIsPlaying(sound) then
                         StartSoundForPlayerBJ(p, sound)
                     end
                 end
-                return false
+                return false, quote.reason
             end
 
             if test then
                 return true
             end
 
-            if not GetSoundIsPlaying(self.success) then
+            if GetLocalPlayer() == p and not GetSoundIsPlaying(self.success) then
                 StartSoundForPlayerBJ(p, self.success)
             end
 
@@ -1655,14 +1666,15 @@ OnInit.final("Shop", function(Require)
         end
 
         function thistype.refresh(pid)
+            -- Filtered lists and detail selections are presentation-only local state.
+            -- A local refresh must not clear authoritative shop selection on one peer.
+            if GetLocalPlayer() ~= Player(pid - 1) then return false end
             local self = registry[GetUnitTypeId(thistype.current[pid])][0] ---@type Shop
 
             if self and not self.definition:canOpen(pid) then
                 if GetLocalPlayer() == Player(pid - 1) then
                     self:visible(false)
                 end
-                self.current[pid] = nil
-                self.definition:setCurrent(pid, nil)
                 return false
             end
 

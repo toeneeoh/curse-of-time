@@ -143,10 +143,11 @@ OnInit.final("BuffBar", function(Require)
                 if remaining and not buff.AURA then
                     button:cooldown(remaining, pid, buff:timeout())
                 elseif is_local then
-                    BlzFrameSetVisible(button.cooldownFrame, false)
+                    button:cooldown(0, pid)
                 end
             else
                 if is_local then
+                    button:cooldown(0, pid)
                     button:visible(false)
                 end
             end

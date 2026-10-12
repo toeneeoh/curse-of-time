@@ -10,6 +10,8 @@ OnInit.final("Commands", function(Require)
     Require('Frames')
     Require('HelpText')
     Require('Tutorial')
+    Require('Dungeons')
+    Require('DungeonReadyView')
 
     local vote_yay  = 0
     local vote_nay  = 0
@@ -65,12 +67,16 @@ OnInit.final("Commands", function(Require)
             DisplayTextToPlayer(p, 0, 0, "|cffffcc00Tome Cap:|r " .. TomeCap(GetHeroLevel(Hero[pid])))
         end,
         ["-ready"] = function(p, pid, args)
-            QUEUE_READY[pid] = true
+            Dungeon.setReady(pid, true)
+            DungeonReadyView.open(pid)
+        end,
+        ["-dungeon"] = function(p, pid, args)
+            DungeonReadyView.open(pid)
         end,
         ["-color"] = function(p, pid, args)
             local num = tonumber(args[2])
 
-            if num and num > 0 and num < 26 then
+            if num and num % 1 == 0 and OriginalHex[num] then
                 User[p].color = ConvertPlayerColor(num - 1)
                 User[p].hex = OriginalHex[num]
                 User[p]:colorUnits()

@@ -1,8 +1,9 @@
 OnInit.global("FrameHelpers", function()
-    -- Tasyen/Bribe's main selected unit lookup.
-    function GetMainSelectedUnit(...)
-        local container_frame = BlzFrameGetChild(BlzFrameGetChild(BlzFrameGetParent(
-            BlzGetFrameByName("SimpleInfoPanelUnitDetail", 0)), 5), 0)
+    -- Tasyen/Bribe's LOCAL main-selection lookup, for presentation only.
+    -- Allocate helpers on all clients, not on the first local mouse/UI call.
+    do
+        local selection_group = CreateGroup()
+        local container_frame
 
         local function get_unit_sort_value(unit)
             return IsUnitType(unit, UNIT_TYPE_HERO) and GetHandleId(unit) or GetUnitTypeId(unit)
@@ -31,15 +32,23 @@ OnInit.global("FrameHelpers", function()
         end)
 
         local frames = {}
-        for index = 0, BlzFrameGetChildrenCount(container_frame) - 1 do
-            local button_container = BlzFrameGetChild(container_frame, index)
-            frames[index + 1] = BlzFrameGetChild(button_container, 0)
-        end
+        OnInit.final("FrameHelpersSelection", function(Require)
+            Require('Frames')
+            Require('TimerQueue')
+            TimerQueue:callDelayed(0., function()
+                container_frame = BlzFrameGetChild(BlzFrameGetChild(BlzFrameGetParent(
+                    BlzGetFrameByName("SimpleInfoPanelUnitDetail", 0)), 5), 0)
+                for index = 0, BlzFrameGetChildrenCount(container_frame) - 1 do
+                    local button_container = BlzFrameGetChild(container_frame, index)
+                    frames[index + 1] = BlzFrameGetChild(button_container, 0)
+                end
+            end)
+        end)
 
         ---@param at_index? integer
         ---@param async? boolean
         function GetMainSelectedUnit(at_index, async)
-            if async and not at_index and BlzFrameIsVisible(container_frame) then
+            if async and not at_index and container_frame and BlzFrameIsVisible(container_frame) then
                 for i = 1, #frames do
                     if BlzFrameIsVisible(frames[i]) then
                         at_index = i - 1
@@ -55,11 +64,9 @@ OnInit.global("FrameHelpers", function()
                 which_filter = filter
                 get_unit = get_unit_at
             end
-            GroupEnumUnitsSelected(bj_lastCreatedGroup, GetLocalPlayer(), which_filter)
-            return get_unit(at_index or bj_lastCreatedGroup)
+            GroupEnumUnitsSelected(selection_group, GetLocalPlayer(), which_filter)
+            return get_unit(at_index or selection_group)
         end
-
-        return GetMainSelectedUnit(...)
     end
 
     ---@param u unit

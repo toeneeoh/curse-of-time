@@ -90,20 +90,8 @@ OnInit.final("Hotkeys", function(Require)
         update_action_tooltip(pid, key_string, action)
     end
 
-    local event_on_unit_select, event_on_select = EVENT_ON_UNIT_SELECT, EVENT_ON_SELECT
-
-    local function select_delay(pid)
-        local u = GetMainSelectedUnit()
-        if u then
-            BlzFrameSetVisible(HIDE_HEALTH_FRAME, (u and Unit[u] and Unit[u].hidehp))
-
-            event_on_unit_select:trigger(u, pid)
-            event_on_select:trigger(pid, u)
-        end
-    end
-
     local function update_ui(pid, _)
-        TimerQueue:callDelayed(0., select_delay, pid)
+        TimerQueue:callDelayed(0., RefreshPlayerSelection, pid)
     end
 
     local function on_rebind()
