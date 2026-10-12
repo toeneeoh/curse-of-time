@@ -49,10 +49,10 @@ extract("    STAT_TAG[ITEM_SPELLBOOST].getter", "    STAT_TAG[ITEM_CRIT_CHANCE].
 Unit[hero].spellboost = .2
 local spell_power = STAT_TAG[ITEM_SPELLBOOST]
 assert(spell_power.getter(hero) == "20.000")
-contains(spell_power.breakdown(hero), "|cff999999Increases supported spell damage, healing,")
+contains(spell_power.breakdown(hero), "|cff999999Increases")
+contains(spell_power.breakdown(hero), "spell damage, healing,")
 contains(spell_power.breakdown(hero), "shield strength, and other spell bonuses.")
-contains(spell_power.breakdown(hero), "Area and duration have no random variance.|r")
-print("PASS: Spell Power breakdown explains its effects in gray text and distinguishes utility from random variance.")
+print("PASS: Spell Power breakdown explains its effects in gray text.")
 local crit = STAT_TAG[ITEM_CRIT_CHANCE]
 assert(crit.getter(hero) == "6.00")
 contains(crit.breakdown(hero), "Base Chance:|r 5.00%")

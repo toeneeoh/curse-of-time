@@ -32,6 +32,20 @@ rows per page.
 
 ## Verification
 
+Skill tooltips add a teal scaling note prefixed with `*` before their existing blue duration /
+cooldown footer. The note is derived from the same dynamic formula tags used
+for the displayed numbers: `[` is full power, `{` is area/duration or half power
+according to the tag routing, and `\` is unscaled. Scalable values have a teal
+ASCII `*`; Alt shows calculated values without stars, with `(50% scaling)` on
+half-Power values only. Annotations follow the percentage unit, before words
+such as "chance", rather than appearing between the number and its `%`.
+Normal tooltips omit effectiveness percentages; the teal note just lists the
+applicable stats. Fixed values are not marked. Surrounding native colors are
+restored after each marker. Spells without tagged scaling do not
+receive a speculative note. Definitions may provide `scaling_note` to describe
+delegated buff/secondary-spell mechanics explicitly, or an empty string to hide
+the note. This is not yet a complete audit of untagged native or delegated effects.
+
 `tools/test_spell_scaling.lua` is an offline Lua test for definition migration,
 shared legacy rolls, fractional utility values, tooltip multiplier selection,
 and pagination. The shipped architecture tests also exercise definition

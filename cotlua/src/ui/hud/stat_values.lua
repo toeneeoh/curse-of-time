@@ -165,26 +165,14 @@ OnInit.final("StatValues", function(Require)
     end
     STAT_TAG[ITEM_SPELLBOOST].breakdown = function(u)
         return "|cffffcc00Spell Power:|r " .. format("%.3f", Unit[u].spellboost * 100.) ..
-            "%\n|cff999999Increases supported spell damage, healing,\n" ..
-            "shield strength, and other spell bonuses.\n" ..
-            "Spell Power retains random variance.\n" ..
-            "Area and duration have no random variance.|r"
+            "%\n|cff999999Increases spell damage, healing,\n" ..
+            "shield strength, and other spell bonuses."
     end
     STAT_TAG[ITEM_SPELL_AREA].getter = function(u)
         return format("%.3f", Unit[u].spell_area * 100.)
     end
-    STAT_TAG[ITEM_SPELL_AREA].breakdown = function(u)
-        return "|cffffcc00Radius/Range Multiplier:|r x" ..
-            format("%.3f", math.max(0., 1. + Unit[u].spell_area)) ..
-            "\nApplies to supported spell radii and distances, not every cast range."
-    end
     STAT_TAG[ITEM_SPELL_DURATION].getter = function(u)
         return format("%.3f", Unit[u].spell_duration * 100.)
-    end
-    STAT_TAG[ITEM_SPELL_DURATION].breakdown = function(u)
-        return "|cffffcc00Duration Multiplier:|r x" ..
-            format("%.3f", math.max(0., 1. + Unit[u].spell_duration)) ..
-            "\nApplies to supported effect durations, not ability cooldowns."
     end
     STAT_TAG[ITEM_CRIT_CHANCE].getter = function(u)
         return format("%.2f", Unit[u].cc)

@@ -1446,6 +1446,15 @@
             return ItemRuntime.commit_slot(self, slot, suppress_refresh)
         end
 
+        local function format_item_stat_value(index, value)
+            value = math.abs(value)
+            if index == ITEM_SPELL_AREA or index == ITEM_SPELL_DURATION then
+                -- Match calculated utility precision without whole-number rounding.
+                return (string.format("%.3f", value):gsub("0+$", ""):gsub("%.$", ""))
+            end
+            return tostring(floor(value + 0.5))
+        end
+
         local parse_item_stat = {
             [ITEM_ABILITY] = function(self, index, value, lower, upper,
                                       valuestr, range)
@@ -1460,6 +1469,11 @@
                                    STAT_TAG[index].suffix or "|r"
 
                 if range ~= 0 then
+                    if index == ITEM_SPELL_AREA or index == ITEM_SPELL_DURATION then
+                        local sign_lower, sign_upper = lower < 0 and "-" or "", upper < 0 and "-" or ""
+                        lower = sign_lower .. format_item_stat_value(index, lower)
+                        upper = sign_upper .. format_item_stat_value(index, upper)
+                    end
                     return concat({
                         "|n + |cffffcc00", lower, "-", upper, suffix, " ",
                         STAT_TAG[index].tag
@@ -1550,16 +1564,10 @@
                 if value ~= 0 then
                     local base_value = self.cached_base[index]
                     local socket_value = value - base_value
-                    local socket_valuestr = tostring(floor(
-                                                         math.abs(socket_value) +
-                                                             0.5))
+                    local socket_valuestr = format_item_stat_value(index, socket_value)
                     local lower = self.cached_lower[index]
                     local upper = self.cached_upper[index]
-                    local valuestr = tostring(floor(math.abs(value) + 0.5))
-                    if index == ITEM_SPELL_AREA or index == ITEM_SPELL_DURATION then
-                        valuestr = RealToString(math.abs(value))
-                        socket_valuestr = RealToString(math.abs(socket_value))
-                    end
+                    local valuestr = format_item_stat_value(index, value)
                     local posneg = "+ |cffffcc00"
 
                     -- handle negative values
@@ -1610,7 +1618,7 @@
                                 base_value > 0 and "+ |cffffcc00" or
                                     "- |cffcc0000"
                             text[#text + 1] =
-                                tostring(math.abs(floor(base_value + 0.5)))
+                                format_item_stat_value(index, base_value)
                             text[#text + 1] = suffix
                         end
 

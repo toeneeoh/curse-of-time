@@ -353,18 +353,51 @@
     local MAX_ROWS = 32
     local STATS_PER_PAGE = 28
     local function stat_page_indices(order, priority_limit, page)
-        local all = {}
+        local all, secondary = {}, {}
+        local available = {}
         for priority = 1, priority_limit do
-            for _, index in ipairs(order[priority] or {}) do all[#all + 1] = index end
+            for _, index in ipairs(order[priority] or {}) do available[index] = true end
         end
-        local pages = math.max(1, math.ceil(#all / STATS_PER_PAGE))
+        for priority = 1, priority_limit do
+            for _, index in ipairs(order[priority] or {}) do
+                if index == XP_RATE or index == DROP_RATE or index == BOSS_DROP_RATE then
+                    secondary[#secondary + 1] = index
+                elseif (index ~= ITEM_SPELL_AREA and index ~= ITEM_SPELL_DURATION) or
+                    not available[ITEM_SPELLBOOST] then
+                    all[#all + 1] = index
+                    if index == ITEM_SPELLBOOST then
+                        for _, utility in ipairs({ITEM_SPELL_AREA, ITEM_SPELL_DURATION}) do
+                            if available[utility] then all[#all + 1] = utility end
+                        end
+                    end
+                end
+            end
+        end
+        -- Keep progression rewards on page two even when page one has room.
+        local page_rows = {{}}
+        for _, index in ipairs(all) do
+            local rows = page_rows[#page_rows]
+            if #rows == STATS_PER_PAGE then
+                rows = {}
+                page_rows[#page_rows + 1] = rows
+            end
+            rows[#rows + 1] = index
+        end
+        if #secondary > 0 then
+            page_rows[2] = page_rows[2] or {}
+            local destination = 2
+            for _, index in ipairs(secondary) do
+                while #page_rows[destination] >= STATS_PER_PAGE do
+                    destination = destination + 1
+                    page_rows[destination] = page_rows[destination] or {}
+                end
+                local rows = page_rows[destination]
+                rows[#rows + 1] = index
+            end
+        end
+        local pages = #page_rows
         page = math.max(1, math.min(pages, page or 1))
-        local indices = {}
-        local first = (page - 1) * STATS_PER_PAGE + 1
-        for index = first, math.min(#all, first + STATS_PER_PAGE - 1) do
-            indices[#indices + 1] = all[index]
-        end
-        return indices, page, pages
+        return page_rows[page], page, pages
     end
     local PROFILE_TAB = 2
     local PERKS_TAB = 3
