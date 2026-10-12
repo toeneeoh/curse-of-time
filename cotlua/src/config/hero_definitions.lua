@@ -171,7 +171,9 @@ OnInit.global("HeroDefinitions", function(Require)
         int_gain     = 2.5,
         main         = "int",
         range        = "Melee",
-        skills       = {"A0GO", "A08Z", "A019", "A074", "A013", "A00C"},
+        -- Innates: Dark Blade, Dark Seal; learned skills: Medean Lightning,
+        -- Freezing Blast, Dark Shield, Dark Ascension.
+        skills       = {"A013", "A0GO", "A019", "A074", "A00A", "A00C"},
         stars        = {1, 3, 3, 0.5, 1.5}
         },
         [HERO_CRUSADER] = {
