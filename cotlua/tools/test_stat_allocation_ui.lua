@@ -9,6 +9,7 @@ local local_player, sender, clicked, wire = 0, 0, nil, nil
 local frames, sync, listeners = {}, nil, {}
 local enable_calls = {}
 local root = {}
+local console = {parent = root}
 INSPECT_HUD_ANCHOR = {}
 for _, name in ipairs({'ORIGIN_FRAME_GAME_UI', 'FRAMEPOINT_TOPRIGHT', 'FRAMEPOINT_TOPLEFT',
     'FRAMEPOINT_BOTTOM', 'FRAMEPOINT_TOP', 'FRAMEPOINT_LEFT', 'FRAMEPOINT_RIGHT', 'FRAMEEVENT_CONTROL_CLICK'}) do env[name] = name end
@@ -23,7 +24,7 @@ end
 BlzCreateFrame = function(kind, parent) return frame(kind, parent) end
 BlzCreateFrameByType = function(kind, _, parent) return frame(kind, parent) end
 BlzFrameSetAbsPoint = function(f, anchor, x, y) f.x, f.y, f.anchor = x, y, anchor end
-BlzFrameSetPoint = function(f, _, _, _, x, y) f.x, f.y = x, y end
+BlzFrameSetPoint = function(f, _, relative, _, x, y) f.x, f.y, f.relative = x, y, relative end
 BlzFrameClearAllPoints = function() end
 BlzFrameSetTexture = function(f, texture) f.texture = texture end
 BlzFrameSetSize = function(f, width, height) f.width, f.height = width, height end
@@ -38,6 +39,7 @@ FrameAddSimpleTooltip = function(_, _, text) return {frame = {}, tooltip = {text
 local context, named, icons = 0, {}, {}
 NextFrameCreateContext = function() context = context + 1; return context end
 BlzGetFrameByName = function(name, index)
+    if name == 'ConsoleUIBackdrop' then return console end
     local key = name .. index
     named[key] = named[key] or {}; return named[key]
 end
@@ -115,8 +117,9 @@ assert(icons[1].texture:find('BTNCancel.blp', 1, true), 'Close button does not u
 assert(icons[1].frame.x == -.04 and icons[1].frame.y == -.04, 'Close button did not move inward by .02')
 assert(panel.height == .27 and not find('Save Ratio').visible, 'Unowned automation section was not hidden and collapsed')
 assert(reminder_icon.tooltip.tooltip.text:find('8 stat points remaining.', 1, true))
-assert(reminder.visible and reminder.parent == INSPECT_HUD_ANCHOR and
-    reminder.x == (.039 + .032) * .5 and reminder.y == .03, 'HUD reminder is not centered .03 above inspect buttons')
+assert(reminder.visible and reminder.parent == console and reminder.relative == INSPECT_HUD_ANCHOR and
+    reminder.x == (.039 + .032) * .5 and reminder.y == .03,
+    'HUD reminder must render in the console layer and remain centered .03 above Inspect')
 click('+5'); click('+', .03)
 assert(#sounds == 1 and sound_handles == 3, 'Rapid draft clicks restarted audio or allocated local handles')
 local click_sound = sounds[1]

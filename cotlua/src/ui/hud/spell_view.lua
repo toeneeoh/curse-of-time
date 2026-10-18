@@ -468,7 +468,9 @@ OnInit.final("SpellView", function(Require)
                             local spell = not dataI.RuntimeKey and Spells[dataI.FourCC]
 
                             if spell then
-                                BlzFrameSetText(thisTooltip.Text, spell:getTooltip(unit, level))
+                                -- Definitions contain value functions. Resolve
+                                -- the selected unit before formatting numbers.
+                                BlzFrameSetText(thisTooltip.Text, spell:create(unit):getTooltip(unit, level))
                             else
                                 BlzFrameSetText(thisTooltip.Text, dataI.Text)
                             end

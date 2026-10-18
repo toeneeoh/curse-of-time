@@ -180,7 +180,9 @@ OnInit.final("StatAllocationUI", function(Require)
     auto_frames[#auto_frames + 1] = save_ratio
     for _, control in ipairs(auto_frames) do BlzFrameSetVisible(control, false) end
     -- Inspect icons are .032 wide and spaced .039 apart from this anchor.
-    local reminder = SimpleButton.create(INSPECT_HUD_ANCHOR,
+    -- Keep the HUD reminder below native and inspected-spell tooltips. Its
+    -- screen anchor stays with Inspect; its render parent is the console.
+    local reminder = SimpleButton.create(BlzGetFrameByName("ConsoleUIBackdrop", 0),
         "ReplaceableTextures\\CommandButtons\\BTNStatUp.blp", .027, .027,
         FRAMEPOINT_BOTTOM, FRAMEPOINT_TOPLEFT, (.039 + .032) * .5, .03, function()
         local pid = GetPlayerId(GetTriggerPlayer()) + 1
@@ -188,6 +190,9 @@ OnInit.final("StatAllocationUI", function(Require)
         UI.open(pid)
         return false
     end, "Allocate Stats", FRAMEPOINT_BOTTOM, FRAMEPOINT_TOP, 0., .01)
+    BlzFrameClearAllPoints(reminder.frame)
+    BlzFrameSetPoint(reminder.frame, FRAMEPOINT_BOTTOM, INSPECT_HUD_ANCHOR,
+        FRAMEPOINT_TOPLEFT, (.039 + .032) * .5, .03)
     reminder:visible(false)
     refresh = function(pid)
         if GetLocalPlayer() ~= Player(pid - 1) then return end

@@ -48,7 +48,25 @@ BlzGetAbilityRealLevelField = function() return 100 end
 BlzGetUnitAbilityByIndex = function() return nil end
 GetPlayerTechCount = function() return 1 end
 R2I = math.floor
-Spells = {[123] = {getTooltip = function() return 'Native parsed tooltip' end}}
+-- Use the real Spell:create path, including evaluation of function-valued
+-- fields. Resurrection's restore formula exposed a definition being formatted
+-- directly as if it were a numeric spell instance.
+local spell_file = assert(io.open('cotlua/src/gameplay/abilities/spells.lua', 'rb'))
+local spell_source = spell_file:read('*a'):gsub('\r\n', '\n'); spell_file:close()
+local first = assert(spell_source:find('        function thistype:create(u)', 1, true))
+local last = assert(spell_source:find('        local mt = {', first, true))
+GetPlayerId = function(player) return player end
+local create_spell = assert(load('local thistype, mts = {}, {}\n' .. spell_source:sub(first, last - 1) ..
+    '\nreturn thistype.create', 'real spell creation', 't', env))()
+local definition = {id = 123, create = create_spell,
+    values = {restore = function(_, u) return 40 + 20 * GetUnitAbilityLevel(u, 123) end}}
+definition.getTooltip = function(self, u, level)
+    assert(self.caster == u and self.pid == GetOwningPlayer(u) + 1 and self.ablev == level,
+        'Spell View rendered a definition instead of the selected unit instance')
+    assert(type(self.restore) == 'number' and self.restore == 60, 'Restore formula was not evaluated')
+    return 'Native parsed tooltip'
+end
+Spells = {[123] = definition}
 load_source('cotlua/src/gameplay/abilities/runtime_spells.lua')
 load_source('cotlua/src/ui/hud/spell_view.lua')
 local ui = TasSpellView
