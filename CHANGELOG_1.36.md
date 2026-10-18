@@ -20,18 +20,37 @@ Verification notes and remaining editorial checks are kept in
 - Reworked repeatable kill bounties, with more rewarding XP turn-ins and reduced rewards for overleveled farming.
 - Replaced Prestige with a persistent, profile-wide Perk Tree. Character milestones earn points for connected bonuses across four branches: Might, Guard, Fellowship, and Legacy.
 - Added Status Resistance, which shortens applicable negative effects, and Cooldown Acceleration, which makes ability cooldowns recover faster.
+- Added independent Spell Area and Spell Duration bonuses alongside Spell Power, with ability tooltips showing applicable scaling.
 - Critical Chance and Critical Damage are separate stats and can be increased through equipment and skills.
 - Reduced spellboost variance to ±10% (from ±20%).
 - Proficiency penalties now retain 75% of most item stats (from 50%).
 - Boss crystals are awarded directly to nearby players rather than dropped on the ground.
+- Added vendor sell values for 57 previously unpriced prechaos drops, with crafting materials valued per item in a stack.
+- Colosseum tickets no longer persist in character or stash saves.
 - Removed the revival wait after a player's grave expires, along with the `-revive` / `-rv` commands.
 - Players may flee the gods arena before killing Zeknen.
 - Added the Giant Polar Bear headhunter quest.
+- Fixed missing Ogre, Hydra, and Yeti headhunter quest turn-ins.
+- Doubled main prechaos boss health and increased Nerubian Empress, Giant Polar Bear, King of Ogres, and Yeti health by 50%. Boss armor totals above 300 are halved, up to a maximum of 350; existing in-combat healing rates are preserved.
+
+## Stat Allocation
+
+- Standardized all 19 heroes to 35 starting stat points, distributed for their class and resource needs. Elementalist starts with 22 Intelligence (from 40); Bloodzerker starts with zero Intelligence.
+- Replaced hero-specific stat gains on level-up with points freely assigned to Strength, Agility, or Intelligence. Early levels grant eight points per level, with larger awards every ten levels after 100.
+- Leveling to 500 grants 24,980 stat points in total. Each point always adds one base stat, including purchased points.
+- Replaced individual attribute tomes and the all-stat tome with a shared Stat Points purchase at the Magic Merchant.
+- Added an allocation window with bulk spending, previews before applying, and attribute-icon shortcuts in Stat View and above the inspect buttons.
+- Added an early, one-point Legacy perk for automatically assigning future level-up and purchased points using a chosen Strength/Agility/Intelligence ratio.
+- Allocations can be reset in town for 100 gold per hero level. Resetting refunds assigned points and clears the ratio to 0/0/0.
 
 ## Interface and Controls
 
+- Stat-allocation feedback sounds now finish naturally instead of being repeatedly stopped and restarted during rapid clicks.
+
 - Added a new hero-selection interface.
+- Added an optional, replayable tutorial with interactive inventory practice, interface guidance, and camera tours of the starting area. Restart it with `-new`.
 - Added a completely new custom inventory interface, with item dragging, swaps, context menus, item inspection, and two dedicated potion slots.
+- Inventory and stash drags now show moves, swaps, and stack counts immediately while the move is confirmed. Rapid consecutive drags are supported, and rejected moves restore the confirmed layout.
 - Added a new Stat View and Profile tab for resources, playtime, Reveal and Teleport levels, best Struggle wave, and other character information.
 - Added Drop Rate and Boss Drop Rate to the stat display.
 - Added a completely new multiboard with boss health, retarget timing, current target, fight duration, individual damage contribution, and DPS.
@@ -48,6 +67,11 @@ Verification notes and remaining editorial checks are kept in
 - Certain action hotkeys can be changed through the backpack settings menu and save with the profile.
 - Added a configurable ability-taunt toggle and hotkey.
 - Replaced many typed commands with interface controls.
+
+## Dungeons
+
+- Added a dungeon ready-check window showing party readiness, with controls to ready up and start the run.
+- Added a level-500 Scarab Tunnels preview with seeded room layouts, branching passages, and doorway traversal. Boss access and rewards are still in development.
 
 ## Factions
 
@@ -68,6 +92,7 @@ Verification notes and remaining editorial checks are kept in
 - Added encounter hazards, boss affixes, and telegraphed attacks.
 - Added wave progress and run information to the interface.
 - Rebalanced tickets, enemy scaling, and gold rewards.
+- Reduced early Colosseum gold rewards to a level-based share of the former payout: 25% at level 50, 50% at level 100, and the full amount from level 200 onward.
 - Colosseum clears now award Honor instead of character XP.
 - Honor can be allocated to bonuses at the Prize Vendor and reallocated without losing lifetime Honor.
 - Added lifetime Honor milestones. Honor progression saves with the character.
@@ -103,6 +128,12 @@ Verification notes and remaining editorial checks are kept in
 
 ## Items, Upgrading, and Crafting
 
+- Eight nearby loot entries now form a selectable treasure pile with a paginated 12×6 loot window beside the inventory. Inspect or take individual items; new additions give the bundle a brief gold pulse.
+- Loot bundles show their remaining item count on hover, with varied rotation and a smaller selection circle. General and Magic merchants also show their names on hover; selecting an NPC hides the native armor and Invulnerable row.
+- Corrected building/Neutral hover-name settings on loot bundles, the Colosseum Director, Huntsman, Headhunter, and Chaotic Huntsman.
+- Sparse drops use direct powerup pickups, replacing the extra-inventory pickup experiment. Bundle contents preserve their rolled data without hidden native items, with shared expiration scheduling and explicit pickup-proxy cleanup.
+- Item tooltips list abilities after all stats, including Spell Area and Spell Duration, and before flavor text. Potion ground models now match their inventory rarity borders.
+- Increased loot bundling radius to 450. Successful potion use now plays a health, mana, or restoration effect on the hero, including buff-only potions.
 - Complete revamp of item rarity system as well as formulas for boss item stats and upgrade prices
 - The enhancer may now Salvage your items for 25% of its gold/platinum cost (can be viewed with Item Info)
 - Changed tooltip format for items
@@ -156,9 +187,11 @@ Verification notes and remaining editorial checks are kept in
 - Arcanist Stasis Field (E) - Reduced cooldown to 20 (from 50)
 - Arcanist Arcane Shift (R) - Increased stun duration to 4 seconds (from 3), now keeps enemies stunned over the entire duration (even after second casting), Reduced cooldown to 30 seconds (from 80)
 - Arcanist Arcanosphere (T) - Movement is much smoother, arcane comets now randomly target nearby enemies instead of landing where your cursor was, Reduced cooldown to 60 seconds (from 300)
-- Assassin Smokebomb (E) - Reduced movespeed slow to 30/32/34/36/38/40% (from 25/30/35/40/45/50)
+- Assassin Smoke Bomb (E) - Now casts instantly around Assassin and follows him. Increased radius to 450 (from 300), reduced mana cost to 15% of maximum (from 20%), and sped up its smoke effect by 50%. Grants Assassin 100% physical evasion for the first three seconds; allied evasion is unchanged. Enemy slow is 30/32/34/36/38/40% (from 25/30/35/40/45/50%).
+- Assassin Blink Strike (W) - Replaced the old burst with a darker green dust wave, played at 2x speed and enlarged by 45%, with Blink effects at departure and arrival.
+- Assassin Blade Spin - Increased radius to 350 (from 250). Both manual and passive spins deal 50% more damage when exactly one enemy is hit.
 - Assassin Dagger Storm (R) - Number of daggers reduced to 30 (from 60), damage scaling increased to 2x agi (from 1x), daggers are now immediately thrown without delay, increased dagger speed by 10%
-- Assassin Phantom Slash (T) - Can no longer be recast before completing a dash, increased dash speed by 20%, grants 100% evasion during the dash, reduced required level to learn to 50 (from 100), damage scaling upped to 1.5/3 x Agi (from 1.5 at all levels)
+- Assassin Phantom Slash (T) - Can no longer be recast before completing a dash, increased dash speed by 20%, grants 100% evasion during the dash, reduced required level to learn to 50 (from 100), damage scaling upped to 1.5/3 x Agi (from 1.5 at all levels). Now readies one manual Blade Spin when the dash ends, including dashes that hit no enemies.
 - Bard - Increased base physical resistance to 180% (from 200), reduced base magic resistance to 160% (from 100)
 - Bard Songs of the Traveler - Added better visual indicator for current playing song
 - Bard Song of Peace - Increased mana regen to 1% (from 0.75%)

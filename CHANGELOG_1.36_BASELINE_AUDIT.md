@@ -202,6 +202,28 @@ independently revalidated or tested in game.
 
 ### Maintaining the release notes
 
+October 17 update: the consolidated draft now includes stat allocation, the
+shared stat-point shop, increasing late-level point awards, the one-point
+Legacy automation perk and the paid reset. The owner's follow-up corrected the
+earlier percentage interpretation: a point always grants one base stat, and
+leveling grants 24,980 points by 500. Supporting behavior
+is documented in `cotlua/docs/STAT_ALLOCATION_IMPLEMENTATION.md` and implemented
+in `gameplay/players/stat_allocation*.lua` and `ui/dialogs/stat_allocation.lua`.
+
+The guided tutorial and dungeon ready-check interface were also missing from the
+public draft. Spell Area and Spell Duration are now named independently of Spell
+Power. Sources: `ui/hud/tutorial.lua`, `ui/dialogs/dungeon_ready.lua`,
+`ui/hud/stat_values.lua`, and the hero ability/tooltips updated after the previous
+changelog edit.
+
+Scarab Tunnels is explicitly described as a preview. Despite older design notes
+calling the crawl development-only, `content/shops/scarab_entrance.lua` now
+registers a public level-500 entrance and `content/dungeons/scarab.lua` starts
+the seeded crawl. Boss access and rewards remain disconnected; the draft makes
+no release claim about the staged boss or its proposed skills/rewards. Routine
+UI alignment, focus, synchronization and architecture-test maintenance were not
+added as new features.
+
 Editorial direction: keep the public draft focused on major systems,
 progression, and meaningful balance changes. Omit effect catalogs, item names
 for new boss pools, recipe components, detailed faction reward payouts,
