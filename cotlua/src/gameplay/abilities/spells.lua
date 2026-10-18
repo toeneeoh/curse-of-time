@@ -477,10 +477,14 @@
             abil = BlzGetUnitAbilityByIndex(source, i)
         end
 
-        UpdateSpellTooltips(source)
-
         -- execute onlearn function
         if spell and spell.onLearn then spell.onLearn(source, ablev, pid) end
+
+        -- Learning registers percentage-mana cost listeners, but does not
+        -- change a stat. Initialize them after the learn hook, just as adding
+        -- an ability does, then render the completed cost and spell state.
+        EVENT_STAT_CHANGE:trigger(source, "int")
+        UpdateSpellTooltips(source)
 
         return false
     end
