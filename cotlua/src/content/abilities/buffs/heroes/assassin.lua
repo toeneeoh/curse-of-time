@@ -53,12 +53,26 @@ OnInit.final("BuffsHeroesAssassin", function(Require)
         end
 
         function thistype:onApply()
-            self.evasion = 9 + GetUnitAbilityLevel(self.source, SMOKEBOMB.id)
-            if self.source == self.target then
-                self.evasion = self.evasion * 2
-            end
+            self.evasion = 18 + GetUnitAbilityLevel(self.source, SMOKEBOMB.id) * 2
 
             Unit[self.target].evasion = Unit[self.target].evasion + self.evasion
+        end
+    end
+
+    ---@class SmokebombVeilBuff : Buff
+    SmokebombVeilBuff = Buff.new()
+    do
+        local thistype = SmokebombVeilBuff
+        thistype.NAME = "Smoke Veil"
+        thistype.ICON = "ReplaceableTextures\\CommandButtons\\BTNSmokeBomb1.blp"
+        thistype.DESC = "This unit has +100% evasion"
+        thistype.DISPEL_TYPE = BUFF_POSITIVE
+        thistype.STACK_TYPE = BUFF_STACK_PARTIAL
+        function thistype:onApply()
+            Unit[self.target].evasion = Unit[self.target].evasion + 100
+        end
+        function thistype:onRemove()
+            Unit[self.target].evasion = Unit[self.target].evasion - 100
         end
     end
 

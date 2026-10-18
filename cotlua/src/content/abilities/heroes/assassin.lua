@@ -69,8 +69,7 @@ OnInit.final("AssassinSpells", function(Require)
 
         function thistype:onCast()
             --change blade spin to active
-            UnitAddAbility(self.caster, BLADESPIN.id)
-            UnitDisableAbility(self.caster, BLADESPIN.id2, true)
+            BLADESPIN.ready(self.caster)
 
             local missile = setmetatable({}, missile_template)
             missile.x = self.x
@@ -117,20 +116,19 @@ OnInit.final("AssassinSpells", function(Require)
             local ug = CreateGroup()
 
             --change blade spin to active
-            UnitAddAbility(self.caster, BLADESPIN.id)
-            UnitDisableAbility(self.caster, BLADESPIN.id2, true)
+            BLADESPIN.ready(self.caster)
 
-            for i = 0, 11 do
-                self.angle = 0.1666 * bj_PI * i
-                DestroyEffect(AddSpecialEffect("Abilities\\Spells\\Orc\\FeralSpirit\\feralspiritdone.mdl", self.targetX + 190. * math.cos(self.angle), self.targetY + 190. * math.sin(self.angle)))
-            end
-
-            DestroyEffect(AddSpecialEffect("Abilities\\Spells\\Orc\\FeralSpirit\\feralspiritdone.mdl", self.targetX, self.targetY))
+            DestroyEffect(AddSpecialEffect("Abilities\\Spells\\NightElf\\Blink\\BlinkCaster.mdl", GetUnitX(self.caster), GetUnitY(self.caster)))
+            local sfx = AddSpecialEffect("war3mapImported\\dustwaveanimate2.mdx", self.targetX, self.targetY)
+            BlzSetSpecialEffectColor(sfx, 140, 210, 150)
+            -- Stand is the intended burst (876 ms); Birth is the alternate
+            -- sequence. Play it at 2x, with a 45% larger visual radius.
+            BlzSetSpecialEffectScale(sfx, 1.45 * self.aoe * ABOOST[self.pid] / 300.)
+            BlzPlaySpecialEffectWithTimeScale(sfx, ANIM_TYPE_STAND, 2.)
+            TQ:callDelayed(.6, HideEffect, sfx)
             MakeGroupInRange(self.pid, ug, self.targetX, self.targetY, self.aoe * ABOOST[self.pid], Condition(FilterEnemy))
 
             for target in each(ug) do
-                DestroyEffect(AddSpecialEffectTarget("Abilities\\Spells\\Other\\Stampede\\StampedeMissileDeath.mdl", target, "origin"))
-
                 local debuff = MarkedForDeathDebuff:get(nil, target)
 
                 if debuff then
@@ -144,6 +142,7 @@ OnInit.final("AssassinSpells", function(Require)
 
             SetUnitXBounded(self.caster, self.targetX)
             SetUnitYBounded(self.caster, self.targetY)
+            DestroyEffect(AddSpecialEffect("Abilities\\Spells\\NightElf\\Blink\\BlinkTarget.mdl", GetUnitX(self.caster), GetUnitY(self.caster)))
 
             DestroyGroup(ug)
         end
@@ -167,56 +166,66 @@ OnInit.final("AssassinSpells", function(Require)
         local thistype = SMOKEBOMB
 
         thistype.values = {
-            aoe = 300.,
+            aoe = 450.,
             dur = 8.,
         }
+        local alive_filter = Condition(isalive)
+
+        local function aura(pt)
+            MakeGroupInRange(pt.pid, pt.ug, GetUnitX(pt.source), GetUnitY(pt.source), pt.aoe, alive_filter)
+            for target in each(pt.ug) do
+                if IsUnitAlly(target, Player(pt.pid - 1)) then
+                    SmokebombBuff:add(pt.source, target):duration(1.)
+                else
+                    SmokebombDebuff:add(pt.source, target):duration(1.)
+                end
+            end
+        end
 
         ---@type fun(pt: PlayerTimer): boolean
         local function periodic(pt)
-            pt.dur = pt.dur - 0.5
-
-            if pt.dur > 0. then
-                MakeGroupInRange(pt.pid, pt.ug, pt.x, pt.y, pt.aoe, Condition(isalive))
-
-                for target in each(pt.ug) do
-                    if IsUnitAlly(target, Player(pt.pid - 1)) then
-                        SmokebombBuff:add(Hero[pt.pid], target):duration(1.)
-                    else
-                        SmokebombDebuff:add(Hero[pt.pid], target):duration(1.)
-                    end
-                end
-
-                return true
-            end
-
-            return false
+            pt.dur = pt.dur - .1
+            if pt.dur <= .000001 or Hero[pt.pid] ~= pt.source or not UnitAlive(pt.source) then return false end
+            BlzSetSpecialEffectPosition(pt.sfx, GetUnitX(pt.source), GetUnitY(pt.source), GetUnitZ(pt.source))
+            pt.pulse = pt.pulse + 1
+            if pt.pulse == 5 then pt.pulse = 0; aura(pt) end
+            return true
+        end
+        local function onRemove(pt)
+            if pt.veil and SmokebombVeilBuff:get(pt.source, pt.source) == pt.veil then pt.veil:remove() end
         end
 
         function thistype:onCast()
             --change blade spin to active
-            UnitAddAbility(self.caster, BLADESPIN.id)
-            UnitDisableAbility(self.caster, BLADESPIN.id2, true)
+            BLADESPIN.ready(self.caster)
 
-            local pt = TimerList[self.pid]:add()
-            pt.x = self.targetX
-            pt.y = self.targetY
+            TimerList[self.pid]:stopAllTimers(thistype.id)
+            local pt = TimerList[self.pid]:add(thistype.id)
+            pt.source = self.caster
             pt.aoe = self.aoe * ABOOST[self.pid]
             pt.dur = self.dur * DBOOST[self.pid]
+            pt.pulse = 0
             pt.ug = CreateGroup()
+            pt.onRemove = onRemove
 
-            pt.sfx = AddSpecialEffect("war3mapImported\\GreySmoke.mdx", self.targetX, self.targetY)
-            BlzSetSpecialEffectScale(pt.sfx, ABOOST[self.pid])
-            pt:startLoop(0.5, periodic)
+            pt.sfx = AddSpecialEffect("war3mapImported\\GreySmoke.mdx", GetUnitX(self.caster), GetUnitY(self.caster))
+            BlzSetSpecialEffectScale(pt.sfx, 1.5 * ABOOST[self.pid])
+            BlzSetSpecialEffectTimeScale(pt.sfx, 1.5)
+            pt.veil = SmokebombVeilBuff:add(self.caster, self.caster)
+            pt.veil:duration(3.)
+            aura(pt)
+            pt:startLoop(.1, periodic)
         end
 
         local manacost = function(u, key)
             if key == "int" or key == "bonus_mana" or key == "bonus_int" then
-                BlzSetUnitAbilityManaCost(u, thistype.id, GetUnitAbilityLevel(u, thistype.id) - 1, R2I(BlzGetUnitMaxMana(u) * 0.2))
+                BlzSetUnitAbilityManaCost(u, thistype.id, GetUnitAbilityLevel(u, thistype.id) - 1, R2I(BlzGetUnitMaxMana(u) * 0.15))
             end
         end
 
         function thistype.onLearn(source, ablev, pid)
             EVENT_STAT_CHANGE:register_unit_action(source, manacost)
+            manacost(source, "int")
         end
     end
 
@@ -285,8 +294,7 @@ OnInit.final("AssassinSpells", function(Require)
 
         function thistype:onCast()
             --change blade spin to active
-            UnitAddAbility(self.caster, BLADESPIN.id)
-            UnitDisableAbility(self.caster, BLADESPIN.id2, true)
+            BLADESPIN.ready(self.caster)
 
             self.count = self.num
 
@@ -320,10 +328,17 @@ OnInit.final("AssassinSpells", function(Require)
         thistype.values = {
             times = function(pid, u) return math.max(8 - GetHeroLevel(u) // 100, 5) end,
             pdmg = function(pid, u) return 8. * GetHeroAgi(u, true) end,
-            aoe = 250.,
+            aoe = 350.,
             admg = function(pid, u) return 4. * GetHeroAgi(u, true) end,
         }
         thistype.count = __jarray(0)
+        function thistype.ready(caster)
+            if GetUnitAbilityLevel(caster, thistype.id) == 0 then
+                UnitAddAbility(caster, thistype.id)
+                SetUnitAbilityLevel(caster, thistype.id, math.min(4, GetHeroLevel(caster) // 100 + 1))
+            end
+            UnitDisableAbility(caster, thistype.id2, true)
+        end
 
         ---@type fun(caster: unit, active: boolean)
         local function spin(caster, active)
@@ -339,20 +354,21 @@ OnInit.final("AssassinSpells", function(Require)
             for i = 0, 1 do
                 local sfx = AddSpecialEffect("war3mapImported\\Ephemeral Slash Jade.mdl", x, y)
                 BlzSetSpecialEffectZ(sfx, GetUnitZ(caster) + 75.)
-                BlzSetSpecialEffectScale(sfx, 1.35)
+                BlzSetSpecialEffectScale(sfx, 1.89 * ABOOST[pid])
                 BlzSetSpecialEffectTimeScale(sfx, 0.5)
                 BlzSetSpecialEffectYaw(sfx, (GetUnitFacing(caster) + 180 * i) * bj_DEGTORAD)
                 DestroyEffect(sfx)
             end
 
             MakeGroupInRange(pid, ug, x, y, thistype.aoe * ABOOST[pid], Condition(FilterEnemy))
+            local multiplier = BlzGroupGetSize(ug) == 1 and 1.5 or 1.
 
             for target in each(ug) do
                 DestroyEffect(AddSpecialEffectTarget("Objects\\Spawnmodels\\Critters\\Albatross\\CritterBloodAlbatross.mdl", target, "chest"))
                 if active then
-                    DamageTarget(caster, target, thistype.admg(pid, caster) * BOOST[pid], ATTACK_TYPE_NORMAL, MAGIC, thistype.tag)
+                    DamageTarget(caster, target, thistype.admg(pid, caster) * BOOST[pid] * multiplier, ATTACK_TYPE_NORMAL, MAGIC, thistype.tag)
                 else
-                    DamageTarget(caster, target, thistype.pdmg(pid, caster) * BOOST[pid], ATTACK_TYPE_NORMAL, MAGIC, thistype.tag)
+                    DamageTarget(caster, target, thistype.pdmg(pid, caster) * BOOST[pid] * multiplier, ATTACK_TYPE_NORMAL, MAGIC, thistype.tag)
                 end
             end
 
@@ -366,7 +382,7 @@ OnInit.final("AssassinSpells", function(Require)
 
         local function on_attack(source, target)
             local pid = GetPlayerId(GetOwningPlayer(source)) + 1
-            if thistype.count[pid] >= thistype.times(pid) - 1 then
+            if thistype.count[pid] >= thistype.times(pid, source) - 1 then
                 thistype.count[pid] = 0
 
                 spin(source, false)
@@ -461,6 +477,9 @@ OnInit.final("AssassinSpells", function(Require)
 
             thistype.slashing[self.pid] = false
             Unit[self.source].evasion = Unit[self.source].evasion - 100
+            if Hero[self.pid] == self.source and UnitAlive(self.source) then
+                BLADESPIN.ready(self.source)
+            end
             SetUnitTimeScale(self.source, 1.)
             SetUnitAnimationByIndex(self.source, 4)
         end
