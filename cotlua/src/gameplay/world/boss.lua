@@ -13,6 +13,7 @@ OnInit.final("Boss", function(Require)
     Require('Users')
     Require('DropTable')
     Require('WorldAreas')
+    Require('UnitTable')
 
     local TQ = TimerQueue
     local dead_gods = 0
@@ -21,6 +22,35 @@ OnInit.final("Boss", function(Require)
 
     local NEARBY_BOSS_RANGE = 2500.
     BOSS_OFFSET = 1
+
+    -- Explicit prechaos types: Chaos bosses and unrelated encounter units keep
+    -- their own tuning. Head-drop bosses receive a smaller early-game increase.
+    local PRECHAOS_HEALTH = {
+        [FourCC('O002')] = 2., [FourCC('H045')] = 2.,
+        [FourCC('U00G')] = 2., [FourCC('H01V')] = 2.,
+        [FourCC('H02H')] = 2., [FourCC('O01B')] = 2.,
+        [FourCC('H040')] = 2., [FourCC('H020')] = 2.,
+        [FourCC('H04Q')] = 2., [FourCC('E00B')] = 2.,
+        [FourCC('E00D')] = 2., [FourCC('E00C')] = 2.,
+        [FourCC('H00O')] = 2.,
+        [FourCC('n02H')] = 1.5, [FourCC('n03L')] = 1.5,
+        [FourCC('n02U')] = 1.5, [FourCC('n0pb')] = 1.5,
+    }
+
+    local function apply_prechaos_balance(unit)
+        local health_multiplier = PRECHAOS_HEALTH[GetUnitTypeId(unit)]
+        if not health_multiplier then return end
+
+        local data = Unit[unit]
+        -- Use derived HP after leveling, including Strength, and the normal
+        -- bonus API so later attribute recalculations retain the increase.
+        data.bonus_hp = data.bonus_hp + math.floor(data.hp * (health_multiplier - 1.))
+        local armor = BlzGetUnitArmor(unit)
+        if armor > 300. then
+            data.armor_percent = data.armor_percent * math.min(armor * 0.5, 350.) / armor
+        end
+        SetWidgetLife(unit, data.hp)
+    end
 
     ---@class Boss
     ---@field index integer
@@ -324,6 +354,7 @@ OnInit.final("Boss", function(Require)
             self.unit = CreateUnit(PLAYER_BOSS, id, loc_x, loc_y, facing)
 
             SetHeroLevel(self.unit, level, false)
+            apply_prechaos_balance(self.unit)
             SetUnitCreepGuard(self.unit, true)
 
             -- boss spell casting
@@ -628,7 +659,9 @@ OnInit.final("Boss", function(Require)
                     if CHAOS_MODE then
                         hp = hp * (0.01 + 0.04 * boss.nearby_count) -- 0.04 percent per player
                     else
-                        hp = hp * 0.2 * boss.nearby_count -- 0.2 percent
+                        -- Preserve pre-tuning healing per second in combat;
+                        -- larger health pools should not create a regen wall.
+                        hp = hp * 0.2 * boss.nearby_count / (PRECHAOS_HEALTH[boss.id] or 1.)
                     end
 
                     if numplayers == 0 then -- out of combat
@@ -682,6 +715,7 @@ OnInit.final("Boss", function(Require)
                 Buff.dispelAll(self.unit)
                 Unit[self.unit].mm = 2.
             end
+            apply_prechaos_balance(self.unit)
             DisplayTimedTextToForce(FORCE_PLAYING, 20, "|cffffcc00" .. self.name .. " has revived.|r")
 
             -- reset multiboard data

@@ -389,13 +389,12 @@ OnInit.final("Quests", function(Require)
             end
         end
 
-        -- nerubian turn in
-        ITEM_LOOKUP[NERUBIAN_QUEST] = function(p, pid, u, itm)
-            turn_in(pid, itm.id)
-        end
-
-        ITEM_LOOKUP[POLARBEAR_QUEST] = function(p, pid, u, itm)
-            turn_in(pid, itm.id)
+        -- Every headhunter offer needs a pickup handler, including the fixed
+        -- Ogre, Hydra, and Yeti rewards (not only the reward-choice quests).
+        for quest_id in pairs(REWARDS) do
+            ITEM_LOOKUP[quest_id] = function(p, pid, u, itm)
+                turn_in(pid, quest_id)
+            end
         end
 
         -- item preload

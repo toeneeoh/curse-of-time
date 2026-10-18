@@ -55,10 +55,12 @@ OnInit.final("Colosseum", function(Require)
     -- At 0.0003 armor per point, 500,000 primary attribute adds 150 armor, keeping a level-400
     -- normal wave near the 300-450 armor range used by contemporary overworld mobs.
     -- Coins are paid even on failure. Their value uses each recipient's own level,
-    -- not the encounter average: 25,000 + 8 * level^2 gold. A character below the
+    -- not the encounter average: (25,000 + 8 * level^2) * min(1, level / 200)
+    -- gold. Early runs pay less than mature characters' runs, reaching the
+    -- existing value at level 200. A character below the
     -- encounter level receives an additional (own level / encounter level)^2
-    -- multiplier. This leaves equal-level parties unchanged while making it
-    -- inefficient for a late-game character to carry a new character for gold.
+    -- multiplier. This penalizes underlevel carries without penalizing
+    -- equal-level parties for grouping together.
     -- Colosseum combat grants no experience, so entering low cannot bypass that
     -- scaling during the run. Honor is separate, character-owned progression and
     -- is awarded only on a clear.
@@ -157,6 +159,7 @@ OnInit.final("Colosseum", function(Require)
     local BOSS_ARMOR = 2
     local COIN_BASE_GOLD = 25000
     local COIN_LEVEL_SCALING = 8
+    local FULL_REWARD_LEVEL = 200
     local CHAOS_ARMOR_LEVEL = 200
     local CHAOS_ATTACK_LEVEL = 250
     local STAT_ARMOR_PER_ATTRIBUTE = 0.0003
@@ -1205,7 +1208,8 @@ OnInit.final("Colosseum", function(Require)
         if level < encounter_level then
             level_multiplier = (level / encounter_level) ^ 2
         end
-        local gold_per_coin = COIN_BASE_GOLD + level * level * COIN_LEVEL_SCALING
+        local early_level_multiplier = math.min(1., level / FULL_REWARD_LEVEL)
+        local gold_per_coin = (COIN_BASE_GOLD + level * level * COIN_LEVEL_SCALING) * early_level_multiplier
         local gold_multiplier = 1. + 0.1 * Honor.getRank(pid, "colosseum_spoils")
         local gold = math.floor(coins * gold_per_coin * level_multiplier * gold_multiplier)
 
