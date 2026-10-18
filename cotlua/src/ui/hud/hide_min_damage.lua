@@ -5,7 +5,8 @@
     A tool that hides the minimum damage from game UI
 ]]
 
-OnInit.final("HideMin", function()
+OnInit.final("HideMin", function(Require)
+    Require('NpcInfoPanel')
     local text, index
     local find, sub, get_text, set_text, is_visible = string.find, string.sub, BlzFrameGetText, BlzFrameSetText, BlzFrameIsVisible
     BlzLoadTOCFile("war3mapImported\\HideMinDamage.toc")
@@ -22,6 +23,7 @@ OnInit.final("HideMin", function()
     end
 
     local function check()
+        NpcInfoPanel.refresh()
         if is_visible(parentA) then
             update(damageA, damageA2)
         end
