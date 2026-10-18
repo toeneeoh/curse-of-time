@@ -233,6 +233,74 @@ end
 print('PASS: native duration color codes stay intact; normal/Alt scaling notes follow duration and cooldown; calculated duration is correct.')
 print('PASS: real normal/Alt tooltips mark scalable values, show half Power only on Alt, leave fixed values alone, and restore surrounding colors.')
 
+-- Removing/re-adding a registered ability resets its native tooltip. The
+-- add hook refreshes rank one; restoring its real rank can reset it again.
+-- Reproduce both paths with the real helper, parser, setter and add hook.
+local tooltip_writes, local_player = 0, 0
+unit.abilities = {}
+actual_spell.tooltip_rewrite = nil
+actual_spell.getTooltip = real_get_tooltip
+actual_spell.create = function(self) return self end
+TEST_TOOLTIPS[123][1] = 'Rank 1: [dmg=10] damage, {aoe=300] AoE.'
+TEST_TOOLTIPS[123][3] = 'Rank 3: [dmg=30] damage, {aoe=500] AoE.'
+local native_text = TEST_TOOLTIPS[123]
+GetUnitAbilityLevel = function(u, id) return u.abilities[id] and u.abilities[id].level or 0 end
+GetOwningPlayer, GetLocalPlayer = function() return 0 end, function() return local_player end
+BlzGetUnitAbility = function(u, id) return u.abilities[id] end
+BlzSetAbilityStringLevelField = function(ability, _, level, text)
+    assert(local_player == 0 and level == ability.level - 1)
+    ability.tooltip = text; tooltip_writes = tooltip_writes + 1
+end
+local normal_text, activated_text = {}, {}
+BlzSetAbilityExtendedTooltip = function(_, text, level) normal_text[level] = text end
+BlzSetAbilityActivatedExtendedTooltip = function(_, text, level) activated_text[level] = text end
+thistype = {}
+actual_spell.setTooltip = extract('gameplay/abilities/spells.lua', '        function thistype:setTooltip(',
+    '        -- Stub methods', '\nreturn thistype.setTooltip')
+UnitRemoveAbility = function(u, id) u.abilities[id] = nil end
+UnitAddAbility = function(u, id)
+    if u.abilities[id] then return false end
+    u.abilities[id] = {level = 1, tooltip = native_text[1]}
+    return true
+end
+SetUnitAbilityLevel = function(u, id, level)
+    u.abilities[id].level, u.abilities[id].tooltip = level, native_text[level]
+end
+BlzUnitDisableAbility = function(u, id, disabled) u.abilities[id].disabled = disabled end
+BlzUnitHideAbility = function(u, id, hidden) u.abilities[id].hidden = hidden end
+Spells = {[123] = actual_spell}
+EVENT_STAT_CHANGE = {trigger = function(_, u) actual_spell:setTooltip(u, 123) end}
+extract('gameplay/abilities/spells.lua', '    local OldUnitAddAbility =', '    -- storage for spell definitions')
+extract('framework/wc3/unit_helpers.lua', '    function UnitDisableAbility(', '    ---@param u unit')
+for _, level in ipairs({1, 3}) do
+    for _, alt in ipairs({false, true}) do
+        TEST_ALT[1] = alt
+        unit.abilities[123] = {level = level, tooltip = native_text[level]}
+        UnitDisableAbility(unit, 123, false)
+        local ability = unit.abilities[123]
+        local expected = actual_spell:getTooltip(unit, level)
+        assert(ability.level == level and ability.hidden and ability.disabled == false)
+        assert(ability.tooltip == expected and not ability.tooltip:find('dmg=', 1, true),
+            'Ability reset left raw/stale tooltip until the next Alt press')
+        assert(normal_text[level - 1] == expected and activated_text[level - 1] == expected)
+        UnitDisableAbility(unit, 123, true)
+        assert(unit.abilities[123].disabled and unit.abilities[123].tooltip == expected)
+    end
+end
+local writes_before = tooltip_writes
+local_player = 1
+UnitDisableAbility(unit, 123, false)
+assert(tooltip_writes == writes_before, 'Another player received local tooltip writes')
+local_player = 0
+UnitDisableAbility(unit, 999, true)
+assert(unit.abilities[999] == nil, 'Disabling an absent ability added it')
+Spells = nil
+unit.abilities[999] = {level = 1}
+UnitDisableAbility(unit, 999, false)
+assert(unit.abilities[999].level == 1, 'Unregistered ability reset failed')
+assert(TEST_TOOLTIPS[123][3] == 'Rank 3: [dmg=30] damage, {aoe=500] AoE.')
+print('PASS: ability resets immediately restore parsed normal/Alt tooltips at the original rank, including disabled state, without non-owner writes or source-template edits.')
+
 local refresh = read('gameplay/players/hero_refresh.lua')
 assert(refresh:find('BOOST[pid] = 1. + unit.spellboost + SpellboostVariance()', 1, true))
 assert(refresh:find('ABOOST[pid] = math.max(0., 1. + unit.spell_area)', 1, true))

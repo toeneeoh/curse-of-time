@@ -9,6 +9,11 @@ OnInit.global("UnitHelpers", function()
         SetUnitAbilityLevel(u, id, level)
         BlzUnitDisableAbility(u, id, disable, false)
         BlzUnitHideAbility(u, id, true)
+        -- Re-adding starts at rank one; restoring the rank can reset its
+        -- native tooltip after the add hook ran. Refresh the final ability
+        -- instance using the owner's current normal/Alt presentation.
+        local spell = Spells and Spells[id]
+        if spell then spell:setTooltip(u, id) end
     end
 
     ---@param u unit
