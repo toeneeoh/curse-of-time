@@ -24,6 +24,7 @@
 
 OnInit.final("Profile", function(Require)
     Require('HeroDefinitions')
+    Require('StatAllocationModel')
     Require('MainMap')
     Require('WorldAreas')
     MAX_INVENTORY_SLOTS = 26 ---@type integer 
@@ -946,6 +947,11 @@ OnInit.final("Profile", function(Require)
                 local hero = CreateUnit(Player(pid - 1), unit_id, GetRectCenterX(gg_rct_ChurchSpawn), GetRectCenterY(gg_rct_ChurchSpawn), 0.)
                 Hero[pid] = hero
                 PLAYER_SELECTED_UNIT[pid] = hero
+                if HERO_STATS[unit_id].str then
+                    BlzSetUnitRealField(hero, UNIT_RF_STRENGTH_PER_LEVEL, 0.)
+                    BlzSetUnitRealField(hero, UNIT_RF_AGILITY_PER_LEVEL, 0.)
+                    BlzSetUnitRealField(hero, UNIT_RF_INTELLIGENCE_PER_LEVEL, 0.)
+                end
 
                 -- backpack
                 local backpack = CreateUnit(Player(pid - 1), BACKPACK, GetRectCenterX(gg_rct_ChurchSpawn), GetRectCenterY(gg_rct_ChurchSpawn), 0)
@@ -1373,8 +1379,7 @@ OnInit.final("Profile", function(Require)
                 serialize_item(result, self.items[slot])
             end
 
-            -- Optional trailing data leaves all existing version-1 inventory
-            -- offsets intact; an older character payload simply reads zero.
+            -- Character metadata follows the fixed inventory records.
             result[#result + 1] = self.summon_essence or 0
             result[#result + 1] = self.struggle_best_wave or 0
             result[#result + 1] = self.struggle_claim_wave or 0
@@ -1393,50 +1398,9 @@ OnInit.final("Profile", function(Require)
                 serialize_item(result, self.stash[slot])
             end
 
+            StatAllocationModel.append(result, self.stat_allocation)
+
             return result
-        end
-
-        local legacy_scalar_keys = {
-            "id", "hardcore", "deprecated_progression", "level", "str", "agi", "int",
-            "gold", "platinum", "crystal", "time",
-        }
-
-        local function propagate_legacy(self, data)
-            local index = 1
-
-            for i = 1, #legacy_scalar_keys do
-                self[legacy_scalar_keys[i]] = data[index]
-                index = index + 1
-            end
-
-            local ids = {}
-            local stats = {}
-
-            for slot = 1, MAX_INVENTORY_SLOTS do
-                ids[slot] = data[index] or 0
-                index = index + 1
-            end
-
-            for slot = 1, MAX_INVENTORY_SLOTS do
-                stats[slot] = data[index] or 0
-                index = index + 1
-            end
-
-            self.teleport = data[index] or 1
-            self.reveal = data[index + 1] or 1
-            self.skin = data[index + 2] or 25
-
-            for slot = 1, MAX_INVENTORY_SLOTS do
-                if ids[slot] ~= 0 then
-                    self.saved_items[slot] = {
-                        id = ids[slot],
-                        stats = stats[slot],
-                        extra = 0,
-                        state = {},
-                        sockets = {},
-                    }
-                end
-            end
         end
 
         ---@param data integer[]
@@ -1444,14 +1408,13 @@ OnInit.final("Profile", function(Require)
             local magic = read_value(data, 1)
 
             if magic ~= CHARACTER_SAVE_MAGIC then
-                propagate_legacy(self, data)
-                return true
+                return false, "Unsupported character save format. Create a new character."
             end
 
             local version = read_value(data, 2)
             local index = 3
 
-            if version ~= CHARACTER_SAVE_VERSION and version ~= 2 then
+            if version ~= CHARACTER_SAVE_VERSION then
                 return false, "Unsupported character save version: " .. tostring(version)
             end
 
@@ -1484,19 +1447,20 @@ OnInit.final("Profile", function(Require)
                 self.faction_point_balances[faction_id] = read_value(data, index + 11 + faction_id)
             end
 
-            self.stash_rows = 1
+            self.stash_rows = math.max(1,
+                math.min(STASH_MAX_ROWS, read_value(data, index + 18)))
             self.saved_stash = {}
-            if version >= 3 then
-                self.stash_rows = math.max(1,
-                    math.min(STASH_MAX_ROWS, read_value(data, index + 18)))
-                local stash_index = index + 19
-                for slot = 1, MAX_STASH_SLOTS do
-                    local err
-                    self.saved_stash[slot], stash_index, err =
-                        deserialize_item(data, stash_index)
-                    if err then return false, err end
-                end
+            local stash_index = index + 19
+            for slot = 1, MAX_STASH_SLOTS do
+                local err
+                self.saved_stash[slot], stash_index, err =
+                    deserialize_item(data, stash_index)
+                if err then return false, err end
             end
+            local allocation_error
+            self.stat_allocation, allocation_error =
+                StatAllocationModel.decode(data, stash_index, self.level)
+            if allocation_error then return false, allocation_error end
 
             return true
         end
@@ -1517,6 +1481,7 @@ OnInit.final("Profile", function(Require)
                 faction_reputation = __jarray(0),
                 faction_point_balances = __jarray(0),
                 experience = 0,
+                stat_allocation = StatAllocationModel.create(),
             }, mt)
         end
     end

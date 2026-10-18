@@ -68,6 +68,7 @@ OnInit.final("Perks", function(Require)
         potion_restoration = "Potion Restoration", potion_duration = "Infusion Duration",
         potion_refill_discount = "Potion Refill Savings", recharge_discount = "Reincarnation Gold Savings",
         reincarnation_capacity = "Reincarnation Capacity", home_channel = "Return Home",
+        auto_allocation = "Auto Allocation",
     }
     local branches = {
         {key = "might", name = "Might", x = 4.5, y = 0, color = "|cffffb060", description = "Attack damage, critical strikes, attributes, and spellcasting."},
@@ -328,6 +329,13 @@ OnInit.final("Perks", function(Require)
     lane("legacy", 34, "potion_refill_discount", .01)
     lane("legacy", 38, "recharge_discount", .01, {"reincarnation_capacity", 1})
     lane("legacy", 39, "home_channel", .025)
+    -- New IDs append to the graph. A direct Origin prerequisite makes this a
+    -- one-point convenience choice as soon as a profile earns its first perks.
+    extend(next_id, "legacy", 0, 0, 1, "auto_allocation", 1, true)
+    nodes[next_id].key = "auto_allocation"
+    nodes_by_key.auto_allocation = nodes[next_id]
+    nodes[next_id].description = "Automatically assign new stat points using your saved attribute ratio. Configure the plan in Allocate Stats."
+    nodes[next_id].icon = ICON_MASTERY
     assert(#nodes - 1 <= PROFILE_PERK_NODE_WORDS * BITS_PER_WORD,
         "Perk graph exceeds profile allocation storage")
 
@@ -388,8 +396,10 @@ OnInit.final("Perks", function(Require)
     local children, widths, coordinates = {}, {}, {}
     for id = 1, #nodes do children[id] = {} end
     for id = 2, #nodes do
-        local siblings = children[nodes[id].parent]
-        siblings[#siblings + 1] = id
+        if nodes[id].effect ~= "auto_allocation" then
+            local siblings = children[nodes[id].parent]
+            siblings[#siblings + 1] = id
+        end
     end
     local function measure(id)
         local width = 0
@@ -436,6 +446,10 @@ OnInit.final("Perks", function(Require)
             left = left + widths[id]
         end
     end
+    -- Put the new convenience node beside Legacy's existing entrance without
+    -- redistributing the established prerequisite tree or changing saved IDs.
+    coordinates[next_id] = {1.45, .98}
+    place(next_id, 1.45, .98)
     -- Store static connector routes next to presentation coordinates. Alternate
     -- prerequisites use a separate outer-side corridor, not an apparent junction.
     for id = 2, #nodes do

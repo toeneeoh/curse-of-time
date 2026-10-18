@@ -7,7 +7,7 @@
     Require('BossSchema')
     DEV_ENABLED = true
     PROFILE_SAVE_VERSION = 0x40000000
-    CHARACTER_SAVE_VERSION = 0x40000002
+    CHARACTER_SAVE_VERSION = 0x40000004 -- Current schema; reject older beta item layouts before parsing.
     SAVE_SCRAMBLE_VERSION = 0x40000000
     MAP_NAME = "CoT Nevermore BETA"
     EXTRA_DEBUG = false

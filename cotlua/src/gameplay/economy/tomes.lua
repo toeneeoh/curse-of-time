@@ -5,25 +5,23 @@ OnInit.final("TomeService", function(Require)
     Require('Currency')
     Require('Profile')
     Require('UnitTable')
+    Require('StatAllocation')
 
     TomeService = {}
 
     TomeService.types = {
         [FourCC('I0TS')] = 1,
-        [FourCC('I0TA')] = 2,
-        [FourCC('I0TI')] = 3,
-        [FourCC('I0TT')] = 4,
+        [FourCC('I0TA')] = 1,
+        [FourCC('I0TI')] = 1,
+        [FourCC('I0TT')] = 1,
     }
 
     TomeService.names = {
-        "|cff990000Strength|r",
-        "|cff006600Agility|r",
-        "|cff3333ffIntelligence|r",
-        "All Stats",
+        "Stat Points",
     }
 
-    -- Knowledge has twice the purchase price, but the same number of gain
-    -- iterations. Each awarded point counts three times against the shared cap.
+    -- Purchases add to one point pool. Earned and unallocated points count for
+    -- price and cap, so delaying allocation or resetting cannot improve a quote.
     TomeService.bundles = {
         { name = "10,000 Gold", iterations = 1, gold = 10000, platinum = 0 },
         { name = "100,000 Gold", iterations = 10, gold = 100000, platinum = 0 },
@@ -42,8 +40,11 @@ OnInit.final("TomeService", function(Require)
         if not hero or not Unit[hero] then
             return nil
         end
-        local unit = Unit[hero]
-        return unit.str + unit.agi + unit.int
+        local data = StatAllocation.get(pid)
+        if not data then return nil end
+        local definition = HERO_STATS[Profile[pid].hero.unit_id]
+        return definition.str + definition.agi + definition.int
+            + StatAllocationModel.budget(GetHeroLevel(hero), data)
     end
 
     ---@param pid integer
@@ -138,18 +139,7 @@ OnInit.final("TomeService", function(Require)
         AddCurrency(pid, GOLD, -quote.gold)
         AddCurrency(pid, PLATINUM, -quote.platinum)
 
-        local unit = Unit[Hero[pid]]
-        if quote.tome_type == 1 then
-            unit.str = unit.str + quote.gain
-        elseif quote.tome_type == 2 then
-            unit.agi = unit.agi + quote.gain
-        elseif quote.tome_type == 3 then
-            unit.int = unit.int + quote.gain
-        else
-            unit.str = unit.str + quote.gain
-            unit.agi = unit.agi + quote.gain
-            unit.int = unit.int + quote.gain
-        end
+        StatAllocation.addPurchased(pid, quote.gain)
 
         DisplayTextToPlayer(Player(pid - 1), 0, 0,
             "You have gained |cffffcc00" .. quote.gain .. "|r " .. TomeService.names[quote.tome_type])

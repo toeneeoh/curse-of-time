@@ -8,6 +8,7 @@
     Require('HonorMilestones')
     Require('Perks')
     Require('PerkTree')
+    Require('StatAllocationUI')
     Require('Faction')
     Require('TimerQueue')
     Require('TeleportAbilities')
@@ -689,6 +690,19 @@
         return false
     end))
 
+    -- Fits the existing tab strip without displacing any stat rows.
+    local allocate_stats = SimpleButton.create(frame,
+        "ReplaceableTextures\\CommandButtons\\BTNStatUp.blp", .024, .024,
+        FRAMEPOINT_TOPRIGHT, FRAMEPOINT_TOPRIGHT, -.02, -.043, function()
+        local pid = GetPlayerId(GetTriggerPlayer()) + 1
+        if GetLocalPlayer() == Player(pid - 1) then
+            StatAllocationUI.playClick(pid)
+            StatAllocationUI.open(pid)
+        end
+        return false
+    end, "Allocate Stats", FRAMEPOINT_BOTTOM, FRAMEPOINT_TOP, 0., .01)
+    allocate_stats:visible(false)
+
     local function ViewPlayersClick()
         local pid = GetPlayerId(GetTriggerPlayer()) + 1 ---@type integer
         local dw = DialogWindow[pid] ---@type DialogWindow
@@ -1039,6 +1053,7 @@
                          GetUnitName(u)
         BlzFrameSetText(title, name)
         BlzFrameSetVisible(manage_perks, page == PERKS_TAB)
+        allocate_stats:visible(page == 1 and u == Hero[pid])
         BlzFrameSetVisible(perk_controls, page == PERKS_TAB)
         BlzFrameSetVisible(stat_controls, false)
         BlzFrameSetText(manage_perks,
@@ -1196,6 +1211,7 @@
             clear_all_rows()
             BlzFrameSetText(title, "Tutorial")
             BlzFrameSetVisible(manage_perks, false)
+            allocate_stats:visible(false)
             BlzFrameSetVisible(perk_controls, false)
             BlzFrameSetVisible(stat_controls, false)
             BlzFrameSetVisible(milestone_controls, false)

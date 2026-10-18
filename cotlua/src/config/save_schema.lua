@@ -14,7 +14,7 @@ OnInit.global("SaveSchema", function(Require)
     -- Thirty allocation bits per word keeps profile values within a safe
     -- positive integer range. Extra words are appended to the profile tail;
     -- earlier profiles load absent words as zero without shifting old fields.
-    PROFILE_PERK_NODE_WORDS = 8
+    PROFILE_PERK_NODE_WORDS = 9
     -- Keep native sync messages comfortably below the engine's small payload
     -- ceiling. FileIO itself may contain much larger character codes.
     local SYNC_CHUNK_DATA_SIZE = 200

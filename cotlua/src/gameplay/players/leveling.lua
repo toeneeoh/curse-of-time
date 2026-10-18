@@ -8,6 +8,7 @@ OnInit.final("Level", function(Require)
     Require('Users')
     Require('Events')
     Require('RewardNotifications')
+    Require('StatAllocation')
 
     local old_set_level = SetHeroLevel
     SetHeroLevel = function(u, lvl, eye_candy)
@@ -27,6 +28,7 @@ OnInit.final("Level", function(Require)
             local metrics = RuntimeMetrics.leveling
             local started_at = os.clock()
             metrics.events = metrics.events + 1
+            StatAllocation.onLevel(pid)
 
             local stage_started_at = os.clock()
             EVENT_HERO_LEVEL_CHANGED:trigger(u, level)
@@ -52,7 +54,7 @@ OnInit.final("Level", function(Require)
             end
             metrics.item_time = metrics.item_time + os.clock() - stage_started_at
 
-            -- update stats TODO: remove built in stat gain?
+            -- Native growth is disabled at hero creation; allocation owns it.
             stage_started_at = os.clock()
             Unit[u]:syncHeroAttributes()
             metrics.stat_sync_time = metrics.stat_sync_time + os.clock() - stage_started_at

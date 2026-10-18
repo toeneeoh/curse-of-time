@@ -83,7 +83,7 @@ cast.ablev = 2; cast:onCast(); assert(channel == 6.75)
 cast.ablev = 10; cast:onCast(); assert(channel == 1)
 
 -- Run actual profile loaders against old and expanded allocation tails.
-PROFILE_SAVE_VERSION, PROFILE_PERK_NODE_WORDS, PROFILE_PERK_SLOTS, MAX_SLOTS = 123, 8, 8, 40
+PROFILE_SAVE_VERSION, PROFILE_PERK_NODE_WORDS, PROFILE_PERK_SLOTS, MAX_SLOTS = 123, 9, 8, 40
 __jarray = function(v) return setmetatable({}, {__index = function() return v end}) end
 Profile.create = function(pid)
     return setmetatable({pid = pid, checksums = {}, perk_ranks = __jarray(0), perk_node_words = __jarray(0)}, {__index = Profile})
@@ -101,6 +101,8 @@ assert(Profile[1].perk_node_words[3] == 789 and Profile[1].perk_node_words[8] ==
 for word = 4, 8 do data[#data + 1] = word * 100 end
 assert(Profile.load('expanded', 1))
 assert(Profile[1].checksums[40] == 40 and Profile[1].perk_node_words[8] == 800)
+assert(Profile[1].perk_node_words[9] == 0, 'Older profile did not default the new word')
+Profile[1].perk_node_words[9] = 1
 SaveHotkey = function(_, index) return index + 10 end
 Compile = function(_, generated) data = generated; return 'roundtrip' end
 extract('cotlua/src/gameplay/persistence/profile.lua', '        function thistype:save_profile()',
@@ -108,6 +110,7 @@ extract('cotlua/src/gameplay/persistence/profile.lua', '        function thistyp
 Profile[1]:save_profile()
 assert(Profile.load('roundtrip', 1))
 assert(Profile[1].perk_node_words[3] == 789 and Profile[1].perk_node_words[8] == 800)
+assert(Profile[1].perk_node_words[9] == 1, 'New Auto Allocation word was not persisted')
 
 -- Exercise the actual wire codec too, with only native name/hash calls mocked.
 OnInit.global = OnInit.final

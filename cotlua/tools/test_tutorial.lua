@@ -23,7 +23,8 @@ Profile[1].hero_select = function()
 end
 Profile.new = function(pid) assert(pid == 1); profile_confirmations = profile_confirmations + 1 end
 local camera_preview = false
-PreviewPlayerCamera = function(pid, region, x, y)
+PreviewPlayerCamera = function(pid, region, x, y, instant, preserve_minimap)
+    assert(instant == false and preserve_minimap == true, 'Tutorial must not reload minimap terrain')
     if pid ~= local_player + 1 then return end
     assert(region == MAIN_MAP.rect)
     camera_preview = true
@@ -91,6 +92,7 @@ local function window(name)
     }
 end
 INVENTORY, StashUI, STAT_WINDOW, PerkTree = window("inventory"), window("stash"), window("stats"), window("perks")
+StatAllocationUI = window("allocation")
 INVENTORY.clearTutorialPractice = function() end
 INVENTORY.prepareTutorialPractice = function() end
 STAT_WINDOW.showTutorial = function(pid, page) STAT_WINDOW.open(pid); STAT_WINDOW.page = page end
@@ -156,6 +158,9 @@ click("Next")
 assert(not StashUI.isOpen(1) and not INVENTORY.isOpen(1) and STAT_WINDOW.page == 1)
 assert(contains("L|r"), "Tour ignored rebound stat key")
 click("Next")
+assert(StatAllocationUI.isOpen(1) and contains("The preview shows the stats you will gain."))
+click("Next")
+assert(not StatAllocationUI.isOpen(1), "Tour left allocation open")
 assert(STAT_WINDOW.page == 2)
 click("Next")
 assert(PerkTree.isOpen(1))
@@ -163,11 +168,18 @@ click("Next")
 assert(not PerkTree.isOpen(1) and STAT_WINDOW.page == 5)
 click("Next")
 click("Next")
+local previews_before_fountain = #camera_locations
 click("Next")
-assert(contains("The fountain") and #pings == 0, "Tour moved the view without a location click")
+assert(contains("The fountain") and #pings == 0, "Tour pinged without a location click")
+assert(#camera_locations == previews_before_fountain + 1 and camera_preview
+    and camera_locations[#camera_locations][1] == -270
+    and camera_locations[#camera_locations][2] == 320,
+    "Fountain page must pan automatically to its fixed map coordinates")
 click("Mark Location")
 assert(pings[1][1] == -270 and pings[1][2] == 320)
 click("Next")
+assert(camera_preview and camera_locations[#camera_locations][1] == 666.6,
+    "Kill-quest page must keep its camera preview")
 click("Mark Location")
 assert(pings[2][1] == 666.6 and pings[2][2] == -543)
 click("Next")
@@ -206,6 +218,9 @@ assert(panel.y - panel.height > 0.408, "Tutorial covers stash preview")
 click("Next")
 assert(STAT_WINDOW.getTutorialFrame().visible and STAT_WINDOW.getTutorialFrame().preview_page == 1)
 click("Next")
+assert(StatAllocationUI.getTutorialFrame().visible, "No-hero allocation preview missing")
+click("Next")
+assert(not StatAllocationUI.getTutorialFrame().visible, "Allocation preview was not cleaned up")
 assert(STAT_WINDOW.getTutorialFrame().preview_page == 2)
 click("Next")
 assert(PerkTree.getTutorialFrame().visible and panel.x >= 0.55, "Tutorial covers perk preview")
@@ -214,7 +229,9 @@ assert(STAT_WINDOW.getTutorialFrame().preview_page == 5)
 click("Next")
 click("Next")
 click("Next")
-assert(camera_preview and camera_locations[#camera_locations][1] == -270)
+assert(camera_preview and camera_locations[#camera_locations][1] == -270
+    and camera_locations[#camera_locations][2] == 320,
+    "Fountain preview must also pan before hero selection")
 click("Back")
 assert(not camera_preview, "Back left tavern camera bounds overridden")
 click("Next")
@@ -246,15 +263,16 @@ print("PASS (mocked control flow only): opt-in, navigation, rebound keys, menu c
 -- Exercise the real camera-preview helpers with native calls recorded, not a
 -- substitute implementation. This cannot verify Warcraft's visual rendering.
 local camera_env = setmetatable({}, {__index = sandbox})
-local camera_callbacks = {}
-camera_env.TimerQueue = {callDelayed = function(_, delay, callback)
-    assert(delay == 0.03, "Camera pan must wait for bounds to settle")
-    camera_callbacks[#camera_callbacks + 1] = callback
-end}
+local camera_poll
+camera_env.CreateTimer = function() return {} end
+camera_env.TimerStart = function(_, delay, periodic, callback)
+    assert(delay == .03 and periodic and not camera_poll)
+    camera_poll = callback
+end
+camera_env.TimerQueue = {callDelayed = function() error('Camera preview touched shared gameplay queue') end}
 local function flush_camera()
-    local pending = camera_callbacks
-    camera_callbacks = {}
-    for _, callback in ipairs(pending) do callback() end
+    camera_poll()
+    camera_poll()
 end
 camera_env.OnInit = {global = function(_, callback) callback(function() end) end, final = function() end}
 camera_env.__jarray = function() return {} end
@@ -296,7 +314,7 @@ assert(bounds[1] == -100 and bounds[4] == 200 and camera_x == 12 and camera_y ==
     "Camera preview failed to restore the original bounds, position, and minimap")
 camera_env.PreviewPlayerCamera(1, MAIN_MAP.rect, -256, 320)
 camera_env.PreviewPlayerCamera(1, MAIN_MAP.rect, 890, 887.6)
-camera_callbacks[1]()
+camera_poll()
 assert(camera_x == 12, "Stale tutorial page panned the camera")
 flush_camera()
 assert(camera_x == 890 and camera_y == 887.6, "Latest tutorial page did not pan")
@@ -351,6 +369,7 @@ local preview_env = setmetatable({}, {__index = sandbox})
 local preview_frame = {}
 preview_env.frame, preview_env.title = preview_frame, {}
 preview_env.manage_perks, preview_env.milestone_controls, preview_env.perk_controls = {}, {}, {}
+preview_env.allocate_stats = {visible = function(self, visible) self.is_visible = visible end}
 preview_env.stat_controls = {}
 preview_env.breakdown_frames = {}
 preview_env.MAX_ROWS = 32

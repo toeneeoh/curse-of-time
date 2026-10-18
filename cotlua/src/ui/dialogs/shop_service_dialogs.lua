@@ -8,6 +8,7 @@ OnInit.final("ShopServiceDialogs", function(Require)
     Require('ShopServices')
     Require('Prices')
     Require('TomeService')
+    Require('StatAllocation')
     Require('Users')
 
     PotionMasterServices = {}
@@ -92,16 +93,16 @@ OnInit.final("ShopServiceDialogs", function(Require)
         end
         return dialog:display()
     end
+    StatPointShop = {open = function(pid) return open_tome(pid, 'I0TS') end}
 
     local function focus_confirm(dialog)
-        local quote = FocusService.commit(dialog.pid)
+        local quote = FocusService.commit(dialog.pid, dialog.reset_cost)
         dialog:destroy()
         if not quote.available then
             failure(dialog.pid, quote.reason)
         else
             DisplayTextToPlayer(Player(dialog.pid - 1), 0, 0,
-                "Your attributes were focused and you were refunded |cffffcc00"
-                    .. quote.refund .. "|r gold.")
+                "Your allocated stat points were refunded and the ratio was cleared.")
         end
         return false
     end
@@ -109,10 +110,10 @@ OnInit.final("ShopServiceDialogs", function(Require)
     local function open_focus(pid)
         local quote = FocusService.quote(pid)
         if not quote.available then return false end
-        local dialog = DialogWindow.create(pid, "Focus attributes?",
+        local dialog = DialogWindow.create(pid, "Reset stat allocations for " .. quote.price .. " Gold?",
             focus_confirm, "focus-service")
-        dialog:addButton("Reduce " .. quote.strength .. "/" .. quote.agility
-            .. "/" .. quote.intelligence .. " (+" .. quote.refund .. " Gold)")
+        dialog.reset_cost = quote.price
+        dialog:addButton("Reset (" .. quote.price .. " Gold)")
         return dialog:display()
     end
 

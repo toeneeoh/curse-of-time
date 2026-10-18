@@ -17,6 +17,7 @@ OnInit.final("ArchitectureTests", function(Require)
     Require('Progression')
     Require('RewardNotifications')
     Require('SaveSchema')
+    Require('StatAllocationModel')
     Require('DevRuntimeLog')
     Require('ShopServiceDialogs')
     Require('Town')
@@ -1616,7 +1617,7 @@ OnInit.final("ArchitectureTests", function(Require)
         end)
 
     ArchitectureTests.register(
-        "character save extensions are backward compatible", function()
+        "character saves round-trip and reject incompatible formats", function()
             local source = HeroData.create()
             source.id = 1
             source.summon_essence = 185
@@ -1629,6 +1630,9 @@ OnInit.final("ArchitectureTests", function(Require)
             source.faction_reputation[3] = 40
             source.faction_point_balances[1] = 35
             source.faction_point_balances[3] = 12
+            source.stat_allocation.purchased = 17
+            source.stat_allocation.flat = {3, 5, 9}
+            source.stat_allocation.ratio = {0, 0, 0}
 
             local current = source:values()
             local decoded = HeroData.create()
@@ -1638,60 +1642,25 @@ OnInit.final("ArchitectureTests", function(Require)
                 decoded.faction_id ~= 1 or decoded.faction_reputation[1] ~= 275 or
                 decoded.faction_reputation[3] ~= 40 or
                 decoded.faction_point_balances[1] ~= 35 or
-                decoded.faction_point_balances[3] ~= 12 then
+                decoded.faction_point_balances[3] ~= 12 or
+                decoded.stat_allocation.purchased ~= 17 or
+                decoded.stat_allocation.flat[3] ~= 9 or
+                decoded.stat_allocation.ratio[1] ~= 0 or
+                decoded.stat_allocation.ratio[2] ~= 0 or
+                decoded.stat_allocation.ratio[3] ~= 0 then
                 return false, "trailing character fields did not round-trip"
             end
 
-            -- The following compatibility checks target the older optional
-            -- character fields, so first remove the complete stash extension.
-            for _ = 1, MAX_STASH_SLOTS + 1 do current[#current] = nil end
-
-            for _ = 1, 13 do current[#current] = nil end
-            local before_factions = HeroData.create()
-            if not before_factions:propagate(current) or
-                before_factions.experience ~= 4321 or before_factions.faction_id ~=
-                0 or before_factions.faction_reputation[1] ~= 0 or
-                before_factions.faction_point_balances[1] ~= 0 then
-                return false,
-                       "pre-Factions character did not default faction progress to zero"
-            end
-
-            current[#current] = nil
-            local before_experience = HeroData.create()
-            if not before_experience:propagate(current) or
-                before_experience.perk_milestones ~= 3 or
-                before_experience.experience ~= 0 then
-                return false,
-                       "pre-XP character did not preserve Perks and default partial XP to zero"
-            end
-
-            current[#current] = nil
-            local before_perks = HeroData.create()
-            if not before_perks:propagate(current) or
-                before_perks.summon_essence ~= 185 or
-                before_perks.struggle_best_wave ~= 75 or
-                before_perks.struggle_claim_wave ~= 70 or
-                before_perks.perk_milestones ~= 0 then
-                return false,
-                       "pre-Perks character did not default milestone progress to zero"
-            end
-
-            current[#current] = nil
-            current[#current] = nil
-            local before_struggle = HeroData.create()
-            if not before_struggle:propagate(current) or
-                before_struggle.summon_essence ~= 185 or
-                before_struggle.struggle_best_wave ~= 0 or
-                before_struggle.struggle_claim_wave ~= 0 then
-                return false,
-                       "pre-Struggle character did not default Struggle progress to zero"
-            end
-
-            current[#current] = nil
+            current[2] = CHARACTER_SAVE_VERSION - 1
             local previous = HeroData.create()
-            if not previous:propagate(current) or previous.summon_essence ~= 0 then
-                return false,
-                       "pre-extension character did not default summon essence to zero"
+            if previous:propagate(current) then
+                return false, "old character version was accepted"
+            end
+            current[2] = CHARACTER_SAVE_VERSION
+            for _ = 1, StatAllocationModel.SAVE_FIELDS do current[#current] = nil end
+            local missing_allocation = HeroData.create()
+            if missing_allocation:propagate(current) then
+                return false, "missing allocation data was accepted"
             end
             return true
         end)
@@ -1785,7 +1754,7 @@ OnInit.final("ArchitectureTests", function(Require)
             local names, branches, positions = {}, {}, {}
             local experience_nodes = 0
             for _, branch in ipairs(Perks.getBranches()) do branches[branch.key] = true end
-            if #nodes ~= 241 or #nodes - 1 > PROFILE_PERK_NODE_WORDS * 30 then
+            if #nodes ~= 242 or #nodes - 1 > PROFILE_PERK_NODE_WORDS * 30 then
                 return false, "perk graph count or allocation storage changed"
             end
             for id, node in ipairs(nodes) do
@@ -1942,7 +1911,7 @@ OnInit.final("ArchitectureTests", function(Require)
     ArchitectureTests.register(
         "shop catalogs are registered independently of their views", function()
             local expected = {
-                {'n01A', 12, 40}, {'n01B', 0, 10}, {'n0P2', 1, 0},
+                {'n01A', 12, 40}, {'n01B', 0, 5}, {'n0P2', 1, 0},
                 {'n032', 2, 0},
                 {'n004', 2, 1}, {'n0P0', 2, 1}, {'n0P1', 2, 1},
                 {'n01F', 11, 11}, {'n02C', 12}, {'n09D', 11}
@@ -1975,6 +1944,14 @@ OnInit.final("ArchitectureTests", function(Require)
                     end
                     if definition:getStock(first_item.id) == nil then
                         return false, values[1] .. " stock state is missing"
+                    end
+                end
+                if values[1] == 'n01B' then
+                    local offer = definition.offers[1]
+                    if #definition.offers ~= 1 or not offer or
+                        offer.key ~= "stat_points" or not offer.virtual or
+                        not definition:has(offer.id) then
+                        return false, "Magic Merchant stat-point offer is incomplete"
                     end
                 end
                 if values[1] == 'n032' then

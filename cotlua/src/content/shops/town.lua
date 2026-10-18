@@ -49,11 +49,13 @@ OnInit.final("TownShops", function(Require)
 
     local magic_shop = FourCC('n01B')
     CreateShop(magic_shop, 1000.)
-    ShopAddItem(magic_shop, 'I0TS:0', 0)
-    ShopAddItem(magic_shop, 'I0TA:0', 0)
-    ShopAddItem(magic_shop, 'I0TI:0', 0)
-    ShopAddItem(magic_shop, 'I0TT:0', 0)
-    ShopAddItem(magic_shop, 'I0N0:0', 0)
+    ShopAddOffer(magic_shop, {
+        key = "stat_points", name = "Stat Points",
+        icon = "ReplaceableTextures\\CommandButtons\\BTNTome.blp",
+        tooltip = "Buy assignable stat points. Spend them from Allocate Stats or the attribute icon above the inspect buttons.",
+        availability = function(pid) return TomeService.availability(pid) end,
+        purchase = function(pid) return StatPointShop.open(pid) end,
+    })
     ShopAddItem(magic_shop, 'I0JN:0', 0)
     ShopAddItem(magic_shop, 'I0JS:0', 0)
     SetItemPrice('I084', { platinum = 4 })

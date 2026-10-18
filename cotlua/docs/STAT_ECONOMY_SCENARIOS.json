@@ -1,0 +1,994 @@
+{
+  "assumptions": {
+    "model": "Equal-level solo normal kills; quest rewards amortized across kills.",
+    "purchaseTiming": "Visit shop after each level gained; reserve the selected share of gross gold.",
+    "excluded": [
+      "boss loot and gold",
+      "sales",
+      "mining",
+      "Colosseum",
+      "one-off quest XP",
+      "party play",
+      "travel and turn-in timing",
+      "XP bonuses",
+      "native attribute rounding"
+    ],
+    "goldRandomization": "Use mean multiplier 1; omit sub-gold reward flooring.",
+    "legacySource": "05f327f^:cotlua/src/helper.lua",
+    "currentQuoteVerifiedAgainstLua": true
+  },
+  "roster": {
+    "count": 19,
+    "meanStartingStats": 31.473684210526315,
+    "meanGrowth": 5.2105263157894735
+  },
+  "noPurchaseQuotes": [
+    {
+      "level": 25,
+      "old": 29.263157894736842,
+      "current": 7.684210526315789
+    },
+    {
+      "level": 50,
+      "old": 23.05263157894737,
+      "current": 7.894736842105263
+    },
+    {
+      "level": 75,
+      "old": 20.68421052631579,
+      "current": 8.368421052631579
+    },
+    {
+      "level": 100,
+      "old": 18.68421052631579,
+      "current": 9.368421052631579
+    },
+    {
+      "level": 150,
+      "old": 16.210526315789473,
+      "current": 11.31578947368421
+    },
+    {
+      "level": 180,
+      "old": 15.210526315789474,
+      "current": 12.578947368421053
+    }
+  ],
+  "scenarios": [
+    {
+      "share": 0.25,
+      "tome": "single",
+      "milestones": [
+        {
+          "level": 25,
+          "gold": 45207.43936510099,
+          "oldBought": 29.473684210526315,
+          "oldCapControlledBought": 27.68421052631579,
+          "currentBought": 7.842105263157895,
+          "gap": 21.63157894736842,
+          "extraPointsPerLevel": 0.9013157894736842,
+          "oldTotal": 186.00000000000003,
+          "currentTotal": 164.3684210526316
+        },
+        {
+          "level": 50,
+          "gold": 237605.98480354782,
+          "oldBought": 120.3157894736842,
+          "oldCapControlledBought": 118.6842105263158,
+          "currentBought": 36.36842105263158,
+          "gap": 83.94736842105263,
+          "extraPointsPerLevel": 1.7132116004296456,
+          "oldTotal": 407.1052631578947,
+          "currentTotal": 323.1578947368421
+        },
+        {
+          "level": 75,
+          "gold": 738953.4093260819,
+          "oldBought": 355.7368421052632,
+          "oldCapControlledBought": 354.2631578947368,
+          "currentBought": 122.21052631578948,
+          "gap": 233.5263157894737,
+          "extraPointsPerLevel": 3.155761024182077,
+          "oldTotal": 772.7894736842105,
+          "currentTotal": 539.2631578947368
+        },
+        {
+          "level": 100,
+          "gold": 1857186.9043039978,
+          "oldBought": 766.578947368421,
+          "oldCapControlledBought": 765.2631578947369,
+          "currentBought": 294.3157894736842,
+          "gap": 472.2631578947368,
+          "extraPointsPerLevel": 4.770334928229665,
+          "oldTotal": 1313.8947368421054,
+          "currentTotal": 841.6315789473683
+        },
+        {
+          "level": 150,
+          "gold": 8688740.036861397,
+          "oldBought": 2630.842105263158,
+          "oldCapControlledBought": 2629.842105263158,
+          "currentBought": 1206.2105263157894,
+          "gap": 1424.6315789473686,
+          "extraPointsPerLevel": 9.56128576474744,
+          "oldTotal": 3438.6842105263163,
+          "currentTotal": 2014.0526315789473
+        },
+        {
+          "level": 180,
+          "gold": 19747536.16832474,
+          "oldBought": 4959.315789473684,
+          "oldCapControlledBought": 4958.368421052632,
+          "currentBought": 2512.5263157894738,
+          "gap": 2446.7894736842104,
+          "extraPointsPerLevel": 13.669214936783298,
+          "oldTotal": 5923.473684210526,
+          "currentTotal": 3476.684210526316
+        }
+      ]
+    },
+    {
+      "share": 0.25,
+      "tome": "knowledge",
+      "milestones": [
+        {
+          "level": 25,
+          "gold": 45207.43936510099,
+          "oldBought": 0,
+          "oldCapControlledBought": 0,
+          "currentBought": 0,
+          "gap": 0,
+          "extraPointsPerLevel": 0,
+          "oldTotal": 156.52631578947367,
+          "currentTotal": 156.52631578947367
+        },
+        {
+          "level": 50,
+          "gold": 237605.98480354782,
+          "oldBought": 139.10526315789474,
+          "oldCapControlledBought": 133.57894736842104,
+          "currentBought": 44.68421052631579,
+          "gap": 94.42105263157896,
+          "extraPointsPerLevel": 1.9269602577873257,
+          "oldTotal": 425.8947368421052,
+          "currentTotal": 331.4736842105263
+        },
+        {
+          "level": 75,
+          "gold": 738953.4093260819,
+          "oldBought": 499.10526315789474,
+          "oldCapControlledBought": 496.7368421052632,
+          "currentBought": 176.05263157894737,
+          "gap": 323.0526315789474,
+          "extraPointsPerLevel": 4.365576102418208,
+          "oldTotal": 916.1578947368421,
+          "currentTotal": 593.1052631578947
+        },
+        {
+          "level": 100,
+          "gold": 1857186.9043039978,
+          "oldBought": 1072.578947368421,
+          "oldCapControlledBought": 1070.5263157894738,
+          "currentBought": 406.42105263157896,
+          "gap": 666.1578947368421,
+          "extraPointsPerLevel": 6.728867623604465,
+          "oldTotal": 1619.8947368421054,
+          "currentTotal": 953.7368421052631
+        },
+        {
+          "level": 150,
+          "gold": 8688740.036861397,
+          "oldBought": 3620.3684210526317,
+          "oldCapControlledBought": 3619.2631578947367,
+          "currentBought": 1574.3684210526317,
+          "gap": 2046,
+          "extraPointsPerLevel": 13.731543624161073,
+          "oldTotal": 4428.210526315789,
+          "currentTotal": 2382.2105263157896
+        },
+        {
+          "level": 180,
+          "gold": 19747536.16832474,
+          "oldBought": 6750.9473684210525,
+          "oldCapControlledBought": 6749.526315789473,
+          "currentBought": 3108.7894736842104,
+          "gap": 3642.157894736842,
+          "extraPointsPerLevel": 20.34725080858571,
+          "oldTotal": 7715.105263157893,
+          "currentTotal": 4072.9473684210525
+        }
+      ]
+    },
+    {
+      "share": 0.5,
+      "tome": "single",
+      "milestones": [
+        {
+          "level": 25,
+          "gold": 45207.43936510099,
+          "oldBought": 57,
+          "oldCapControlledBought": 55.10526315789474,
+          "currentBought": 14.894736842105264,
+          "gap": 42.10526315789474,
+          "extraPointsPerLevel": 1.7543859649122808,
+          "oldTotal": 213.5263157894737,
+          "currentTotal": 171.42105263157896
+        },
+        {
+          "level": 50,
+          "gold": 237605.98480354782,
+          "oldBought": 239.68421052631578,
+          "oldCapControlledBought": 237.89473684210526,
+          "currentBought": 73.78947368421052,
+          "gap": 165.89473684210526,
+          "extraPointsPerLevel": 3.385606874328679,
+          "oldTotal": 526.4736842105262,
+          "currentTotal": 360.578947368421
+        },
+        {
+          "level": 75,
+          "gold": 738953.4093260819,
+          "oldBought": 622.9473684210526,
+          "oldCapControlledBought": 615.0526315789474,
+          "currentBought": 214.68421052631578,
+          "gap": 408.2631578947368,
+          "extraPointsPerLevel": 5.517069701280227,
+          "oldTotal": 1040,
+          "currentTotal": 631.7368421052631
+        },
+        {
+          "level": 100,
+          "gold": 1857186.9043039978,
+          "oldBought": 1259.2631578947369,
+          "oldCapControlledBought": 1252.2105263157894,
+          "currentBought": 495.4736842105263,
+          "gap": 763.7894736842106,
+          "extraPointsPerLevel": 7.7150451887294,
+          "oldTotal": 1806.578947368421,
+          "currentTotal": 1042.7894736842106
+        },
+        {
+          "level": 150,
+          "gold": 8688740.036861397,
+          "oldBought": 3938.157894736842,
+          "oldCapControlledBought": 3897.7368421052633,
+          "currentBought": 1915.0526315789473,
+          "gap": 2023.1052631578948,
+          "extraPointsPerLevel": 13.577887672200637,
+          "oldTotal": 4746,
+          "currentTotal": 2722.894736842105
+        },
+        {
+          "level": 180,
+          "gold": 19747536.16832474,
+          "oldBought": 7326.578947368421,
+          "oldCapControlledBought": 6900.368421052632,
+          "currentBought": 3841.157894736842,
+          "gap": 3485.4210526315787,
+          "extraPointsPerLevel": 19.47162599235519,
+          "oldTotal": 8290.736842105262,
+          "currentTotal": 4805.315789473684
+        }
+      ]
+    },
+    {
+      "share": 0.5,
+      "tome": "knowledge",
+      "milestones": [
+        {
+          "level": 25,
+          "gold": 45207.43936510099,
+          "oldBought": 88.42105263157895,
+          "oldCapControlledBought": 80.52631578947368,
+          "currentBought": 23.210526315789473,
+          "gap": 65.21052631578948,
+          "extraPointsPerLevel": 2.717105263157895,
+          "oldTotal": 244.94736842105263,
+          "currentTotal": 179.73684210526318
+        },
+        {
+          "level": 50,
+          "gold": 237605.98480354782,
+          "oldBought": 308.5263157894737,
+          "oldCapControlledBought": 263.5263157894737,
+          "currentBought": 98.36842105263158,
+          "gap": 210.15789473684214,
+          "extraPointsPerLevel": 4.288936627282492,
+          "oldTotal": 595.3157894736842,
+          "currentTotal": 385.1578947368421
+        },
+        {
+          "level": 75,
+          "gold": 738953.4093260819,
+          "oldBought": 662.2105263157895,
+          "oldCapControlledBought": 636.4736842105264,
+          "currentBought": 295.57894736842104,
+          "gap": 366.63157894736844,
+          "extraPointsPerLevel": 4.9544807965860596,
+          "oldTotal": 1079.2631578947369,
+          "currentTotal": 712.6315789473684
+        },
+        {
+          "level": 100,
+          "gold": 1857186.9043039978,
+          "oldBought": 1270.578947368421,
+          "oldCapControlledBought": 1251,
+          "currentBought": 646.1052631578947,
+          "gap": 624.4736842105264,
+          "extraPointsPerLevel": 6.307814992025519,
+          "oldTotal": 1817.8947368421052,
+          "currentTotal": 1193.421052631579
+        },
+        {
+          "level": 150,
+          "gold": 8688740.036861397,
+          "oldBought": 5655.9473684210525,
+          "oldCapControlledBought": 3896.5263157894738,
+          "currentBought": 2335.8947368421054,
+          "gap": 3320.052631578947,
+          "extraPointsPerLevel": 22.282232426704343,
+          "oldTotal": 6463.78947368421,
+          "currentTotal": 3143.7368421052633
+        },
+        {
+          "level": 180,
+          "gold": 19747536.16832474,
+          "oldBought": 8780.21052631579,
+          "oldCapControlledBought": 6899.210526315789,
+          "currentBought": 4725.631578947368,
+          "gap": 4054.5789473684217,
+          "extraPointsPerLevel": 22.651279035577776,
+          "oldTotal": 9744.368421052632,
+          "currentTotal": 5689.78947368421
+        }
+      ]
+    },
+    {
+      "share": 1,
+      "tome": "single",
+      "milestones": [
+        {
+          "level": 25,
+          "gold": 45207.43936510099,
+          "oldBought": 105.05263157894737,
+          "oldCapControlledBought": 93.26315789473684,
+          "currentBought": 27.842105263157894,
+          "gap": 77.21052631578948,
+          "extraPointsPerLevel": 3.217105263157895,
+          "oldTotal": 261.57894736842104,
+          "currentTotal": 184.3684210526316
+        },
+        {
+          "level": 50,
+          "gold": 237605.98480354782,
+          "oldBought": 302.10526315789474,
+          "oldCapControlledBought": 293.7894736842105,
+          "currentBought": 134.21052631578948,
+          "gap": 167.89473684210526,
+          "extraPointsPerLevel": 3.426423200859291,
+          "oldTotal": 588.8947368421053,
+          "currentTotal": 420.99999999999994
+        },
+        {
+          "level": 75,
+          "gold": 738953.4093260819,
+          "oldBought": 645.7894736842105,
+          "oldCapControlledBought": 637.4736842105264,
+          "currentBought": 357.05263157894734,
+          "gap": 288.7368421052632,
+          "extraPointsPerLevel": 3.9018492176386914,
+          "oldTotal": 1062.842105263158,
+          "currentTotal": 774.1052631578947
+        },
+        {
+          "level": 100,
+          "gold": 1857186.9043039978,
+          "oldBought": 2159.0526315789475,
+          "oldCapControlledBought": 1252.2105263157894,
+          "currentBought": 782.3684210526316,
+          "gap": 1376.6842105263158,
+          "extraPointsPerLevel": 13.905901116427433,
+          "oldTotal": 2706.3684210526317,
+          "currentTotal": 1329.684210526316
+        },
+        {
+          "level": 150,
+          "gold": 8688740.036861397,
+          "oldBought": 4428.105263157895,
+          "oldCapControlledBought": 3897.7368421052633,
+          "currentBought": 2919.6315789473683,
+          "gap": 1508.4736842105267,
+          "extraPointsPerLevel": 10.12398445778877,
+          "oldTotal": 5235.9473684210525,
+          "currentTotal": 3727.4736842105262
+        },
+        {
+          "level": 180,
+          "gold": 19747536.16832474,
+          "oldBought": 7458.1578947368425,
+          "oldCapControlledBought": 6900.368421052632,
+          "currentBought": 5654.578947368421,
+          "gap": 1803.5789473684217,
+          "extraPointsPerLevel": 10.075860041164367,
+          "oldTotal": 8422.315789473685,
+          "currentTotal": 6618.736842105262
+        }
+      ]
+    },
+    {
+      "share": 1,
+      "tome": "knowledge",
+      "milestones": [
+        {
+          "level": 25,
+          "gold": 45207.43936510099,
+          "oldBought": 151.26315789473685,
+          "oldCapControlledBought": 94.10526315789474,
+          "currentBought": 41.36842105263158,
+          "gap": 109.89473684210526,
+          "extraPointsPerLevel": 4.578947368421052,
+          "oldTotal": 307.7894736842105,
+          "currentTotal": 197.8947368421053
+        },
+        {
+          "level": 50,
+          "gold": 237605.98480354782,
+          "oldBought": 324,
+          "oldCapControlledBought": 283.2631578947368,
+          "currentBought": 177.94736842105263,
+          "gap": 146.05263157894737,
+          "extraPointsPerLevel": 2.9806659505907627,
+          "oldTotal": 610.7894736842105,
+          "currentTotal": 464.7368421052632
+        },
+        {
+          "level": 75,
+          "gold": 738953.4093260819,
+          "oldBought": 661.2631578947369,
+          "oldCapControlledBought": 636.4736842105264,
+          "currentBought": 468.4736842105263,
+          "gap": 192.78947368421058,
+          "extraPointsPerLevel": 2.6052631578947376,
+          "oldTotal": 1078.3157894736842,
+          "currentTotal": 885.5263157894736
+        },
+        {
+          "level": 100,
+          "gold": 1857186.9043039978,
+          "oldBought": 1268.3684210526317,
+          "oldCapControlledBought": 1251,
+          "currentBought": 980.2105263157895,
+          "gap": 288.1578947368422,
+          "extraPointsPerLevel": 2.9106858054226485,
+          "oldTotal": 1815.6842105263158,
+          "currentTotal": 1527.526315789474
+        },
+        {
+          "level": 150,
+          "gold": 8688740.036861397,
+          "oldBought": 5121.789473684211,
+          "oldCapControlledBought": 3896.5263157894738,
+          "currentBought": 3442.4210526315787,
+          "gap": 1679.3684210526321,
+          "extraPointsPerLevel": 11.270929000353236,
+          "oldTotal": 5929.631578947367,
+          "currentTotal": 4250.263157894737
+        },
+        {
+          "level": 180,
+          "gold": 19747536.16832474,
+          "oldBought": 7576.105263157895,
+          "oldCapControlledBought": 6899.210526315789,
+          "currentBought": 6787.894736842105,
+          "gap": 788.21052631579,
+          "extraPointsPerLevel": 4.4034107615407265,
+          "oldTotal": 8540.263157894737,
+          "currentTotal": 7752.052631578946
+        }
+      ]
+    }
+  ],
+  "replacements": [
+    {
+      "growth": 6,
+      "milestones": [
+        {
+          "level": 25,
+          "total": 188.68421052631578,
+          "bought": 13.210526315789474
+        },
+        {
+          "level": 50,
+          "total": 390.57894736842104,
+          "bought": 65.10526315789474
+        },
+        {
+          "level": 75,
+          "total": 666.5263157894736,
+          "bought": 191.05263157894737
+        },
+        {
+          "level": 100,
+          "total": 1084.3157894736842,
+          "bought": 458.8421052631579
+        },
+        {
+          "level": 150,
+          "total": 2770.157894736842,
+          "bought": 1844.6842105263158
+        },
+        {
+          "level": 180,
+          "total": 4854.1578947368425,
+          "bought": 3748.684210526316
+        }
+      ]
+    },
+    {
+      "growth": 7,
+      "milestones": [
+        {
+          "level": 25,
+          "total": 210.8421052631579,
+          "bought": 11.368421052631579
+        },
+        {
+          "level": 50,
+          "total": 431,
+          "bought": 56.526315789473685
+        },
+        {
+          "level": 75,
+          "total": 724.4736842105264,
+          "bought": 175
+        },
+        {
+          "level": 100,
+          "total": 1128.8947368421052,
+          "bought": 404.42105263157896
+        },
+        {
+          "level": 150,
+          "total": 2834.842105263158,
+          "bought": 1760.3684210526317
+        },
+        {
+          "level": 180,
+          "total": 4921.8421052631575,
+          "bought": 3637.3684210526317
+        }
+      ]
+    },
+    {
+      "growth": 8,
+      "milestones": [
+        {
+          "level": 25,
+          "total": 233.31578947368422,
+          "bought": 9.842105263157896
+        },
+        {
+          "level": 50,
+          "total": 471.63157894736844,
+          "bought": 48.1578947368421
+        },
+        {
+          "level": 75,
+          "total": 771.6315789473684,
+          "bought": 148.1578947368421
+        },
+        {
+          "level": 100,
+          "total": 1195.6315789473683,
+          "bought": 372.1578947368421
+        },
+        {
+          "level": 150,
+          "total": 2929.5263157894738,
+          "bought": 1706.0526315789473
+        },
+        {
+          "level": 180,
+          "total": 5011.526315789473,
+          "bought": 3548.0526315789475
+        }
+      ]
+    },
+    {
+      "growth": 9,
+      "milestones": [
+        {
+          "level": 25,
+          "total": 253.05263157894737,
+          "bought": 5.578947368421052
+        },
+        {
+          "level": 50,
+          "total": 514.3684210526316,
+          "bought": 41.89473684210526
+        },
+        {
+          "level": 75,
+          "total": 839.3684210526316,
+          "bought": 141.89473684210526
+        },
+        {
+          "level": 100,
+          "total": 1288.3684210526317,
+          "bought": 365.89473684210526
+        },
+        {
+          "level": 150,
+          "total": 2953.4210526315787,
+          "bought": 1580.9473684210527
+        },
+        {
+          "level": 180,
+          "total": 5047.368421052632,
+          "bought": 3404.8947368421054
+        }
+      ]
+    },
+    {
+      "growth": 10,
+      "milestones": [
+        {
+          "level": 25,
+          "total": 271.4736842105263,
+          "bought": 0
+        },
+        {
+          "level": 50,
+          "total": 553.421052631579,
+          "bought": 31.94736842105263
+        },
+        {
+          "level": 75,
+          "total": 883,
+          "bought": 111.52631578947368
+        },
+        {
+          "level": 100,
+          "total": 1324.6315789473683,
+          "bought": 303.1578947368421
+        },
+        {
+          "level": 150,
+          "total": 2984,
+          "bought": 1462.5263157894738
+        },
+        {
+          "level": 180,
+          "total": 5086,
+          "bought": 3264.5263157894738
+        }
+      ]
+    }
+  ],
+  "sensitivity": [
+    {
+      "questCoverage": 0,
+      "goldFind": 0,
+      "bundled": false,
+      "milestones": [
+        {
+          "level": 25,
+          "gold": 42695.91495592871,
+          "gap": 41.78947368421053
+        },
+        {
+          "level": 50,
+          "gold": 224405.65231446183,
+          "gap": 164.89473684210526
+        },
+        {
+          "level": 100,
+          "gold": 1754009.8540648867,
+          "gap": 771.3157894736842
+        },
+        {
+          "level": 180,
+          "gold": 18650450.825640034,
+          "gap": 3364.2631578947367
+        }
+      ]
+    },
+    {
+      "questCoverage": 0,
+      "goldFind": 0,
+      "bundled": true,
+      "milestones": [
+        {
+          "level": 25,
+          "gold": 42695.91495592871,
+          "gap": 41.78947368421053
+        },
+        {
+          "level": 50,
+          "gold": 224405.65231446183,
+          "gap": 164.89473684210526
+        },
+        {
+          "level": 100,
+          "gold": 1754009.8540648867,
+          "gap": 771.3157894736842
+        },
+        {
+          "level": 180,
+          "gold": 18650450.825640034,
+          "gap": 3633.842105263158
+        }
+      ]
+    },
+    {
+      "questCoverage": 0,
+      "goldFind": 0.2,
+      "bundled": false,
+      "milestones": [
+        {
+          "level": 25,
+          "gold": 51235.09794711445,
+          "gap": 42.68421052631579
+        },
+        {
+          "level": 50,
+          "gold": 269286.7827773542,
+          "gap": 187.94736842105263
+        },
+        {
+          "level": 100,
+          "gold": 2104811.824877864,
+          "gap": 715.1052631578947
+        },
+        {
+          "level": 180,
+          "gold": 22380540.990768038,
+          "gap": 3000.5263157894738
+        }
+      ]
+    },
+    {
+      "questCoverage": 0,
+      "goldFind": 0.2,
+      "bundled": true,
+      "milestones": [
+        {
+          "level": 25,
+          "gold": 51235.09794711445,
+          "gap": 42.68421052631579
+        },
+        {
+          "level": 50,
+          "gold": 269286.7827773542,
+          "gap": 187.94736842105263
+        },
+        {
+          "level": 100,
+          "gold": 2104811.824877864,
+          "gap": 715.1052631578947
+        },
+        {
+          "level": 180,
+          "gold": 22380540.990768038,
+          "gap": 3132.2631578947367
+        }
+      ]
+    },
+    {
+      "questCoverage": 0.5,
+      "goldFind": 0,
+      "bundled": false,
+      "milestones": [
+        {
+          "level": 25,
+          "gold": 44168.1878854435,
+          "gap": 42.10526315789474
+        },
+        {
+          "level": 50,
+          "gold": 232143.7782563398,
+          "gap": 165.89473684210526
+        },
+        {
+          "level": 100,
+          "gold": 1814492.9524809176,
+          "gap": 769
+        },
+        {
+          "level": 180,
+          "gold": 19293569.819627624,
+          "gap": 3310.157894736842
+        }
+      ]
+    },
+    {
+      "questCoverage": 0.5,
+      "goldFind": 0,
+      "bundled": true,
+      "milestones": [
+        {
+          "level": 25,
+          "gold": 44168.1878854435,
+          "gap": 42.10526315789474
+        },
+        {
+          "level": 50,
+          "gold": 232143.7782563398,
+          "gap": 165.89473684210526
+        },
+        {
+          "level": 100,
+          "gold": 1814492.9524809176,
+          "gap": 769
+        },
+        {
+          "level": 180,
+          "gold": 19293569.819627624,
+          "gap": 3382.9473684210525
+        }
+      ]
+    },
+    {
+      "questCoverage": 0.5,
+      "goldFind": 0.2,
+      "bundled": false,
+      "milestones": [
+        {
+          "level": 25,
+          "gold": 53001.82546253219,
+          "gap": 43.36842105263158
+        },
+        {
+          "level": 50,
+          "gold": 278572.5339076077,
+          "gap": 188.89473684210526
+        },
+        {
+          "level": 100,
+          "gold": 2177391.5429771007,
+          "gap": 706.578947368421
+        },
+        {
+          "level": 180,
+          "gold": 23152283.783553146,
+          "gap": 2897.842105263158
+        }
+      ]
+    },
+    {
+      "questCoverage": 0.5,
+      "goldFind": 0.2,
+      "bundled": true,
+      "milestones": [
+        {
+          "level": 25,
+          "gold": 53001.82546253219,
+          "gap": 43.36842105263158
+        },
+        {
+          "level": 50,
+          "gold": 278572.5339076077,
+          "gap": 188.89473684210526
+        },
+        {
+          "level": 100,
+          "gold": 2177391.5429771007,
+          "gap": 706.578947368421
+        },
+        {
+          "level": 180,
+          "gold": 23152283.783553146,
+          "gap": 2929
+        }
+      ]
+    },
+    {
+      "questCoverage": 1,
+      "goldFind": 0,
+      "bundled": false,
+      "milestones": [
+        {
+          "level": 25,
+          "gold": 45207.43936510099,
+          "gap": 42.10526315789474
+        },
+        {
+          "level": 50,
+          "gold": 237605.98480354782,
+          "gap": 165.89473684210526
+        },
+        {
+          "level": 100,
+          "gold": 1857186.9043039978,
+          "gap": 763.7894736842105
+        },
+        {
+          "level": 180,
+          "gold": 19747536.16832474,
+          "gap": 3278.0526315789475
+        }
+      ]
+    },
+    {
+      "questCoverage": 1,
+      "goldFind": 0,
+      "bundled": true,
+      "milestones": [
+        {
+          "level": 25,
+          "gold": 45207.43936510099,
+          "gap": 42.10526315789474
+        },
+        {
+          "level": 50,
+          "gold": 237605.98480354782,
+          "gap": 165.89473684210526
+        },
+        {
+          "level": 100,
+          "gold": 1857186.9043039978,
+          "gap": 763.7894736842105
+        },
+        {
+          "level": 180,
+          "gold": 19747536.16832474,
+          "gap": 3485.4210526315787
+        }
+      ]
+    },
+    {
+      "questCoverage": 1,
+      "goldFind": 0.2,
+      "bundled": false,
+      "milestones": [
+        {
+          "level": 25,
+          "gold": 54248.92723812118,
+          "gap": 43.36842105263158
+        },
+        {
+          "level": 50,
+          "gold": 285127.18176425726,
+          "gap": 195.26315789473685
+        },
+        {
+          "level": 100,
+          "gold": 2228624.285164797,
+          "gap": 696.2105263157895
+        },
+        {
+          "level": 180,
+          "gold": 23697043.401989684,
+          "gap": 2831.315789473684
+        }
+      ]
+    },
+    {
+      "questCoverage": 1,
+      "goldFind": 0.2,
+      "bundled": true,
+      "milestones": [
+        {
+          "level": 25,
+          "gold": 54248.92723812118,
+          "gap": 43.36842105263158
+        },
+        {
+          "level": 50,
+          "gold": 285127.18176425726,
+          "gap": 195.26315789473685
+        },
+        {
+          "level": 100,
+          "gold": 2228624.285164797,
+          "gap": 696.2105263157895
+        },
+        {
+          "level": 180,
+          "gold": 23697043.401989684,
+          "gap": 2813.9473684210525
+        }
+      ]
+    }
+  ]
+}

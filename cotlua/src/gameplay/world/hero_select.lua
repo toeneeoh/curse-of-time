@@ -135,10 +135,10 @@ OnInit.final("HeroSelect", function(Require)
             hero_buttons[i]:setTooltipIcon(BlzGetAbilityIcon(v.id))
             hero_buttons[i]:setTooltipName(v.name)
             hero_buttons[i]:setTooltipText(BlzGetAbilityExtendedTooltip(v.select, 0) ..
-            "\n\n" .. "|cffbb0000Strength:|r " .. v.str .. " (+" .. (v.str_gain or 0) ..
-            ")\n" .. "|cff008800Agility:|r " .. v.agi .. " (+" .. (v.agi_gain or 0) ..
-            ")\n" .. "|cff2255ffIntelligence:|r " .. v.int .. " (+" .. (v.int_gain or 0) ..
-            ")\n" .. "|cffff6600Damage:|r " .. (v[v.main] + 1) ..
+            "\n\n" .. "|cffbb0000Strength:|r " .. v.str ..
+            "\n|cff008800Agility:|r " .. v.agi ..
+            "\n|cff2255ffIntelligence:|r " .. v.int ..
+            "\n" .. "|cffff6600Damage:|r " .. (v[v.main] + 1) ..
             "\n" .. "|cffa4a4feArmor:|r " .. v.armor ..
             "\nRange: " .. v.range)
         end

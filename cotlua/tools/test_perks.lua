@@ -8,7 +8,7 @@ end
 local function run(path) assert(load(read(path), path, 't', env))() end
 __jarray = function(v) return setmetatable({}, {__index = function() return v end}) end
 OnInit = {final = function(_, callback) callback(function() end) end}
-MAX_SLOTS, MAX_LEVEL, PLAYER_CAP, PROFILE_PERK_NODE_WORDS = 40, 500, 2, 8
+MAX_SLOTS, MAX_LEVEL, PLAYER_CAP, PROFILE_PERK_NODE_WORDS = 40, 500, 2, 9
 local hero = {owner = 0, level = 50}
 Hero = {[1] = hero}
 Profile = {[1] = {playing = true, storage = {}, perk_node_words = __jarray(0),
@@ -47,7 +47,8 @@ BlzAdjustUnitAbilityCooldownRemaining = function(_, _, delta) cooldown_remaining
 run('cotlua/src/gameplay/abilities/cooldown_acceleration.lua')
 run('cotlua/src/gameplay/players/perks.lua')
 local nodes, names, positions = Perks.getNodes(), {}, {}
-assert(#nodes == 241 and #Perks.getBranches() == 4)
+assert(#nodes == 242 and #Perks.getBranches() == 4)
+assert(nodes[242].effect == 'auto_allocation' and nodes[242].parent == 1 and nodes[242].branch == 'legacy')
 for id, node in ipairs(nodes) do
     for other_id = 1, id - 1 do
         local other = nodes[other_id]
@@ -110,7 +111,7 @@ Profile[3] = {storage = {{hardcore = 0, perk_milestones = 3}, {hardcore = 1, per
 assert(Perks.getTotal(3) == 20, 'SC/HC milestones no longer award 8/12 points per completed character')
 Profile[3].storage = {}
 for slot = 1, 20 do Profile[3].storage[slot] = {hardcore = 1, perk_milestones = 3} end
-assert(Perks.getTotal(3) == #nodes - 1, 'Graph does not accommodate twenty completed hardcore characters')
+assert(Perks.getTotal(3) == 240, 'Twenty completed hardcore characters no longer award 240 points')
 local function connected(id, visited)
     if id == 1 then return true end
     visited = visited or {}; assert(not visited[id], 'Perk prerequisites contain a cycle')
@@ -210,7 +211,8 @@ while remaining > 0 do
     end
     assert(remaining < before, 'Unreachable perk node')
 end
-assert(Perks.getSpent(1) == 240)
+assert(Perks.getSpent(1) == #nodes - 1)
+assert(Profile[1].perk_node_words[9] == 1 and Perks.getBonuses(1).auto_allocation == 1)
 for word = 1, 8 do assert(Profile[1].perk_node_words[word] == 0x3fffffff, 'Lost high-word allocation bits') end
 assert(Perks.getRank(1, 'fellowship') == 5 and Perks.getRank(1, 'inheritance') == 5)
 local bonuses = Perks.getBonuses(1)
@@ -389,7 +391,7 @@ assert(pending_sync == nil and Perks.getSpent(1) == 1, 'Remote client emitted a 
 pending_sync = '102'; sync_callback()
 assert(Perks.hasNode(1, 102), 'Remote client failed to apply synchronized allocation')
 GetLocalPlayer = function() return 0 end
-for _, malformed in ipairs({'0', '1', '242', '2.5', 'nan', 'not_a_node'}) do
+for _, malformed in ipairs({'0', '1', '243', '2.5', 'nan', 'not_a_node'}) do
     pending_sync = malformed; sync_callback(); assert(Perks.getSpent(1) == 2)
 end
 Profile[1].perk_reset_available = 1

@@ -140,6 +140,7 @@ assert(context_buttons[2].frame.visible and context_buttons[3].frame.visible and
 INVENTORY.previewTutorial(1, false)
 assert(not context_menu_backdrop.visible and not EVENT_ON_M2_UP.callback)
 for _, button in ipairs(context_buttons) do assert(not button.frame.visible) end
+clicked_frame = context_buttons[4].frame
 context_buttons[4].click.callback() -- stale native event after Next
 assert(not context_menu_backdrop.visible)
 INVENTORY.previewTutorial(1, true)

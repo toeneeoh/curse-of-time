@@ -8,6 +8,7 @@ OnInit.final("ShopServices", function(Require)
     Require('PotionService')
     Require('Profile')
     Require('Perks')
+    Require('StatAllocation')
     Require('Spells')
     Require('TimerQueue')
 
@@ -24,12 +25,22 @@ OnInit.final("ShopServices", function(Require)
     end
 
     function FocusService.quote(pid)
+        local data = StatAllocation.get(pid)
+        if data then
+            local allowed, reason = StatAllocation.canReset(pid)
+            local quote = result(allowed, reason)
+            quote.strength, quote.agility, quote.intelligence = data.flat[1], data.flat[2], data.flat[3]
+            quote.refund = 0
+            quote.price = StatAllocation.resetCost(pid)
+            return quote
+        end
         if not Hero[pid] or not Unit[Hero[pid]] then
             return result(false, "NO HERO")
         end
 
         local unit = Unit[Hero[pid]]
         local quote = result(false, "NO STATS")
+        quote.price = 0
         quote.strength = math.max(0, math.min(50, unit.str - 20))
         quote.agility = math.max(0, math.min(50, unit.agi - 20))
         quote.intelligence = math.max(0, math.min(50, unit.int - 20))
@@ -43,9 +54,13 @@ OnInit.final("ShopServices", function(Require)
         return quote
     end
 
-    function FocusService.commit(pid)
+    function FocusService.commit(pid, expected_cost)
         local quote = FocusService.quote(pid)
         if not quote.available then return quote end
+        if StatAllocation.get(pid) then
+            quote.available, quote.reason = StatAllocation.reset(pid, StatAllocation.getGeneration(pid), expected_cost)
+            return quote
+        end
         local unit = Unit[Hero[pid]]
         unit.str = unit.str - quote.strength
         unit.agi = unit.agi - quote.agility

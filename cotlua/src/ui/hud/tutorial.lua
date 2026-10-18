@@ -6,6 +6,7 @@ OnInit.final("Tutorial", function(Require)
     Require('Inventory')
     Require('StashUI')
     Require('StatView')
+    Require('StatAllocationUI')
     Require('PerkTree')
     Require('Multiboard')
     Require('Potion')
@@ -16,6 +17,7 @@ OnInit.final("Tutorial", function(Require)
     Tutorial = {}
     local states, ui = {}, {}
     local render
+    local minimap_frame
 
     local function key(pid, name, fallback)
         for _, action in ipairs(GetHotkeyTable()) do
@@ -28,13 +30,15 @@ OnInit.final("Tutorial", function(Require)
 
     local function close_opened(pid, state)
         for name in pairs(state.previews) do
-            ({inventory = INVENTORY, stash = StashUI, stats = STAT_WINDOW, perks = PerkTree})[name].previewTutorial(pid, false)
+            ({inventory = INVENTORY, stash = StashUI, stats = STAT_WINDOW, perks = PerkTree,
+                allocation = StatAllocationUI})[name].previewTutorial(pid, false)
         end
         state.previews = {}
         if state.opened.stash then StashUI.close(pid) end
         if state.opened.inventory then INVENTORY.close(pid) end
         if state.opened.stats then STAT_WINDOW.close(pid) end
         if state.opened.perks then PerkTree.close(pid) end
+        if state.opened.allocation then StatAllocationUI.close(pid) end
         state.opened = {}
     end
 
@@ -118,6 +122,20 @@ OnInit.final("Tutorial", function(Require)
             target = function() return STAT_WINDOW.getTutorialFrame() end,
         },
         {
+            title = "Stat allocation",
+            text = function()
+                return "The |cffffcc00attribute icon above the inspect buttons|r opens Allocate Stats; it is also in Stat View. " ..
+                    "Choose a point amount, adjust Strength, Agility or Intelligence, then |cffffcc00Apply|r. " ..
+                    "The preview shows the stats you will gain. You can reset your choices in town."
+            end,
+            open = function(pid, state)
+                if not has_hero(pid) then preview(pid, state, "allocation", StatAllocationUI); return end
+                if not StatAllocationUI.isOpen(pid) then state.opened.allocation = true end
+                StatAllocationUI.open(pid)
+            end,
+            target = function() return StatAllocationUI.getTutorialFrame() end,
+        },
+        {
             title = "Profile",
             text = function()
                 return "The |cffffcc00Profile|r tab gathers your currencies, playtime, and progression information. " ..
@@ -177,6 +195,8 @@ OnInit.final("Tutorial", function(Require)
                 return "Ready to begin? The |cffffcc00Fountain of Hope|r in town restores health and mana nearby. " ..
                     "|cffffcc00Mark Location|r also pings it on your minimap."
             end,
+            -- Fixed map coordinates work before a hero is selected and do
+            -- not depend on a fountain unit handle for either pan or ping.
             location = function() return -270., 320. end,
         },
         {
@@ -270,7 +290,7 @@ OnInit.final("Tutorial", function(Require)
         if step and step.open then step.open(pid, state) end
         if step and step.location then
             local x, y = step.location()
-            PreviewPlayerCamera(pid, MAIN_MAP.rect, x, y)
+            PreviewPlayerCamera(pid, MAIN_MAP.rect, x, y, false, true)
         else
             RestorePlayerCameraPreview(pid)
         end
@@ -292,7 +312,7 @@ OnInit.final("Tutorial", function(Require)
         -- Keep both side-by-side stash windows and the central perk tree clear.
         BlzFrameClearAllPoints(ui.frame)
         BlzFrameSetAbsPoint(ui.frame, FRAMEPOINT_TOPLEFT,
-            state.index == 7 and 0.57 or 0.25,
+            step and step.title == "Perks" and 0.57 or step and step.title == "Stat allocation" and .04 or 0.25,
             state.index == 4 and 0.60 or 0.44)
         BlzFrameSetVisible(ui.highlight, false)
         BlzFrameSetText(ui.title, "|cffffcc00Tutorial|r" .. (step and
@@ -306,7 +326,7 @@ OnInit.final("Tutorial", function(Require)
         BlzFrameSetEnable(ui.back, state.index > 0)
         BlzFrameSetVisible(ui.mark, step and step.location ~= nil or false)
         if step and (step.target or step.location) then
-            local target = step.target and step.target() or BlzGetOriginFrame(ORIGIN_FRAME_MINIMAP, 0)
+            local target = step.target and step.target() or minimap_frame
             if target and BlzFrameIsVisible(target) then
                 BlzFrameClearAllPoints(ui.highlight)
                 BlzFrameSetAllPoints(ui.highlight, target)
@@ -318,6 +338,9 @@ OnInit.final("Tutorial", function(Require)
 
     -- Defer construction until initial UI setup has completed, on every client.
     TimerQueue:callDelayed(0., function()
+        -- Resolve native origin frames on every client, not for the first time
+        -- inside one player's local render when the location tour starts.
+        minimap_frame = BlzGetOriginFrame(ORIGIN_FRAME_MINIMAP, 0)
         INVENTORY.prepareTutorialPractice()
         local parent = BlzGetFrameByName("ConsoleUIBackdrop", 0)
         ui.frame = BlzCreateFrame("ListBoxWar3", parent, 0, 0)
