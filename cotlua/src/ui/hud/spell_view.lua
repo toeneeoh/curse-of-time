@@ -34,6 +34,10 @@ OnInit.final("SpellView", function(Require)
         [FourCC('A00F')] = 1, -- Settings
         [FourCC('A00Y')] = 1, -- Item Drops
 
+        -- shop selection utilities
+        [FourCC('Aneu')] = 1, -- Select Hero
+        [FourCC('Anei')] = 1, -- Select User
+
         -- dummy spells
         [FourCC('A06K')] = 1, -- Forced Meta
         [FourCC('A0A3')] = 1, -- Multi-Shot

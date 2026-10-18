@@ -350,10 +350,9 @@ OnInit.final("Gluebutton", function(Require)
         thistype.clicked = CreateTrigger()
         thistype.scrolled = CreateTrigger()
         thistype.double = CreateTimer() ---@type timer 
-        thistype.timer ={} ---@type timer[] 
+        thistype.scrollReadyAt = {} ---@type number[] Local presentation deadlines.
         thistype.table ={} ---@type table 
         thistype.time ={} ---@type table 
-        thistype.canScroll = {} ---@type boolean[] 
         thistype.texture = "" ---@type string 
 
         function thistype:x(newX)
@@ -677,26 +676,23 @@ OnInit.final("Gluebutton", function(Require)
             return self
         end
 
-        function thistype.onExpire()
-            thistype.canScroll[GetPlayerId(GetLocalPlayer())] = true
+        -- The clock starts once on every client. Reading it for local UI
+        -- throttling never starts, pauses or destroys a native timer.
+        function thistype.uiTime()
+            return TimerGetElapsed(thistype.double)
         end
 
         function thistype.onScrolled()
+            if GetLocalPlayer() ~= GetTriggerPlayer() then return end
             local self = thistype.table[(BlzGetTriggerFrame())] ---@type Button
-            local i = GetPlayerId(GetLocalPlayer()) ---@type integer 
+            local i = GetPlayerId(GetTriggerPlayer()) ---@type integer
+            local now = thistype.uiTime()
 
             if self then
-                if thistype.canScroll[i] and self.scroll ~= nil then
-                    if SCROLL_DELAY > 0 then
-                        thistype.canScroll[i] = false
-                    end
-
+                if now >= (thistype.scrollReadyAt[i] or 0) and self.scroll ~= nil then
+                    thistype.scrollReadyAt[i] = now + SCROLL_DELAY
                     TriggerEvaluate(self.scroll)
                 end
-            end
-
-            if SCROLL_DELAY > 0 then
-                TimerStart(thistype.timer[i], SCROLL_DELAY, false, thistype.onExpire)
             end
         end
 
@@ -725,11 +721,6 @@ OnInit.final("Gluebutton", function(Require)
                     doubleTime[i][j] = self.time[i][j]
                 end
             end
-        end
-
-        for i = 0, PLAYER_CAP - 1 do
-            Button.timer[i] = CreateTimer()
-            Button.canScroll[i] = true
         end
 
         TimerStart(thistype.double, 10000000., false, nil)

@@ -1110,8 +1110,7 @@ OnInit.final("Shop", function(Require)
     ---@field craftableButton Button
     ---@field craftablesort boolean
     ---@field clearCategory Button
-    ---@field canScroll boolean[]
-    ---@field timer timer[]
+    ---@field scrollReadyAt number[] Local presentation deadlines.
     ---@field visible function
     ---@field first? ShopSlot
     ---@field last? ShopSlot
@@ -1137,8 +1136,7 @@ OnInit.final("Shop", function(Require)
         thistype.success    = nil ---@type sound 
         thistype.error      = nil ---@type sound 
         thistype.noGold     = {} ---@type sound[] 
-        thistype.timer      = {} ---@type timer[] 
-        thistype.canScroll  = {} ---@type boolean[] 
+        thistype.scrollReadyAt = {} ---@type number[]
         thistype.current    = {} ---@type unit[] 
         thistype.isVisible  = nil ---@type boolean 
         thistype.aoe        = 1000 ---@type number 
@@ -1225,6 +1223,10 @@ OnInit.final("Shop", function(Require)
 
             if not quote.can_buy then
                 if not test and GetLocalPlayer() == p then
+                    if quote.reason == "range" then
+                        DisplayTimedTextToPlayer(p, 0, 0, 5.,
+                            "|cffff5555You are too far away from this shop.|r")
+                    end
                     local sound = quote.reason == "currency"
                         and self.noGold[GetPlayerRace(p)] or self.error
                     if not GetSoundIsPlaying(sound) then
@@ -1594,8 +1596,6 @@ OnInit.final("Shop", function(Require)
                 registry[(self.edit)][0] = self
 
                 while u do
-                        thistype.timer[u.id] = CreateTimer()
-                        thistype.canScroll[u.id] = true
                         registry[(u.player)][id] = self
                         registry[(u.player)][self.count] = id
                     u = u.next
@@ -1797,28 +1797,17 @@ OnInit.final("Shop", function(Require)
             end
         end
 
-        function thistype.onExpire()
-            thistype.canScroll[GetPlayerId(GetLocalPlayer()) + 1] = true
-        end
-
         function thistype.onScroll() --shop
+            if GetLocalPlayer() ~= GetTriggerPlayer() then return end
             local self = registry[(BlzGetTriggerFrame())][0] ---@type Shop
-            local pid = GetPlayerId(GetLocalPlayer()) + 1
+            local pid = GetPlayerId(GetTriggerPlayer()) + 1
+            local now = Button.uiTime()
 
             if self then
-                if GetLocalPlayer() == GetTriggerPlayer() then
-                    if thistype.canScroll[pid] then
-                        if SCROLL_DELAY > 0 then
-                            thistype.canScroll[pid] = false
-                        end
-
-                        self:scroll(BlzGetTriggerFrameValue() < 0)
-                    end
+                if now >= (thistype.scrollReadyAt[pid] or 0) then
+                    thistype.scrollReadyAt[pid] = now + SCROLL_DELAY
+                    self:scroll(BlzGetTriggerFrameValue() < 0)
                 end
-            end
-
-            if SCROLL_DELAY > 0 then
-                TimerStart(thistype.timer[pid], SCROLL_DELAY, false, thistype.onExpire)
             end
         end
 

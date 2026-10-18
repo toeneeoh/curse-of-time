@@ -14,7 +14,7 @@ assert(not section('        function thistype.onPurchase()', '    ---@class Cate
 local function client(local_player)
     local env = setmetatable({}, {__index = _G})
     local packet, callback, payload, trace = nil, nil, '', {}
-    local gold, renders = 100, 0
+    local gold, renders, messages, in_range = 100, 0, 0, true
     local item = {id = 'I001:0'}
     local offer = {id = 'offer:example'}
     local shop = {id = 1234, first = nil, details = {refresh = function() renders = renders + 1 end}}
@@ -31,12 +31,17 @@ local function client(local_player)
     env.BlzGetTriggerSyncData = function() return payload end
     env.SyncCallback = function(prefix, fn) assert(prefix == 'shop_buy'); callback = fn end
     env.ShopTransaction = {commit = function(_, selected, pid)
+        if not in_range then return {can_buy = false, reason = 'range'} end
         local bought = gold >= 50
         if bought then gold = gold - 50 end
         trace[#trace + 1] = selected.id .. ':' .. pid .. ':' .. gold .. ':' .. tostring(bought)
         return {can_buy = bought, reason = bought and nil or 'currency'}
     end}
-    env.ShopQuote = {evaluate = function() return {can_buy = true} end}
+    env.ShopQuote = {evaluate = function() return {can_buy = in_range, reason = not in_range and 'range'} end}
+    env.DisplayTimedTextToPlayer = function(p, _, _, _, text)
+        assert(p == 4 and text:find('too far away', 1, true))
+        messages = messages + 1
+    end
     env.GetPlayerRace = function() return 'human' end
     env.GetSoundIsPlaying, env.StartSoundForPlayerBJ = function() return false end, function() end
     env.SPRITE_MODEL, env.SPRITE_SCALE = 'sprite', 1
@@ -48,6 +53,13 @@ local function client(local_player)
     if packet then assert(packet[1] == 'shop_buy' and packet[2] == '1234:I001:0') end
     for _ = 1, 3 do payload = '1234:I001:0'; callback() end
     assert(gold == 0 and #trace == 3, 'Two purchases plus insufficient-gold rejection')
+    in_range = false
+    payload = '1234:I001:0'; callback()
+    assert(gold == 0 and #trace == 3, 'Range failure must not mutate purchases')
+    assert(messages == (local_player == 4 and 1 or 0), 'Range text must appear only for the buyer')
+    shop:buy(item, 4, true)
+    assert(messages == (local_player == 4 and 1 or 0), 'Dry-run quote must not display errors')
+    in_range = true
     for _, bad in ipairs({'garbage', '1234:unknown', '9999:I001:0', '1234:'}) do
         payload = bad; callback()
     end

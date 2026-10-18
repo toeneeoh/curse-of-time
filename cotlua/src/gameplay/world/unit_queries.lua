@@ -3,7 +3,7 @@ OnInit.global("WorldUnitQueries", function(Require)
     Require('Variables')
 
     local similar_units = {
-        [FourCC('nitt')] = FourCC('n0tb'),
+        [FourCC('n0tt')] = FourCC('n0tb'),
         [FourCC('n0tw')] = FourCC('n0ts'),
         [FourCC('n0tc')] = FourCC('n0ts'),
         [FourCC('n0sl')] = FourCC('n0ss'),

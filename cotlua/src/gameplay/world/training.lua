@@ -14,8 +14,8 @@ OnInit.final("Training", function(Require)
     local chaosTrainer = CreateUnit(Player(PLAYER_NEUTRAL_PASSIVE), FourCC('h001'), 29415., 252., 270.)
     do
         local itm = UnitAddItemById(prechaosTrainer, FourCC('I0MY'))
-        BlzSetItemName(itm.obj, "|cffffcc00" .. GetObjectName(FourCC('nitt')) .. "|r")
-        BlzSetItemIconPath(itm.obj, BlzGetAbilityIcon(FourCC('nitt')))
+        BlzSetItemName(itm.obj, "|cffffcc00" .. GetObjectName(FourCC('n0tt')) .. "|r")
+        BlzSetItemIconPath(itm.obj, BlzGetAbilityIcon(FourCC('n0tt')))
         itm.spawn = 0
 
         itm = UnitAddItemById(chaosTrainer, FourCC('I0MY'))

@@ -345,6 +345,10 @@ OnInit.final("Multiboard", function(Require)
 
         -- frame setup
         MB.frame = BlzCreateFrameByType("FRAME", "", BlzGetFrameByName("ConsoleUIBackdrop", 0), "", 0)
+        -- QuestTracker's sibling header is level 8. Raise this parent branch,
+        -- not just the nested drop icons, so drops/tooltips remain on top of
+        -- both the expanded tracker and its collapsed toggle button.
+        BlzFrameSetLevel(MB.frame, 9)
         MB.main = BlzCreateFrame("ListBoxWar3", MB.frame, 0, 0)
         BlzFrameSetSize(MB.main, ROW_WIDTH, ROW_HEIGHT)
         BlzFrameSetAbsPoint(MB.main, FRAMEPOINT_TOPRIGHT, 0.925, 0.6)
@@ -376,7 +380,6 @@ OnInit.final("Multiboard", function(Require)
         local boss = MB.create(4)
         local damageLog = MB.create(6)
 
-        main:addRows(User.AmountPlaying)
         main.available = __jarray(true)
         main.title = "Curse of Time RPG: |cff9966ffNevermore|r"
 
@@ -395,6 +398,9 @@ OnInit.final("Multiboard", function(Require)
 
             for pid = 1, PLAYER_CAP do
                 if User[pid - 1] then
+                    -- Allocate from the same roster used to populate/refresh rows.
+                    -- AmountPlaying is a live counter, not the retained User roster.
+                    main:addRows(1)
                     main:get(index, 1).text = {0.02, 0, 0.09, ICON_SIZE}
                     main:get(index, 2).icon = {0.11, 0, ICON_SIZE, ICON_SIZE}
                     main:get(index, 3).icon = {0.13, 0, ICON_SIZE, ICON_SIZE}
@@ -608,7 +614,7 @@ OnInit.final("Multiboard", function(Require)
             end
 
             -- init
-            boss:addRows(3 + User.AmountPlaying)
+            boss:addRows(3 + #main.rows)
             boss:get(1, 1).icon = {0.015, -0.001, 0.026, 0.026}
             local boss_icon = boss:get(1, 1).icon
             boss:get(1, 2).bar = {0.05, -0.001, 0.225, 0.024}

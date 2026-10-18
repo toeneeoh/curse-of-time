@@ -86,21 +86,30 @@ OnInit.final("Threat", function(Require)
     end
 
     local function is_ally(object, source)
-        return object ~= source and UnitAlive(object) and IsUnitAlly(object, GetOwningPlayer(source))
+        return object ~= source and UnitAlive(object)
+            and GetUnitAbilityLevel(object, ABIL_AVUL) == 0
+            and GetUnitAbilityLevel(object, ABIL_ALOC) == 0
+            and IsUnitAlly(object, GetOwningPlayer(source))
     end
 
     local function call_for_help(target, source, _, _, _)
-        -- ignore non-player sources or self aggro (?)
-        if GetPlayerId(GetOwningPlayer(source)) < PLAYER_CAP or target == source then
+        -- Player heroes and their summons can alarm a pack, including at night.
+        if not source or not UnitAlive(source) or target == source
+            or GetPlayerId(GetOwningPlayer(source)) >= PLAYER_CAP
+            or not IsUnitEnemy(source, GetOwningPlayer(target)) then
             return
         end
 
         local allies = ALICE_EnumObjectsInRange(GetUnitX(target), GetUnitY(target), CALL_FOR_HELP_RANGE, "unit", is_ally, target)
 
         for _, ally in ipairs(allies) do
-            if Unit[ally].target == nil and
-                IsUnitVisible(source, GetOwningPlayer(ally)) then
-                Unit[source]:taunt(Unit[ally])
+            if Unit[ally] and Unit[ally].target == nil then
+                UnitWakeUp(ally)
+                -- An alarm is not limited by the sleeping ally's sight range,
+                -- but must not grant detection against invisible attackers.
+                if not IsUnitInvisible(source, GetOwningPlayer(ally)) then
+                    Unit[source]:taunt(Unit[ally])
+                end
             end
         end
     end

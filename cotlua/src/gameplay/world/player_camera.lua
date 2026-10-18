@@ -7,6 +7,21 @@ OnInit.global("PlayerCamera", function(Require)
     local preview_camera = {}
     local minimap_texture
     local lighting_override = {}
+    local pending_preview
+    -- Create/start once on every client. Local sightseeing must never enqueue,
+    -- restart, pause or cancel a timer used by shared gameplay callbacks.
+    local preview_timer = CreateTimer()
+    TimerStart(preview_timer, 0.03, true, function()
+        local pending = pending_preview
+        if not pending then return end
+        pending.ticks = pending.ticks - 1
+        if pending.ticks > 0 then return end
+        pending_preview = nil
+        if GetLocalPlayer() == Player(pending.pid - 1)
+            and preview_camera[pending.pid] == pending.saved then
+            PanCameraToTimed(pending.x, pending.y, pending.duration)
+        end
+    end)
 
     ---@param pid integer
     local function apply_camera_lock(pid)
@@ -102,7 +117,7 @@ OnInit.global("PlayerCamera", function(Require)
 
     ---@type fun(pid: integer, texture: string)
     function SetMinimapTexture(pid, texture)
-        if GetLocalPlayer() == Player(pid - 1) then
+        if GetLocalPlayer() == Player(pid - 1) and minimap_texture ~= texture then
             minimap_texture = texture
             BlzChangeMinimapTerrainTex(texture)
         end
@@ -111,8 +126,7 @@ OnInit.global("PlayerCamera", function(Require)
     -- Local presentation only; unlike SetCamera this does not touch a hero's
     -- lighting abilities and therefore also works before a hero is selected.
     ---@param instant boolean? Snap immediately and keep bounds correction instant.
-    function PreviewPlayerCamera(pid, region, x, y, instant)
-        local saved, generation
+    function PreviewPlayerCamera(pid, region, x, y, instant, preserve_minimap)
         if GetLocalPlayer() == Player(pid - 1) then
             if not preview_camera[pid] then
                 preview_camera[pid] = {
@@ -122,9 +136,7 @@ OnInit.global("PlayerCamera", function(Require)
                     minimap = minimap_texture,
                 }
             end
-            saved = preview_camera[pid]
-            saved.generation = (saved.generation or 0) + 1
-            generation = saved.generation
+            local saved = preview_camera[pid]
             local data = REGION_DATA[region]
             local rect = data.vision
             if data.hide_minimap then
@@ -134,21 +146,16 @@ OnInit.global("PlayerCamera", function(Require)
             end
             SetCameraBounds(GetRectMinX(rect), GetRectMinY(rect), GetRectMinX(rect),
                 GetRectMaxY(rect), GetRectMaxX(rect), GetRectMaxY(rect), GetRectMaxX(rect), GetRectMinY(rect))
-            if data.minimap then SetMinimapTexture(pid, data.minimap) end
+            -- Tutorial sightseeing does not require a terrain texture reload.
+            -- Keep this native out of its local page-navigation path.
+            if data.minimap and not preserve_minimap then SetMinimapTexture(pid, data.minimap) end
             if instant then PanCameraToTimed(x, y, 0.) end
+            -- Two polling ticks guarantee at least .03 seconds for bounds to
+            -- settle, even if this request arrives immediately before a tick.
+            -- Replacing this local record coalesces rapid Next/room changes.
+            pending_preview = {pid = pid, saved = saved, x = x, y = y,
+                duration = instant and 0. or 0.35, ticks = 2}
         end
-        -- Bounds changes can clamp the old tavern position on the next update.
-        -- Reassert the target afterwards; regular previews start their smooth pan
-        -- then, while instant traversal has already snapped. Queue this on every
-        -- client; only the camera mutation itself is local.
-        TimerQueue:callDelayed(0.03, function()
-            if GetLocalPlayer() == Player(pid - 1) and preview_camera[pid] == saved
-                and saved and saved.generation == generation then
-                -- Room traversal snaps now and reasserts after bounds settle;
-                -- tutorial sightseeing retains its existing smooth pan.
-                PanCameraToTimed(x, y, instant and 0. or 0.35)
-            end
-        end)
     end
 
     function RestorePlayerCameraPreview(pid)
@@ -156,6 +163,7 @@ OnInit.global("PlayerCamera", function(Require)
         local saved = preview_camera[pid]
         if not saved then return end
         preview_camera[pid] = nil
+        pending_preview = nil
         SetCameraBounds(saved.min_x, saved.min_y, saved.min_x, saved.max_y,
             saved.max_x, saved.max_y, saved.max_x, saved.min_y)
         if saved.minimap then SetMinimapTexture(pid, saved.minimap) end

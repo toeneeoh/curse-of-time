@@ -147,7 +147,16 @@ OnInit.global("SimpleButton", function(Require)
 
             if func ~= nil then
                 self.click = CreateTrigger()
-                TriggerAddCondition(self.click, Condition(func))
+                TriggerAddCondition(self.click, Condition(function()
+                    -- Release native keyboard focus before the action hides,
+                    -- disables or changes the clicked control.
+                    if GetLocalPlayer() == GetTriggerPlayer() then
+                        local f = BlzGetTriggerFrame()
+                        BlzFrameSetEnable(f, false)
+                        BlzFrameSetEnable(f, true)
+                    end
+                    return func()
+                end))
                 BlzTriggerRegisterFrameEvent(self.click, self.frame, FRAMEEVENT_CONTROL_CLICK)
             end
         end
