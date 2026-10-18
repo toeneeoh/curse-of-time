@@ -10,6 +10,34 @@ OnInit.final("Prices", function(Require)
 
     local PRICES = {}
     local AVAILABILITY = {}
+
+    -- Per-item vendor payouts for prechaos drops without a formula/shop price.
+    -- These do not add items to shops or alter purchase prices. Ordinary early
+    -- trinkets retain their native half-cost value; equipment rises by region.
+    ---@type table<integer, integer>
+    ITEM_SELL_PRICES = {}
+    local function drop_sell_value(value, ...)
+        for _, id in ipairs({...}) do ITEM_SELL_PRICES[FourCC(id)] = value end
+    end
+    drop_sell_value(25, 'I01V', 'I02D') -- courage medallion, regeneration ring
+    drop_sell_value(40, 'I021') -- vitality medallion
+    drop_sell_value(55, 'I03Q') -- Horse Boost, comparable to Seven League Boots
+    drop_sell_value(100, 'I025') -- Greater Mask of Death
+    drop_sell_value(250, 'I02L') -- Great Circlet
+    drop_sell_value(300, 'I06T', 'I034', 'I0FG', 'I06R', 'I0FT') -- Ursa weapons
+    drop_sell_value(350, 'I035', 'I0FO', 'I07O') -- bear armor
+    drop_sell_value(400, 'I0FQ') -- mammoth fullplate
+    drop_sell_value(500, 'I08I', 'I0FE', 'I07W', 'I08B', 'I0FD', 'I08R',
+        'I08E', 'I08F', 'I07Y') -- ogre / tauren equipment
+    drop_sell_value(750, 'I0FS', 'I0FR', 'I0FY', 'I01W', 'I0MB') -- unbroken
+    drop_sell_value(1000, 'I00Z', 'I00S', 'I011', 'I02E', 'I023', 'I0MA') -- hellfire
+    drop_sell_value(1250, 'I06J', 'I06I', 'I06L', 'I06K', 'I07H') -- centaur weapons
+    drop_sell_value(1500, 'I01Q', 'I01N', 'I015', 'I019') -- magnataur / forgotten
+    drop_sell_value(2500, 'I02W', 'I00W', 'I017', 'I013', 'I02I', 'I01P',
+        'I006', 'I02V', 'I009') -- devourer equipment
+    drop_sell_value(250, 'I04X', 'I05Z') -- dragon bone / scale, per stack unit
+    drop_sell_value(500, 'I056') -- dragon heart, per stack unit
+    drop_sell_value(750, 'I07N') -- hydra crafting fang; quest head stays unsellable
     local CURRENCY = {
         gold = GOLD,
         platinum = PLATINUM,
