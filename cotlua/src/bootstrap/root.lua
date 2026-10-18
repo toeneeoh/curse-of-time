@@ -180,6 +180,7 @@ dofile('devtools/console.lua')
 dofile('vendor/total_initialization.lua')
 dofile('bootstrap/environment.lua')
 dofile('devtools/dev.lua')
+dofile('devtools/inventory_loadout.lua')
 dofile('bootstrap/map_setup.lua')
 
 dofile('config/rawcodes.lua')

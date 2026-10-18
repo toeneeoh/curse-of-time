@@ -39,6 +39,7 @@
     Require('ScarabKitPreview')
     Require('ScarabBoss')
     Require('ScarabLayout')
+    Require('DevInventoryLoadout')
     local pack, find, lower = string.pack, string.find, string.lower
     local searchable = {} ---@type boolean[]
     local dev_cmds, wipe_item_stats, find_item, event_setup
@@ -69,6 +70,7 @@
         ["momentum"] = "Add lobby Faction Momentum to your active faction. usage: -momentum [#]",
         ["bounty"] = "Give yourself a Vanguard Bounty consumable.",
         ["potion"] = "Spawn potion test drops. usage: -potion [all|legendary|chaos|donor|prefixes|suffixes|corrosive|voltaic|overflow|...]",
+        ["invtest"] = "Populate free slots with a save/load test loadout: equipped/socketed items, partially charged and empty items, backpack stacks, four stash rows and unsaveable tickets. usage: -invtest",
         ["lvl"] = "Set the selected hero's level to #. usage: -lvl [1-500]",
         ["str"] = "Set the selected hero's strength to #. usage: -str [#]",
         ["agi"] = "Set the selected hero's agility to #. usage: -agi [#]",
@@ -826,6 +828,14 @@ modifiers:
                       ABILITY_SF_NAME))
             print(pack(">I4", BlzGetAbilityId(
                            BlzGetUnitAbilityByIndex(Hero[pid], S2I(args[2])))))
+        end,
+        ["invtest"] = function(p, pid)
+            local ok, report = DevInventoryLoadout.populate(pid)
+            if ok then
+                for _, line in ipairs(report) do DisplayTimedTextToPlayer(p, 0., 0., 30., line) end
+            else
+                DisplayTimedTextToPlayer(p, 0., 0., 15., report)
+            end
         end,
         ["loottest"] = function(p, pid, args)
             local hero = Hero[pid]
