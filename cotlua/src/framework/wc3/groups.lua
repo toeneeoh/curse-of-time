@@ -31,7 +31,7 @@ OnInit.global("Groups", function(Require)
     ---@type fun(u: unit): boolean
     function IsDummy(u)
         local id = GetUnitTypeId(u)
-        return id == DUMMY_CASTER or id == DUMMY_VISION
+        return id == DUMMY_CASTER or id == DUMMY_VISION or id == FourCC('nLTP')
     end
 
     ---@return boolean

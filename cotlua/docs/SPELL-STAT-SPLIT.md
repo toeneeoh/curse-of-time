@@ -32,8 +32,8 @@ rows per page.
 
 ## Verification
 
-Skill tooltips add a teal scaling note prefixed with `*` before their existing blue duration /
-cooldown footer. The note is derived from the same dynamic formula tags used
+Skill tooltips add a teal scaling note prefixed with `*` after all native text,
+including duration, cooldown, and mana costs, separated by a single newline. The note is derived from the same dynamic formula tags used
 for the displayed numbers: `[` is full power, `{` is area/duration or half power
 according to the tag routing, and `\` is unscaled. Scalable values have a teal
 ASCII `*`; Alt shows calculated values without stars, with `(50% scaling)` on

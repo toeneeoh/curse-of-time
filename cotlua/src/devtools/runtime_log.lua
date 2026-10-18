@@ -9,6 +9,9 @@ OnInit.global("DevRuntimeLog", function(Require)
         enabled = DEV_LOG_ENABLED and FileIO.enabled,
         path = MAP_NAME .. "\\dev\\runtime-player-" .. (GetPlayerId(GetLocalPlayer()) + 1) .. ".pld",
         entries = {},
+        -- Enable only for focused desync reproduction: each inventory move
+        -- otherwise rewrites the entire growing log twice on the main thread.
+        inventory_immediate_flush = false,
     }
 
     local writing = false
@@ -57,6 +60,11 @@ OnInit.global("DevRuntimeLog", function(Require)
 
     function DevLog.snapshot(label)
         if not DevLog.enabled then return end
+        if LootService then
+            local loot = LootService.getMetrics()
+            DevLog.write("LOOT", string.format("records=%d bundles=%d proxies=%d expiry=%d",
+                loot.records, loot.piles, loot.proxies, loot.expiry), true)
+        end
         local items = RuntimeMetrics.items
         local initializers = RuntimeMetrics.initializers
         local events = RuntimeMetrics.events

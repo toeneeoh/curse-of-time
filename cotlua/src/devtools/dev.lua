@@ -23,6 +23,7 @@
     Require('TimerQueue')
     Require('Variables')
     Require('Items')
+    Require('LootService')
     Require('ItemHelpers')
     Require('RuntimeItemDefinitions')
     Require('PotionService')
@@ -825,6 +826,20 @@ modifiers:
                       ABILITY_SF_NAME))
             print(pack(">I4", BlzGetAbilityId(
                            BlzGetUnitAbilityByIndex(Hero[pid], S2I(args[2])))))
+        end,
+        ["loottest"] = function(p, pid, args)
+            local hero = Hero[pid]
+            if not hero then return end
+            local count = math.max(1, math.min(1000, math.floor(tonumber(args[2]) or 8)))
+            local id = args[3] and #args[3] == 4 and FourCC(args[3]) or FourCC('I01V')
+            if id == LootService.PROXY_ID or IsDummyCastItem(id) then return end
+            for _ = 1, count do LootService.create(id, GetUnitX(hero) + 120., GetUnitY(hero), 600.) end
+            DisplayTextToPlayer(p, 0., 0., "Created " .. count .. " test loot entries. Use -lootstats for object counts.")
+        end,
+        ["lootstats"] = function(p)
+            local stats = LootService.getMetrics()
+            DisplayTextToPlayer(p, 0., 0., string.format("Loot: %d records, %d bundles, %d individual proxies, %d expiry entries.",
+                stats.records, stats.piles, stats.proxies, stats.expiry))
         end,
         ["makeitem"] = function(p, pid, args)
             ItemRuntime.create(FourCC('I0OX'), 0, 0)

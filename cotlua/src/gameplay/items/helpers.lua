@@ -121,6 +121,8 @@ OnInit.global("ItemHelpers", function(Require)
 
     ---@type fun(itemid: integer): integer|nil
     function ItemToIndex(itemid)
+        -- Colosseum admission belongs to the current run, not character saves.
+        if itemid == FourCC('I008') then return nil end
         return SAVE_TABLE.KEY_ITEMS[itemid]
     end
 
@@ -139,7 +141,8 @@ OnInit.global("ItemHelpers", function(Require)
         if GetItemType(itm.obj) == ITEM_TYPE_POWERUP then
             UnitAddItem(Hero[pid], itm.obj)
         elseif not itm:equip() then
-            SetItemPosition(itm.obj, GetUnitX(Hero[pid]), GetUnitY(Hero[pid]))
+            itm.x, itm.y = GetUnitX(Hero[pid]), GetUnitY(Hero[pid])
+            if LootService then LootService.add(itm) else SetItemPosition(itm.obj, itm.x, itm.y) end
         end
     end
 
@@ -159,7 +162,7 @@ OnInit.global("ItemHelpers", function(Require)
             UnitAddItem(Hero[pid], item.obj)
         else
             if level > 0 then item:lvl(level) end
-            item:equip()
+            if not item:equip() and LootService then LootService.add(item) end
         end
         return item
     end

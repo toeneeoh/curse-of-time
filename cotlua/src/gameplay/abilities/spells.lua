@@ -113,20 +113,8 @@
         end
         if note == "" then return result end
         note = "|cff40e0d0* " .. note .. "|r"
-        -- Native skill footers use blue. Keep their existing text and color
-        -- together, including a duration line preceding the cooldown line.
-        local footer
-        for position, color in result:gmatch("()\n|c(%x%x%x%x%x%x%x%x)") do
-            local tail = result:sub(position):lower()
-            if color:sub(3):lower() == "0080c0" and
-                (tail:find("cooldown", 1, true) or tail:find("duration", 1, true)) then
-                footer = position
-                break
-            end
-        end
-        if footer then
-            return result:sub(1, footer - 1):gsub("%s+$", "") .. "\n" .. note .. "\n" .. result:sub(footer + 1)
-        end
+        -- Explain markers after every value, including duration and costs.
+        -- Preserve native text and colors without guessing footer boundaries.
         return result:gsub("%s+$", "") .. "\n" .. note
     end
 

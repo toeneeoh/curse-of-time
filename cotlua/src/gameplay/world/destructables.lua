@@ -1,16 +1,17 @@
 OnInit.final("Destructables", function(Require)
     Require('Items')
+    Require('LootService')
 
 ---@type fun(d: destructable, d2: destructable)
 
 local DTable = {
-    [gg_dest_LTcr_9593] = function(d) ItemRuntime.create(DropTable:pickItem(69), GetWidgetX(d), GetWidgetY(d), 600.) end,
-    [gg_dest_LTbs_4010] = function(d) ItemRuntime.create(DropTable:pickItem(69), GetWidgetX(d), GetWidgetY(d), 600.) end,
-    [gg_dest_LTbs_4009] = function(d) ItemRuntime.create(DropTable:pickItem(69), GetWidgetX(d), GetWidgetY(d), 600.) end,
-    [gg_dest_LTcr_4012] = function(d) ItemRuntime.create(DropTable:pickItem(69), GetWidgetX(d), GetWidgetY(d), 600.) end,
-    [gg_dest_LTba_9594] = function(d) ItemRuntime.create(DropTable:pickItem(69), GetWidgetX(d), GetWidgetY(d), 600.) end,
-    [gg_dest_LTbs_4008] = function(d) ItemRuntime.create(DropTable:pickItem(69), GetWidgetX(d), GetWidgetY(d), 600.) end,
-    [gg_dest_B007_3861] = function(d) ItemRuntime.create(FourCC('I042'), GetWidgetX(d), GetWidgetY(d)) end,
+    [gg_dest_LTcr_9593] = function(d) LootService.create(DropTable:pickItem(69), GetWidgetX(d), GetWidgetY(d), 600.) end,
+    [gg_dest_LTbs_4010] = function(d) LootService.create(DropTable:pickItem(69), GetWidgetX(d), GetWidgetY(d), 600.) end,
+    [gg_dest_LTbs_4009] = function(d) LootService.create(DropTable:pickItem(69), GetWidgetX(d), GetWidgetY(d), 600.) end,
+    [gg_dest_LTcr_4012] = function(d) LootService.create(DropTable:pickItem(69), GetWidgetX(d), GetWidgetY(d), 600.) end,
+    [gg_dest_LTba_9594] = function(d) LootService.create(DropTable:pickItem(69), GetWidgetX(d), GetWidgetY(d), 600.) end,
+    [gg_dest_LTbs_4008] = function(d) LootService.create(DropTable:pickItem(69), GetWidgetX(d), GetWidgetY(d), 600.) end,
+    [gg_dest_B007_3861] = function(d) LootService.create(FourCC('I042'), GetWidgetX(d), GetWidgetY(d)) end,
 }
 
 function DestructableDeath()

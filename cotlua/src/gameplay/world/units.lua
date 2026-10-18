@@ -10,6 +10,7 @@ OnInit.final("Units", function(Require)
     Require('EvilShopkeeperShop')
     Require('Boss')
     Require('Items')
+    Require('LootService')
     Require('Damage')
     Require('BossAbilities')
     Require('Shopkeeper')
@@ -214,7 +215,7 @@ OnInit.final("Units", function(Require)
         UNIT_COUNT = UNIT_COUNT + 1
     end
 
-    setup_unit(FourCC('nitt'), 18, 1, 0) -- ice troll trapper
+    setup_unit(FourCC('n0tt'), 18, 1, 0) -- ice troll trapper
     setup_unit(FourCC('n0tb'), 10, 1, 0) -- ice troll berserker
     setup_unit(FourCC('n0ts'), 10, 2, 0) -- tuskarr sorc
     setup_unit(FourCC('n0tw'), 11, 2, 0) -- tuskarr warrior
@@ -423,7 +424,7 @@ OnInit.final("Units", function(Require)
     EVENT_ON_KILL:register_unit_action(townpaladin, paladin_on_kill)
     EVENT_ON_UNIT_DEATH:register_unit_action(townpaladin, function(u)
         TimerQueue:disableCallback(wander)
-        ItemRuntime.create(FourCC('I01Y'), GetUnitX(u), GetUnitY(u)) -- cheese
+        LootService.create(FourCC('I01Y'), GetUnitX(u), GetUnitY(u)) -- cheese
     end)
 
     -- minigame banners
@@ -450,22 +451,22 @@ OnInit.final("Units", function(Require)
     SetHeroLevel(pinky, 100, false)
     UnitAddItemById(pinky, FourCC('I02Y'))
     EVENT_ON_UNIT_DEATH:register_unit_action(pinky, function(u)
-        ItemRuntime.create(FourCC('I02Y'), GetUnitX(u), GetUnitY(u)) -- pinky pick
+        LootService.create(FourCC('I02Y'), GetUnitX(u), GetUnitY(u)) -- pinky pick
     end)
     -- bryan
     bryan = CreateUnit(PLAYER_CREEP, FourCC('H043'), 11528., 7880., 180.)
     SetHeroLevel(bryan, 100, false)
     UnitAddItemById(bryan, FourCC('I02X'))
     EVENT_ON_UNIT_DEATH:register_unit_action(bryan, function(u)
-        ItemRuntime.create(FourCC('I02X'), GetUnitX(u), GetUnitY(u)) -- bryan pick
+        LootService.create(FourCC('I02X'), GetUnitX(u), GetUnitY(u)) -- bryan pick
     end)
     -- ice troll
     ice_troll = CreateUnit(PLAYER_CREEP, FourCC('O00T'), 15833., 4382., 254.)
     SetHeroLevel(ice_troll, 100, false)
     UnitAddItemById(ice_troll, FourCC('I03Z'))
     EVENT_ON_UNIT_DEATH:register_unit_action(ice_troll, function(u)
-        ItemRuntime.create(FourCC('I040'), GetUnitX(u), GetUnitY(u)) -- key of redemption
-        ItemRuntime.create(FourCC('I03Z'), GetUnitX(u), GetUnitY(u)) -- da's dingo
+        LootService.create(FourCC('I040'), GetUnitX(u), GetUnitY(u)) -- key of redemption
+        LootService.create(FourCC('I03Z'), GetUnitX(u), GetUnitY(u)) -- da's dingo
     end)
 
     -- kroresh
@@ -475,7 +476,7 @@ OnInit.final("Units", function(Require)
     UnitAddItemById(kroresh, FourCC('I064'))
     UnitAddItemById(kroresh, FourCC('I04B'))
     EVENT_ON_UNIT_DEATH:register_unit_action(kroresh, function(u)
-        ItemRuntime.create(FourCC('I04B'), GetUnitX(u), GetUnitY(u), 600.) -- jewel of the horde
+        LootService.create(FourCC('I04B'), GetUnitX(u), GetUnitY(u), 600.) -- jewel of the horde
     end)
     -- zeknen
     UnitAddItemById(zeknen, FourCC('I03Y'))
@@ -566,7 +567,7 @@ OnInit.final("Units", function(Require)
         evilshopkeeperbrother = gg_unit_n02S_0098
         evilshopkeeper = CreateUnit(Player(PLAYER_NEUTRAL_PASSIVE), FourCC('n01F'), 7284., -13177., 270.)
         EVENT_ON_UNIT_DEATH:register_unit_action(evilshopkeeper, function(u)
-            ItemRuntime.create(FourCC('I045'), GetUnitX(u), GetUnitY(u)) -- bloodstained cloak
+            LootService.create(FourCC('I045'), GetUnitX(u), GetUnitY(u)) -- bloodstained cloak
         end)
         MoveShopkeeper()
     end

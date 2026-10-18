@@ -267,6 +267,10 @@ OnInit.final("StashService", function(Require)
         item.stash_index = nil
         SetItemPosition(item.obj, GetUnitX(Hero[pid]), GetUnitY(Hero[pid]))
         SetItemVisible(item.obj, true)
+        if LootService then
+            item.x, item.y = GetUnitX(Hero[pid]), GetUnitY(Hero[pid])
+            LootService.add(item, not item.owner and 600. or nil)
+        end
         SoundHandler("Sound\\Interface\\HeroDropItem1.flac", true,
                      Player(pid - 1), Hero[pid])
         notify(pid)

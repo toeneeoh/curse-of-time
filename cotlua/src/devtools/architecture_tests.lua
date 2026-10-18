@@ -262,8 +262,7 @@ OnInit.final("ArchitectureTests", function(Require)
             local item = PotionService.create(case[1], 30000., 30000.)
             local properties = PotionService.getProperties(item)
             local customization = PotionService.getCustomization(item)
-            local expected_skin = case[2] == FourCC('I00E') and
-                                      FourCC('pman') or FourCC('phea')
+            local expected_skin = ITEM_MODEL[math.ceil(index / 2)]
             local expected_icon = case[2] == FourCC('I00E') and
                                       "ReplaceableTextures\\CommandButtons\\BTNPotionBlue.blp" or
                                       "ReplaceableTextures\\CommandButtons\\BTNPotionGreen.blp"
@@ -271,8 +270,7 @@ OnInit.final("ArchitectureTests", function(Require)
                               customization and customization.capacity == 0 and
                               customization.prefix == nil and
                               customization.suffix == nil and
-                              item.runtime_definition.world_skin_id ==
-                              expected_skin and
+                              BlzGetItemSkin(item.obj) == expected_skin and
                               BlzGetItemIconPath(item.obj) == expected_icon and
                               properties.level_requirement == case[3] and
                               properties.maximum_charges >= case[4] and
@@ -324,11 +322,9 @@ OnInit.final("ArchitectureTests", function(Require)
             local case = cases[index]
             local item = PotionService.create(case[1], 30000., 30000.)
             local properties = PotionService.getProperties(item)
-            local expected_skin = case[2] == FourCC('I00E') and
-                                      FourCC('pman') or FourCC('phea')
+            local expected_skin = ITEM_MODEL[3]
             local valid = item and item.id == case[2] and properties and
-                              item.runtime_definition.world_skin_id ==
-                              expected_skin and
+                              BlzGetItemSkin(item.obj) == expected_skin and
                               properties.level_requirement == 200 and
                               properties.maximum_charges >= 4 and
                               properties.maximum_charges <= 8 and
@@ -700,12 +696,11 @@ OnInit.final("ArchitectureTests", function(Require)
                               item.tooltip:find(
                                   "|cff808080Suffix:|r |cff40bf5fOpen|r", 1,
                                   true) and
-                              item.runtime_definition.world_skin_id ==
-                                  FourCC('phea')
+                              BlzGetItemSkin(item.obj) == ITEM_MODEL[4]
             item:destroy()
             if not valid then
                 return false,
-                       "Legendary Flask lost open affixes or potion world skin after search leveling"
+                       "Legendary Flask lost open affixes or rarity world skin after search leveling"
             end
             return true
         end)
@@ -1000,17 +995,17 @@ OnInit.final("ArchitectureTests", function(Require)
                                function()
         local cases = {
             {
-                PotionService.STONEBLOOD_KEY, 0, FourCC('phea'),
+                PotionService.STONEBLOOD_KEY, 0, ITEM_MODEL[3],
                 PotionService.INFUSION_TEMPEST, 0, "Tempest Flask"
             },
             {
-                PotionService.LEGENDARY_CHAOS_KEY, 2, FourCC('phea'),
+                PotionService.LEGENDARY_CHAOS_KEY, 2, ITEM_MODEL[4],
                 PotionService.INFUSION_STONE,
                 PotionService.CATALYST_ACCELERANT,
                 "Stoneblood Flask of Acceleration"
             },
             {
-                PotionService.CHAOS_FLASK_KEY, 3, FourCC('phea'),
+                PotionService.CHAOS_FLASK_KEY, 3, ITEM_MODEL[5],
                 PotionService.INFUSION_VOLTAIC,
                 PotionService.CATALYST_OVERFLOW,
                 "Voltaic Flask of Overflow"
@@ -1047,8 +1042,8 @@ OnInit.final("ArchitectureTests", function(Require)
             local customization = PotionService.getCustomization(restored)
             local valid = restored and properties and
                               RuntimeItemDefinitions.is(restored, case[1]) and
-                              restored.runtime_definition.world_skin_id ==
-                              case[3] and restored.charges == case[2] and
+                              BlzGetItemSkin(restored.obj) == case[3] and
+                              restored.charges == case[2] and
                               properties.charges == case[2] and
                               properties.maximum_charges == maximum_charges and
                               properties.flat_health == expected.flat_health and
@@ -1075,13 +1070,13 @@ OnInit.final("ArchitectureTests", function(Require)
                                       customization.catalyst.name .. ":", 1,
                                       true))
 
+            local restored_skin = restored and BlzGetItemSkin(restored.obj)
             if restored then restored:destroy() end
             if not valid then
                 local actual = properties and string.format(
                     "identity=%s skin=%s charges=%s/%s restoration=%s/%s/%s/%s expected=%s/%s/%s/%s affixes=%s/%s cooldown=%s tooltip=%s/%s",
                     tostring(restored and RuntimeItemDefinitions.is(restored,
-                        case[1])), tostring(restored and
-                        restored.runtime_definition.world_skin_id == case[3]),
+                        case[1])), tostring(restored_skin == case[3]),
                     tostring(restored and restored.charges),
                     tostring(properties.maximum_charges),
                     tostring(properties.flat_health),

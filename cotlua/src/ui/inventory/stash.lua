@@ -222,10 +222,15 @@ OnInit.final("StashUI", function(Require)
         local unlocked_rows = math.max(1,
             math.min(STASH_MAX_ROWS, hero.stash_rows or 1))
         local used = 0
+        local view = INVENTORY.getPresentedItems(pid)
         for slot = 1, MAX_STASH_SLOTS do
-            local item = hero.stash[slot]
-            if item then used = used + 1 end
-            INVENTORY.renderItemButton(slots[slot], item, pid)
+            local value = view[MAX_INVENTORY_SLOTS + slot]
+            if value then used = used + 1 end
+            INVENTORY.renderItemButton(slots[slot], value and value.item, pid, value and value.charges)
+            local draft = dragging[pid]
+            if draft ~= 0 and draft.slot == slot and value and draft.identity == value.identity then
+                slots[slot]:visible(false)
+            end
         end
         BlzFrameSetText(title, "Stash  " .. used .. " / " ..
                             unlocked_rows * STASH_COLUMNS)
@@ -289,7 +294,7 @@ OnInit.final("StashUI", function(Require)
         local clicked = BlzGetTriggerFrame()
         BlzFrameSetEnable(clicked, false)
         BlzFrameSetEnable(clicked, true)
-        if StashUI.isReadOnly(pid) then
+        if StashUI.isReadOnly(pid) or INVENTORY.hasPendingMoves(pid) then
             close_context(pid)
             StashUI.refresh(pid)
             return
@@ -323,7 +328,7 @@ OnInit.final("StashUI", function(Require)
 
     local function on_m1_down()
         local pid = GetPlayerId(GetTriggerPlayer()) + 1
-        if not open_for[pid] then return end
+        if GetLocalPlayer() ~= GetTriggerPlayer() or not open_for[pid] then return end
         if StashUI.isReadOnly(pid) then
             close_context(pid)
             StashUI.refresh(pid)
@@ -331,18 +336,20 @@ OnInit.final("StashUI", function(Require)
         end
         local stash_slot = GetLocalPlayer() == Player(pid - 1) and
                                StashUI.getLocalHoveredSlot() or 0
+        if stash_slot <= 0 then return end
         local hero = Profile[pid] and Profile[pid].hero
-        local item = hero and hero.stash[stash_slot]
+        local item = hero and INVENTORY.getPresentedItem(pid, MAX_INVENTORY_SLOTS + stash_slot)
         if not item then return end
 
         if ctrl_down[pid] then
+            if INVENTORY.hasPendingMoves(pid) then return end
             if GetLocalPlayer() == Player(pid - 1) then
                 BlzSendSyncData("stash_action", "withdraw:" .. stash_slot)
             end
             return
         end
 
-        dragging[pid] = stash_slot
+        dragging[pid] = {slot = stash_slot, identity = item.sync_id}
         if GetLocalPlayer() == Player(pid - 1) then
             slots[stash_slot]:visible(false)
         end
@@ -351,7 +358,7 @@ OnInit.final("StashUI", function(Require)
 
     local function on_m2_down()
         local pid = GetPlayerId(GetTriggerPlayer()) + 1
-        if StashUI.isReadOnly(pid) then
+        if StashUI.isReadOnly(pid) or INVENTORY.hasPendingMoves(pid) then
             right_click_origin[pid] = 0
             close_context(pid)
             StashUI.refresh(pid)
@@ -364,7 +371,7 @@ OnInit.final("StashUI", function(Require)
 
     local function on_m2_up()
         local pid = GetPlayerId(GetTriggerPlayer()) + 1
-        if StashUI.isReadOnly(pid) then
+        if StashUI.isReadOnly(pid) or INVENTORY.hasPendingMoves(pid) then
             right_click_origin[pid] = 0
             close_context(pid)
             StashUI.refresh(pid)
@@ -393,32 +400,25 @@ OnInit.final("StashUI", function(Require)
 
     local function on_m1_up()
         local pid = GetPlayerId(GetTriggerPlayer()) + 1
-        local source = dragging[pid]
-        if source <= 0 then return end
+        if GetLocalPlayer() ~= GetTriggerPlayer() then return end
+        local draft = dragging[pid]
+        if draft == 0 then return end
         dragging[pid] = 0
         INVENTORY.hideDragTracker(pid)
 
-        if StashUI.isReadOnly(pid) then
-            StashUI.refresh(pid)
-            return
-        end
-
-        local stash_target = GetLocalPlayer() == Player(pid - 1) and
-                                 StashUI.getLocalHoveredSlot() or 0
+        if StashUI.isReadOnly(pid) then StashUI.refresh(pid); return end
+        local stash_target = StashUI.getLocalHoveredSlot()
         local inventory_target = INVENTORY.getLocalInventoryHoveredSlot(pid)
-        if GetLocalPlayer() == Player(pid - 1) then
-            if stash_target > 0 then
-                BlzSendSyncData("stash_action",
-                                "move:" .. source .. ":" .. stash_target)
-            elseif inventory_target > 0 then
-                BlzSendSyncData("stash_action",
-                                "transfer:" .. inventory_target .. ":" ..
-                                    source)
-            elseif stash_target == -1 and inventory_target == -1 then
-                BlzSendSyncData("stash_action", "drop:" .. source)
-            else
-                StashUI.refresh(pid)
-            end
+        local target
+        if stash_target > 0 then
+            target = MAX_INVENTORY_SLOTS + stash_target
+        elseif inventory_target > 0 then
+            target = inventory_target
+        elseif stash_target == -1 and inventory_target == -1 then
+            target = -1
+        end
+        if not target or not INVENTORY.requestMove(pid, MAX_INVENTORY_SLOTS + draft.slot, target, draft.identity) then
+            INVENTORY.renderLocalPreview(pid)
         end
     end
 
@@ -437,6 +437,7 @@ OnInit.final("StashUI", function(Require)
     end
 
     function StashUI.open(pid)
+        if LootUI then LootUI.close(pid) end
         open_for[pid] = true
         EVENT_ON_M1_DOWN:unregister_action(pid, on_m1_down)
         EVENT_ON_M1_UP:unregister_action(pid, on_m1_up)

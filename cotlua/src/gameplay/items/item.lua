@@ -33,7 +33,7 @@
     local TYPE_SOCKETABLE = 12
     local DISPLAY_STATS = {}
 
-    for index = 1, ITEM_ABILITY2 do DISPLAY_STATS[#DISPLAY_STATS + 1] = index end
+    for index = 1, ITEM_ABILITY - 1 do DISPLAY_STATS[#DISPLAY_STATS + 1] = index end
     DISPLAY_STATS[#DISPLAY_STATS + 1] = STATUS_RESISTANCE
     DISPLAY_STATS[#DISPLAY_STATS + 1] = ITEM_SPELL_AREA
     DISPLAY_STATS[#DISPLAY_STATS + 1] = ITEM_SPELL_DURATION
@@ -149,13 +149,19 @@
 
     ---@type fun(itm: Item)
     ---@return number total, number gold, number plat
-    function GetItemSellPrice(itm)
+    function GetItemSellPrice(itm, viewer_pid)
         local total = itm.cached_stats[ITEM_COST] // 2
 
         if total == 0 then
-            local price = GetItemPrice(itm.id, itm.pid)
+            local price = GetItemPrice(itm.id, viewer_pid or itm.pid)
 
             if price then total = price[GOLD] // 2 end
+        end
+
+        if total == 0 then
+            local count = itm.cached_stats[ITEM_STACK] > 1 and
+                              math.max(1, itm.charges or 0) or 1
+            total = (ITEM_SELL_PRICES[itm.id] or 0) * count
         end
 
         local gold = math.fmod(total, 1000000)
@@ -178,7 +184,7 @@
     end
 
     ---@class ItemAbilityRuntime
-    ---@field obj item
+    ---@field obj item? Absent for data-backed ground loot.
     ---@field id integer
     ---@field callback? function
     ---@field block_chance? number
@@ -188,11 +194,21 @@
     ---@class Item
     ---@field obj item
     ---@field holder unit
-    ---@field trig trigger
+    ---@field trig trigger?
+    ---@field data_only boolean
+    ---@field automatic boolean
+    ---@field ground_lifetime number?
+    ---@field expiry_callback integer?
+    ---@field loot_id integer?
+    ---@field loot_revision integer?
+    ---@field pickup_receipt integer?
+    ---@field display_name string?
+    ---@field display_icon string?
     ---@field lvl function
     ---@field level integer
     ---@field id integer
     ---@field type integer
+    ---@field sync_id integer Session identity assigned during synchronized runtime creation; never a native handle ID.
     ---@field charges integer
     ---@field x number
     ---@field y number
@@ -287,6 +303,7 @@
         ---@field syncAbilitySlots fun(pid: integer): boolean
         ---@field guardNativeItem fun(dummy: item, carrier: unit): boolean
         ---@field getRarityIndex fun(item: Item): integer
+        ---@field getWorldSkin fun(item: Item): integer
         ---@field minimumResourceAfterMaxChange fun(current: number, old_maximum: number, new_maximum: number, minimum?: number): number
         ---@class RuntimeItemDefinition
         ---@field custom_level? boolean
@@ -299,10 +316,43 @@
         ItemRuntime = {definitions = {}}
         local NativeCreateItem = CreateItem
         ItemRuntime.native_create = NativeCreateItem
+        -- Managed items are created/wrapped in synchronized gameplay/setup.
+        -- Native GetHandleId values may differ between clients and must never
+        -- validate a cross-client command. This counter is Lua-only, monotonic,
+        -- and not reused after destruction. It is not part of saved item data.
+        local next_sync_id = 0
+        local record_depth = 0
+        local native_metadata = {}
+
+        -- Only synchronized drop factories enter this scope. Every record uses
+        -- the ordinary Item calculator and frozen rolls, without a native item.
+        function ItemRuntime.withRecords(factory, ...)
+            record_depth = record_depth + 1
+            local result = table.pack(pcall(factory, ...))
+            record_depth = record_depth - 1
+            if not result[1] then error(result[2], 0) end
+            return table.unpack(result, 2, result.n)
+        end
+
+        local function metadata(id)
+            if native_metadata[id] then return native_metadata[id] end
+            -- Prime immutable OE data once per rawcode, never from local hover.
+            local sample = NativeCreateItem(id, 30000., 30000.)
+            local value = {
+                charges = GetItemCharges(sample),
+                automatic = BlzGetItemBooleanField(sample, ITEM_BF_USE_AUTOMATICALLY_WHEN_ACQUIRED),
+            }
+            if ItemData[id].tooltip == 0 then
+                ParseItemTooltip(sample, BlzGetItemDescription(sample) or "")
+            end
+            RemoveItem(sample)
+            native_metadata[id] = value
+            return value
+        end
 
         ---Returns the rarity used by item presentation. Logical items may opt
-        ---into the ordinary rarity header and inventory border without
-        ---pretending to have an upgrade level or changing their world skin.
+        ---into the ordinary rarity presentation without pretending to have
+        ---an upgrade level.
         ---@param item Item
         ---@return integer
         function ItemRuntime.getRarityIndex(item)
@@ -320,6 +370,17 @@
                                 (item.level + 3) // item.rarity)
             end
             return 0
+        end
+
+        ---Use the same rarity for ground models as inventory borders. An
+        ---explicit logical-item model remains an intentional override.
+        ---@param item Item
+        ---@return integer
+        function ItemRuntime.getWorldSkin(item)
+            local explicit = item.runtime_definition and item.runtime_definition.world_skin_id
+            if explicit then return explicit end
+            local rarity = ItemRuntime.getRarityIndex(item)
+            return rarity > 0 and ITEM_MODEL[rarity] or item.id
         end
 
         ---Chooses the more punitive outcome between preserving an absolute
@@ -418,20 +479,26 @@
             end
 
             -- create the item if given an id rather than a handle
-            if type(id) ~= "userdata" then
+            local record = record_depth > 0 and type(id) ~= "userdata"
+            local info = record and metadata(id) or nil
+            if record then
+                itm = nil
+            elseif type(id) ~= "userdata" then
                 itm = NativeCreateItem(id, x or 30000., y or 30000.)
             elseif Item[itm] then
                 return Item[itm]
             end
 
-            local item_id = GetItemTypeId(itm)
+            local item_id = record and id or GetItemTypeId(itm)
+            next_sync_id = next_sync_id + 1
             local self = setmetatable({ ---@type Item
                 obj = itm,
                 id = item_id,
+                sync_id = next_sync_id,
                 level = lvl,
-                trig = CreateTrigger(),
-                x = GetItemX(itm),
-                y = GetItemY(itm),
+                trig = not record and CreateTrigger() or nil,
+                x = record and (x or 30000.) or GetItemX(itm),
+                y = record and (y or 30000.) or GetItemY(itm),
                 quality = __jarray(0),
                 extra = __jarray(0),
                 persistent_state = {},
@@ -439,7 +506,10 @@
                 holder = nil,
                 equipped = false,
                 alive = true,
-                charges = GetItemCharges(itm),
+                charges = info and info.charges or GetItemCharges(itm),
+                automatic = info and info.automatic or false,
+                data_only = record,
+                ground_lifetime = record and expire or nil,
                 dummies = nil, -- stores item spells
                 sockets = {},
                 proxy = {restricted = false}
@@ -473,18 +543,20 @@
                 SAVE_TABLE.KEY_ITEMS[self.id] = save_index
 
                 -- hide the item according to item drop settings
-                if not IS_ITEM_DROP[GetPlayerId(GetLocalPlayer()) + 1] then
+                if self.obj and not IS_ITEM_DROP[GetPlayerId(GetLocalPlayer()) + 1] then
                     BlzSetItemSkin(self.obj, FourCC('rar0'))
                 end
             end
 
             -- handle item death
-            TriggerRegisterDeathEvent(self.trig, self.obj)
-            TriggerAddCondition(self.trig, thistype.eval)
+            if self.obj then
+                TriggerRegisterDeathEvent(self.trig, self.obj)
+                TriggerAddCondition(self.trig, thistype.eval)
+            end
 
             -- timed life
-            if expire then
-                TQ:callDelayed(expire, thistype.expire, self)
+            if expire and not record then
+                self.expiry_callback = TQ:callDelayed(expire, thistype.expire, self)
             end
 
             if tbl[ITEM_TIER] ~= 0 then
@@ -502,7 +574,7 @@
                 self.alt_tooltip = self.tooltip
             end
 
-            Item[self.obj] = self
+            if self.obj then Item[self.obj] = self end
 
             if RuntimeMetrics then
                 RuntimeMetrics.items.created = RuntimeMetrics.items.created + 1
@@ -513,6 +585,46 @@
             end
 
             return self
+        end
+
+        -- Attach an owned carrier without constructing/re-rolling another Item.
+        function ItemRuntime.materialize(self)
+            if self.obj then return true end
+            if not self.alive then return false end
+            self.obj = NativeCreateItem(self.id, 30000., 30000.)
+            if not self.obj then return false end
+            self.trig = CreateTrigger()
+            TriggerRegisterDeathEvent(self.trig, self.obj)
+            TriggerAddCondition(self.trig, thistype.eval)
+            Item[self.obj] = self
+            self.data_only = false
+            for _, socket in ipairs(self.sockets) do
+                if not ItemRuntime.materialize(socket) then ItemRuntime.dematerialize(self); return false end
+            end
+            self:update(true)
+            if self.runtime_definition and self.runtime_definition.restore_item then
+                self.runtime_definition.restore_item(self)
+            end
+            SetItemCharges(self.obj, self.charges or 0)
+            SetItemVisible(self.obj, false)
+            return true
+        end
+
+        function ItemRuntime.dematerialize(self)
+            for _, socket in ipairs(self.sockets) do ItemRuntime.dematerialize(socket) end
+            if self.obj then
+                self.automatic = BlzGetItemBooleanField(self.obj, ITEM_BF_USE_AUTOMATICALLY_WHEN_ACQUIRED)
+                Item[self.obj] = nil
+                if self.trig then DestroyTrigger(self.trig) end
+                set_widget_life(self.obj, 1.)
+                RemoveItem(self.obj)
+                self.obj, self.trig = nil, nil
+            end
+            self.data_only = true
+            if self.expiry_callback then
+                TQ:disableCallback(self.expiry_callback)
+                self.expiry_callback = nil
+            end
         end
 
         ---@param handle item
@@ -758,14 +870,14 @@
             return name
         end
 
-        function thistype:info()
+        function thistype:info(viewer_pid)
             local details = {
                 self.alt_tooltip or self.tooltip or
-                    BlzGetItemDescription(self.obj)
+                    (self.obj and BlzGetItemDescription(self.obj)) or ""
             }
             local data = item_data(self)
             local maxlvl = data[ITEM_UPGRADE_MAX]
-            local total, gold, plat = GetItemSellPrice(self)
+            local total, gold, plat = GetItemSellPrice(self, viewer_pid)
 
             if maxlvl > 0 then
                 details[#details + 1] = "|n|cff999999Maximum Upgrade: +" ..
@@ -807,12 +919,12 @@
                 details[#details + 1] = "|n" ..
                                             (socket.alt_tooltip or
                                                 socket.tooltip or
-                                                BlzGetItemDescription(socket.obj))
+                                                (socket.obj and BlzGetItemDescription(socket.obj)) or "")
             end
 
             return {
-                name = self:name(),
-                icon = data.path,
+                name = self.display_name or self:name(),
+                icon = self.display_icon or data.path,
                 description = concat(details)
             }
         end
@@ -1276,6 +1388,10 @@
                 SetItemPosition(socket.obj, GetUnitX(Hero[self.pid]),
                                 GetUnitY(Hero[self.pid]))
                 SetItemVisible(socket.obj, true)
+                if LootService then
+                    socket.x, socket.y = GetUnitX(Hero[self.pid]), GetUnitY(Hero[self.pid])
+                    LootService.add(socket, not socket.owner and 600. or nil)
+                end
             end
 
             return socket
@@ -1503,8 +1619,6 @@
             -- first "header" lines: rarity, upg level, tier, type, req level
             local rarity_index = ItemRuntime.getRarityIndex(self)
             if self.level > 0 and not (definition and definition.custom_level) then
-                BlzSetItemSkin(self.obj, ITEM_MODEL[rarity_index])
-
                 text[#text + 1] = RARITY_NAME[rarity_index]
                 text[#text + 1] = " +"
                 text[#text + 1] = self.level
@@ -1649,6 +1763,17 @@
                 self.runtime_definition.append_stats(self, text, alt_text)
             end
 
+            -- Abilities follow every ordinary/custom stat in both tooltip
+            -- views, immediately before the flavor text.
+            for index = ITEM_ABILITY, ITEM_ABILITY2 do
+                local value = cs[index]
+                if value ~= 0 then
+                    local ability_text = parse_item_stat[index](self, index, value, 0, 0)
+                    text[#text + 1] = ability_text
+                    alt_text[#alt_text + 1] = ability_text
+                end
+            end
+
             -- flavor text
             -- remove bracket pairs, extra spaces, and extra newlines
             local flavor = orig:gsub("(%b[]%s*)", "")
@@ -1676,19 +1801,17 @@
             self.tooltip = concat(text)
             self.alt_tooltip = concat(alt_text)
 
-            if self.runtime_definition and
-                self.runtime_definition.world_skin_id then
-                -- Generic rarity presentation may select a world skin while
-                -- rebuilding the item. Logical items own their dropped model.
-                BlzSetItemSkin(self.obj,
-                               self.runtime_definition.world_skin_id)
+            if self.obj then
+                BlzSetItemSkin(self.obj, ItemRuntime.getWorldSkin(self))
+                BlzSetItemIconPath(self.obj, data.path)
+                BlzSetItemName(self.obj, definition and definition.name and
+                                   definition.name(self) or data.name)
+                BlzSetItemTooltip(self.obj, data.name)
+                BlzSetItemDescription(self.obj, self.tooltip)
+                BlzSetItemExtendedTooltip(self.obj, self.tooltip)
             end
-            BlzSetItemIconPath(self.obj, data.path)
-            BlzSetItemName(self.obj, definition and definition.name and
-                               definition.name(self) or data.name)
-            BlzSetItemTooltip(self.obj, data.name)
-            BlzSetItemDescription(self.obj, self.tooltip)
-            BlzSetItemExtendedTooltip(self.obj, self.tooltip)
+
+            if self.data_only and LootService and self.loot_id then LootService.changed(self) end
 
             -- update inventory frames
             if self.pid and not suppress_refresh then
@@ -1827,6 +1950,12 @@
             self.holder = nil
             self.index = nil
 
+            if not mute and LootService then
+                self.x, self.y = x or GetUnitX(Hero[self.pid]), y or GetUnitY(Hero[self.pid])
+                local lifetime = not self.owner and 600. or nil
+                LootService.add(self, lifetime)
+            end
+
             if not suppress_refresh then NotifyItemChanged(self.pid) end
         end
 
@@ -1835,6 +1964,9 @@
 
             self.alive = false
 
+            for _, socket in ipairs(self.sockets) do socket:destroy() end
+            self.sockets = {}
+
             if self.sfx then
                 DestroyEffect(self.sfx)
                 self.sfx = nil
@@ -1842,14 +1974,8 @@
 
             if self.pid then NotifyItemChanged(self.pid) end
 
-            -- Release the strong registry reference before invalidating the handle.
-            Item[self.obj] = nil
-            DestroyTrigger(self.trig)
-            set_widget_life(self.obj, 1.)
-            RemoveItem(self.obj)
-
-            self.trig = nil
-            self.obj = nil
+            if LootService and self.loot_id then LootService.detach(self) end
+            ItemRuntime.dematerialize(self)
 
             if RuntimeMetrics then
                 RuntimeMetrics.items.destroyed =

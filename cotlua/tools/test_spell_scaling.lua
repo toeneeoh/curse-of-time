@@ -99,6 +99,32 @@ normal = tooltip_body(tooltip_item, explicit)
 assert(normal:find('8%', 1, true) and not normal:find('8.000', 1, true))
 print('PASS: real normal/Alt item tooltip bodies preserve fractional utility, socket bonuses, negative values, and ranges.')
 
+-- Render the actual display order and custom-stat/ability/flavor tail together.
+local order_start = assert(item_source:find('    local DISPLAY_STATS = {}', 1, true))
+local order_end = assert(item_source:find('    local function item_data', order_start, true))
+local flavor_end = assert(item_source:find('            if self.limit > 0 then', body_end, true))
+ParseItemAbilityTooltip = function(_, index) return index == ITEM_ABILITY and 'First ability' or 'Second ability' end
+local ordered_tooltip = assert(load(item_source:sub(formatting_start, formatting_end - 1) ..
+    '\n' .. item_source:sub(order_start, order_end - 1) ..
+    '\nreturn function(self, data)\nlocal text, alt_text, orig = {}, {}, data.tooltip\n' ..
+    item_source:sub(body_start, flavor_end - 1) ..
+    '\nreturn concat(text), concat(alt_text)\nend', 'ordered item tooltip', 't', sandbox))()
+tooltip_item.cached_stats[ITEM_ABILITY], tooltip_item.cached_stats[ITEM_ABILITY2] = 1, 1
+tooltip_item.runtime_definition = {append_stats = function(_, text, alt_text)
+    text[#text + 1] = '|nCustom Cooldown'; alt_text[#alt_text + 1] = '|nCustom Cooldown'
+end}
+explicit.tooltip = 'An authored flavor blurb.'
+for _, description in ipairs({ordered_tooltip(tooltip_item, explicit)}) do
+    local area = assert(description:find('Spell Area', 1, true))
+    local duration = assert(description:find('Spell Duration', 1, true))
+    local custom = assert(description:find('Custom Cooldown', 1, true))
+    local ability = assert(description:find('First ability', 1, true))
+    local second = assert(description:find('Second ability', 1, true))
+    local flavor = assert(description:find(explicit.tooltip, 1, true))
+    assert(area < ability and duration < ability and custom < ability and ability < second and second < flavor)
+end
+print('PASS: normal/Alt item tooltips place utility and custom stats before abilities, followed by flavor text.')
+
 local unit = {}
 Unit = {[unit] = {spellboost = .2, spell_area = .3, spell_duration = .4}}
 extract('gameplay/abilities/spells.lua', '    local pattern', '    -- set by getTooltip')
@@ -118,14 +144,18 @@ local rendered = 'Damage 12, area 390, shield 22.\n|c000080c05.6 second duration
 local annotated = SpellScalingTooltip(tagged, original, rendered)
 assert(annotated:find('Spell Power, Spell Duration, Spell Area', 1, true))
 assert(not annotated:find('50%', 1, true))
-assert(annotated:find('Improved by:', 1, true) < annotated:find('second duration', 1, true))
-assert(annotated:find('|c000080c05.6 second duration.\n10 second cooldown.|r', 1, true))
-assert(annotated:find('shield 22.\n|cff40e0d0* Improved by:', 1, true))
-assert(annotated:find('Spell Area.|r\n|c000080c0', 1, true))
-assert(not annotated:find('\n\n', 1, true))
-local crlf = SpellScalingTooltip(tagged, original, rendered:gsub('\n', '\r\n'))
-assert(crlf:find('shield 22.\n|cff40e0d0* ', 1, true))
-assert(crlf:find('Spell Area.|r\n|c000080c0', 1, true))
+local note = '|cff40e0d0* Improved by: Spell Power, Spell Duration, Spell Area.|r'
+assert(annotated == rendered .. '\n' .. note, 'Scaling note must follow the complete native footer')
+local crlf_rendered = rendered:gsub('\n', '\r\n')
+assert(SpellScalingTooltip(tagged, original, crlf_rendered) == crlf_rendered .. '\n' .. note)
+-- Mana-only, differently colored, uncolored and absent footers all use the
+-- same placement, with one newline and no edits to the authored text.
+for _, footer in ipairs({'\n|cff0080c03% max mana cost per second.|r',
+    '\n|cffffcc0015 mana. 10 second cooldown.|r', '\n15 mana cost.', ''}) do
+    local body = 'Damage 12.' .. footer
+    assert(SpellScalingTooltip(tagged, original, body .. '\n\n') == body .. '\n' .. note)
+end
+
 tagged.values = {pshield = 20}
 assert(SpellScalingTooltip(tagged, original, rendered):find('Improved by: Spell Power.', 1, true))
 tagged.tooltip_scaling = {pshield = 'none'}
@@ -137,7 +167,7 @@ assert(SpellScalingTooltip(tagged, original, rendered) == rendered)
 assert(SpellScalingTooltip({id = 0, values = {cost = 20}}, '\\cost=20] mana.', '20 mana.') == '20 mana.')
 assert(SpellScalingTooltip({id = 0, values = {dmg = 10}}, '[dmg=10]', '10 damage.') ==
     '10 damage.\n|cff40e0d0* Improved by: Spell Power.|r')
-print('PASS: scaling notes list applicable stats without vague effectiveness text and preserve blue footers.')
+print('PASS: scaling notes list applicable stats without vague effectiveness text and follow all native footers without changing their text or colors.')
 
 -- Execute the real getTooltip/replacer with normal and Alt contexts.
 local spell_source = read('gameplay/abilities/spells.lua')
@@ -197,10 +227,10 @@ local fixed_alt = real_get_tooltip(actual_spell, unit)
 assert(fixed_normal:find('|c000080c03|cff40e0d0*|c000080c0 second duration.', 1, true))
 assert(fixed_alt:find('|c000080c04.20 second duration.', 1, true))
 for _, text in ipairs({fixed_normal, fixed_alt}) do
-    assert(text:find('* Improved by:', 1, true) < text:find('second duration', 1, true))
-    assert(text:find('|c000080c010 second cooldown.|r', 1, true))
+    assert(text:find('* Improved by:', 1, true) > text:find('second cooldown', 1, true))
+    assert(text:find('|c000080c010 second cooldown.|r\n|cff40e0d0* Improved by:', 1, true))
 end
-print('PASS: native duration color codes stay intact; normal/Alt scaling notes stay above duration; calculated duration is correct.')
+print('PASS: native duration color codes stay intact; normal/Alt scaling notes follow duration and cooldown; calculated duration is correct.')
 print('PASS: real normal/Alt tooltips mark scalable values, show half Power only on Alt, leave fixed values alone, and restore surrounding colors.')
 
 local refresh = read('gameplay/players/hero_refresh.lua')

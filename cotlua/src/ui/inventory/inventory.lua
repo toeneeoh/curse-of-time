@@ -14,6 +14,8 @@ OnInit.final("Inventory", function(Require)
     Require('Currency')
     Require('PlayerSync')
     Require('Items')
+    Require('InventoryPreview')
+    Require('RuntimeItemDefinitions')
 
     local INVENTORY_WIDTH   = 0.1981
     local INVENTORY_HEIGHT  = 0.232
@@ -115,13 +117,39 @@ OnInit.final("Inventory", function(Require)
         local context = __jarray(0) ---@type integer[]
         local slots = {} ---@type Button[]
         local slot_centers = {} -- derived from the same offsets as Button.create
-        local viewing, move_item_cooldown = __jarray(-1), {}
+        local viewing = __jarray(-1)
+        local pending_moves = InventoryPreview.create() -- owner-local visual state
+        local last_move_request = {} -- synchronized replay protection
+        local render_inventory
         local on_m1_down, on_m2_down, on_m1_up, on_m2_up, open_context_menu
         local dragging = {} -- local input drafts; never consulted by sync handlers
         local ui_mode = __jarray(0) -- 0 = normal, 1 = context menu open
         local right_click_origin = __jarray(0)
         local skip_drag_release = __jarray(false)
         local practice_context_action
+
+        function thistype.hasPendingMoves(pid)
+            return GetLocalPlayer() == Player(pid - 1) and InventoryPreview.pending(pending_moves)
+        end
+
+        function thistype.getPresentedItems(pid)
+            local profile = Profile[pid]
+            local hero = profile and profile.hero
+            local state = GetLocalPlayer() == Player(pid - 1) and pending_moves or {queue = {}}
+            return InventoryPreview.project(state, hero and hero.items, hero and hero.stash,
+                MAX_INVENTORY_SLOTS, MAX_STASH_SLOTS)
+        end
+
+        function thistype.getPresentedItem(pid, slot)
+            local value = thistype.getPresentedItems(pid)[slot]
+            return value and value.item, value and value.charges
+        end
+
+        local function acknowledge_preview(pid, serial)
+            if GetLocalPlayer() == Player(pid - 1) then
+                InventoryPreview.ack(pending_moves, serial)
+            end
+        end
 
         ---@param itm Item
         ---@return string
@@ -175,6 +203,7 @@ OnInit.final("Inventory", function(Require)
 
         local function get_hovered_slot()
             local local_pid = GetPlayerId(GetLocalPlayer()) + 1
+            if LootUI and LootUI.containsLocalPoint() then return 0 end
             if StashUI and StashUI.getLocalHoveredSlot and
                 StashUI.isOpen(local_pid) then
                 local stash_slot = StashUI.getLocalHoveredSlot()
@@ -202,9 +231,8 @@ OnInit.final("Inventory", function(Require)
         ---@return integer
         local function get_local_item_slot(pid)
             local slot = get_local_hovered_slot(pid)
-            local profile = Profile[viewing[pid]]
-
-            if slot > 0 and profile and profile.hero and profile.hero.items[slot] then
+            if slot > 0 and slot <= MAX_INVENTORY_SLOTS and
+                thistype.getPresentedItem(viewing[pid], slot) then
                 return slot
             end
             return 0
@@ -387,6 +415,7 @@ OnInit.final("Inventory", function(Require)
 
             local btn_index = frame_to_btn[f]
             if not btn_index then return false end
+            if thistype.hasPendingMoves(pid) then return false end
             -- Practice menus must never reach profile reads, sync messages,
             -- or the real inventory service (including Drop/Sell).
             if practice_context_action and practice_context_action(pid, btn_index) then return false end
@@ -400,6 +429,7 @@ OnInit.final("Inventory", function(Require)
                 clear_context(pid)
             elseif context[pid] > 0 and GetLocalPlayer() == GetTriggerPlayer() then
                 BlzSendSyncData("inventory_action", btn_index .. ":" .. context[pid])
+                clear_context(pid)
             end
 
             return false
@@ -413,6 +443,7 @@ OnInit.final("Inventory", function(Require)
         local tracker = BlzCreateFrameByType("BACKDROP", "", BlzGetFrameByName("ConsoleUIBackdrop", 0), "", 0)
         local tracker_timer = CreateTimer()
         local tracker_x, tracker_y
+        local tracker_active = false -- client-local presentation, never a timer lifecycle gate
         BlzFrameSetEnable(tracker, false)
         BlzFrameSetSize(tracker, INVENTORY_SLOT_SIZE, INVENTORY_SLOT_SIZE)
         BlzFrameSetTexture(tracker, "trans32.blp", 0, true)
@@ -434,7 +465,7 @@ OnInit.final("Inventory", function(Require)
 
         local hide_tracker = function(pid)
             if GetLocalPlayer() == Player(pid - 1) then
-                PauseTimer(tracker_timer)
+                tracker_active = false
                 BlzFrameSetTexture(tracker, "trans32.blp", 0, true)
                 tracker_x, tracker_y = nil, nil
             end
@@ -444,16 +475,24 @@ OnInit.final("Inventory", function(Require)
             if GetLocalPlayer() == Player(pid - 1) then
                 update_tracker_position(true)
                 BlzFrameSetTexture(tracker, texture, 0, true)
-                TimerStart(tracker_timer, 1. / 128., true, update_tracker_position)
+                tracker_active = true
             end
         end
 
         thistype.showDragTracker = show_tracker
         thistype.hideDragTracker = hide_tracker
 
+        -- Start once during synchronized initialization. Starting/pausing a native
+        -- timer from local drag input gives clients different timer lifecycles.
+        -- The idle callback does nothing; only this client's icon motion is gated.
+        TimerStart(tracker_timer, 1. / 128., true, function()
+            if tracker_active then update_tracker_position() end
+        end)
+
         --#endregion
 
         INVENTORY.open = function(pid, tpid)
+            if LootUI and tpid ~= pid then LootUI.close(pid) end
             if GetLocalPlayer() == Player(pid - 1) then
                 frame_set_visible(frame, true)
             end
@@ -479,6 +518,7 @@ OnInit.final("Inventory", function(Require)
         end
 
         INVENTORY.close = function(pid)
+            if LootUI then LootUI.close(pid) end
             if viewing[pid] ~= -1 then
                 if StashUI and StashUI.isOpen(pid) then StashUI.close(pid) end
                 if GetLocalPlayer() == Player(pid - 1) then
@@ -537,9 +577,9 @@ OnInit.final("Inventory", function(Require)
                 if socket then
                     tooltip:attachment(
                         i,
-                        GetItemName(socket.obj),
+                        socket.obj and GetItemName(socket.obj) or socket:name(),
                         get_socket_subtext(socket),
-                        BlzGetItemIconPath(socket.obj)
+                        socket.obj and BlzGetItemIconPath(socket.obj) or (socket.data or ItemData[socket.id]).path
                     )
                 else
                     tooltip:attachment(i)
@@ -547,17 +587,17 @@ OnInit.final("Inventory", function(Require)
             end
         end
 
-        function thistype.renderItemButton(button, itm, pid)
+        function thistype.renderItemButton(button, itm, pid, preview_charges)
             if itm then
-                local icon = BlzGetItemIconPath(itm.obj)
+                local icon = itm.obj and BlzGetItemIconPath(itm.obj) or itm.display_icon or (itm.data or ItemData[itm.id]).path
                 button:icon(icon)
                 button.tooltip:icon(icon)
-                button.tooltip:name(GetItemName(itm.obj))
+                button.tooltip:name(itm.obj and GetItemName(itm.obj) or itm.display_name or itm:name())
                 button.tooltip:text(alt_down[pid] and itm.alt_tooltip or
                                         itm.tooltip)
                 update_socket_tooltips(button.tooltip, itm)
                 button:visible(true)
-                button:charge(itm.charges)
+                button:charge(preview_charges or itm.charges)
                 set_rarity_border(button, get_rarity_border(itm))
             else
                 update_socket_tooltips(button.tooltip)
@@ -568,7 +608,7 @@ OnInit.final("Inventory", function(Require)
 
         -- Presentation-only refresh for local drag/tooltip input. Do not call
         -- POTION.refresh here: it rebuilds native item presentation/state.
-        local function render_inventory(pid)
+        render_inventory = function(pid)
             if not pid or pid < 1 or not Profile[pid] or not Profile[pid].hero then
                 return
             end
@@ -580,10 +620,51 @@ OnInit.final("Inventory", function(Require)
             end
 
             -- local block for players viewing this inventory
-            local items = Profile[pid].hero.items
+            local view = thistype.getPresentedItems(pid)
             for i = 1, MAX_INVENTORY_SLOTS do
-                thistype.renderItemButton(slots[i], items[i], pid)
+                local value = view[i]
+                thistype.renderItemButton(slots[i], value and value.item, pid, value and value.charges)
+                local draft = dragging[me]
+                if draft and draft.slot == i and value and draft.identity == value.identity then
+                    slots[i]:visible(false)
+                end
             end
+        end
+
+        function thistype.renderLocalPreview(pid)
+            if GetLocalPlayer() ~= Player(pid - 1) then return end
+            render_inventory(pid)
+            if StashUI then StashUI.refresh(pid) end
+        end
+
+        function thistype.requestMove(pid, from, to, identity)
+            if GetLocalPlayer() ~= Player(pid - 1) or disabled_for_player[pid] then return false end
+            local total = MAX_INVENTORY_SLOTS + MAX_STASH_SLOTS
+            if from < 1 or from > total or to == 0 or to < -1 or to > total or from == to then return false end
+            local view = thistype.getPresentedItems(pid)
+            local source, target = view[from], view[to]
+            if not source or source.identity ~= identity then return false end
+            local operation
+            if to > 0 then
+                local stack_limit
+                if from <= MAX_INVENTORY_SLOTS and to <= MAX_INVENTORY_SLOTS and target and
+                    source.item.level == target.item.level and
+                    RuntimeItemDefinitions.sameIdentity(source.item, target.item) then
+                    local limit = source.item.cached_stats[ITEM_STACK]
+                    if limit > 1 then stack_limit = limit end
+                end
+                operation = InventoryPreview.push(pending_moves, view, from, to, stack_limit)
+                if not operation then return false end
+            else
+                -- World drops remain ordered gameplay commands, not fake removal.
+                operation = {serial = InventoryPreview.next(pending_moves),
+                    identity = identity, target_identity = 0}
+            end
+            local sent = BlzSendSyncData("inventory_move", string.format("%d:%d:%d:%d:%d:%.3f:%.3f",
+                operation.serial, from, to, identity, operation.target_identity, GetMouseX(pid), GetMouseY(pid)))
+            if sent == false then InventoryPreview.ack(pending_moves, operation.serial) end
+            thistype.renderLocalPreview(pid)
+            return sent ~= false
         end
 
         INVENTORY.refresh = function(pid)
@@ -906,8 +987,8 @@ OnInit.final("Inventory", function(Require)
 
             if highlighted > 0 then
                 local new_slot = slots[highlighted]
-                local item = Profile[pid].hero.items[highlighted]
-                dragging[pid] = {slot = highlighted, identity = GetHandleId(item.obj)}
+                local item = thistype.getPresentedItem(pid, highlighted)
+                dragging[pid] = {slot = highlighted, identity = item.sync_id}
 
                 if GetLocalPlayer() == Player(pid - 1) then
                     new_slot:visible(false)
@@ -915,10 +996,6 @@ OnInit.final("Inventory", function(Require)
                 show_tracker(pid, new_slot.texture)
 
             end
-        end
-
-        local reset_cooldown = function(pid)
-            move_item_cooldown[pid] = false
         end
 
         local function update_context_buttons(pid, slot)
@@ -1044,6 +1121,32 @@ OnInit.final("Inventory", function(Require)
             end
         end
 
+        -- Retain both trace entries without a full FileIO save per entry.
+        -- Focused desync runs can opt into immediate flushes through DevLog.
+        -- These reads never allocate native objects or consult local selection.
+        local function log_inventory_sync(pid, stage, from, to, identity, code)
+            if not DevLog or not DevLog.enabled then return end
+            local profile = Profile[pid]
+            local items = profile and profile.hero and profile.hero.items
+            local stash = profile and profile.hero and profile.hero.stash
+            local source = from and (from <= MAX_INVENTORY_SLOTS and items and items[from] or
+                from > MAX_INVENTORY_SLOTS and stash and stash[from - MAX_INVENTORY_SLOTS])
+            local target = to and (to <= MAX_INVENTORY_SLOTS and items and items[to] or
+                to > MAX_INVENTORY_SLOTS and stash and stash[to - MAX_INVENTORY_SLOTS])
+            local carriers = {}
+            for slot = 0, 5 do
+                local carrier = Hero[pid] and UnitItemInSlot(Hero[pid], slot)
+                carriers[slot + 1] = carrier and GetHandleId(carrier) or 0
+            end
+            DevLog.write("INVENTORY_SYNC", string.format(
+                "%s pid=%d from=%s to=%s requested=%s source=%d/%d target=%d/%d source_instance=%d target_instance=%d carriers=%s result=%s",
+                stage, pid, tostring(from), tostring(to), tostring(identity),
+                source and GetHandleId(source.obj) or 0, source and source.id or 0,
+                target and GetHandleId(target.obj) or 0, target and target.id or 0,
+                source and source.sync_id or 0, target and target.sync_id or 0,
+                table.concat(carriers, ","), code or "pending"), not DevLog.inventory_immediate_flush)
+        end
+
         local function on_inventory_action_sync()
             local pid = GetPlayerId(GetTriggerPlayer()) + 1
             local action, slot = BlzGetTriggerSyncData():match("^(%d+):(%d+)$")
@@ -1051,51 +1154,73 @@ OnInit.final("Inventory", function(Require)
             slot = tonumber(slot)
 
             if not disabled_for_player[pid] and action and action >= 1 and action <= 7 and action ~= 5 and slot then
+                log_inventory_sync(pid, "action-" .. action .. "-begin", slot, 0, 0)
                 local response = context_functions[action](pid, slot)
+                log_inventory_sync(pid, "action-" .. action .. "-end", slot, 0, 0,
+                    response and response.code)
                 render_inventory_result(pid, response)
             end
 
-            clear_context(pid)
             return false
         end
 
-        -- One atomic request contains both slots and the source instance. All
-        -- clients execute this directly: no local menu state, suspended threads,
-        -- or separately arriving context/target messages decide the mutation.
+        -- Each atomic request carries a serial and both expected identities.
+        -- All clients execute it directly; prediction and local menu state
+        -- never decide validation, ordering, or the resulting item mutation.
+        local function authoritative_item(hero, slot)
+            if not hero or not slot then return nil end
+            if slot <= MAX_INVENTORY_SLOTS then return hero.items[slot] end
+            return hero.stash and hero.stash[slot - MAX_INVENTORY_SLOTS]
+        end
+
         local function on_inventory_move_sync()
             local pid = GetPlayerId(GetTriggerPlayer()) + 1
-            local from, to, identity, x, y = BlzGetTriggerSyncData():match(
-                "^(%d+):(%-?%d+):(%d+):([%d%.%-]+):([%d%.%-]+)$")
-            from, to, identity, x, y = tonumber(from), tonumber(to), tonumber(identity), tonumber(x), tonumber(y)
+            local serial, from, to, identity, target_identity, x, y = BlzGetTriggerSyncData():match(
+                "^(%d+):(%d+):(%-?%d+):(%d+):(%d+):([%d%.%-]+):([%d%.%-]+)$")
+            serial, from, to, identity, target_identity, x, y = tonumber(serial), tonumber(from),
+                tonumber(to), tonumber(identity), tonumber(target_identity), tonumber(x), tonumber(y)
+            -- Only local presentation is acknowledged here. No preview state is
+            -- consulted by validation or any synchronized service below.
+            acknowledge_preview(pid, serial)
             local profile = Profile[pid]
             local hero = profile and profile.hero
-            local item = hero and hero.items[from]
+            local total = MAX_INVENTORY_SLOTS + MAX_STASH_SLOTS
             local response
-            if not disabled_for_player[pid] and not move_item_cooldown[pid]
-                and from and from >= 1 and from <= MAX_INVENTORY_SLOTS
-                and to and (to == -1 or (to >= 1 and to <= MAX_INVENTORY_SLOTS + MAX_STASH_SLOTS))
-                and identity and identity >= 0 and identity % 1 == 0
-                and x and y and math.abs(x) <= 65536 and math.abs(y) <= 65536
-            then
-                if not item or not item.alive or GetHandleId(item.obj) ~= identity then
+            log_inventory_sync(pid, "move-begin", from, to, identity)
+            if serial and serial > (last_move_request[pid] or 0) and serial <= 0x7FFFFFFF and
+                from and from >= 1 and from <= total and to and (to == -1 or (to >= 1 and to <= total)) and
+                identity and identity > 0 and identity % 1 == 0 and target_identity and
+                target_identity % 1 == 0 and x and y and math.abs(x) <= 65536 and math.abs(y) <= 65536 then
+                last_move_request[pid] = serial
+                local item, target = authoritative_item(hero, from), authoritative_item(hero, to)
+                if disabled_for_player[pid] then
+                    response = {ok = false, code = "stale"}
+                elseif not item or not item.alive or item.sync_id ~= identity or
+                    (to > 0 and (target and target.sync_id or 0) ~= target_identity) then
                     response = {ok = false, code = "stale"}
                 elseif to == -1 then
-                    hero.item_to_drop = item
-                    IssuePointOrder(item.holder, DROP_ITEM_COMMAND, x, y)
+                    if from > MAX_INVENTORY_SLOTS then
+                        response = StashService.drop(pid, from - MAX_INVENTORY_SLOTS)
+                    else
+                        hero.item_to_drop = item
+                        IssuePointOrder(item.holder, DROP_ITEM_COMMAND, x, y)
+                    end
+                elseif from > MAX_INVENTORY_SLOTS and to > MAX_INVENTORY_SLOTS then
+                    response = StashService.move(pid, from - MAX_INVENTORY_SLOTS, to - MAX_INVENTORY_SLOTS)
+                elseif from > MAX_INVENTORY_SLOTS then
+                    response = StashService.transfer(pid, to, from - MAX_INVENTORY_SLOTS)
                 elseif to > MAX_INVENTORY_SLOTS then
                     response = StashService.transfer(pid, from, to - MAX_INVENTORY_SLOTS)
                 else
                     response = InventoryService.move(pid, from, to)
                 end
-                if DevLog then
-                    DevLog.write("INVENTORY", string.format("move pid=%d from=%d to=%d item=%d result=%s",
-                        pid, from, to, identity, response and response.code or "drop"), true)
-                end
+                log_inventory_sync(pid, "move-end", from, to, identity, response and response.code or "drop")
                 render_inventory_result(pid, response)
-                move_item_cooldown[pid] = true
-                TimerQueue:callDelayed(0.05, reset_cooldown, pid)
+            else
+                log_inventory_sync(pid, "move-rejected", from, to, identity, "invalid-or-replayed")
             end
             thistype.refresh(pid)
+            if StashUI then StashUI.refresh(pid) end
             return false
         end
 
@@ -1106,17 +1231,18 @@ OnInit.final("Inventory", function(Require)
             hide_tracker(pid)
             if not draft then return end
             local slot = get_hovered_slot()
+            local submitted = false
             if slot ~= 0 and slot ~= draft.slot then
-                BlzSendSyncData("inventory_move", string.format("%d:%d:%d:%.3f:%.3f",
-                    draft.slot, slot, draft.identity, GetMouseX(pid), GetMouseY(pid)))
+                submitted = thistype.requestMove(pid, draft.slot, slot, draft.identity)
             end
             clear_context(pid)
-            render_inventory(pid)
+            if not submitted then thistype.renderLocalPreview(pid) end
         end
 
         -- mouse events
         on_m2_up = function(pid)
             if GetLocalPlayer() ~= Player(pid - 1) then return end
+            if thistype.hasPendingMoves(pid) then right_click_origin[pid] = 0; return end
             local pressed_slot = right_click_origin[pid]
             local released_slot = get_local_item_slot(pid)
             right_click_origin[pid] = 0
@@ -1129,7 +1255,7 @@ OnInit.final("Inventory", function(Require)
         on_m2_down = function(pid)
             if GetLocalPlayer() ~= Player(pid - 1) then return end
 
-            if not disabled_for_player[pid] then
+            if not disabled_for_player[pid] and not thistype.hasPendingMoves(pid) then
                 right_click_origin[pid] = get_local_item_slot(pid)
             end
         end
@@ -1138,11 +1264,12 @@ OnInit.final("Inventory", function(Require)
             if GetLocalPlayer() ~= Player(pid - 1) then return end
 
             if ui_mode[pid] == 0 then
-                if not disabled_for_player[pid] and not move_item_cooldown[pid] then
+                if not disabled_for_player[pid] then
                     local highlighted = get_local_item_slot(pid)
                     if ctrl_down[pid] and highlighted > 0 and StashUI and
                         StashUI.isOpen(pid) and not StashUI.isReadOnly(pid) then
                         skip_drag_release[pid] = true
+                        if thistype.hasPendingMoves(pid) then return end
                         if GetLocalPlayer() == Player(pid - 1) then
                             BlzSendSyncData("stash_action",
                                             "deposit:" .. highlighted)
@@ -1177,6 +1304,7 @@ OnInit.final("Inventory", function(Require)
 
         local function on_cleanup(pid)
             thistype.close(pid)
+            if GetLocalPlayer() == Player(pid - 1) then InventoryPreview.clear(pending_moves) end
         end
 
         -- assign a prefix and function for BlzSendSyncData calls

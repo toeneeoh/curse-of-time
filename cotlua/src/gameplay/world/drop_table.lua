@@ -6,6 +6,7 @@
     Require('PotionService')
     Require('BossEquipment')
     Require('UnitTable')
+    Require('LootService')
 
     ItemDrops = array2d(0)
     Rates = __jarray(0)
@@ -209,7 +210,7 @@
         ---@return boolean
         function thistype:rollColosseumTicket(x, y, chance)
             if math.random() < chance then
-                ItemRuntime.create(COLOSSEUM_TICKET, x, y, 600.)
+                LootService.create(COLOSSEUM_TICKET, x, y, 600.)
                 return true
             end
             return false
@@ -229,7 +230,7 @@
 
             local key = PotionService.getPrechaosDropKey(level)
             if not key then return false end
-            return PotionService.create(key, x, y, 600.) ~= nil
+            return LootService.from(PotionService.create, key, x, y, 600.) ~= nil
         end
 
         thistype:registerBossDropSource({
@@ -285,11 +286,11 @@
                     if GetRandomReal(0., 1.) < per_roll then
                         local item
                         if runtime_pool then
-                            item = BossEquipment.create(
+                            item = LootService.from(BossEquipment.create,
                                 runtime_pool[GetRandomInt(1, #runtime_pool)],
                                 x, y, 600.)
                         else
-                            item = ItemRuntime.create(
+                            item = LootService.create(
                                 thistype:pickItem(boss.id), x, y, 600.)
                         end
                         if item then
@@ -339,7 +340,7 @@
                 local donor = PotionService.getChaosBossDropChances(
                                   boss.level, boss.difficulty)
                 if GetRandomReal(0., 1.) < donor * multiplier then
-                    PotionService.createChaosDonor(x, y, 600.)
+                    LootService.from(PotionService.createChaosDonor, x, y, 600.)
                 end
             end,
         })
@@ -364,7 +365,7 @@
                 local _, legendary = PotionService.getChaosBossDropChances(
                                           boss.level, boss.difficulty)
                 if GetRandomReal(0., 1.) < legendary * multiplier then
-                    PotionService.create(PotionService.LEGENDARY_CHAOS_KEY,
+                    LootService.from(PotionService.create, PotionService.LEGENDARY_CHAOS_KEY,
                                          x, y, 600.)
                 end
             end,
@@ -411,7 +412,7 @@
             local lvl = GetUnitLevel(killed)
             local drop_rate = killer_drop_rate(killer)
             if rand < Rates[uid] * drop_rate then
-                ItemRuntime.create(thistype:pickItem(uid), x, y, 600.)
+                LootService.create(thistype:pickItem(uid), x, y, 600.)
             end
 
             -- iron golem ore
@@ -419,10 +420,10 @@
 
             rand = math.random(0, 99)
             if lvl > 45 and lvl < 85 and rand < (0.05 * lvl) * drop_rate then
-                ItemRuntime.create(FourCC('I02Q'), x, y, 600.)
+                LootService.create(FourCC('I02Q'), x, y, 600.)
             elseif lvl > 265 and lvl < 305 and
                 rand < (0.02 * lvl) * drop_rate then
-                ItemRuntime.create(FourCC('I04Z'), x, y, 600.)
+                LootService.create(FourCC('I04Z'), x, y, 600.)
             end
 
             local ticket_chance = IsUnitType(killed, UNIT_TYPE_HERO) and

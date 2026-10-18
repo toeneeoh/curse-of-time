@@ -37,6 +37,8 @@ local cooldowns = {}
 cooldown_table = function() return cooldowns end
 TQ = {callDelayed = function() return {} end}
 clear_cooldown, NotifyItemChanged = function() end, function() end
+-- Visual feedback is covered separately by test_potion_use_effect.lua.
+play_use_effect = function() end
 extract('cotlua/src/gameplay/items/potions.lua', '    function PotionService.use', '    local function prepare_vampire_flask')
 assert(PotionService.use(1, 1).success and potion.charges == 4)
 assert(math.abs(context.heal - 327) < 1e-9 and math.abs(mana_received - 76.3) < 1e-9)

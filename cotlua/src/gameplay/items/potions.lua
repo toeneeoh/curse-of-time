@@ -3,6 +3,7 @@ OnInit.final("PotionService", function(Require)
     Require('BuffsItems')
     Require('CooldownAcceleration')
     Require('Events')
+    Require('Effects')
     Require('ItemEventRegistry')
     Require('Items')
     Require('Profile')
@@ -385,12 +386,6 @@ OnInit.final("PotionService", function(Require)
     ---@return RuntimeLogicalItemDefinition?
     function PotionService.define(key, spec, behavior)
         spec.item_type = TYPE_POTION_INDEX
-        if not spec.world_skin then
-            local carrier = type(spec.carrier) == "string" and
-                                FourCC(spec.carrier) or spec.carrier
-            spec.world_skin = carrier == MANA_FLASK_ID and FourCC('pman') or
-                                  FourCC('phea')
-        end
         spec.metadata = spec.metadata or {}
         spec.metadata.potion = behavior or {}
         spec.adjust_cached_stats = adjust_restoration_for_affixes
@@ -1530,6 +1525,8 @@ OnInit.final("PotionService", function(Require)
                          catalyst.icon or
                          (item.runtime_definition and
                              item.runtime_definition.data.path or item.data.path)
+        item.display_name, item.display_icon = name, icon
+        if not item.obj then return end
         BlzSetItemName(item.obj, name)
         BlzSetItemTooltip(item.obj, name)
         BlzSetItemIconPath(item.obj, icon)
@@ -2318,6 +2315,20 @@ OnInit.final("PotionService", function(Require)
         return changed
     end
 
+    local function play_use_effect(hero, heal, mana)
+        local model, lifetime
+        if heal > 0 and mana <= 0 then
+            model, lifetime = "Abilities\\Spells\\Items\\AIhe\\AIheTarget.mdl", 1.9
+        elseif mana > 0 and heal <= 0 then
+            model, lifetime = "Abilities\\Spells\\Items\\AIma\\AImaTarget.mdl", 1.9
+        else
+            -- Hybrid and buff-only potions share a default restoration flash.
+            model, lifetime = "Abilities\\Spells\\Items\\AIre\\AIreTarget.mdl", 2.2
+        end
+        local effect = AddSpecialEffectTarget(model, hero, "origin")
+        TQ:callDelayed(lifetime, HideEffect, effect)
+    end
+
     ---Consumes one potion charge and applies its restoration and infusion.
     ---@param pid integer
     ---@param index integer Potion button index, 1 or 2.
@@ -2403,6 +2414,7 @@ OnInit.final("PotionService", function(Require)
         local player_cooldowns = cooldown_table(pid)
         player_cooldowns[index] = TQ:callDelayed(use_cooldown, clear_cooldown,
                                                  pid, index)
+        play_use_effect(hero, heal, mana)
         NotifyItemChanged(pid)
 
         return {success = true, cooldown = use_cooldown}

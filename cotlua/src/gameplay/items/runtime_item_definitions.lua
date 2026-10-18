@@ -159,7 +159,7 @@ OnInit.final("RuntimeItemDefinitions", function(Require)
         if initialize then item.persistent_state = {} end
         item.runtime_definition = definition
         item.extra[2] = definition.id
-        if definition.world_skin_id then
+        if item.obj and definition.world_skin_id then
             BlzSetItemSkin(item.obj, definition.world_skin_id)
         end
         ItemRuntime.applyData(item, definition.data, initialize == true)
@@ -180,7 +180,7 @@ OnInit.final("RuntimeItemDefinitions", function(Require)
         item.runtime_definition = nil
         item.extra[2] = 0
         item.persistent_state = {}
-        BlzSetItemSkin(item.obj, item.id)
+        if item.obj then BlzSetItemSkin(item.obj, item.id) end
         ItemRuntime.applyData(item, ItemData[item.id], false)
         item:update(true)
     end
