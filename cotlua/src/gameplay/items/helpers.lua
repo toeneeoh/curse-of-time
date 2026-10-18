@@ -119,10 +119,16 @@ OnInit.global("ItemHelpers", function(Require)
         return (HasProficiency(pid, PROF[prof]) and 1) or 0.75
     end
 
+    ---@param itemid integer
+    ---@return boolean
+    function ItemIsSaveExcluded(itemid)
+        -- Colosseum admission belongs to the current run, not character saves.
+        return itemid == FourCC('I008')
+    end
+
     ---@type fun(itemid: integer): integer|nil
     function ItemToIndex(itemid)
-        -- Colosseum admission belongs to the current run, not character saves.
-        if itemid == FourCC('I008') then return nil end
+        if ItemIsSaveExcluded(itemid) then return nil end
         return SAVE_TABLE.KEY_ITEMS[itemid]
     end
 

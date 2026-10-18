@@ -62,7 +62,7 @@ print('PASS (real DTO/architecture callbacks): current saves, sparse inventory/s
 FourCC = function(id) return string.unpack('>I4', id) end
 SAVE_TABLE = {KEY_ITEMS = {[FourCC('I008')] = 8, [FourCC('I01V')] = 100}}
 local helpers = read('cotlua/src/gameplay/items/helpers.lua')
-first = assert(helpers:find('    function ItemToIndex', 1, true))
+first = assert(helpers:find('    function ItemIsSaveExcluded', 1, true))
 last = assert(helpers:find('    ---@type fun(u: unit', first, true))
 assert(load(helpers:sub(first, last - 1), 'real item save policy', 't', env))()
 local items = read('cotlua/src/gameplay/items/item.lua')
@@ -70,9 +70,10 @@ first = assert(items:find('        function thistype:encode_id()', 1, true))
 last = assert(items:find('        function thistype:drop(', first, true))
 thistype = {}
 assert(load(items:sub(first, last - 1), 'real item id encoder', 't', env))()
+local item_class = thistype
 local function saved_item(code)
     return setmetatable({id = FourCC(code), level = 0, quality = {0, 0},
-        encode_stats = function() return 0 end, encode_extra = function() return 0 end}, {__index = thistype})
+        encode_stats = function() return 0 end, encode_extra = function() return 0 end}, {__index = item_class})
 end
 local admission, equipment = saved_item('I008'), saved_item('I01V')
 assert(admission:encode_id() == 0 and equipment:encode_id() == 100)
@@ -87,3 +88,40 @@ assert(restored:propagate(character:values()))
 assert(not restored.saved_items[9] and not restored.saved_stash[1])
 assert(restored.saved_items[10].id == 100 and restored.saved_stash[2].id == 100)
 print('PASS: Colosseum tickets are omitted from inventory/stash saves and snapshots; adjacent equipment remains intact.')
+
+-- The normal save gate must also omit explicitly excluded items, while still
+-- rejecting unsupported inventory, stash, and socket encodings.
+local live_hero = {id = 123}
+Hero, Backpack, Unit = {[1] = live_hero}, {[1] = {}}, {[live_hero] = {str = 10, agi = 10, int = 15}}
+SAVE_TABLE.KEY_UNITS = {[123] = 1}
+GetUnitTypeId = function(unit) return unit.id end
+GetHeroLevel, GetCurrency, GetUnitAbilityLevel = function() return 1 end, function() return 0 end, function() return 1 end
+Progression = {getXPIntoLevel = function() return 0 end}
+TELEPORT_HOME = {id = 456}
+MAX_STATS, MAX_GOLD, MAX_PLAT_CRYS, MAX_HONOR, MAX_FACTION, MAX_TIME_PLAYED = 255000, 10000000, 100000, 10000, 10000, 100000
+Player, GetLocalPlayer = function(id) return id end, function() return -1 end
+DisplayTimedTextToPlayer = function() end
+GetObjectName = tostring
+GAME_STATE = 0
+local compiled
+Compile = function(_, values) compiled = values; return 'test-code' end
+thistype = {}
+first = assert(profile:find('        function thistype:save_character()', 1, true))
+last = assert(profile:find('        function thistype:skin(', first, true))
+assert(load(profile:sub(first, last - 1), 'real normal character save', 't', env))()
+character.time = 10
+local owner_profile = {pid = 1, hero = character, current_slot = 1, character_code = {},
+    save_profile = function(self) self.profile_saved = true end}
+assert(thistype.save_character(owner_profile), 'Explicit unsaveables blocked normal saving')
+assert(compiled and owner_profile.profile_saved and owner_profile.character_code[1] == 'test-code')
+restored = HeroData.create(); assert(restored:propagate(compiled))
+assert(not restored.saved_items[9] and not restored.saved_stash[1] and restored.saved_items[10].id == 100)
+local unsupported = saved_item('I999')
+character.items[11] = unsupported
+assert(not thistype.save_character(owner_profile), 'Unsupported inventory item was silently omitted')
+character.items[11] = nil; character.stash[3] = unsupported
+assert(not thistype.save_character(owner_profile), 'Unsupported stash item was silently omitted')
+character.stash[3] = nil; equipment.sockets = {unsupported}
+assert(not thistype.save_character(owner_profile), 'Unsupported socket was silently omitted')
+equipment.sockets = {}
+print('PASS: normal save accepts explicit exclusions in inventory/stash and rejects unsupported items/sockets.')

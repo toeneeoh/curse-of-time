@@ -758,7 +758,7 @@ OnInit.final("Profile", function(Require)
 
             for i = 1, MAX_INVENTORY_SLOTS do
                 local itm = hero.items[i]
-                if itm then
+                if itm and not ItemIsSaveExcluded(itm.id) then
                     itm.owner = p
                     if (itm:encode_id() or 0) == 0 then
                         DisplayTimedTextToPlayer(p, 0, 0, 30.,
@@ -781,7 +781,7 @@ OnInit.final("Profile", function(Require)
 
             for i = 1, MAX_STASH_SLOTS do
                 local itm = hero.stash[i]
-                if itm then
+                if itm and not ItemIsSaveExcluded(itm.id) then
                     itm.owner = p
                     if (itm:encode_id() or 0) == 0 then
                         DisplayTimedTextToPlayer(p, 0, 0, 30.,
