@@ -112,4 +112,49 @@ selected = unit; ui.Update()
 RuntimeSpells.unbind(unit); ui.Update()
 assert(not ui.Data[0].RuntimeKey and ui.Data[0].Name == 'Native Skill', 'Unbinding retained stale runtime UI')
 selected = nil; ui.Update(); assert(not ui.Parent.visible)
+
+-- Hero setup must move innate icons on observers too. Otherwise a viewer
+-- retains the inherited lower-row position and displaces Blade Spin.
+local profile_file = assert(io.open('cotlua/src/gameplay/persistence/profile.lua', 'rb'))
+local profile_source = profile_file:read('*a'):gsub('\r\n', '\n'); profile_file:close()
+local setup_first = assert(profile_source:find('        -- move passive ability icon position', 1, true))
+local setup_last = assert(profile_source:find('        local hero = Hero[pid]', setup_first, true))
+local place_innate = assert(load('return function(pid, hero_data)\n' ..
+    profile_source:sub(setup_first, setup_last - 1) .. '\nend', 'hero icon placement', 't', env))()
+local innate_id, spin_id = 456, 789
+local viewer, positions = 0, {}
+Player = function(id) return id end
+GetLocalPlayer = function() return viewer end
+HERO_STATS = {[200] = {passive = innate_id}}
+BlzSetAbilityPosY = function(id, y) positions[viewer][id] = y end
+BlzGetAbilityPosX = function() return 1 end
+BlzGetAbilityPosY = function(id) return positions[viewer][id] end
+local names = {[innate_id] = 'Innate Power & Resistances', [spin_id] = 'Blade Spin'}
+BlzGetUnitAbility = function(_, id) return id end
+GetUnitAbilityLevel = function() return 1 end
+BlzGetUnitAbilityManaCost, BlzGetUnitAbilityCooldown, BlzGetUnitAbilityCooldownRemaining =
+    function() return 0 end, function() return 0 end, function() return 0 end
+BlzGetAbilityStringLevelField = function(id, field)
+    if field == 'icon' then return 'icon-' .. id end
+    if field == 'name' then return names[id] end
+    return names[id] .. ' description'
+end
+ui.UnitSkills[200] = {innate_id, spin_id}
+for _, observer in ipairs({0, 1}) do
+    viewer = observer -- hero owner is player 0; player 1 inspects their ally
+    positions[viewer] = {[innate_id] = 1, [spin_id] = 1}
+    place_innate(1, {unit_id = 200})
+    assert(positions[viewer][innate_id] == 0, 'Innate position was only corrected for its owner')
+    selected = {id = 200, owner = 0}
+    for i = 0, 11 do ui.Frame[i].SimpleTooltip.visible = false end
+    ui.Update()
+    assert(ui.Data[1].FourCC == innate_id and ui.Data[5].FourCC == spin_id,
+        'Innate collided with the Blade Spin slot on an observer')
+    ui.Frame[5].SimpleTooltip.visible = true; ui.Update()
+    assert(ui.Frame.Tooltip.Name.text == 'Blade Spin' and
+        ui.Frame.Tooltip.Text.text == 'Blade Spin description', 'Blade Spin showed the innate tooltip')
+    ui.Frame[5].SimpleTooltip.visible = false
+    ui.Frame[1].SimpleTooltip.visible = true; ui.Update()
+    assert(ui.Frame.Tooltip.Name.text == names[innate_id], 'Innate tooltip lost its own slot')
+end
 print('PASS: per-handle runtime spells, no fake editor IDs/native ability calls, live cooldown/tooltip updates, slot conflicts, rebind/unbind, passive display, and existing native Spell View compatibility.')

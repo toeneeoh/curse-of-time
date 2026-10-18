@@ -1536,9 +1536,9 @@ OnInit.final("Profile", function(Require)
         end
 
         -- move passive ability icon position
-        if GetLocalPlayer() == Player(pid - 1) then
-            BlzSetAbilityPosY(HERO_STATS[hero_data.unit_id].passive, 0)
-        end
+        -- Spell View reads these positions on allies' clients as well. Keep
+        -- the innate on the same row there so it cannot displace a skill.
+        BlzSetAbilityPosY(HERO_STATS[hero_data.unit_id].passive, 0)
 
         local hero = Hero[pid]
 
