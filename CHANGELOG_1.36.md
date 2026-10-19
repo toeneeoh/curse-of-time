@@ -214,6 +214,7 @@ Verification notes and remaining editorial checks are kept in
 - Dark Savior Metamorphosis (R) - Renamed to Dark Ascension, no longer provides ranged attacks and has a new model
 - Dark Savior Freezing Blast (W) - Damage increased to 2/4/5/6 x int (from 1/2/3/4), freeze reduced to 1.5 seconds (from 5), and now slows for 30% for 3 seconds after freeze expires
 - Dark Summoner Destroyer (E) - Increased attack range to 700 (from 600)
+- Dark Summoner Destroyer - Reduced model size to approximately 45% of its previous size.
 - Elementalist - New skill: Flame Breath, Increased attack range to 600 (from 475)
 - Elementalist Master of Elements - Reduced cooldown to 3 seconds (from 10), Fire: No longer increases damage taken, Ice: Increased mana regeneration to 1.5% max mana per second (from 1) and move speed slow reduced to 35% (from 50), Lightning: Increased range to 900 and only shocks a single enemy for 0.5% current health pure damage every 5 seconds, Earth: Increased damage reduction to 25% (from 20), No longer reflects damage, now increases Gaia Armor shield amount by 250%
 - Elementalist Ball of Lightning (Q) - Only hits a single target now, scaling increased to 6/7/8/9 x Int (from 2/4/6/8), Now has a 5% max mana cost
