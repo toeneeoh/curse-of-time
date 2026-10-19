@@ -5,6 +5,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const {parse} = require('./update_npc_hover');
 const {build} = require('./build_hero_sprite');
+const {gameplayModel} = require('./high_priestess_model');
 const uint = n => {const b = Buffer.alloc(4); b.writeUInt32LE(n); return b;};
 const MODEL = 'war3mapImported\\HighPriestess.mdx';
 const ASSETS = new Map([
@@ -61,7 +62,7 @@ function prepare(directory) {
     for (const [name, asset] of ASSETS) {
         const file = path.join(directory, ...name.split('\\'));
         changes.push({file, input: fs.existsSync(file) ? fs.readFileSync(file) : null,
-            output: fs.readFileSync(path.join(assets, asset))});
+            output: name === MODEL ? gameplayModel(source) : fs.readFileSync(path.join(assets, asset))});
     }
     return changes;
 }

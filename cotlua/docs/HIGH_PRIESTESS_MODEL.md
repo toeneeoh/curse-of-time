@@ -1,10 +1,17 @@
 # High Priestess model
 
 Replaced E012's Sally Whitemane model with the owner's
-`B:/wc3assets/HighPriestess/priest1.mdx` (Calia Menethil). The gameplay model is
+`B:/wc3assets/HighPriestess/priest1.mdx` (Calia Menethil). The supplied source is
 stored byte-for-byte as `assets/high_priestess/HighPriestess.mdx`. Its original
 eight animations, emitters, attachments and portrait camera are retained.
 The unit keeps its existing 1.1 model scale and other object fields.
+
+The installer repairs the gameplay model's existing team-color hero glow. Its
+three additive, unshaded glow quads were accidentally divided by 100 while
+their bounds remained full-sized. Only those 12 vertices are restored to match
+the authored bounds; the stock replaceable Team Glow texture and pulsing bones
+are retained. The repair is idempotent. The selection sprite continues to be
+built from the supplied source and retains its existing appearance.
 
 The accompanying `HighPriestessSprite.mdx` follows the manually made selection
 sprites:

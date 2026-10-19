@@ -6,11 +6,36 @@ const {chunks} = require('./build_loot_model');
 const {build, ROTATION} = require('./build_hero_sprite');
 const {modelField, imports, MODEL, ASSETS} = require('./update_high_priestess');
 const {parse} = require('./update_npc_hover');
+const {gameplayModel} = require('./high_priestess_model');
 const directory = path.resolve(__dirname, '../assets/high_priestess');
 const source = fs.readFileSync(path.join(directory, 'HighPriestess.mdx'));
 const sprite = fs.readFileSync(path.join(directory, 'HighPriestessSprite.mdx'));
 const src = new Map(chunks(source).map(c => [c.tag, c.body]));
 const out = new Map(chunks(sprite).map(c => [c.tag, c.body]));
+// Repair only the original glow vertices. Materials (team color/additive),
+// skeleton, animations, emitters, UVs and every other byte remain untouched.
+const gameplay = gameplayModel(source);
+assert.deepEqual(gameplayModel(gameplay), gameplay, 'Glow repair scales twice');
+assert.equal(gameplay.length, source.length);
+const gameParts = new Map(chunks(gameplay).map(c => [c.tag, c.body]));
+for (const [tag, body] of src) if (tag !== 'GEOS') assert.deepEqual(gameParts.get(tag), body);
+const oldMeshes = src.get('GEOS'), newMeshes = gameParts.get('GEOS');
+let changedMeshes = 0;
+for (let p = 0; p < oldMeshes.length;) {
+    const end = p + oldMeshes.readUInt32LE(p);
+    if (!oldMeshes.subarray(p, end).equals(newMeshes.subarray(p, end))) {
+        changedMeshes++;
+        assert.equal(oldMeshes.readUInt32LE(p + 8), 12);
+        for (let i = 0; i < 36; i++) {
+            const offset = p + 12 + i * 4;
+            assert(Math.abs(newMeshes.readFloatLE(offset) - oldMeshes.readFloatLE(offset) * 100) < .00001);
+        }
+        assert.deepEqual(newMeshes.subarray(p + 12 + 36 * 4, end), oldMeshes.subarray(p + 12 + 36 * 4, end));
+        assert(newMeshes.readFloatLE(p + 12) < -100, 'Hero glow is still microscopic');
+    }
+    p = end;
+}
+assert.equal(changedMeshes, 1, 'Glow repair changed character geometry');
 assert.deepEqual(build(source), sprite, 'Committed sprite is not reproducible');
 assert(sprite.length < source.length * .65, 'Unused animation data was retained');
 for (const tag of ['PREM', 'PRE2', 'RIBB', 'LITE', 'CAMS', 'EVTS', 'CLID', 'ATCH']) {
@@ -94,4 +119,4 @@ assert.equal(imported.readUInt32LE(4), ASSETS.size);
 assert.deepEqual(imported.subarray(8, 8 + oldImport.length), oldImport);
 assert.deepEqual(imports(imported), imported);
 assert.throws(() => build(source.subarray(0, source.length - 1)));
-console.log('PASS: reproducible trimmed sprite, Stand-only tracks, unshaded layers, compact bone/pivot IDs, shared rotation root, BLP textures, and isolated/idempotent unit/import updates.');
+console.log('PASS: correctly sized team-color hero glow with no other gameplay-model changes; reproducible trimmed sprite, Stand-only tracks, unshaded layers, compact bone/pivot IDs, shared rotation root, BLP textures, and isolated/idempotent unit/import updates.');

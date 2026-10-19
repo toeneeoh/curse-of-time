@@ -223,7 +223,7 @@ Verification notes and remaining editorial checks are kept in
 - Elite Marksman Sniper Stance (E) - Moved to D hotkey and is now pre-skilled, Now halves base attack speed while active, but grants a 2x critical chance and damage multiplier
 - Elite Marksman Hand Grenade (R) - Reduced damage to 50/60/70/80/90/100% attack damage (from 75/100/125/150/175%) and helicopter damage to 100/110/120/130/140/150%
 - Elite Marksman U-235 Shell (T) - Reworked to Flaming Betty
-- High Priestess - Updated her character model and matching hero-selection sprite.
+- High Priestess - Updated her character model and matching hero-selection sprite, with a restored team-colored hero glow.
 - High Priestess Invigoration (F) - Now can be channeled forever with no cooldown, restores max mana per second to the priestess while channeled and heal changed to 0.15x int + 1% max hp of target, changed hotkey to (D)
 - High Priestess Divine Light (Q) - Reduced cooldown to 5 seconds (from 7), heal changed to 1x int + 5% max hp of target and now grants a move speed buff, mana cost is now 5% max mana
 - High Priestess Holy Shock (W) - Reworked to Sanctified Ground
