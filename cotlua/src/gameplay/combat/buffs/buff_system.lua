@@ -64,6 +64,7 @@ OnInit.final("BuffSystem", function(Require)
     ---@field applied_duration number? Duration after status resistance.
     ---@field refresh function
     ---@field remaining function
+    ---@field removed boolean? Terminal state; prevents repeated cleanup or rearming.
     Buff = {} ---@type Buff
     do
         local thistype = Buff
@@ -133,6 +134,7 @@ OnInit.final("BuffSystem", function(Require)
             if unit_data then
                 if buff.index then
                     shift_unit_buffs(unit_data, buff.index)
+                    buff.index = nil
                 end
                 notify_change(u, buff, "remove")
             end
@@ -140,7 +142,9 @@ OnInit.final("BuffSystem", function(Require)
 
         ---@type fun(self: Buff)
         function Buff:refresh()
+            if self.removed then return end
             if self.onRemove then self:onRemove() end
+            if self.removed then return end
             if self.onApply then self:onApply() end
         end
 
@@ -169,6 +173,11 @@ OnInit.final("BuffSystem", function(Require)
         end
 
         function thistype:remove()
+            -- Cleanup may cause damage/death and re-enter buff removal.
+            -- Expiration callbacks and callers can also retain this instance.
+            if self.removed then return end
+            self.removed = true
+
             if self.internal_callback then
                 TQ:disableCallback(self.internal_callback)
             end
@@ -193,6 +202,9 @@ OnInit.final("BuffSystem", function(Require)
         ---@param dur number?
         ---@param ignore_status_resistance boolean? Treat dur as already final.
         function Buff:duration(dur, ignore_status_resistance)
+            -- onApply can synchronously kill the target and remove this buff
+            -- before the caller reaches add(...):duration(...).
+            if self.removed then return end
             if self.internal_callback then
                 TQ:disableCallback(self.internal_callback)
             end
@@ -275,7 +287,7 @@ OnInit.final("BuffSystem", function(Require)
 
                 if self.onApply then self:onApply() end
 
-                UnitAddBuff(target, self)
+                if not self.removed then UnitAddBuff(target, self) end
             end
 
             return self

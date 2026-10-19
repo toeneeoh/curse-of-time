@@ -277,4 +277,5 @@ Verification notes and remaining editorial checks are kept in
 - The Evil Shopkeeper's Brother gives hints about the Evil Shopkeeper's location.
 - Improved town protection against roaming overworld/event enemies.
 - Fixed repeated boss-party scaling accumulating across encounters.
+- Fixed Blood Frenzy permanently reducing attack speed when its health cost kills the caster, and prevented repeated buff cleanup after removal.
 - Fixed several item equip, socket, charge, and tooltip inconsistencies.
